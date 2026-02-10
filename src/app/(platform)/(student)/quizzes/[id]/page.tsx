@@ -1,12 +1,12 @@
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { createClient } from "@/lib/supabase/server";
+import { redirect, notFound } from "next/navigation";
+import { QuizPlayer } from "@/components/quiz/quiz-player";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import type { Quiz } from "@/types/database";
+
+export const dynamic = "force-dynamic";
 
 export default async function QuizDetailPage({
   params,
@@ -15,26 +15,53 @@ export default async function QuizDetailPage({
 }) {
   const { id } = await params;
 
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const { data: quiz, error } = await supabase
+    .from("quizzes")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !quiz) {
+    notFound();
+  }
+
+  const ACTIVITY_LABELS: Record<string, string> = {
+    flashcards: "Flashcards",
+    gap_fill: "Fill in the Gap",
+    translation: "Sentence Translation",
+    mcq: "Multiple Choice",
+    matching: "Matching",
+    discussion: "Discussion",
+    text_translation: "Text Translation",
+    translation_list: "Translation List",
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Quiz</h1>
-        <p className="text-muted-foreground">Quiz ID: {id}</p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/quizzes">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{quiz.title}</h1>
+          <p className="text-sm text-muted-foreground">
+            {ACTIVITY_LABELS[quiz.type] || quiz.type}
+          </p>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="items-center text-center py-12">
-          <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-2" />
-          <CardTitle className="text-lg">Coming Soon</CardTitle>
-          <CardDescription>
-            The quiz player is being built. You will be able to practice
-            flashcards, fill-in-the-gap, and translation activities here.
-          </CardDescription>
-          <Button asChild variant="outline" className="mt-4">
-            <Link href="/quizzes">Back to Quizzes</Link>
-          </Button>
-        </CardHeader>
-      </Card>
+      <QuizPlayer quiz={quiz as Quiz} />
     </div>
   );
 }
