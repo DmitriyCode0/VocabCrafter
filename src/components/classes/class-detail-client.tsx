@@ -12,15 +12,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +35,6 @@ import {
   Check,
   Users,
   ClipboardList,
-  PlusCircle,
   Loader2,
   Trash2,
   Calendar,
@@ -52,6 +42,7 @@ import {
   X,
 } from "lucide-react";
 import type { Role } from "@/types/roles";
+import { CreateAssignmentDialog } from "@/components/assignments/create-assignment-dialog";
 
 interface ClassDetailClientProps {
   classData: Record<string, unknown>;
@@ -403,7 +394,12 @@ export function ClassDetailClient({
           {isTutor && (
             <CreateAssignmentDialog
               classId={classData.id as string}
-              quizzes={quizzes}
+              quizzes={quizzes.map((q) => ({
+                id: q.id as string,
+                title: q.title as string,
+                type: q.type as string,
+                cefr_level: q.cefr_level as string,
+              }))}
             />
           )}
         </CardHeader>
@@ -481,134 +477,4 @@ export function ClassDetailClient({
   );
 }
 
-function CreateAssignmentDialog({
-  classId,
-  quizzes,
-}: {
-  classId: string;
-  quizzes: Record<string, unknown>[];
-}) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [quizId, setQuizId] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleCreate() {
-    if (!title.trim() || !quizId) return;
-    setIsCreating(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/assignments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          classId,
-          quizId,
-          title: title.trim(),
-          instructions: instructions.trim() || undefined,
-          dueDate: dueDate || undefined,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to create assignment");
-      }
-
-      setOpen(false);
-      setTitle("");
-      setQuizId("");
-      setInstructions("");
-      setDueDate("");
-      router.refresh();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to create assignment",
-      );
-    } finally {
-      setIsCreating(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" disabled={quizzes.length === 0}>
-          <PlusCircle className="mr-2 h-3 w-3" />
-          Assign Quiz
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Create Assignment</DialogTitle>
-          <DialogDescription>
-            Assign a quiz to this class. Students will see it on their
-            dashboard.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Assignment Title</Label>
-            <Input
-              placeholder="e.g., Week 5 Vocabulary Practice"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Quiz</Label>
-            <Select value={quizId} onValueChange={setQuizId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a quiz..." />
-              </SelectTrigger>
-              <SelectContent>
-                {quizzes.map((q) => (
-                  <SelectItem key={q.id as string} value={q.id as string}>
-                    {q.title as string} ({q.type as string})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Instructions (optional)</Label>
-            <Input
-              placeholder="Any special instructions..."
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Due Date (optional)</Label>
-            <Input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </div>
-        <DialogFooter>
-          <Button
-            onClick={handleCreate}
-            disabled={!title.trim() || !quizId || isCreating}
-          >
-            {isCreating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              "Create Assignment"
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}

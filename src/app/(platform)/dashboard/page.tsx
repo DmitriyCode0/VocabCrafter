@@ -77,6 +77,7 @@ async function StudentDashboard({ userId }: { userId: string }) {
     { count: quizCount },
     { count: attemptCount },
     { data: recentAttempts },
+    { data: memberships },
   ] = await Promise.all([
     supabase
       .from("quizzes")
@@ -92,7 +93,46 @@ async function StudentDashboard({ userId }: { userId: string }) {
       .eq("student_id", userId)
       .order("completed_at", { ascending: false })
       .limit(5),
+    supabase
+      .from("class_members")
+      .select("class_id")
+      .eq("student_id", userId),
   ]);
+
+  // Fetch pending assignments for student
+  const classIds = memberships?.map((m) => m.class_id) ?? [];
+  let pendingAssignments: {
+    id: string;
+    title: string;
+    due_date: string | null;
+    instructions: string | null;
+    quiz_id: string;
+    classes: { name: string } | null;
+    quizzes: { id: string; title: string; type: string } | null;
+  }[] = [];
+
+  if (classIds.length > 0) {
+    const { data: allAssignments } = await supabase
+      .from("assignments")
+      .select("id, title, due_date, instructions, quiz_id, classes(name), quizzes(id, title, type)")
+      .in("class_id", classIds)
+      .order("created_at", { ascending: false });
+
+    // Filter out completed ones
+    const quizIds = allAssignments?.map((a) => a.quiz_id).filter(Boolean) ?? [];
+    const { data: attempts } = quizIds.length
+      ? await supabase
+          .from("quiz_attempts")
+          .select("quiz_id")
+          .eq("student_id", userId)
+          .in("quiz_id", quizIds)
+      : { data: [] };
+
+    const completedQuizIds = new Set(attempts?.map((a) => a.quiz_id) ?? []);
+    pendingAssignments = ((allAssignments ?? []) as typeof pendingAssignments).filter(
+      (a) => !completedQuizIds.has(a.quiz_id),
+    );
+  }
 
   const avgScore =
     recentAttempts && recentAttempts.length > 0
@@ -163,6 +203,70 @@ async function StudentDashboard({ userId }: { userId: string }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Pending assignments */}
+      {pendingAssignments.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">
+                Pending Assignments ({pendingAssignments.length})
+              </CardTitle>
+              <CardDescription>
+                Quizzes assigned by your tutors
+              </CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/assignments">View All</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pendingAssignments.slice(0, 5).map((assignment) => {
+              const quiz = assignment.quizzes as {
+                id: string;
+                title: string;
+                type: string;
+              } | null;
+              const cls = assignment.classes as { name: string } | null;
+              const isPastDue =
+                assignment.due_date &&
+                new Date(assignment.due_date) < new Date();
+
+              return (
+                <div
+                  key={assignment.id}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {assignment.title}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {cls && <span>{cls.name}</span>}
+                      {assignment.due_date && (
+                        <Badge
+                          variant={isPastDue ? "destructive" : "outline"}
+                          className="text-xs"
+                        >
+                          {isPastDue ? "Past due" : "Due"}{" "}
+                          {new Date(
+                            assignment.due_date,
+                          ).toLocaleDateString("en-US")}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  {quiz && (
+                    <Button asChild size="sm">
+                      <Link href={`/quizzes/${quiz.id}`}>Start</Link>
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent activity */}
       {recentAttempts && recentAttempts.length > 0 && (

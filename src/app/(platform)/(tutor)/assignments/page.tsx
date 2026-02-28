@@ -10,8 +10,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ClipboardList, PlusCircle } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { DeleteAssignmentButton } from "@/components/assignments/delete-assignment-button";
+import { CreateAssignmentDialog } from "@/components/assignments/create-assignment-dialog";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -53,12 +54,7 @@ export default async function AssignmentsPage() {
             Manage quiz assignments for your classes.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/classes">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Assign from Class
-          </Link>
-        </Button>
+        <CreateAssignmentDialog />
       </div>
 
       {!assignments || assignments.length === 0 ? (
@@ -67,12 +63,11 @@ export default async function AssignmentsPage() {
             <ClipboardList className="h-12 w-12 text-muted-foreground/50 mb-2" />
             <CardTitle className="text-lg">No assignments yet</CardTitle>
             <CardDescription>
-              Go to a class page and assign quizzes to your students with
-              deadlines and instructions.
+              Create your first assignment by selecting a class and quiz.
             </CardDescription>
-            <Button asChild className="mt-4" variant="outline">
-              <Link href="/classes">Go to Classes</Link>
-            </Button>
+            <div className="mt-4">
+              <CreateAssignmentDialog />
+            </div>
           </CardHeader>
         </Card>
       ) : (
