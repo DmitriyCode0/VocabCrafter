@@ -63,9 +63,3 @@ export const ROLE_LABELS: Record<Role, string> = {
   tutor: "Tutor",
   superadmin: "Super Admin",
 };
-
-export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  student: "Create and take quizzes, join classes, track your progress",
-  tutor: "Manage classes, assign quizzes, review student work",
-  superadmin: "Platform analytics, user management, billing",
-};

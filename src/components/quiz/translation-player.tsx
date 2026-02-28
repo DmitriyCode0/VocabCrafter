@@ -17,6 +17,7 @@ import type { TranslationQuestion } from "@/types/quiz";
 
 interface TranslationPlayerProps {
   questions: TranslationQuestion[];
+  cefrLevel?: string;
   onComplete: (results: TranslationResult[]) => void;
 }
 
@@ -31,6 +32,7 @@ export interface TranslationResult {
 
 export function TranslationPlayer({
   questions,
+  cefrLevel,
   onComplete,
 }: TranslationPlayerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -58,7 +60,7 @@ export function TranslationPlayer({
         body: JSON.stringify({
           userTranslation: userTranslation.trim(),
           referenceTranslation: question.englishReference,
-          cefrLevel: "B1",
+          cefrLevel: cefrLevel ?? "B1",
         }),
       });
 
@@ -81,7 +83,7 @@ export function TranslationPlayer({
       setResults([...results, result]);
     } catch {
       setEvaluation({
-        score: 0,
+        score: -1,
         feedback: "Could not evaluate your translation. Please try again.",
       });
     } finally {
@@ -99,6 +101,10 @@ export function TranslationPlayer({
     }
   }
 
+  function handleRetry() {
+    setEvaluation(null);
+  }
+
   function getScoreColor(score: number) {
     if (score >= 80) return "text-green-600";
     if (score >= 50) return "text-orange-600";
@@ -107,7 +113,9 @@ export function TranslationPlayer({
 
   const avgScore =
     results.length > 0
-      ? Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length)
+      ? Math.round(
+          results.reduce((sum, r) => sum + r.score, 0) / results.length,
+        )
       : 0;
 
   return (
@@ -164,11 +172,24 @@ export function TranslationPlayer({
             </Button>
           )}
 
-          {evaluation && (
+          {evaluation && evaluation.score === -1 && (
+            <div className="space-y-3">
+              <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                {evaluation.feedback}
+              </div>
+              <Button onClick={handleRetry} className="w-full" variant="outline">
+                Retry Evaluation
+              </Button>
+            </div>
+          )}
+
+          {evaluation && evaluation.score >= 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 rounded-md bg-muted">
                 <span className="font-medium">Score</span>
-                <span className={`text-2xl font-bold ${getScoreColor(evaluation.score)}`}>
+                <span
+                  className={`text-2xl font-bold ${getScoreColor(evaluation.score)}`}
+                >
                   {evaluation.score}/100
                 </span>
               </div>

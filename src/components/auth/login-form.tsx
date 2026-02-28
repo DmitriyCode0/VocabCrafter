@@ -75,6 +75,14 @@ export function LoginForm() {
               required
             />
           </div>
+          <div className="flex justify-end">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}

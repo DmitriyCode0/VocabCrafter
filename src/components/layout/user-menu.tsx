@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, User } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { Profile } from "@/types/database";
 import { ROLE_LABELS } from "@/types/roles";
 import type { Role } from "@/types/roles";
@@ -72,6 +73,11 @@ export function UserMenu({ profile }: UserMenuProps) {
           <User className="mr-2 h-4 w-4" />
           Profile
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <div className="flex items-center justify-between px-2 py-1.5">
+          <span className="text-sm">Theme</span>
+          <ThemeToggle />
+        </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />

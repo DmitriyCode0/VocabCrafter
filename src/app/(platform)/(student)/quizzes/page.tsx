@@ -7,22 +7,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { BookOpen, PlusCircle } from "lucide-react";
+import { QuizCard } from "@/components/quiz/quiz-card";
 
 export const dynamic = "force-dynamic";
-
-const ACTIVITY_LABELS: Record<string, string> = {
-  flashcards: "Flashcards",
-  gap_fill: "Fill in the Gap",
-  translation: "Translation",
-  mcq: "Multiple Choice",
-  matching: "Matching",
-  discussion: "Discussion",
-  text_translation: "Text Translation",
-  translation_list: "Translation List",
-};
 
 export default async function QuizzesPage() {
   const supabase = await createClient();
@@ -33,11 +22,15 @@ export default async function QuizzesPage() {
 
   if (!user) redirect("/login");
 
-  const { data: quizzes } = await supabase
+  const { data: quizzes, error: quizzesError } = await supabase
     .from("quizzes")
     .select("*")
     .eq("creator_id", user.id)
     .order("created_at", { ascending: false });
+
+  if (quizzesError) {
+    console.error("Failed to load quizzes:", quizzesError);
+  }
 
   return (
     <div className="space-y-6">
@@ -72,30 +65,9 @@ export default async function QuizzesPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {quizzes.map((quiz) => {
-            const terms = quiz.vocabulary_terms as { term: string; definition: string }[];
-            return (
-              <Link key={quiz.id} href={`/quizzes/${quiz.id}`}>
-                <Card className="h-full transition-colors hover:border-primary cursor-pointer">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">{quiz.title}</CardTitle>
-                      <Badge variant="secondary" className="text-xs">
-                        {ACTIVITY_LABELS[quiz.type] || quiz.type}
-                      </Badge>
-                    </div>
-                    <CardDescription>
-                      {Array.isArray(terms) ? terms.length : 0} terms &middot; CEFR{" "}
-                      {quiz.cefr_level}
-                    </CardDescription>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(quiz.created_at).toLocaleDateString()}
-                    </p>
-                  </CardHeader>
-                </Card>
-              </Link>
-            );
-          })}
+          {quizzes.map((quiz) => (
+            <QuizCard key={quiz.id} quiz={quiz} />
+          ))}
         </div>
       )}
     </div>

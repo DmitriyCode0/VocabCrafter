@@ -14,6 +14,7 @@ const createQuizSchema = z.object({
   ),
   generatedContent: z.record(z.string(), z.unknown()),
   config: z.record(z.string(), z.unknown()).optional(),
+  isPublic: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { title, type, cefrLevel, vocabularyTerms, generatedContent, config } =
+    const { title, type, cefrLevel, vocabularyTerms, generatedContent, config, isPublic } =
       parsed.data;
 
     const { data: quiz, error: insertError } = await supabase
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
         vocabulary_terms: vocabularyTerms as unknown as Record<string, unknown>[],
         generated_content: generatedContent,
         config: config ?? null,
+        is_public: isPublic ?? false,
       })
       .select()
       .single();

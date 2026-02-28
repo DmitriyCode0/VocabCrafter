@@ -12,8 +12,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { WordInput } from "@/components/quiz/word-input";
 import { ParsedWordList } from "@/components/quiz/parsed-word-list";
+import { WordBankPicker } from "@/components/quiz/word-bank-picker";
+import { QuizWordPicker } from "@/components/quiz/quiz-word-picker";
+import { GrammarTopicSelector } from "@/components/quiz/grammar-topic-selector";
+import { useUser } from "@/hooks/use-user";
+import { Switch } from "@/components/ui/switch";
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,6 +36,8 @@ import {
   Loader2,
   PenLine,
   Languages,
+  Save,
+  Globe,
 } from "lucide-react";
 import type { QuizTerm } from "@/types/quiz";
 
@@ -55,18 +72,61 @@ const ACTIVITIES: {
 
 export function CreateQuizFlow() {
   const router = useRouter();
+  const { profile } = useUser();
+  const cefrLevel = profile?.cefr_level || "B1";
+
   const [step, setStep] = useState<Step>("input");
   const [terms, setTerms] = useState<QuizTerm[]>([]);
   const [title, setTitle] = useState("");
-  const [selectedActivity, setSelectedActivity] =
-    useState<ActivityType | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<ActivityType | null>(
+    null,
+  );
   const [isParseLoading, setIsParseLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Grammar topics state
+  const [grammarTopics, setGrammarTopics] = useState<string[]>([]);
+
+  // Public toggle
+  const [isPublic, setIsPublic] = useState(false);
+
+  // Save to word bank state
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [bankName, setBankName] = useState("");
+  const [isSavingBank, setIsSavingBank] = useState(false);
+  const [bankSaved, setBankSaved] = useState(false);
+
   function handleTermsParsed(parsed: QuizTerm[]) {
     setTerms(parsed);
     setStep("edit");
+  }
+
+  async function handleSaveToBank() {
+    if (!bankName.trim() || terms.length === 0) return;
+
+    setIsSavingBank(true);
+
+    try {
+      const res = await fetch("/api/word-banks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: bankName.trim(), terms }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save word bank");
+
+      setBankSaved(true);
+      setTimeout(() => {
+        setSaveDialogOpen(false);
+        setBankSaved(false);
+        setBankName("");
+      }, 1500);
+    } catch {
+      setError("Failed to save word bank.");
+    } finally {
+      setIsSavingBank(false);
+    }
   }
 
   async function handleGenerate() {
@@ -77,11 +137,12 @@ export function CreateQuizFlow() {
 
     try {
       const config = {
-        cefrLevel: "B1" as const,
+        cefrLevel: cefrLevel as "A1" | "A2" | "B1" | "B2" | "C1" | "C2",
         vocabularyChallenge: "Standard" as const,
         grammarChallenge: "Standard" as const,
         teacherPersona: "standard" as const,
         timedMode: false,
+        grammarTopics: grammarTopics.length > 0 ? grammarTopics : undefined,
       };
 
       const res = await fetch("/api/ai/generate-quiz", {
@@ -106,12 +167,13 @@ export function CreateQuizFlow() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title || `Quiz - ${new Date().toLocaleDateString()}`,
+          title: title || `Quiz - ${new Date().toLocaleDateString("en-US")}`,
           type: selectedActivity,
-          cefrLevel: "B1",
+          cefrLevel,
           vocabularyTerms: terms,
           generatedContent: content,
           config,
+          isPublic,
         }),
       });
 
@@ -123,9 +185,7 @@ export function CreateQuizFlow() {
       const { quiz } = await saveRes.json();
       router.push(`/quizzes/${quiz.id}`);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to generate quiz",
-      );
+      setError(err instanceof Error ? err.message : "Failed to generate quiz");
     } finally {
       setIsGenerating(false);
     }
@@ -136,7 +196,7 @@ export function CreateQuizFlow() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Create New Quiz</h1>
         <p className="text-muted-foreground">
-          {step === "input" && "Paste your vocabulary words to get started."}
+          {step === "input" && "Add vocabulary words to get started."}
           {step === "edit" && "Review and edit your parsed vocabulary list."}
           {step === "activity" && "Choose an activity type for your quiz."}
         </p>
@@ -179,18 +239,33 @@ export function CreateQuizFlow() {
       {step === "input" && (
         <Card>
           <CardHeader>
-            <CardTitle>Paste Vocabulary</CardTitle>
+            <CardTitle>Add Vocabulary</CardTitle>
             <CardDescription>
-              Paste text, word lists, or tab-separated vocabulary. AI will
-              extract words and generate English-Ukrainian translations.
+              Parse new words with AI, load from a saved word bank, or reuse
+              vocabulary from a previous quiz.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <WordInput
-              onParsed={handleTermsParsed}
-              isLoading={isParseLoading}
-              setIsLoading={setIsParseLoading}
-            />
+            <Tabs defaultValue="parse">
+              <TabsList className="mb-4">
+                <TabsTrigger value="parse">Parse New</TabsTrigger>
+                <TabsTrigger value="saved">Saved Words</TabsTrigger>
+                <TabsTrigger value="quiz">From Quiz</TabsTrigger>
+              </TabsList>
+              <TabsContent value="parse">
+                <WordInput
+                  onParsed={handleTermsParsed}
+                  isLoading={isParseLoading}
+                  setIsLoading={setIsParseLoading}
+                />
+              </TabsContent>
+              <TabsContent value="saved">
+                <WordBankPicker onSelect={handleTermsParsed} />
+              </TabsContent>
+              <TabsContent value="quiz">
+                <QuizWordPicker onSelect={handleTermsParsed} />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       )}
@@ -201,7 +276,8 @@ export function CreateQuizFlow() {
           <CardHeader>
             <CardTitle>Review Vocabulary</CardTitle>
             <CardDescription>
-              Edit terms, fix translations, remove unwanted words, or add new ones.
+              Edit terms, fix translations, remove unwanted words, or add new
+              ones.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -211,6 +287,51 @@ export function CreateQuizFlow() {
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
+
+              <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Save className="mr-2 h-4 w-4" />
+                    Save to Word Bank
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Save to Word Bank</DialogTitle>
+                    <DialogDescription>
+                      Save these {terms.length} terms for reuse in future
+                      quizzes.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-name">Bank Name</Label>
+                    <Input
+                      id="bank-name"
+                      placeholder="e.g., Unit 5 Vocabulary"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      onClick={handleSaveToBank}
+                      disabled={!bankName.trim() || isSavingBank}
+                    >
+                      {isSavingBank ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : bankSaved ? (
+                        "Saved!"
+                      ) : (
+                        "Save"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
               <Button
                 onClick={() => setStep("activity")}
                 disabled={terms.length === 0}
@@ -265,6 +386,39 @@ export function CreateQuizFlow() {
             ))}
           </div>
 
+          {/* Public toggle */}
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div className="flex items-center gap-3">
+              <Globe className="h-5 w-5 text-muted-foreground" />
+              <div className="space-y-0.5">
+                <Label htmlFor="is-public" className="font-medium">
+                  Make quiz public
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Allow other users to discover and take this quiz.
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="is-public"
+              checked={isPublic}
+              onCheckedChange={setIsPublic}
+            />
+          </div>
+
+          {/* Grammar topic selector - only for translation activity */}
+          {selectedActivity === "translation" && (
+            <Card>
+              <CardContent className="pt-6">
+                <GrammarTopicSelector
+                  cefrLevel={cefrLevel}
+                  selectedTopics={grammarTopics}
+                  onTopicsChange={setGrammarTopics}
+                />
+              </CardContent>
+            </Card>
+          )}
+
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="flex gap-2">
@@ -280,7 +434,8 @@ export function CreateQuizFlow() {
               {isGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating {selectedActivity === "flashcards" ? "flashcards" : "quiz"}...
+                  Generating{" "}
+                  {selectedActivity === "flashcards" ? "flashcards" : "quiz"}...
                 </>
               ) : (
                 <>

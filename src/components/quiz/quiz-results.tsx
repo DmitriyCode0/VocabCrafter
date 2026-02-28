@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -11,11 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { CheckCircle2, XCircle, RotateCcw, Home } from "lucide-react";
+import { saveAttempt } from "@/lib/save-attempt";
 import type { GapFillResult } from "./gap-fill-player";
 import type { TranslationResult } from "./translation-player";
 
 interface QuizResultsProps {
   type: "gap_fill" | "translation";
+  quizId: string;
   gapFillResults?: GapFillResult[];
   translationResults?: TranslationResult[];
   onRestart: () => void;
@@ -23,10 +26,38 @@ interface QuizResultsProps {
 
 export function QuizResults({
   type,
+  quizId,
   gapFillResults,
   translationResults,
   onRestart,
 }: QuizResultsProps) {
+  const savedRef = useRef(false);
+
+  useEffect(() => {
+    if (savedRef.current) return;
+    savedRef.current = true;
+
+    if (type === "gap_fill" && gapFillResults) {
+      const correct = gapFillResults.filter((r) => r.isCorrect).length;
+      saveAttempt(
+        quizId,
+        { type: "gap_fill", results: gapFillResults },
+        correct,
+        gapFillResults.length,
+      );
+    } else if (type === "translation" && translationResults) {
+      const avgScore = Math.round(
+        translationResults.reduce((sum, r) => sum + r.score, 0) /
+          translationResults.length,
+      );
+      saveAttempt(
+        quizId,
+        { type: "translation", results: translationResults },
+        avgScore,
+        100,
+      );
+    }
+  }, [type, quizId, gapFillResults, translationResults]);
   if (type === "gap_fill" && gapFillResults) {
     const correct = gapFillResults.filter((r) => r.isCorrect).length;
     const total = gapFillResults.length;
@@ -46,7 +77,7 @@ export function QuizResults({
               <div
                 key={index}
                 className={`flex items-start gap-3 p-3 rounded-md ${
-                  result.isCorrect ? "bg-green-50" : "bg-red-50"
+                  result.isCorrect ? "bg-green-50 dark:bg-green-950/30" : "bg-red-50 dark:bg-red-950/30"
                 }`}
               >
                 {result.isCorrect ? (
@@ -96,17 +127,13 @@ export function QuizResults({
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Translation Complete!</CardTitle>
-            <CardDescription>
-              Average score: {avgScore}/100
-            </CardDescription>
+            <CardDescription>Average score: {avgScore}/100</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {translationResults.map((result, index) => (
               <div key={index} className="p-3 rounded-md bg-muted space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">
-                    Sentence {index + 1}
-                  </p>
+                  <p className="text-sm font-medium">Sentence {index + 1}</p>
                   <Badge
                     variant="outline"
                     className={

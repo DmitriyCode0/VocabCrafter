@@ -289,6 +289,38 @@ export interface Database {
           },
         ];
       };
+      word_banks: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          terms: Record<string, unknown>[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          terms: Record<string, unknown>[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          terms?: Record<string, unknown>[];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "word_banks_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -312,3 +344,4 @@ export type Quiz = Database["public"]["Tables"]["quizzes"]["Row"];
 export type QuizAttempt = Database["public"]["Tables"]["quiz_attempts"]["Row"];
 export type Assignment = Database["public"]["Tables"]["assignments"]["Row"];
 export type Feedback = Database["public"]["Tables"]["feedback"]["Row"];
+export type WordBank = Database["public"]["Tables"]["word_banks"]["Row"];

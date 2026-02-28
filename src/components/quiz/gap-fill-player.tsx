@@ -143,8 +143,8 @@ export function GapFillPlayer({ questions, onComplete }: GapFillPlayerProps) {
             <div
               className={`flex items-start gap-2 p-3 rounded-md ${
                 isCorrect
-                  ? "bg-green-50 text-green-800"
-                  : "bg-red-50 text-red-800"
+                  ? "bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-300"
+                  : "bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-300"
               }`}
             >
               {isCorrect ? (

@@ -16,7 +16,7 @@ import type { FlashcardItem } from "@/types/quiz";
 
 interface FlashcardPlayerProps {
   cards: FlashcardItem[];
-  onComplete: () => void;
+  onComplete: (known: number, total: number) => void;
 }
 
 export function FlashcardPlayer({ cards, onComplete }: FlashcardPlayerProps) {
@@ -112,7 +112,12 @@ export function FlashcardPlayer({ cards, onComplete }: FlashcardPlayerProps) {
       </Card>
 
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" onClick={goPrev} disabled={currentIndex === 0}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={goPrev}
+          disabled={currentIndex === 0}
+        >
           <ArrowLeft className="h-4 w-4" />
         </Button>
 
@@ -125,11 +130,7 @@ export function FlashcardPlayer({ cards, onComplete }: FlashcardPlayerProps) {
             >
               Still Learning
             </Button>
-            <Button
-              className="flex-1"
-              variant="outline"
-              onClick={handleKnow}
-            >
+            <Button className="flex-1" variant="outline" onClick={handleKnow}>
               Know It
             </Button>
           </>
@@ -170,7 +171,9 @@ export function FlashcardPlayer({ cards, onComplete }: FlashcardPlayerProps) {
               <RotateCcw className="mr-2 h-4 w-4" />
               Restart
             </Button>
-            <Button onClick={onComplete}>Done</Button>
+            <Button onClick={() => onComplete(known.size, cards.length)}>
+              Done
+            </Button>
           </CardContent>
         </Card>
       )}

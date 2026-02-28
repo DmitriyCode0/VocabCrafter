@@ -3,7 +3,6 @@ export {
   ROLE_PERMISSIONS,
   ROLES,
   ROLE_LABELS,
-  ROLE_DESCRIPTIONS,
 } from "./roles";
 
 export type {

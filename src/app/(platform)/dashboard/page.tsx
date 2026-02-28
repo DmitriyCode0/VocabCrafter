@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { Role } from "@/types/roles";
-import { ROLE_LABELS } from "@/types/roles";
 import {
   Card,
   CardContent,
@@ -10,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import {
   BookOpen,
@@ -20,7 +20,13 @@ import {
   MessageSquare,
   BarChart3,
   PlusCircle,
+  Trophy,
+  Target,
+  Clock,
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -57,162 +63,429 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {role === "student" && <StudentDashboard />}
-      {role === "tutor" && <TutorDashboard />}
+      {role === "student" && <StudentDashboard userId={user.id} />}
+      {role === "tutor" && <TutorDashboard userId={user.id} />}
       {role === "superadmin" && <AdminDashboard />}
     </div>
   );
 }
 
-function StudentDashboard() {
+async function StudentDashboard({ userId }: { userId: string }) {
+  const supabase = await createClient();
+
+  const [
+    { count: quizCount },
+    { count: attemptCount },
+    { data: recentAttempts },
+  ] = await Promise.all([
+    supabase
+      .from("quizzes")
+      .select("*", { count: "exact", head: true })
+      .eq("creator_id", userId),
+    supabase
+      .from("quiz_attempts")
+      .select("*", { count: "exact", head: true })
+      .eq("student_id", userId),
+    supabase
+      .from("quiz_attempts")
+      .select("score, max_score, completed_at, quizzes(title, type)")
+      .eq("student_id", userId)
+      .order("completed_at", { ascending: false })
+      .limit(5),
+  ]);
+
+  const avgScore =
+    recentAttempts && recentAttempts.length > 0
+      ? Math.round(
+          recentAttempts.reduce((sum, a) => {
+            if (a.score !== null && a.max_score !== null && a.max_score > 0) {
+              return sum + (a.score / a.max_score) * 100;
+            }
+            return sum;
+          }, 0) /
+            recentAttempts.filter(
+              (a) => a.max_score !== null && a.max_score > 0,
+            ).length || 0,
+        )
+      : 0;
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <PlusCircle className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle className="text-base">Create Quiz</CardTitle>
-            <CardDescription>Generate a new AI-powered quiz</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Button asChild className="w-full">
-            <Link href="/quizzes/new">New Quiz</Link>
-          </Button>
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      {/* Stats cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Quizzes</CardTitle>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{quizCount ?? 0}</div>
+            <p className="text-xs text-muted-foreground">quizzes created</p>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <BookOpen className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle className="text-base">My Quizzes</CardTitle>
-            <CardDescription>View and retake your quizzes</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Button asChild variant="outline" className="w-full">
-            <Link href="/quizzes">View Quizzes</Link>
-          </Button>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Attempts</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{attemptCount ?? 0}</div>
+            <p className="text-xs text-muted-foreground">quizzes completed</p>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <GraduationCap className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle className="text-base">My Classes</CardTitle>
-            <CardDescription>Join and view your classes</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Button asChild variant="outline" className="w-full">
-            <Link href="/classes">View Classes</Link>
-          </Button>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Avg Score</CardTitle>
+            <Trophy className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {avgScore > 0 ? `${avgScore}%` : "—"}
+            </div>
+            <p className="text-xs text-muted-foreground">recent performance</p>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle className="text-base">Progress</CardTitle>
-            <CardDescription>Track your learning journey</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Button asChild variant="outline" className="w-full">
-            <Link href="/progress">View Progress</Link>
-          </Button>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Last Active</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {recentAttempts && recentAttempts.length > 0
+                ? new Date(recentAttempts[0].completed_at).toLocaleDateString()
+                : "—"}
+            </div>
+            <p className="text-xs text-muted-foreground">last quiz attempt</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent activity */}
+      {recentAttempts && recentAttempts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recent Activity</CardTitle>
+            <CardDescription>Your latest quiz attempts</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {recentAttempts.map((attempt, i) => {
+              const quiz = attempt.quizzes as unknown as {
+                title: string;
+                type: string;
+              } | null;
+              const pct =
+                attempt.score !== null &&
+                attempt.max_score !== null &&
+                attempt.max_score > 0
+                  ? Math.round((attempt.score / attempt.max_score) * 100)
+                  : null;
+              return (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {quiz?.title ?? "Untitled Quiz"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(attempt.completed_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {pct !== null && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Progress value={pct} className="w-20 h-2" />
+                      <Badge
+                        variant="outline"
+                        className={
+                          pct >= 80
+                            ? "text-green-600"
+                            : pct >= 50
+                              ? "text-orange-600"
+                              : "text-red-600"
+                        }
+                      >
+                        {pct}%
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quick actions */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <PlusCircle className="h-5 w-5 text-primary" />
+            <div>
+              <CardTitle className="text-base">Create Quiz</CardTitle>
+              <CardDescription>Generate a new AI-powered quiz</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <Link href="/quizzes/new">New Quiz</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <BookOpen className="h-5 w-5 text-primary" />
+            <div>
+              <CardTitle className="text-base">My Quizzes</CardTitle>
+              <CardDescription>View and retake your quizzes</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/quizzes">View Quizzes</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <div>
+              <CardTitle className="text-base">Progress</CardTitle>
+              <CardDescription>Track your learning journey</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/progress">View Progress</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
-function TutorDashboard() {
+async function TutorDashboard({ userId }: { userId: string }) {
+  const supabase = await createClient();
+
+  const [
+    { count: classCount },
+    { count: assignmentCount },
+    { data: recentClasses },
+  ] = await Promise.all([
+    supabase
+      .from("classes")
+      .select("*", { count: "exact", head: true })
+      .eq("tutor_id", userId),
+    supabase
+      .from("assignments")
+      .select("*", { count: "exact", head: true })
+      .eq("tutor_id", userId),
+    supabase
+      .from("classes")
+      .select("id, name, cefr_level, is_active, created_at")
+      .eq("tutor_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(3),
+  ]);
+
+  // Get total student count across all classes
+  let totalStudents = 0;
+  if (recentClasses && recentClasses.length > 0) {
+    const classIds = recentClasses.map((c) => c.id);
+    const { count } = await supabase
+      .from("class_members")
+      .select("*", { count: "exact", head: true })
+      .in("class_id", classIds);
+    totalStudents = count ?? 0;
+  }
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <Users className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle className="text-base">Classes</CardTitle>
-            <CardDescription>Manage your classes and students</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Button asChild className="w-full">
-            <Link href="/classes">Manage Classes</Link>
-          </Button>
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Classes</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{classCount ?? 0}</div>
+            <p className="text-xs text-muted-foreground">active classes</p>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <ClipboardList className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle className="text-base">Assignments</CardTitle>
-            <CardDescription>Create and manage assignments</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Button asChild variant="outline" className="w-full">
-            <Link href="/assignments">View Assignments</Link>
-          </Button>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Students</CardTitle>
+            <GraduationCap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalStudents}</div>
+            <p className="text-xs text-muted-foreground">enrolled students</p>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle className="text-base">Review</CardTitle>
-            <CardDescription>Review student submissions</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Button asChild variant="outline" className="w-full">
-            <Link href="/review">Review Work</Link>
-          </Button>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Assignments</CardTitle>
+            <ClipboardList className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{assignmentCount ?? 0}</div>
+            <p className="text-xs text-muted-foreground">total assignments</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            <div>
+              <CardTitle className="text-base">Classes</CardTitle>
+              <CardDescription>
+                Manage your classes and students
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <Link href="/classes">Manage Classes</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-primary" />
+            <div>
+              <CardTitle className="text-base">Assignments</CardTitle>
+              <CardDescription>Create and manage assignments</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/assignments">View Assignments</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-primary" />
+            <div>
+              <CardTitle className="text-base">Review</CardTitle>
+              <CardDescription>Review student submissions</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/review">Review Work</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
-function AdminDashboard() {
-  return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle className="text-base">Analytics</CardTitle>
-            <CardDescription>Platform usage and metrics</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Button asChild className="w-full">
-            <Link href="/analytics">View Analytics</Link>
-          </Button>
-        </CardContent>
-      </Card>
+async function AdminDashboard() {
+  const supabase = await createClient();
 
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <Users className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle className="text-base">Users</CardTitle>
-            <CardDescription>Manage platform users</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Button asChild variant="outline" className="w-full">
-            <Link href="/users">Manage Users</Link>
-          </Button>
-        </CardContent>
-      </Card>
+  const [
+    { count: userCount },
+    { count: quizCount },
+    { count: classCount },
+    { count: attemptCount },
+  ] = await Promise.all([
+    supabase.from("profiles").select("*", { count: "exact", head: true }),
+    supabase.from("quizzes").select("*", { count: "exact", head: true }),
+    supabase.from("classes").select("*", { count: "exact", head: true }),
+    supabase.from("quiz_attempts").select("*", { count: "exact", head: true }),
+  ]);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{userCount ?? 0}</div>
+            <p className="text-xs text-muted-foreground">registered users</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Quizzes</CardTitle>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{quizCount ?? 0}</div>
+            <p className="text-xs text-muted-foreground">quizzes created</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Classes</CardTitle>
+            <GraduationCap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{classCount ?? 0}</div>
+            <p className="text-xs text-muted-foreground">active classes</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Attempts</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{attemptCount ?? 0}</div>
+            <p className="text-xs text-muted-foreground">quiz attempts</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            <div>
+              <CardTitle className="text-base">Analytics</CardTitle>
+              <CardDescription>Platform usage and metrics</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <Link href="/analytics">View Analytics</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            <div>
+              <CardTitle className="text-base">Users</CardTitle>
+              <CardDescription>Manage platform users</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/users">Manage Users</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

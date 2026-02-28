@@ -74,7 +74,7 @@ export async function updateSession(request: NextRequest) {
     // Role-based route protection
     if (profile) {
       const adminRoutes = ["/analytics", "/users", "/billing"];
-      const tutorRoutes = ["/assignments", "/review"];
+      const tutorRoutes = ["/review"];
       const isAdminRoute = adminRoutes.some((route) =>
         pathname.startsWith(route),
       );

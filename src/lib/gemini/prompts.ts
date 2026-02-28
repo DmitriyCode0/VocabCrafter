@@ -1,4 +1,5 @@
 import type { QuizConfig, QuizTerm, QuizType } from "@/types/quiz";
+import { GRAMMAR_RULES } from "@/lib/grammar/rules";
 
 function formatTerms(terms: QuizTerm[]): string {
   return terms.map((t) => `- "${t.term}" = "${t.definition}"`).join("\n");
@@ -12,7 +13,15 @@ function configContext(config: QuizConfig): string {
     `Teacher Persona: ${config.teacherPersona}`,
   ];
   if (config.grammarTopics?.length) {
-    parts.push(`Grammar Topics: ${config.grammarTopics.join(", ")}`);
+    const topicDetails = config.grammarTopics
+      .map((topic) => {
+        const rule = GRAMMAR_RULES[topic];
+        return rule ? `- ${topic}:\n${rule}` : `- ${topic}`;
+      })
+      .join("\n\n");
+    parts.push(
+      `Grammar Focus (generate sentences using these grammar patterns):\n${topicDetails}`,
+    );
   }
   if (config.customTopic) {
     parts.push(`Custom Topic/Context: ${config.customTopic}`);

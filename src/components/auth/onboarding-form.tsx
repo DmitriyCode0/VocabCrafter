@@ -20,8 +20,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ROLE_DESCRIPTIONS } from "@/types/roles";
 import type { Role, CEFRLevel } from "@/types";
+
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  student: "Create and take quizzes, join classes, track your progress",
+  tutor: "Manage classes, assign quizzes, review student work",
+};
 
 const CEFR_LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
 

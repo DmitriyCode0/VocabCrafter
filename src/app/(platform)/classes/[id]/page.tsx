@@ -1,12 +1,10 @@
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { Users } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { redirect, notFound } from "next/navigation";
+import type { Role } from "@/types/roles";
+import { ClassDetailClient } from "@/components/classes/class-detail-client";
+
+export const dynamic = "force-dynamic";
 
 export default async function ClassDetailPage({
   params,
@@ -14,27 +12,68 @@ export default async function ClassDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) redirect("/login");
+
+  const role = profile.role as Role;
+
+  const { data: classData, error } = await supabase
+    .from("classes")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !classData) notFound();
+
+  // Use admin client to bypass profiles RLS (tutor already verified above)
+  const supabaseAdmin = createAdminClient();
+  const { data: members, error: membersError } = await supabaseAdmin
+    .from("class_members")
+    .select("*, profiles(id, full_name, email, avatar_url, cefr_level)")
+    .eq("class_id", id);
+
+  if (membersError) console.error("Failed to load members:", membersError);
+
+  const { data: assignments, error: assignmentsError } = await supabase
+    .from("assignments")
+    .select("*, quizzes(title, type)")
+    .eq("class_id", id)
+    .order("created_at", { ascending: false });
+
+  if (assignmentsError) console.error("Failed to load assignments:", assignmentsError);
+
+  // If tutor, get their quizzes for assignment creation
+  let quizzes: Record<string, unknown>[] = [];
+  if (role === "tutor" || role === "superadmin") {
+    const { data } = await supabase
+      .from("quizzes")
+      .select("id, title, type, cefr_level")
+      .eq("creator_id", user.id)
+      .order("created_at", { ascending: false });
+    quizzes = (data || []) as unknown as Record<string, unknown>[];
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Class Details</h1>
-        <p className="text-muted-foreground">Class ID: {id}</p>
-      </div>
-
-      <Card>
-        <CardHeader className="items-center text-center py-12">
-          <Users className="h-12 w-12 text-muted-foreground/50 mb-2" />
-          <CardTitle className="text-lg">Coming Soon</CardTitle>
-          <CardDescription>
-            Class management with student roster, join codes, and assignment
-            tracking is being built.
-          </CardDescription>
-          <Button asChild variant="outline" className="mt-4">
-            <Link href="/classes">Back to Classes</Link>
-          </Button>
-        </CardHeader>
-      </Card>
-    </div>
+    <ClassDetailClient
+      classData={classData as unknown as Record<string, unknown>}
+      members={(members || []) as unknown as Record<string, unknown>[]}
+      assignments={(assignments || []) as unknown as Record<string, unknown>[]}
+      quizzes={quizzes}
+      role={role}
+      userId={user.id}
+    />
   );
 }

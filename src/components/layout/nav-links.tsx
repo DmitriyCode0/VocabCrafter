@@ -45,12 +45,24 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["student"],
   },
   {
+    label: "Assignments",
+    href: "/assignments",
+    icon: ClipboardList,
+    roles: ["student"],
+  },
+  {
     label: "Progress",
     href: "/progress",
     icon: TrendingUp,
     roles: ["student"],
   },
   // Tutor items
+  {
+    label: "My Quizzes",
+    href: "/quizzes",
+    icon: BookOpen,
+    roles: ["tutor"],
+  },
   {
     label: "Classes",
     href: "/classes",

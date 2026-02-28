@@ -17,11 +17,3 @@ export function hasAllPermissions(
 ): boolean {
   return permissions.every((permission) => hasPermission(role, permission));
 }
-
-export function isRole(role: Role, expectedRole: Role): boolean {
-  return role === expectedRole;
-}
-
-export function isAnyRole(role: Role, expectedRoles: Role[]): boolean {
-  return expectedRoles.includes(role);
-}
