@@ -13,6 +13,9 @@ export interface Database {
           onboarding_completed: boolean;
           cefr_level: string;
           preferred_language: string;
+          plan: string;
+          ai_calls_this_month: number;
+          ai_calls_reset_at: string;
           created_at: string;
           updated_at: string;
         };
@@ -25,6 +28,9 @@ export interface Database {
           onboarding_completed?: boolean;
           cefr_level?: string;
           preferred_language?: string;
+          plan?: string;
+          ai_calls_this_month?: number;
+          ai_calls_reset_at?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -37,6 +43,9 @@ export interface Database {
           onboarding_completed?: boolean;
           cefr_level?: string;
           preferred_language?: string;
+          plan?: string;
+          ai_calls_this_month?: number;
+          ai_calls_reset_at?: string;
           updated_at?: string;
         };
         Relationships: [];
