@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
+import {
+  extractWordResults,
+  upsertWordMastery,
+} from "@/lib/mastery/engine";
 
 const createAttemptSchema = z.object({
   quizId: z.string().uuid(),
@@ -51,6 +56,37 @@ export async function POST(request: Request) {
         { error: "Failed to save attempt" },
         { status: 500 },
       );
+    }
+
+    // ── Update word mastery ──────────────────────────────
+    try {
+      const supabaseAdmin = createAdminClient();
+      const { data: quiz } = await supabaseAdmin
+        .from("quizzes")
+        .select("type, vocabulary_terms, generated_content")
+        .eq("id", quizId)
+        .single();
+
+      if (quiz) {
+        const vocabTerms = (quiz.vocabulary_terms ?? []) as {
+          term: string;
+          definition: string;
+        }[];
+        const genContent = (quiz.generated_content ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const wordResults = extractWordResults(
+          quiz.type,
+          answers,
+          vocabTerms,
+          genContent,
+        );
+        await upsertWordMastery(supabaseAdmin, user.id, wordResults);
+      }
+    } catch (masteryErr) {
+      // Don't fail the attempt save if mastery update fails
+      console.error("Word mastery update error:", masteryErr);
     }
 
     return NextResponse.json({ attempt });

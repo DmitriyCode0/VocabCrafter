@@ -145,22 +145,35 @@ export function CreateQuizFlow() {
         grammarTopics: grammarTopics.length > 0 ? grammarTopics : undefined,
       };
 
-      const res = await fetch("/api/ai/generate-quiz", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: selectedActivity,
-          terms,
-          config,
-        }),
-      });
+      let content: Record<string, unknown>;
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to generate quiz");
+      if (selectedActivity === "flashcards") {
+        // Build flashcards directly from terms — no AI needed
+        content = {
+          cards: terms.map((t) => ({
+            term: t.term,
+            definition: t.definition,
+          })),
+        };
+      } else {
+        const res = await fetch("/api/ai/generate-quiz", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: selectedActivity,
+            terms,
+            config,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to generate quiz");
+        }
+
+        const result = await res.json();
+        content = result.content;
       }
-
-      const { content } = await res.json();
 
       // Save quiz to Supabase
       const saveRes = await fetch("/api/quizzes", {

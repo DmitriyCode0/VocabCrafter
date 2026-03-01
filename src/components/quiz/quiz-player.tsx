@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { FlashcardPlayer } from "./flashcard-player";
+import { FlashcardPlayer, type FlashcardResult } from "./flashcard-player";
 import { GapFillPlayer, type GapFillResult } from "./gap-fill-player";
 import {
   TranslationPlayer,
@@ -53,8 +53,18 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   }
 
   const handleFlashcardComplete = useCallback(
-    (known: number, total: number) => {
-      saveAttempt(quiz.id, { type: "flashcards", known, total }, known, total);
+    (results: FlashcardResult[], known: number, total: number) => {
+      saveAttempt(
+        quiz.id,
+        {
+          type: "flashcards",
+          known,
+          total,
+          results: results.map((r) => ({ term: r.term, known: r.known })),
+        },
+        known,
+        total,
+      );
       setFlashcardKnown(known);
       setFlashcardTotal(total);
       setShowResults(true);
@@ -64,14 +74,18 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
   if (quiz.type === "flashcards") {
     if (showResults) {
-      const percentage = flashcardTotal > 0 ? Math.round((flashcardKnown / flashcardTotal) * 100) : 0;
+      const percentage =
+        flashcardTotal > 0
+          ? Math.round((flashcardKnown / flashcardTotal) * 100)
+          : 0;
       return (
         <div className="space-y-6">
           <Card>
             <CardHeader className="text-center">
               <CardTitle className="text-2xl">Flashcards Complete!</CardTitle>
               <CardDescription>
-                You knew {flashcardKnown} of {flashcardTotal} terms ({percentage}%)
+                You knew {flashcardKnown} of {flashcardTotal} terms (
+                {percentage}%)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

@@ -13,6 +13,8 @@ import {
   CreditCard,
   Settings,
   TrendingUp,
+  Zap,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types/roles";
@@ -57,6 +59,12 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["student"],
   },
   {
+    label: "Vocabulary",
+    href: "/vocabulary",
+    icon: Zap,
+    roles: ["student"],
+  },
+  {
     label: "Feedback",
     href: "/feedback",
     icon: MessageSquare,
@@ -85,6 +93,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Review",
     href: "/review",
     icon: MessageSquare,
+    roles: ["tutor"],
+  },
+  {
+    label: "Mastery",
+    href: "/mastery",
+    icon: Brain,
     roles: ["tutor"],
   },
   // Admin items

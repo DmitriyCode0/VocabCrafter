@@ -104,7 +104,8 @@ export function WordBankPicker({ onSelect }: WordBankPickerProps) {
                 <CardTitle className="text-base">{bank.name}</CardTitle>
                 <CardDescription>
                   {bank.terms.length} term{bank.terms.length !== 1 ? "s" : ""}{" "}
-                  &middot; {new Date(bank.created_at).toLocaleDateString("en-US")}
+                  &middot;{" "}
+                  {new Date(bank.created_at).toLocaleDateString("en-US")}
                 </CardDescription>
               </div>
               <Button

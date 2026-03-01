@@ -34,7 +34,8 @@ export function GapFillPlayer({ questions, onComplete }: GapFillPlayerProps) {
   const [results, setResults] = useState<GapFillResult[]>([]);
 
   const question = questions[currentIndex];
-  const progress = ((currentIndex + (submitted ? 1 : 0)) / questions.length) * 100;
+  const progress =
+    ((currentIndex + (submitted ? 1 : 0)) / questions.length) * 100;
   const isCorrect =
     submitted &&
     userAnswer.trim().toLowerCase() === question.correctAnswer.toLowerCase();
@@ -61,9 +62,7 @@ export function GapFillPlayer({ questions, onComplete }: GapFillPlayerProps) {
       setUserAnswer("");
       setSubmitted(false);
     } else {
-      const finalResults = [
-        ...results,
-      ];
+      const finalResults = [...results];
       onComplete(finalResults);
     }
   }
@@ -94,9 +93,7 @@ export function GapFillPlayer({ questions, onComplete }: GapFillPlayerProps) {
         <CardContent className="space-y-4">
           <p className="text-lg leading-relaxed">{question.sentence}</p>
 
-          <p className="text-sm text-muted-foreground">
-            Hint: {question.hint}
-          </p>
+          <p className="text-sm text-muted-foreground">Hint: {question.hint}</p>
 
           <div className="flex gap-2">
             <Input
@@ -119,10 +116,7 @@ export function GapFillPlayer({ questions, onComplete }: GapFillPlayerProps) {
               }
             />
             {!submitted ? (
-              <Button
-                onClick={handleSubmit}
-                disabled={!userAnswer.trim()}
-              >
+              <Button onClick={handleSubmit} disabled={!userAnswer.trim()}>
                 Check
               </Button>
             ) : (
@@ -159,7 +153,9 @@ export function GapFillPlayer({ questions, onComplete }: GapFillPlayerProps) {
                   <>
                     <p className="font-medium">
                       Not quite. The correct answer is:{" "}
-                      <span className="font-bold">{question.correctAnswer}</span>
+                      <span className="font-bold">
+                        {question.correctAnswer}
+                      </span>
                     </p>
                   </>
                 )}

@@ -14,9 +14,14 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 import type { FlashcardItem } from "@/types/quiz";
 
+export interface FlashcardResult {
+  term: string;
+  known: boolean;
+}
+
 interface FlashcardPlayerProps {
   cards: FlashcardItem[];
-  onComplete: (known: number, total: number) => void;
+  onComplete: (results: FlashcardResult[], known: number, total: number) => void;
 }
 
 export function FlashcardPlayer({ cards, onComplete }: FlashcardPlayerProps) {
@@ -167,11 +172,19 @@ export function FlashcardPlayer({ cards, onComplete }: FlashcardPlayerProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex gap-2 justify-center">
-            <Button variant="outline" onClick={restart}>
+            <Button onClick={restart}>
               <RotateCcw className="mr-2 h-4 w-4" />
               Restart
             </Button>
-            <Button onClick={() => onComplete(known.size, cards.length)}>
+            <Button
+              onClick={() => {
+                const results: FlashcardResult[] = cards.map((card, idx) => ({
+                  term: card.term,
+                  known: known.has(idx),
+                }));
+                onComplete(results, known.size, cards.length);
+              }}
+            >
               Done
             </Button>
           </CardContent>

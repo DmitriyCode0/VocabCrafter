@@ -53,10 +53,12 @@ export default async function ClassDetailPage({
     .eq("class_id", id)
     .order("created_at", { ascending: false });
 
-  if (assignmentsError) console.error("Failed to load assignments:", assignmentsError);
+  if (assignmentsError)
+    console.error("Failed to load assignments:", assignmentsError);
 
   // If tutor, get their quizzes for assignment creation
   let quizzes: Record<string, unknown>[] = [];
+  let wordMastery: Record<string, unknown>[] = [];
   if (role === "tutor" || role === "superadmin") {
     const { data } = await supabase
       .from("quizzes")
@@ -64,6 +66,23 @@ export default async function ClassDetailPage({
       .eq("creator_id", user.id)
       .order("created_at", { ascending: false });
     quizzes = (data || []) as unknown as Record<string, unknown>[];
+
+    // Fetch word mastery for all students in the class
+    const studentIds = (members ?? []).map(
+      (m: Record<string, unknown>) => m.student_id as string,
+    );
+    if (studentIds.length > 0) {
+      const { data: masteryData } = await supabaseAdmin
+        .from("word_mastery")
+        .select(
+          "student_id, term, definition, mastery_level, correct_count, incorrect_count, streak",
+        )
+        .in("student_id", studentIds);
+      wordMastery = (masteryData ?? []) as unknown as Record<
+        string,
+        unknown
+      >[];
+    }
   }
 
   return (
@@ -72,6 +91,7 @@ export default async function ClassDetailPage({
       members={(members || []) as unknown as Record<string, unknown>[]}
       assignments={(assignments || []) as unknown as Record<string, unknown>[]}
       quizzes={quizzes}
+      wordMastery={wordMastery}
       role={role}
       userId={user.id}
     />

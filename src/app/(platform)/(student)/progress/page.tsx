@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import {
   Card,
@@ -136,18 +137,14 @@ export default async function ProgressPage() {
     }
   }
 
-  // Total unique terms practiced
-  const allTerms = new Set<string>();
-  for (const a of attempts) {
-    const quizData = a.quizzes as unknown as {
-      vocabulary_terms: { term: string }[];
-    } | null;
-    if (quizData?.vocabulary_terms) {
-      for (const t of quizData.vocabulary_terms) {
-        allTerms.add(t.term?.toLowerCase());
-      }
-    }
-  }
+  // Total unique terms practiced — from word_mastery table
+  const supabaseAdmin = createAdminClient();
+  const { data: masteryRows } = await supabaseAdmin
+    .from("word_mastery")
+    .select("mastery_level")
+    .eq("student_id", user.id);
+  const totalWords = masteryRows?.length ?? 0;
+  const masteredWords = masteryRows?.filter((r) => r.mastery_level >= 4).length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -203,9 +200,9 @@ export default async function ProgressPage() {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{allTerms.size}</div>
+            <div className="text-2xl font-bold">{totalWords}</div>
             <p className="text-xs text-muted-foreground">
-              unique terms across {quizCount ?? 0} quizzes
+              {masteredWords} mastered &middot; {quizCount ?? 0} quizzes
             </p>
           </CardContent>
         </Card>

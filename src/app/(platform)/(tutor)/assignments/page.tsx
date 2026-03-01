@@ -132,7 +132,9 @@ export default async function AssignmentsPage() {
                   )}
                   <p className="text-xs text-muted-foreground mt-2">
                     Created{" "}
-                    {new Date(assignment.created_at).toLocaleDateString("en-US")}
+                    {new Date(assignment.created_at).toLocaleDateString(
+                      "en-US",
+                    )}
                   </p>
                 </CardContent>
               </Card>
@@ -215,8 +217,7 @@ async function StudentAssignments({
       (a.score != null &&
         a.max_score != null &&
         (existing.score == null ||
-          a.score / a.max_score >
-            existing.score / (existing.max_score ?? 1)))
+          a.score / a.max_score > existing.score / (existing.max_score ?? 1)))
     ) {
       attemptMap[a.quiz_id] = { score: a.score, max_score: a.max_score };
     }

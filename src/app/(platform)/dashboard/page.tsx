@@ -94,10 +94,7 @@ async function StudentDashboard({ userId }: { userId: string }) {
       .eq("student_id", userId)
       .order("completed_at", { ascending: false })
       .limit(5),
-    supabase
-      .from("class_members")
-      .select("class_id")
-      .eq("student_id", userId),
+    supabase.from("class_members").select("class_id").eq("student_id", userId),
   ]);
 
   // Fetch pending assignments for student
@@ -116,7 +113,9 @@ async function StudentDashboard({ userId }: { userId: string }) {
     const supabaseAdmin = createAdminClient();
     const { data: allAssignments } = await supabaseAdmin
       .from("assignments")
-      .select("id, title, due_date, instructions, quiz_id, classes(name), quizzes(id, title, type)")
+      .select(
+        "id, title, due_date, instructions, quiz_id, classes(name), quizzes(id, title, type)",
+      )
       .in("class_id", classIds)
       .order("created_at", { ascending: false });
 
@@ -131,9 +130,9 @@ async function StudentDashboard({ userId }: { userId: string }) {
       : { data: [] };
 
     const completedQuizIds = new Set(attempts?.map((a) => a.quiz_id) ?? []);
-    pendingAssignments = ((allAssignments ?? []) as typeof pendingAssignments).filter(
-      (a) => !completedQuizIds.has(a.quiz_id),
-    );
+    pendingAssignments = (
+      (allAssignments ?? []) as typeof pendingAssignments
+    ).filter((a) => !completedQuizIds.has(a.quiz_id));
   }
 
   const avgScore =
@@ -214,9 +213,7 @@ async function StudentDashboard({ userId }: { userId: string }) {
               <CardTitle className="text-base">
                 Pending Assignments ({pendingAssignments.length})
               </CardTitle>
-              <CardDescription>
-                Quizzes assigned by your tutors
-              </CardDescription>
+              <CardDescription>Quizzes assigned by your tutors</CardDescription>
             </div>
             <Button asChild variant="outline" size="sm">
               <Link href="/assignments">View All</Link>
@@ -251,9 +248,9 @@ async function StudentDashboard({ userId }: { userId: string }) {
                           className="text-xs"
                         >
                           {isPastDue ? "Past due" : "Due"}{" "}
-                          {new Date(
-                            assignment.due_date,
-                          ).toLocaleDateString("en-US")}
+                          {new Date(assignment.due_date).toLocaleDateString(
+                            "en-US",
+                          )}
                         </Badge>
                       )}
                     </div>

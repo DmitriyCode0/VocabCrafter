@@ -64,7 +64,10 @@ export default async function ReviewDetailPage({
   } | null;
   const rawAnswers = attempt.answers as Record<string, unknown> | null;
   // Answers are stored as {type, results: [...]} or {type, known, total}
-  const answerResults = (rawAnswers?.results ?? []) as Record<string, unknown>[];
+  const answerResults = (rawAnswers?.results ?? []) as Record<
+    string,
+    unknown
+  >[];
   const scored = attempt.score != null && attempt.max_score != null;
   const pct = scored
     ? Math.round((Number(attempt.score) / Number(attempt.max_score)) * 100)

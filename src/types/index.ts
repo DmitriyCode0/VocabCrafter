@@ -1,9 +1,5 @@
 export type { Role, Permission } from "./roles";
-export {
-  ROLE_PERMISSIONS,
-  ROLES,
-  ROLE_LABELS,
-} from "./roles";
+export { ROLE_PERMISSIONS, ROLES, ROLE_LABELS } from "./roles";
 
 export type {
   CEFRLevel,

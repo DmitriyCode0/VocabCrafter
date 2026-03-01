@@ -64,12 +64,8 @@ export function CreateAssignmentDialog({
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [classes, setClasses] = useState<ClassOption[]>(
-    preloadedClasses ?? [],
-  );
-  const [quizzes, setQuizzes] = useState<QuizOption[]>(
-    preloadedQuizzes ?? [],
-  );
+  const [classes, setClasses] = useState<ClassOption[]>(preloadedClasses ?? []);
+  const [quizzes, setQuizzes] = useState<QuizOption[]>(preloadedQuizzes ?? []);
   const [loadingData, setLoadingData] = useState(false);
 
   // Fetch classes and quizzes when dialog opens (if not preloaded)
@@ -235,8 +231,7 @@ export function CreateAssignmentDialog({
                 <SelectContent>
                   {quizzes.map((q) => (
                     <SelectItem key={q.id} value={q.id}>
-                      {q.title} (
-                      {ACTIVITY_LABELS[q.type] || q.type})
+                      {q.title} ({ACTIVITY_LABELS[q.type] || q.type})
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -77,7 +77,9 @@ export function QuizResults({
               <div
                 key={index}
                 className={`flex items-start gap-3 p-3 rounded-md ${
-                  result.isCorrect ? "bg-green-50 dark:bg-green-950/30" : "bg-red-50 dark:bg-red-950/30"
+                  result.isCorrect
+                    ? "bg-green-50 dark:bg-green-950/30"
+                    : "bg-red-50 dark:bg-red-950/30"
                 }`}
               >
                 {result.isCorrect ? (

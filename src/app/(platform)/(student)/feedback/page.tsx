@@ -86,8 +86,7 @@ export default async function StudentFeedbackPage() {
             const quiz = fb.quiz_attempts?.quizzes;
             const attempt = fb.quiz_attempts;
             const tutor = fb.profiles;
-            const scored =
-              attempt?.score != null && attempt?.max_score != null;
+            const scored = attempt?.score != null && attempt?.max_score != null;
             const pct = scored
               ? Math.round(
                   (Number(attempt.score) / Number(attempt.max_score)) * 100,
@@ -126,12 +125,9 @@ export default async function StudentFeedbackPage() {
                   </div>
                   <CardDescription className="flex items-center justify-between">
                     <span>
-                      From{" "}
-                      <strong>{tutor?.full_name ?? "Tutor"}</strong>
+                      From <strong>{tutor?.full_name ?? "Tutor"}</strong>
                     </span>
-                    <span>
-                      {new Date(fb.created_at).toLocaleDateString()}
-                    </span>
+                    <span>{new Date(fb.created_at).toLocaleDateString()}</span>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">

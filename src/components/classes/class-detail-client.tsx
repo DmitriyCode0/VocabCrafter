@@ -40,6 +40,7 @@ import {
   Calendar,
   LogOut,
   X,
+  BookOpen,
 } from "lucide-react";
 import type { Role } from "@/types/roles";
 import { CreateAssignmentDialog } from "@/components/assignments/create-assignment-dialog";
@@ -49,6 +50,7 @@ interface ClassDetailClientProps {
   members: Record<string, unknown>[];
   assignments: Record<string, unknown>[];
   quizzes: Record<string, unknown>[];
+  wordMastery: Record<string, unknown>[];
   role: Role;
   userId: string;
 }
@@ -58,6 +60,7 @@ export function ClassDetailClient({
   members,
   assignments,
   quizzes,
+  wordMastery,
   role,
   userId,
 }: ClassDetailClientProps) {
@@ -68,7 +71,9 @@ export function ClassDetailClient({
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [removingStudent, setRemovingStudent] = useState<string | null>(null);
-  const [deletingAssignment, setDeletingAssignment] = useState<string | null>(null);
+  const [deletingAssignment, setDeletingAssignment] = useState<string | null>(
+    null,
+  );
 
   const isTutor =
     (role === "tutor" || role === "superadmin") &&
@@ -243,10 +248,7 @@ export function ClassDetailClient({
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setLeaveOpen(false)}
-                >
+                <Button variant="outline" onClick={() => setLeaveOpen(false)}>
                   Cancel
                 </Button>
                 <Button
@@ -354,16 +356,19 @@ export function ClassDetailClient({
                             className="h-7 w-7 text-muted-foreground hover:text-destructive"
                             onClick={() =>
                               handleRemoveStudent(
-                                (profile?.id as string) ?? (member.student_id as string),
+                                (profile?.id as string) ??
+                                  (member.student_id as string),
                               )
                             }
                             disabled={
                               removingStudent ===
-                              ((profile?.id as string) ?? (member.student_id as string))
+                              ((profile?.id as string) ??
+                                (member.student_id as string))
                             }
                           >
                             {removingStudent ===
-                            ((profile?.id as string) ?? (member.student_id as string)) ? (
+                            ((profile?.id as string) ??
+                              (member.student_id as string)) ? (
                               <Loader2 className="h-3 w-3 animate-spin" />
                             ) : (
                               <X className="h-3 w-3" />
@@ -473,8 +478,77 @@ export function ClassDetailClient({
           </CardContent>
         )}
       </Card>
+
+      {/* Vocabulary Mastery – tutor only */}
+      {isTutor && wordMastery.length > 0 && (() => {
+        const LEVEL_LABELS = ["New", "Seen", "Learning", "Familiar", "Strong", "Mastered"];
+        const LEVEL_COLORS = [
+          "bg-gray-200 text-gray-700",
+          "bg-red-100 text-red-700",
+          "bg-orange-100 text-orange-700",
+          "bg-yellow-100 text-yellow-700",
+          "bg-blue-100 text-blue-700",
+          "bg-green-100 text-green-700",
+        ];
+
+        // group by student
+        const byStudent = new Map<string, Record<string, unknown>[]>();
+        for (const row of wordMastery) {
+          const sid = row.student_id as string;
+          if (!byStudent.has(sid)) byStudent.set(sid, []);
+          byStudent.get(sid)!.push(row);
+        }
+
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" /> Vocabulary Mastery
+              </CardTitle>
+              <CardDescription>
+                Per-student word mastery overview
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {members.filter(m => byStudent.has(m.student_id as string)).map(member => {
+                const profile = member.profiles as Record<string, unknown> | null;
+                const name = (profile?.full_name as string) || (profile?.email as string) || "Student";
+                const words = byStudent.get(member.student_id as string) ?? [];
+                const mastered = words.filter(w => (w.mastery_level as number) >= 4).length;
+                const avgLevel = words.length
+                  ? (words.reduce((s, w) => s + (w.mastery_level as number), 0) / words.length).toFixed(1)
+                  : "0";
+
+                // level distribution
+                const dist = [0, 0, 0, 0, 0, 0];
+                for (const w of words) dist[w.mastery_level as number]++;
+
+                return (
+                  <div key={member.student_id as string} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium">{name}</p>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{words.length} words</span>
+                        <span>{mastered} mastered</span>
+                        <span>Avg {avgLevel}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                      {dist.map((count, lvl) =>
+                        count > 0 ? (
+                          <Badge key={lvl} variant="secondary" className={`text-xs ${LEVEL_COLORS[lvl]}`}>
+                            {LEVEL_LABELS[lvl]} {count}
+                          </Badge>
+                        ) : null,
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }
-
-

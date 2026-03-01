@@ -321,6 +321,54 @@ export interface Database {
           },
         ];
       };
+      word_mastery: {
+        Row: {
+          id: string;
+          student_id: string;
+          term: string;
+          definition: string;
+          mastery_level: number;
+          correct_count: number;
+          incorrect_count: number;
+          streak: number;
+          last_practiced: string;
+          next_review: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          term: string;
+          definition?: string;
+          mastery_level?: number;
+          correct_count?: number;
+          incorrect_count?: number;
+          streak?: number;
+          last_practiced?: string;
+          next_review?: string;
+          created_at?: string;
+        };
+        Update: {
+          student_id?: string;
+          term?: string;
+          definition?: string;
+          mastery_level?: number;
+          correct_count?: number;
+          incorrect_count?: number;
+          streak?: number;
+          last_practiced?: string;
+          next_review?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "word_mastery_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -345,3 +393,4 @@ export type QuizAttempt = Database["public"]["Tables"]["quiz_attempts"]["Row"];
 export type Assignment = Database["public"]["Tables"]["assignments"]["Row"];
 export type Feedback = Database["public"]["Tables"]["feedback"]["Row"];
 export type WordBank = Database["public"]["Tables"]["word_banks"]["Row"];
+export type WordMastery = Database["public"]["Tables"]["word_mastery"]["Row"];

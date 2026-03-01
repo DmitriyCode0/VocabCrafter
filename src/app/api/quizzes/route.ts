@@ -39,8 +39,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { title, type, cefrLevel, vocabularyTerms, generatedContent, config, isPublic } =
-      parsed.data;
+    const {
+      title,
+      type,
+      cefrLevel,
+      vocabularyTerms,
+      generatedContent,
+      config,
+      isPublic,
+    } = parsed.data;
 
     const { data: quiz, error: insertError } = await supabase
       .from("quizzes")
@@ -49,7 +56,10 @@ export async function POST(request: Request) {
         title,
         type,
         cefr_level: cefrLevel,
-        vocabulary_terms: vocabularyTerms as unknown as Record<string, unknown>[],
+        vocabulary_terms: vocabularyTerms as unknown as Record<
+          string,
+          unknown
+        >[],
         generated_content: generatedContent,
         config: config ?? null,
         is_public: isPublic ?? false,

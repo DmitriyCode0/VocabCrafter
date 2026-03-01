@@ -177,7 +177,11 @@ export function TranslationPlayer({
               <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
                 {evaluation.feedback}
               </div>
-              <Button onClick={handleRetry} className="w-full" variant="outline">
+              <Button
+                onClick={handleRetry}
+                className="w-full"
+                variant="outline"
+              >
                 Retry Evaluation
               </Button>
             </div>
