@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import {
   Card,
@@ -54,8 +55,11 @@ export default async function ReviewPage() {
     );
   }
 
+  // Use admin client to bypass RLS for cross-table queries
+  const supabaseAdmin = createAdminClient();
+
   // Get students in tutor's classes
-  const { data: members } = await supabase
+  const { data: members } = await supabaseAdmin
     .from("class_members")
     .select("student_id")
     .in("class_id", classIds);
@@ -127,7 +131,7 @@ export default async function ReviewPage() {
   }
 
   // Get quiz attempts for assigned/owned quizzes by students in tutor's classes
-  const { data: attempts } = await supabase
+  const { data: attempts } = await supabaseAdmin
     .from("quiz_attempts")
     .select("*, quizzes(title, type), profiles(full_name, email)")
     .in("quiz_id", allQuizIds)
@@ -138,7 +142,7 @@ export default async function ReviewPage() {
   // Get existing feedback from this tutor
   const attemptIds = attempts?.map((a) => a.id) ?? [];
   const { data: feedbackList } = attemptIds.length
-    ? await supabase
+    ? await supabaseAdmin
         .from("feedback")
         .select("attempt_id")
         .eq("tutor_id", user.id)

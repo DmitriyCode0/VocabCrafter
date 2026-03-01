@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import {
   Card,
@@ -30,8 +31,11 @@ export default async function ReviewDetailPage({
 
   if (!user) redirect("/login");
 
+  // Use admin client to bypass RLS for cross-table queries
+  const supabaseAdmin = createAdminClient();
+
   // Fetch the attempt with quiz and student info
-  const { data: attempt } = await supabase
+  const { data: attempt } = await supabaseAdmin
     .from("quiz_attempts")
     .select(
       "*, quizzes(title, type, vocabulary_terms, config), profiles(full_name, email)",
@@ -42,7 +46,7 @@ export default async function ReviewDetailPage({
   if (!attempt) notFound();
 
   // Fetch existing feedback for this attempt
-  const { data: feedbackList } = await supabase
+  const { data: feedbackList } = await supabaseAdmin
     .from("feedback")
     .select("*, profiles(full_name)")
     .eq("attempt_id", id)
