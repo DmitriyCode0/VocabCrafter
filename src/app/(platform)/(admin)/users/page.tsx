@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Users, Shield, GraduationCap, BookOpen } from "lucide-react";
+import { RoleSelector } from "./role-selector";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,8 @@ export default async function UsersPage() {
     .single();
 
   if (currentProfile?.role !== "superadmin") redirect("/dashboard");
+
+  const currentUserId = user.id;
 
   // Fetch all users with their stats
   const { data: profiles } = await supabase
@@ -135,6 +138,7 @@ export default async function UsersPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Change Role</TableHead>
                   <TableHead>CEFR</TableHead>
                   <TableHead>Quizzes</TableHead>
                   <TableHead>Attempts</TableHead>
@@ -158,6 +162,13 @@ export default async function UsersPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={config.variant}>{config.label}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <RoleSelector
+                          userId={profile.id}
+                          currentRole={profile.role as "student" | "tutor" | "superadmin"}
+                          isSelf={profile.id === currentUserId}
+                        />
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
