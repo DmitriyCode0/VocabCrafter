@@ -147,7 +147,7 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
           <CardDescription>
-            Customize how VocabCrafter looks on your device.
+            Customize how VocabCrafter 2.0 looks on your device.
           </CardDescription>
         </CardHeader>
         <CardContent>

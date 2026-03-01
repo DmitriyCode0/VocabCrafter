@@ -20,7 +20,7 @@ interface HeaderProps {
 
 export function Header({ profile }: HeaderProps) {
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-background px-4 md:px-6">
+    <header className="flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
       {/* Mobile sidebar trigger */}
       <Sheet>
         <SheetTrigger asChild>
@@ -31,13 +31,13 @@ export function Header({ profile }: HeaderProps) {
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-0">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <div className="flex h-14 items-center border-b px-4">
+          <div className="flex h-16 items-center border-b px-4">
             <Link
               href="/dashboard"
               className="flex items-center gap-2 font-semibold"
             >
               <BookOpen className="h-5 w-5 text-primary" />
-              <span>VocabCrafter</span>
+              <span>VocabCrafter 2.0</span>
             </Link>
           </div>
           <div className="px-3 py-4">

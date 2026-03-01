@@ -85,7 +85,7 @@ export function OnboardingForm() {
     return (
       <div className="w-full max-w-2xl space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Welcome to VocabCrafter</h1>
+          <h1 className="text-3xl font-bold">Welcome to VocabCrafter 2.0</h1>
           <p className="mt-2 text-muted-foreground">
             Choose your role to get started
           </p>

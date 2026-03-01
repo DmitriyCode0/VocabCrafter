@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VocabCrafter",
+  title: "VocabCrafter 2.0",
   description: "AI-powered vocabulary quiz platform",
 };
 

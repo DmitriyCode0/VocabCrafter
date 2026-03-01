@@ -19,7 +19,7 @@ export function Sidebar({ profile }: SidebarProps) {
           className="flex items-center gap-3 font-semibold text-lg"
         >
           <BookOpen className="h-6 w-6 text-primary" />
-          <span>VocabCrafter</span>
+          <span>VocabCrafter 2.0</span>
         </Link>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-4">
