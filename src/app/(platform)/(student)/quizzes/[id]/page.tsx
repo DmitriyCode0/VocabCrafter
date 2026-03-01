@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import { QuizPlayer } from "@/components/quiz/quiz-player";
 import { QuizHeader } from "@/components/quiz/quiz-header";
@@ -21,7 +22,9 @@ export default async function QuizDetailPage({
 
   if (!user) redirect("/login");
 
-  const { data: quiz, error } = await supabase
+  // Use admin client so students can access assigned quizzes (bypasses RLS)
+  const supabaseAdmin = createAdminClient();
+  const { data: quiz, error } = await supabaseAdmin
     .from("quizzes")
     .select("*")
     .eq("id", id)
