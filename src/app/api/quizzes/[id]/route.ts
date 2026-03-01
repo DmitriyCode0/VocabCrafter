@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 
 const updateQuizSchema = z.object({
@@ -83,13 +84,27 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Delete associated attempts first
-    await supabase.from("quiz_attempts").delete().eq("quiz_id", id);
+    // Use admin client to delete dependent rows — the user client is blocked
+    // by RLS on quiz_attempts and assignments (no DELETE policy for non-tutors).
+    const supabaseAdmin = createAdminClient();
 
-    // Delete associated assignments
-    await supabase.from("assignments").delete().eq("quiz_id", id);
+    // Verify the quiz belongs to this user before proceeding
+    const { data: owned } = await supabaseAdmin
+      .from("quizzes")
+      .select("id")
+      .eq("id", id)
+      .eq("creator_id", user.id)
+      .single();
 
-    const { error } = await supabase
+    if (!owned) {
+      return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
+    }
+
+    // Delete dependents first (foreign key constraints)
+    await supabaseAdmin.from("quiz_attempts").delete().eq("quiz_id", id);
+    await supabaseAdmin.from("assignments").delete().eq("quiz_id", id);
+
+    const { error } = await supabaseAdmin
       .from("quizzes")
       .delete()
       .eq("id", id)
