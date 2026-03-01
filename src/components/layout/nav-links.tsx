@@ -118,7 +118,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Billing",
     href: "/billing",
     icon: CreditCard,
-    roles: ["superadmin"],
+    roles: ["student", "tutor", "superadmin"],
   },
   // Shared
   {

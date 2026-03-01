@@ -14,6 +14,7 @@ export type Permission =
   | "feedback:receive"
   | "analytics:view"
   | "users:manage"
+  | "billing:view"
   | "billing:manage";
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
@@ -24,6 +25,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "class:join",
     "assignment:submit",
     "feedback:receive",
+    "billing:view",
   ],
   tutor: [
     "quiz:create",
@@ -33,6 +35,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "class:manage",
     "assignment:create",
     "feedback:give",
+    "billing:view",
   ],
   superadmin: [
     "quiz:create",
@@ -48,6 +51,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "feedback:receive",
     "analytics:view",
     "users:manage",
+    "billing:view",
     "billing:manage",
   ],
 } as const;
