@@ -1,75 +1,39 @@
 -- =============================================
 -- Superadmin RLS Override Policies
 -- =============================================
--- Superadmins need to read all data for analytics, user management, and billing.
--- These policies allow superadmin users (role = 'superadmin' in profiles) to SELECT from all tables.
+-- Uses a SECURITY DEFINER helper function to avoid infinite recursion
+-- that occurs when checking profiles.role from within a profiles RLS policy.
 
--- ========== PROFILES ==========
+CREATE OR REPLACE FUNCTION public.is_superadmin()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'superadmin'
+  );
+$$;
+
 CREATE POLICY "Superadmins can read all profiles"
-  ON public.profiles FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.role = 'superadmin'
-    )
-  );
+  ON public.profiles FOR SELECT USING (public.is_superadmin());
 
--- ========== CLASSES ==========
 CREATE POLICY "Superadmins can read all classes"
-  ON public.classes FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'superadmin'
-    )
-  );
+  ON public.classes FOR SELECT USING (public.is_superadmin());
 
--- ========== CLASS MEMBERS ==========
 CREATE POLICY "Superadmins can read all class members"
-  ON public.class_members FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'superadmin'
-    )
-  );
+  ON public.class_members FOR SELECT USING (public.is_superadmin());
 
--- ========== QUIZZES ==========
 CREATE POLICY "Superadmins can read all quizzes"
-  ON public.quizzes FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'superadmin'
-    )
-  );
+  ON public.quizzes FOR SELECT USING (public.is_superadmin());
 
--- ========== QUIZ ATTEMPTS ==========
 CREATE POLICY "Superadmins can read all quiz attempts"
-  ON public.quiz_attempts FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'superadmin'
-    )
-  );
+  ON public.quiz_attempts FOR SELECT USING (public.is_superadmin());
 
--- ========== ASSIGNMENTS ==========
 CREATE POLICY "Superadmins can read all assignments"
-  ON public.assignments FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'superadmin'
-    )
-  );
+  ON public.assignments FOR SELECT USING (public.is_superadmin());
 
--- ========== FEEDBACK ==========
 CREATE POLICY "Superadmins can read all feedback"
-  ON public.feedback FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'superadmin'
-    )
-  );
+  ON public.feedback FOR SELECT USING (public.is_superadmin());
