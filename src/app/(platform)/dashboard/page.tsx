@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import type { Role } from "@/types/roles";
 import {
@@ -112,7 +113,8 @@ async function StudentDashboard({ userId }: { userId: string }) {
   }[] = [];
 
   if (classIds.length > 0) {
-    const { data: allAssignments } = await supabase
+    const supabaseAdmin = createAdminClient();
+    const { data: allAssignments } = await supabaseAdmin
       .from("assignments")
       .select("id, title, due_date, instructions, quiz_id, classes(name), quizzes(id, title, type)")
       .in("class_id", classIds)

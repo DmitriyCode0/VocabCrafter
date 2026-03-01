@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import {
   Card,
@@ -185,8 +186,9 @@ async function StudentAssignments({
     );
   }
 
-  // Get assignments for those classes
-  const { data: assignments } = await supabase
+  // Get assignments for those classes (admin client to bypass RLS on joined tables)
+  const supabaseAdmin = createAdminClient();
+  const { data: assignments } = await supabaseAdmin
     .from("assignments")
     .select("*, classes(name), quizzes(id, title, type, cefr_level)")
     .in("class_id", classIds)

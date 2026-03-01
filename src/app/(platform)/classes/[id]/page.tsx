@@ -47,7 +47,7 @@ export default async function ClassDetailPage({
 
   if (membersError) console.error("Failed to load members:", membersError);
 
-  const { data: assignments, error: assignmentsError } = await supabase
+  const { data: assignments, error: assignmentsError } = await supabaseAdmin
     .from("assignments")
     .select("*, quizzes(title, type)")
     .eq("class_id", id)
