@@ -62,7 +62,9 @@ export default async function ReviewDetailPage({
     full_name: string | null;
     email: string;
   } | null;
-  const answers = attempt.answers as Record<string, unknown>;
+  const rawAnswers = attempt.answers as Record<string, unknown> | null;
+  // Answers are stored as {type, results: [...]} or {type, known, total}
+  const answerResults = (rawAnswers?.results ?? []) as Record<string, unknown>[];
   const scored = attempt.score != null && attempt.max_score != null;
   const pct = scored
     ? Math.round((Number(attempt.score) / Number(attempt.max_score)) * 100)
@@ -124,51 +126,102 @@ export default async function ReviewDetailPage({
           )}
 
           {/* Show answers based on quiz type */}
-          {quiz?.type === "gap_fill" && answers && (
+          {quiz?.type === "gap_fill" && answerResults.length > 0 && (
             <div className="space-y-2">
               <h3 className="font-medium text-sm">Student Answers</h3>
-              {Object.entries(answers).map(([key, value]) => (
-                <div
-                  key={key}
-                  className="flex items-center gap-2 text-sm bg-muted/50 rounded px-3 py-2"
-                >
-                  <span className="font-mono text-muted-foreground">
-                    Q{Number(key) + 1}:
-                  </span>
-                  <span>{String(value)}</span>
-                </div>
-              ))}
+              {answerResults.map((result, index) => {
+                const r = result as {
+                  userAnswer?: string;
+                  correctAnswer?: string;
+                  isCorrect?: boolean;
+                };
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-start gap-3 text-sm rounded px-3 py-2 ${
+                      r.isCorrect
+                        ? "bg-green-50 dark:bg-green-950/30"
+                        : "bg-red-50 dark:bg-red-950/30"
+                    }`}
+                  >
+                    <span className="font-mono text-muted-foreground shrink-0">
+                      Q{index + 1}:
+                    </span>
+                    <div>
+                      <p>
+                        Answer: <strong>{r.userAnswer ?? "—"}</strong>
+                        {r.isCorrect === false && r.correctAnswer && (
+                          <span className="text-muted-foreground ml-2">
+                            (Correct: <strong>{r.correctAnswer}</strong>)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`ml-auto shrink-0 text-xs ${r.isCorrect ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {r.isCorrect ? "Correct" : "Wrong"}
+                    </Badge>
+                  </div>
+                );
+              })}
             </div>
           )}
 
-          {quiz?.type === "translation" && answers && (
+          {quiz?.type === "translation" && answerResults.length > 0 && (
             <div className="space-y-2">
               <h3 className="font-medium text-sm">Translation Answers</h3>
-              {Object.entries(answers).map(([key, value]) => {
-                const answer = value as {
-                  input?: string;
+              {answerResults.map((result, index) => {
+                const r = result as {
+                  ukrainianSentence?: string;
+                  userTranslation?: string;
+                  referenceTranslation?: string;
                   score?: number;
                   feedback?: string;
                 };
                 return (
                   <div
-                    key={key}
+                    key={index}
                     className="bg-muted/50 rounded px-3 py-2 space-y-1"
                   >
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-mono text-muted-foreground">
-                        Q{Number(key) + 1}:
+                        Q{index + 1}:
                       </span>
-                      {answer?.score != null && (
-                        <Badge variant="outline" className="text-xs">
-                          {answer.score}/100
+                      {r.score != null && (
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${
+                            r.score >= 80
+                              ? "text-green-600"
+                              : r.score >= 50
+                                ? "text-orange-600"
+                                : "text-red-600"
+                          }`}
+                        >
+                          {r.score}/100
                         </Badge>
                       )}
                     </div>
-                    {answer?.input && <p className="text-sm">{answer.input}</p>}
-                    {answer?.feedback && (
+                    {r.ukrainianSentence && (
+                      <p className="text-sm text-muted-foreground">
+                        {r.ukrainianSentence}
+                      </p>
+                    )}
+                    {r.userTranslation && (
+                      <p className="text-sm">
+                        Student: <em>{r.userTranslation}</em>
+                      </p>
+                    )}
+                    {r.referenceTranslation && (
+                      <p className="text-sm text-muted-foreground">
+                        Reference: <em>{r.referenceTranslation}</em>
+                      </p>
+                    )}
+                    {r.feedback && (
                       <p className="text-xs text-muted-foreground">
-                        AI: {answer.feedback}
+                        AI: {r.feedback}
                       </p>
                     )}
                   </div>

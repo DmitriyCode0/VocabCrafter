@@ -56,6 +56,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: TrendingUp,
     roles: ["student"],
   },
+  {
+    label: "Feedback",
+    href: "/feedback",
+    icon: MessageSquare,
+    roles: ["student"],
+  },
   // Tutor items
   {
     label: "My Quizzes",
