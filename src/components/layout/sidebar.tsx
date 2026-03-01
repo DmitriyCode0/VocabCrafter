@@ -13,12 +13,12 @@ interface SidebarProps {
 export function Sidebar({ profile }: SidebarProps) {
   return (
     <aside className="hidden w-64 shrink-0 border-r bg-sidebar md:flex md:flex-col">
-      <div className="flex h-14 items-center border-b px-4">
+      <div className="flex h-16 items-center border-b px-5">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2 font-semibold"
+          className="flex items-center gap-3 font-semibold text-lg"
         >
-          <BookOpen className="h-5 w-5 text-primary" />
+          <BookOpen className="h-6 w-6 text-primary" />
           <span>VocabCrafter</span>
         </Link>
       </div>
