@@ -131,9 +131,7 @@ export default async function BillingPage() {
       ? 0
       : Math.min(
           100,
-          Math.round(
-            ((myMonthlyQuizzes ?? 0) / plan.quizzesPerMonth) * 100,
-          ),
+          Math.round(((myMonthlyQuizzes ?? 0) / plan.quizzesPerMonth) * 100),
         );
 
   const attemptUsagePct =
@@ -141,9 +139,7 @@ export default async function BillingPage() {
       ? 0
       : Math.min(
           100,
-          Math.round(
-            ((myMonthlyAttempts ?? 0) / plan.attemptsPerMonth) * 100,
-          ),
+          Math.round(((myMonthlyAttempts ?? 0) / plan.attemptsPerMonth) * 100),
         );
 
   return (
@@ -203,9 +199,7 @@ export default async function BillingPage() {
               {myMonthlyQuizzes ?? 0}{" "}
               <span className="text-sm font-normal text-muted-foreground">
                 /{" "}
-                {plan.quizzesPerMonth === Infinity
-                  ? "∞"
-                  : plan.quizzesPerMonth}
+                {plan.quizzesPerMonth === Infinity ? "∞" : plan.quizzesPerMonth}
               </span>
             </div>
             <Progress value={quizUsagePct} className="h-2" />
@@ -427,8 +421,7 @@ async function AdminUsageSection() {
           <CardContent>
             <div className="text-2xl font-bold">${monthlyCost.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              Est. for{" "}
-              {new Date().toLocaleString("en-US", { month: "long" })}
+              Est. for {new Date().toLocaleString("en-US", { month: "long" })}
             </p>
           </CardContent>
         </Card>
