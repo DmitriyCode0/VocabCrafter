@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -22,25 +22,132 @@ import { ACTIVITY_LABELS } from "@/lib/constants";
 import type { Role } from "@/types/roles";
 import { AttemptDetail } from "./attempt-detail";
 
-interface QuizInfo {
-  title?: string;
-  type?: string;
-  cefr_level?: string;
-}
-
-interface StudentInfo {
-  full_name?: string | null;
-  email?: string;
-  avatar_url?: string | null;
+interface ExtendedAttempt {
+  id: string;
+  student_id: string;
+  score: number | null;
+  max_score: number | null;
+  completed_at: string;
+  quizzes?: {
+    title: string;
+    type: string;
+    cefr_level: string;
+  } | null;
+  profiles?: {
+    full_name: string | null;
+    email: string;
+    avatar_url: string | null;
+  } | null;
+  [key: string]: any;
 }
 
 interface HistoryClientProps {
   role: Role;
-  attempts: Record<string, unknown>[];
-  students: Record<string, unknown>[];
+  attempts: any[];
+  students: any[];
   userId?: string;
   initialStudentFilter?: string;
 }
+
+const AttemptCard = React.memo(function AttemptCard({
+  attempt,
+  isTutor,
+  userId,
+  isExpanded,
+  onToggleExpand,
+}: {
+  attempt: ExtendedAttempt;
+  isTutor: boolean;
+  userId?: string;
+  isExpanded: boolean;
+  onToggleExpand: (id: string) => void;
+}) {
+  const quiz = attempt.quizzes;
+  const student = attempt.profiles;
+  const scored = attempt.score != null && attempt.max_score != null;
+  const pct = scored
+    ? Math.round((Number(attempt.score) / Number(attempt.max_score)) * 100)
+    : null;
+  const isOwnAttempt = userId && attempt.student_id === userId;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            {isTutor && (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
+                <User className="h-3.5 w-3.5" />
+                <span className="max-w-[140px] truncate">
+                  {isOwnAttempt
+                    ? "You"
+                    : student?.full_name || student?.email || "Unknown"}
+                </span>
+              </div>
+            )}
+            <CardTitle className="text-base truncate">
+              {quiz?.title ?? "Quiz"}
+            </CardTitle>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {quiz && (
+              <Badge variant="outline">
+                {ACTIVITY_LABELS[quiz.type ?? ""] || quiz.type}
+              </Badge>
+            )}
+            {quiz?.cefr_level && (
+              <Badge variant="secondary">{quiz.cefr_level}</Badge>
+            )}
+            {pct !== null && (
+              <Badge
+                variant={
+                  pct >= 80 ? "default" : pct >= 50 ? "secondary" : "destructive"
+                }
+              >
+                {pct}%
+              </Badge>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">
+            {new Date(attempt.completed_at).toLocaleString()}
+            {scored && (
+              <span className="ml-2">
+                Score: {Number(attempt.score)} / {Number(attempt.max_score)}
+              </span>
+            )}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onToggleExpand(attempt.id)}
+          >
+            {isExpanded ? (
+              <>
+                Hide Details
+                <ChevronUp className="ml-1 h-4 w-4" />
+              </>
+            ) : (
+              <>
+                Show Details
+                <ChevronDown className="ml-1 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </div>
+
+        {isExpanded && (
+          <div className="mt-4 border-t pt-4">
+            <AttemptDetail attempt={attempt as Record<string, unknown>} />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+});
 
 export function HistoryClient({
   role,
@@ -52,25 +159,35 @@ export function HistoryClient({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStudent, setFilterStudent] = useState<string>(
-    initialStudentFilter || "all",
+    initialStudentFilter || "all"
   );
 
-  const filtered = attempts.filter((a) => {
-    const quiz = a.quizzes as QuizInfo | null;
-    if (filterType !== "all" && quiz?.type !== filterType) return false;
-    if (filterStudent !== "all" && a.student_id !== filterStudent) return false;
-    return true;
-  });
+  const typedAttempts = useMemo(() => attempts as ExtendedAttempt[], [attempts]);
+
+  const filtered = useMemo(() => {
+    return typedAttempts.filter((a) => {
+      const quiz = a.quizzes;
+      if (filterType !== "all" && quiz?.type !== filterType) return false;
+      if (filterStudent !== "all" && a.student_id !== filterStudent) return false;
+      return true;
+    });
+  }, [typedAttempts, filterType, filterStudent]);
 
   const isTutor = role === "tutor" || role === "superadmin";
 
-  const quizTypes = [
-    ...new Set(
-      attempts
-        .map((a) => (a.quizzes as QuizInfo | null)?.type)
-        .filter((t): t is string => !!t),
-    ),
-  ];
+  const quizTypes = useMemo(() => {
+    return [
+      ...new Set(
+        typedAttempts
+          .map((a) => a.quizzes?.type)
+          .filter((t): t is string => !!t)
+      ),
+    ];
+  }, [typedAttempts]);
+
+  const handleToggleExpand = React.useCallback((id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -137,110 +254,16 @@ export function HistoryClient({
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map((attempt) => {
-            const quiz = attempt.quizzes as QuizInfo | null;
-            const student = attempt.profiles as StudentInfo | null;
-            const scored = attempt.score != null && attempt.max_score != null;
-            const pct = scored
-              ? Math.round(
-                  (Number(attempt.score) / Number(attempt.max_score)) * 100,
-                )
-              : null;
-            const isExpanded = expandedId === (attempt.id as string);
-            const isOwnAttempt =
-              userId && (attempt.student_id as string) === userId;
-
-            return (
-              <Card key={attempt.id as string}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {isTutor && (
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
-                          <User className="h-3.5 w-3.5" />
-                          <span className="max-w-[140px] truncate">
-                            {isOwnAttempt
-                              ? "You"
-                              : student?.full_name ||
-                                student?.email ||
-                                "Unknown"}
-                          </span>
-                        </div>
-                      )}
-                      <CardTitle className="text-base truncate">
-                        {quiz?.title ?? "Quiz"}
-                      </CardTitle>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {quiz && (
-                        <Badge variant="outline">
-                          {ACTIVITY_LABELS[quiz.type ?? ""] || quiz.type}
-                        </Badge>
-                      )}
-                      {quiz?.cefr_level && (
-                        <Badge variant="secondary">{quiz.cefr_level}</Badge>
-                      )}
-                      {pct !== null && (
-                        <Badge
-                          variant={
-                            pct >= 80
-                              ? "default"
-                              : pct >= 50
-                                ? "secondary"
-                                : "destructive"
-                          }
-                        >
-                          {pct}%
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(
-                        attempt.completed_at as string,
-                      ).toLocaleString()}
-                      {scored && (
-                        <span className="ml-2">
-                          Score: {Number(attempt.score)} /{" "}
-                          {Number(attempt.max_score)}
-                        </span>
-                      )}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setExpandedId(
-                          isExpanded ? null : (attempt.id as string),
-                        )
-                      }
-                    >
-                      {isExpanded ? (
-                        <>
-                          Hide Details
-                          <ChevronUp className="ml-1 h-4 w-4" />
-                        </>
-                      ) : (
-                        <>
-                          Show Details
-                          <ChevronDown className="ml-1 h-4 w-4" />
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  {isExpanded && (
-                    <div className="mt-4 border-t pt-4">
-                      <AttemptDetail attempt={attempt} />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+          {filtered.map((attempt) => (
+            <AttemptCard
+              key={attempt.id}
+              attempt={attempt}
+              isTutor={isTutor}
+              userId={userId}
+              isExpanded={expandedId === attempt.id}
+              onToggleExpand={handleToggleExpand}
+            />
+          ))}
         </div>
       )}
     </div>
