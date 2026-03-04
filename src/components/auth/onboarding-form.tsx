@@ -66,7 +66,7 @@ export function OnboardingForm() {
       .update({
         role: selectedRole,
         full_name: fullName || null,
-        cefr_level: selectedRole === "student" ? cefrLevel : null,
+        cefr_level: selectedRole === "student" ? cefrLevel : undefined,
         onboarding_completed: true,
       })
       .eq("id", user.id);
