@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getGenAI, GEMINI_MODEL } from "@/lib/gemini/client";
+import { generateFromGemini } from "@/lib/gemini/client";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { z } from "zod";
 
@@ -80,31 +80,15 @@ Respond with JSON in this exact format:
   ]
 }`;
 
-    const response = await getGenAI().models.generateContent({
-      model: GEMINI_MODEL,
-      contents: prompt,
-      config: {
+    const result = await generateFromGemini(
+      {
+        prompt,
         systemInstruction:
           "You are a professional English-Ukrainian vocabulary extraction tool. Always respond with valid JSON only. Do not include any markdown formatting or code blocks.",
         temperature: 0.3,
       },
-    });
-
-    const responseText = response.text;
-
-    if (!responseText) {
-      return NextResponse.json(
-        { error: "AI returned empty response" },
-        { status: 502 },
-      );
-    }
-
-    const cleaned = responseText
-      .replace(/```(?:json)?\s*\n?/g, "")
-      .replace(/\n?```\s*$/g, "")
-      .trim();
-
-    const result = parsedTermSchema.parse(JSON.parse(cleaned));
+      parsedTermSchema,
+    );
 
     // Increment AI call counter after successful parse
     await incrementAICalls(user.id);

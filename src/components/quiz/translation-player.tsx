@@ -13,11 +13,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Loader2 } from "lucide-react";
-import type { TranslationQuestion } from "@/types/quiz";
+import type { TranslationQuestion, QuizConfig } from "@/types/quiz";
 
 interface TranslationPlayerProps {
   questions: TranslationQuestion[];
   cefrLevel?: string;
+  quizConfig?: QuizConfig;
   onComplete: (results: TranslationResult[]) => void;
 }
 
@@ -33,6 +34,7 @@ export interface TranslationResult {
 export function TranslationPlayer({
   questions,
   cefrLevel,
+  quizConfig,
   onComplete,
 }: TranslationPlayerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -61,6 +63,7 @@ export function TranslationPlayer({
           userTranslation: userTranslation.trim(),
           referenceTranslation: question.englishReference,
           cefrLevel: cefrLevel ?? "B1",
+          config: quizConfig,
         }),
       });
 

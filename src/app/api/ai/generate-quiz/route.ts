@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getGenAI, GEMINI_MODEL } from "@/lib/gemini/client";
+import { generateFromGemini } from "@/lib/gemini/client";
 import { getQuizPrompt, getSystemInstruction } from "@/lib/gemini/prompts";
-import { parseQuizResponse } from "@/lib/gemini/validation";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import type { GenerateQuizRequest } from "@/types/quiz";
 import { z } from "zod";
+import {
+  mcqResponseSchema,
+  gapFillResponseSchema,
+  translationResponseSchema,
+  textTranslationResponseSchema,
+  matchingResponseSchema,
+  flashcardsResponseSchema,
+  discussionResponseSchema,
+} from "@/lib/gemini/validation";
+import type { QuizType } from "@/types/quiz";
 
 const requestSchema = z.object({
   type: z.enum([
@@ -85,25 +94,21 @@ export async function POST(request: Request) {
     const prompt = getQuizPrompt(type, terms, config);
     const systemInstruction = getSystemInstruction(config);
 
-    const response = await getGenAI().models.generateContent({
-      model: GEMINI_MODEL,
-      contents: prompt,
-      config: {
-        systemInstruction,
-        temperature: 0.7,
-      },
-    });
+    const SCHEMA_MAP: Record<QuizType, z.ZodSchema> = {
+      mcq: mcqResponseSchema,
+      gap_fill: gapFillResponseSchema,
+      translation: translationResponseSchema,
+      text_translation: textTranslationResponseSchema,
+      translation_list: translationResponseSchema,
+      matching: matchingResponseSchema,
+      flashcards: flashcardsResponseSchema,
+      discussion: discussionResponseSchema,
+    };
 
-    const text = response.text;
-
-    if (!text) {
-      return NextResponse.json(
-        { error: "AI returned empty response" },
-        { status: 502 },
-      );
-    }
-
-    const generatedContent = parseQuizResponse(type, text);
+    const generatedContent = await generateFromGemini(
+      { prompt, systemInstruction, temperature: 0.7 },
+      SCHEMA_MAP[type],
+    );
 
     // Increment AI call counter after successful generation
     await incrementAICalls(user.id);

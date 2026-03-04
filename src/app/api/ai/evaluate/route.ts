@@ -1,13 +1,27 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getGenAI, GEMINI_MODEL } from "@/lib/gemini/client";
+import { generateFromGemini } from "@/lib/gemini/client";
+import { getEvaluationPrompt } from "@/lib/gemini/prompts";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { z } from "zod";
+import type { QuizConfig } from "@/types/quiz";
 
 const requestSchema = z.object({
   userTranslation: z.string().min(1),
   referenceTranslation: z.string().min(1),
   cefrLevel: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]),
+  // Full config for rich evaluation — optional for backward compatibility
+  config: z
+    .object({
+      cefrLevel: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]),
+      vocabularyChallenge: z.enum(["Simple", "Standard", "Complex"]),
+      grammarChallenge: z.enum(["Simple", "Standard", "Complex"]),
+      teacherPersona: z.enum(["learning", "strict", "standard"]),
+      timedMode: z.boolean(),
+      grammarTopics: z.array(z.string()).optional(),
+      customTopic: z.string().optional(),
+    })
+    .optional(),
 });
 
 const evaluationResponseSchema = z.object({
@@ -37,7 +51,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { userTranslation, referenceTranslation, cefrLevel } = parsed.data;
+    const { userTranslation, referenceTranslation, cefrLevel, config } =
+      parsed.data;
 
     // --- Enforce AI quota ---
     const quota = await checkAIQuota(user.id);
@@ -51,48 +66,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const prompt = `Evaluate the following English translation attempt.
+    // Build a full QuizConfig — use provided config or fall back to defaults
+    const evalConfig: QuizConfig = config ?? {
+      cefrLevel,
+      vocabularyChallenge: "Standard",
+      grammarChallenge: "Standard",
+      teacherPersona: "standard",
+      timedMode: false,
+    };
 
-CEFR Level: ${cefrLevel}
+    const prompt = getEvaluationPrompt(
+      userTranslation,
+      referenceTranslation,
+      evalConfig,
+    );
 
-Reference translation: "${referenceTranslation}"
-Student's translation: "${userTranslation}"
-
-Score the translation from 0 to 100 and provide constructive feedback.
-Consider: accuracy, grammar, vocabulary usage, and naturalness.
-Be encouraging but honest about mistakes.
-
-Respond with JSON in this exact format:
-{
-  "score": 85,
-  "feedback": "Detailed feedback here"
-}`;
-
-    const response = await getGenAI().models.generateContent({
-      model: GEMINI_MODEL,
-      contents: prompt,
-      config: {
+    const result = await generateFromGemini(
+      {
+        prompt,
         systemInstruction:
           "You are a professional English language teacher evaluating student translations. Always respond with valid JSON only. Do not include any markdown formatting or code blocks.",
         temperature: 0.4,
       },
-    });
-
-    const responseText = response.text;
-
-    if (!responseText) {
-      return NextResponse.json(
-        { error: "AI returned empty response" },
-        { status: 502 },
-      );
-    }
-
-    const cleaned = responseText
-      .replace(/```(?:json)?\s*\n?/g, "")
-      .replace(/\n?```\s*$/g, "")
-      .trim();
-
-    const result = evaluationResponseSchema.parse(JSON.parse(cleaned));
+      evaluationResponseSchema,
+    );
 
     // Increment AI call counter after successful evaluation
     await incrementAICalls(user.id);

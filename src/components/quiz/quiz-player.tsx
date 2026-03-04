@@ -43,6 +43,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const [flashcardTotal, setFlashcardTotal] = useState(0);
 
   const content = quiz.generated_content as Record<string, unknown>;
+  const quizConfig = quiz.config as
+    | import("@/types/quiz").QuizConfig
+    | null
+    | undefined;
 
   function handleRestart() {
     setShowResults(false);
@@ -162,6 +166,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       <TranslationPlayer
         questions={questions}
         cefrLevel={quiz.cefr_level}
+        quizConfig={quizConfig ?? undefined}
         onComplete={(results) => {
           setTranslationResults(results);
           setShowResults(true);
