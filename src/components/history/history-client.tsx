@@ -110,10 +110,7 @@ export function HistoryClient({
               <SelectItem value="all">All Students</SelectItem>
               {userId && <SelectItem value={userId}>My Attempts</SelectItem>}
               {students.map((s) => (
-                <SelectItem
-                  key={s.id as string}
-                  value={s.id as string}
-                >
+                <SelectItem key={s.id as string} value={s.id as string}>
                   {(s.full_name as string) || (s.email as string)}
                 </SelectItem>
               ))}
@@ -143,8 +140,7 @@ export function HistoryClient({
           {filtered.map((attempt) => {
             const quiz = attempt.quizzes as QuizInfo | null;
             const student = attempt.profiles as StudentInfo | null;
-            const scored =
-              attempt.score != null && attempt.max_score != null;
+            const scored = attempt.score != null && attempt.max_score != null;
             const pct = scored
               ? Math.round(
                   (Number(attempt.score) / Number(attempt.max_score)) * 100,
@@ -182,9 +178,7 @@ export function HistoryClient({
                         </Badge>
                       )}
                       {quiz?.cefr_level && (
-                        <Badge variant="secondary">
-                          {quiz.cefr_level}
-                        </Badge>
+                        <Badge variant="secondary">{quiz.cefr_level}</Badge>
                       )}
                       {pct !== null && (
                         <Badge
