@@ -173,9 +173,13 @@ export default async function UsersPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {profile.cefr_level ?? "—"}
-                        </Badge>
+                        {profile.role === "student" ? (
+                          <Badge variant="outline" className="text-xs">
+                            {profile.cefr_level ?? "—"}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
                       </TableCell>
                       <TableCell>{userQuizMap[profile.id] ?? 0}</TableCell>
                       <TableCell>{userAttemptMap[profile.id] ?? 0}</TableCell>
