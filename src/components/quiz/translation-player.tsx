@@ -245,8 +245,9 @@ export function TranslationPlayer({
                     if (!trimmed) return null;
                     const isPass = trimmed.startsWith("✓");
                     const isFail = trimmed.startsWith("✗");
-                    const isSuggested =
-                      trimmed.toLowerCase().startsWith("suggested");
+                    const isSuggested = trimmed
+                      .toLowerCase()
+                      .startsWith("suggested");
                     return (
                       <p
                         key={i}
