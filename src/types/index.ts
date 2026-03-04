@@ -34,4 +34,5 @@ export type {
   QuizAttempt,
   Assignment,
   Feedback,
+  TutorStudent,
 } from "./database";

@@ -15,6 +15,9 @@ import {
   TrendingUp,
   Zap,
   Brain,
+  History,
+  UserCheck,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types/roles";
@@ -70,6 +73,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: MessageSquare,
     roles: ["student"],
   },
+  {
+    label: "My Tutors",
+    href: "/tutors",
+    icon: UserCheck,
+    roles: ["student"],
+  },
   // Tutor items
   {
     label: "My Quizzes",
@@ -100,6 +109,19 @@ const NAV_ITEMS: NavItem[] = [
     href: "/mastery",
     icon: Brain,
     roles: ["tutor"],
+  },
+  {
+    label: "My Students",
+    href: "/students",
+    icon: UserPlus,
+    roles: ["tutor"],
+  },
+  // Shared items
+  {
+    label: "History",
+    href: "/history",
+    icon: History,
+    roles: ["student", "tutor", "superadmin"],
   },
   // Admin items
   {
