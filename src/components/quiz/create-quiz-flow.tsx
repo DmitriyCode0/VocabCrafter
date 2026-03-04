@@ -30,6 +30,13 @@ import { GrammarTopicSelector } from "@/components/quiz/grammar-topic-selector";
 import { useUser } from "@/hooks/use-user";
 import { Switch } from "@/components/ui/switch";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
@@ -38,8 +45,20 @@ import {
   Languages,
   Save,
   Globe,
+  GraduationCap,
 } from "lucide-react";
-import type { QuizTerm } from "@/types/quiz";
+import type { QuizTerm, CEFRLevel } from "@/types/quiz";
+
+const CEFR_LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
+
+const CEFR_DESCRIPTIONS: Record<CEFRLevel, string> = {
+  A1: "Beginner",
+  A2: "Elementary",
+  B1: "Intermediate",
+  B2: "Upper Intermediate",
+  C1: "Advanced",
+  C2: "Proficiency",
+};
 
 type Step = "input" | "edit" | "activity";
 type ActivityType = "flashcards" | "gap_fill" | "translation";
@@ -73,9 +92,11 @@ const ACTIVITIES: {
 export function CreateQuizFlow() {
   const router = useRouter();
   const { profile } = useUser();
-  const cefrLevel = profile?.cefr_level || "B1";
+  const isTutor = profile?.role === "tutor" || profile?.role === "superadmin";
+  const defaultCefr: CEFRLevel = (profile?.cefr_level as CEFRLevel) || "B1";
 
   const [step, setStep] = useState<Step>("input");
+  const [cefrLevel, setCefrLevel] = useState<CEFRLevel>(isTutor ? "B1" : defaultCefr);
   const [terms, setTerms] = useState<QuizTerm[]>([]);
   const [title, setTitle] = useState("");
   const [selectedActivity, setSelectedActivity] = useState<ActivityType | null>(
@@ -417,6 +438,38 @@ export function CreateQuizFlow() {
               checked={isPublic}
               onCheckedChange={setIsPublic}
             />
+          </div>
+
+          {/* Difficulty (CEFR level) selector */}
+          <div className="rounded-lg border p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <GraduationCap className="h-5 w-5 text-muted-foreground" />
+              <div className="space-y-0.5">
+                <Label htmlFor="cefr-select" className="font-medium">
+                  Difficulty Level
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {isTutor
+                    ? "Choose the CEFR difficulty for this quiz"
+                    : "Defaults to your profile level — override if needed"}
+                </p>
+              </div>
+            </div>
+            <Select
+              value={cefrLevel}
+              onValueChange={(v) => setCefrLevel(v as CEFRLevel)}
+            >
+              <SelectTrigger id="cefr-select" className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CEFR_LEVELS.map((lvl) => (
+                  <SelectItem key={lvl} value={lvl}>
+                    {lvl} — {CEFR_DESCRIPTIONS[lvl]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Grammar topic selector - only for translation activity */}

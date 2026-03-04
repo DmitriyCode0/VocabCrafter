@@ -70,7 +70,7 @@ export function QuizCard({ quiz }: QuizCardProps) {
               </Badge>
             </div>
             <CardDescription>
-              {Array.isArray(terms) ? terms.length : 0} terms &middot; CEFR{" "}
+              {Array.isArray(terms) ? terms.length : 0} terms &middot;{" "}
               {quiz.cefr_level}
             </CardDescription>
             <p className="text-xs text-muted-foreground">

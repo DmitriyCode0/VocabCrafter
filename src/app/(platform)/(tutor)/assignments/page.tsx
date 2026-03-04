@@ -296,8 +296,8 @@ async function StudentAssignments({
                         {cls && <span>Class: {cls.name}</span>}
                         {quiz && (
                           <span>
-                            {ACTIVITY_LABELS[quiz.type] || quiz.type} &middot;
-                            CEFR {quiz.cefr_level}
+                            {ACTIVITY_LABELS[quiz.type] || quiz.type} &middot;{" "}
+                            {quiz.cefr_level}
                           </span>
                         )}
                       </div>

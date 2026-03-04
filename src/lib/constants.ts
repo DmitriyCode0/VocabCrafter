@@ -2,4 +2,9 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   flashcards: "Flashcards",
   gap_fill: "Fill in the Gap",
   translation: "Translation",
+  mcq: "Multiple Choice",
+  matching: "Matching",
+  text_translation: "Text Translation",
+  translation_list: "Translation List",
+  discussion: "Discussion",
 };
