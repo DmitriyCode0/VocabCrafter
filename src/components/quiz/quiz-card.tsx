@@ -18,7 +18,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Trash2, Loader2 } from "lucide-react";
 import type { Quiz } from "@/types/database";
@@ -81,19 +80,18 @@ export function QuizCard({ quiz }: QuizCardProps) {
       </Link>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute bottom-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </DialogTrigger>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute bottom-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDialogOpen(true);
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
         <DialogContent onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
             <DialogTitle>Delete Quiz</DialogTitle>
