@@ -177,7 +177,19 @@ export function TranslationPlayer({
           <Textarea
             value={userTranslation}
             onChange={(e) => setUserTranslation(e.target.value)}
-            placeholder="Type your English translation..."
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !evaluation &&
+                !isEvaluating &&
+                userTranslation.trim()
+              ) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder="Type your English translation... (Enter to submit, Shift+Enter for new line)"
             rows={3}
             disabled={!!evaluation || isEvaluating}
           />
