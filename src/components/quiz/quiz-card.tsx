@@ -64,7 +64,7 @@ export function QuizCard({ quiz }: QuizCardProps) {
         <Card className="h-full transition-colors hover:border-primary cursor-pointer">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base pr-6">{quiz.title}</CardTitle>
+              <CardTitle className="text-base">{quiz.title}</CardTitle>
               <Badge variant="secondary" className="text-xs shrink-0">
                 {ACTIVITY_LABELS[quiz.type] || quiz.type}
               </Badge>
@@ -85,7 +85,7 @@ export function QuizCard({ quiz }: QuizCardProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+            className="absolute bottom-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
