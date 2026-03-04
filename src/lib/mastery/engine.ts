@@ -220,7 +220,9 @@ export function computeNewMastery(
 
   // Compute next review interval: 1 day × 2^(level-1), min 1 day
   const intervalDays = newLevel >= 1 ? Math.pow(2, newLevel - 1) : 1;
-  const nextReview = new Date(now.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+  const nextReview = new Date(
+    now.getTime() + intervalDays * 24 * 60 * 60 * 1000,
+  );
 
   return {
     mastery_level: newLevel,
@@ -245,7 +247,10 @@ export async function upsertWordMastery(
   if (wordResults.length === 0) return;
 
   // Deduplicate: if a term appears multiple times in one quiz, aggregate
-  const termResults = new Map<string, { definition: string; correctCount: number; totalCount: number }>();
+  const termResults = new Map<
+    string,
+    { definition: string; correctCount: number; totalCount: number }
+  >();
   for (const wr of wordResults) {
     const existing = termResults.get(wr.term) ?? {
       definition: wr.definition,

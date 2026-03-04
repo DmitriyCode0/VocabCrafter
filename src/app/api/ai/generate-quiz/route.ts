@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getGenAI, GEMINI_MODEL } from "@/lib/gemini/client";
 import { getQuizPrompt, getSystemInstruction } from "@/lib/gemini/prompts";
 import { parseQuizResponse } from "@/lib/gemini/validation";
+import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import type { GenerateQuizRequest } from "@/types/quiz";
 import { z } from "zod";
 
@@ -61,6 +62,26 @@ export async function POST(request: Request) {
 
     const { type, terms, config } = parsed.data as GenerateQuizRequest;
 
+    // --- Enforce AI quota ---
+    const quota = await checkAIQuota(user.id);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: `AI call limit reached (${quota.limit}/month). Upgrade your plan for more.`,
+          code: "QUOTA_EXCEEDED",
+        },
+        { status: 429 },
+      );
+    }
+
+    // Sanitize customTopic to prevent prompt injection
+    if (config.customTopic) {
+      config.customTopic = config.customTopic
+        .replace(/[\r\n]+/g, " ")
+        .replace(/[{}\[\]`]/g, "")
+        .slice(0, 200);
+    }
+
     const prompt = getQuizPrompt(type, terms, config);
     const systemInstruction = getSystemInstruction(config);
 
@@ -83,6 +104,9 @@ export async function POST(request: Request) {
     }
 
     const generatedContent = parseQuizResponse(type, text);
+
+    // Increment AI call counter after successful generation
+    await incrementAICalls(user.id);
 
     return NextResponse.json({ content: generatedContent });
   } catch (error) {

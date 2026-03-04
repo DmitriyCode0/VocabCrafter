@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  extractWordResults,
-  upsertWordMastery,
-} from "@/lib/mastery/engine";
+import { extractWordResults, upsertWordMastery } from "@/lib/mastery/engine";
 
 /**
  * POST /api/mastery/backfill
@@ -108,10 +105,7 @@ export async function POST() {
           skipped++;
         }
       } catch (err) {
-        console.error(
-          `Backfill: error processing attempt ${attempt.id}:`,
-          err,
-        );
+        console.error(`Backfill: error processing attempt ${attempt.id}:`, err);
         skipped++;
       }
     }

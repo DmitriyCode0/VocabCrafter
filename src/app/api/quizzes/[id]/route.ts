@@ -36,10 +36,14 @@ export async function PATCH(
 
     const updates: Record<string, unknown> = {};
     if (parsed.data.title !== undefined) updates.title = parsed.data.title;
-    if (parsed.data.isPublic !== undefined) updates.is_public = parsed.data.isPublic;
+    if (parsed.data.isPublic !== undefined)
+      updates.is_public = parsed.data.isPublic;
 
     if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No fields to update" },
+        { status: 400 },
+      );
     }
 
     const { data: quiz, error } = await supabase

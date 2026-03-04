@@ -166,7 +166,9 @@ export default async function UsersPage() {
                       <TableCell>
                         <RoleSelector
                           userId={profile.id}
-                          currentRole={profile.role as "student" | "tutor" | "superadmin"}
+                          currentRole={
+                            profile.role as "student" | "tutor" | "superadmin"
+                          }
                           isSelf={profile.id === currentUserId}
                         />
                       </TableCell>

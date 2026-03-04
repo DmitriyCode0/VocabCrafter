@@ -144,7 +144,8 @@ export default async function ProgressPage() {
     .select("mastery_level")
     .eq("student_id", user.id);
   const totalWords = masteryRows?.length ?? 0;
-  const masteredWords = masteryRows?.filter((r) => r.mastery_level >= 4).length ?? 0;
+  const masteredWords =
+    masteryRows?.filter((r) => r.mastery_level >= 4).length ?? 0;
 
   return (
     <div className="space-y-6">

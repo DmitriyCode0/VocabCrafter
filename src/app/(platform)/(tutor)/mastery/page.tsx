@@ -106,9 +106,7 @@ export default async function TutorMasteryPage() {
     .select("student_id")
     .in("class_id", classIds);
 
-  const studentIds = [
-    ...new Set((members ?? []).map((m) => m.student_id)),
-  ];
+  const studentIds = [...new Set((members ?? []).map((m) => m.student_id))];
 
   if (studentIds.length === 0) {
     return (

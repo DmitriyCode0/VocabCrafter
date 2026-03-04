@@ -31,6 +31,17 @@ export default async function ReviewDetailPage({
 
   if (!user) redirect("/login");
 
+  // Verify the user is a tutor or superadmin before using admin client
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile || (profile.role !== "tutor" && profile.role !== "superadmin")) {
+    redirect("/dashboard");
+  }
+
   // Use admin client to bypass RLS for cross-table queries
   const supabaseAdmin = createAdminClient();
 
@@ -38,12 +49,36 @@ export default async function ReviewDetailPage({
   const { data: attempt } = await supabaseAdmin
     .from("quiz_attempts")
     .select(
-      "*, quizzes(title, type, vocabulary_terms, config), profiles(full_name, email)",
+      "*, quizzes(title, type, vocabulary_terms, config, creator_id), profiles(full_name, email)",
     )
     .eq("id", id)
     .single();
 
   if (!attempt) notFound();
+
+  // Ownership check: verify the tutor owns the quiz or assigned it via a class
+  const quizData = attempt.quizzes as unknown as {
+    title: string;
+    type: string;
+    vocabulary_terms: string[];
+    config: Record<string, unknown>;
+    creator_id: string;
+  } | null;
+
+  if (quizData?.creator_id !== user.id && profile.role !== "superadmin") {
+    // Check if the tutor assigned this quiz via one of their classes
+    const { data: assignment } = await supabaseAdmin
+      .from("assignments")
+      .select("id")
+      .eq("quiz_id", attempt.quiz_id)
+      .eq("tutor_id", user.id)
+      .limit(1)
+      .single();
+
+    if (!assignment) {
+      redirect("/review");
+    }
+  }
 
   // Fetch existing feedback for this attempt
   const { data: feedbackList } = await supabaseAdmin
@@ -52,12 +87,7 @@ export default async function ReviewDetailPage({
     .eq("attempt_id", id)
     .order("created_at", { ascending: false });
 
-  const quiz = attempt.quizzes as unknown as {
-    title: string;
-    type: string;
-    vocabulary_terms: string[];
-    config: Record<string, unknown>;
-  } | null;
+  const quiz = quizData;
   const student = attempt.profiles as unknown as {
     full_name: string | null;
     email: string;

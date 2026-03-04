@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getGenAI, GEMINI_MODEL } from "@/lib/gemini/client";
+import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { z } from "zod";
 
 const requestSchema = z.object({
@@ -39,6 +40,18 @@ export async function POST(request: Request) {
     }
 
     const { text } = parsed.data;
+
+    // --- Enforce AI quota ---
+    const quota = await checkAIQuota(user.id);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: `AI call limit reached (${quota.limit}/month). Upgrade your plan for more.`,
+          code: "QUOTA_EXCEEDED",
+        },
+        { status: 429 },
+      );
+    }
 
     const prompt = `You are a vocabulary extraction assistant. Analyze the following text and extract individual English words or short phrases (2-3 words max) that would be useful vocabulary for an English language learner.
 
@@ -92,6 +105,9 @@ Respond with JSON in this exact format:
       .trim();
 
     const result = parsedTermSchema.parse(JSON.parse(cleaned));
+
+    // Increment AI call counter after successful parse
+    await incrementAICalls(user.id);
 
     return NextResponse.json(result);
   } catch (error) {

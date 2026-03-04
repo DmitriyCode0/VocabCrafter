@@ -21,7 +21,11 @@ export interface FlashcardResult {
 
 interface FlashcardPlayerProps {
   cards: FlashcardItem[];
-  onComplete: (results: FlashcardResult[], known: number, total: number) => void;
+  onComplete: (
+    results: FlashcardResult[],
+    known: number,
+    total: number,
+  ) => void;
 }
 
 export function FlashcardPlayer({ cards, onComplete }: FlashcardPlayerProps) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getGenAI, GEMINI_MODEL } from "@/lib/gemini/client";
+import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { z } from "zod";
 
 const requestSchema = z.object({
@@ -37,6 +38,18 @@ export async function POST(request: Request) {
     }
 
     const { userTranslation, referenceTranslation, cefrLevel } = parsed.data;
+
+    // --- Enforce AI quota ---
+    const quota = await checkAIQuota(user.id);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: `AI call limit reached (${quota.limit}/month). Upgrade your plan for more.`,
+          code: "QUOTA_EXCEEDED",
+        },
+        { status: 429 },
+      );
+    }
 
     const prompt = `Evaluate the following English translation attempt.
 
@@ -80,6 +93,9 @@ Respond with JSON in this exact format:
       .trim();
 
     const result = evaluationResponseSchema.parse(JSON.parse(cleaned));
+
+    // Increment AI call counter after successful evaluation
+    await incrementAICalls(user.id);
 
     return NextResponse.json(result);
   } catch (error) {

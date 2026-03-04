@@ -10,13 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import {
-  BookOpen,
-  Star,
-  Clock,
-  TrendingUp,
-  Zap,
-} from "lucide-react";
+import { BookOpen, Star, Clock, TrendingUp, Zap } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -130,16 +124,16 @@ export default async function VocabularyPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Due for Review</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Due for Review
+            </CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
               {dueForReview}
             </div>
-            <p className="text-xs text-muted-foreground">
-              words to practice
-            </p>
+            <p className="text-xs text-muted-foreground">words to practice</p>
           </CardContent>
         </Card>
 
@@ -263,9 +257,7 @@ export default async function VocabularyPage() {
                           </span>
                           {w.last_practiced && (
                             <span>
-                              {new Date(
-                                w.last_practiced,
-                              ).toLocaleDateString()}
+                              {new Date(w.last_practiced).toLocaleDateString()}
                             </span>
                           )}
                         </div>

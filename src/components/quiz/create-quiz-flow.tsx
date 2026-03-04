@@ -96,7 +96,9 @@ export function CreateQuizFlow() {
   const defaultCefr: CEFRLevel = (profile?.cefr_level as CEFRLevel) || "B1";
 
   const [step, setStep] = useState<Step>("input");
-  const [cefrLevel, setCefrLevel] = useState<CEFRLevel>(isTutor ? "B1" : defaultCefr);
+  const [cefrLevel, setCefrLevel] = useState<CEFRLevel>(
+    isTutor ? "B1" : defaultCefr,
+  );
   const [terms, setTerms] = useState<QuizTerm[]>([]);
   const [title, setTitle] = useState("");
   const [selectedActivity, setSelectedActivity] = useState<ActivityType | null>(

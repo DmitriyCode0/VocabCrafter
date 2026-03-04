@@ -78,10 +78,7 @@ export default async function ClassDetailPage({
           "student_id, term, definition, mastery_level, correct_count, incorrect_count, streak",
         )
         .in("student_id", studentIds);
-      wordMastery = (masteryData ?? []) as unknown as Record<
-        string,
-        unknown
-      >[];
+      wordMastery = (masteryData ?? []) as unknown as Record<string, unknown>[];
     }
   }
 
