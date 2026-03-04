@@ -67,6 +67,7 @@ export interface TranslationQuestion {
   ukrainianSentence: string;
   englishReference: string;
   sourceTerm: string;
+  highlightText?: string;
 }
 
 export interface TranslationAnswer {

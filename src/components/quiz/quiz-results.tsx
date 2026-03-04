@@ -156,9 +156,28 @@ export function QuizResults({
                 <p className="text-sm text-muted-foreground">
                   Reference: <em>{result.referenceTranslation}</em>
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {result.feedback}
-                </p>
+                <div className="text-xs text-muted-foreground space-y-0.5">
+                  {result.feedback.split("\n").map((line, i) => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return null;
+                    const isPass = trimmed.startsWith("✓");
+                    const isFail = trimmed.startsWith("✗");
+                    return (
+                      <p
+                        key={i}
+                        className={
+                          isFail
+                            ? "text-red-500"
+                            : isPass
+                              ? "text-green-600 dark:text-green-400"
+                              : ""
+                        }
+                      >
+                        {trimmed}
+                      </p>
+                    );
+                  })}
+                </div>
               </div>
             ))}
 

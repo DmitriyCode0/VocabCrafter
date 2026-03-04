@@ -50,6 +50,28 @@ export function TranslationPlayer({
   const progress =
     ((currentIndex + (evaluation ? 1 : 0)) / questions.length) * 100;
 
+  /** Bold the target vocabulary word in the Ukrainian sentence */
+  function renderHighlightedSentence(
+    sentence: string,
+    highlight?: string,
+  ): React.ReactNode {
+    if (!highlight) return sentence;
+    const idx = sentence.toLowerCase().indexOf(highlight.toLowerCase());
+    if (idx === -1) return sentence;
+    const before = sentence.slice(0, idx);
+    const match = sentence.slice(idx, idx + highlight.length);
+    const after = sentence.slice(idx + highlight.length);
+    return (
+      <>
+        {before}
+        <span className="font-bold text-primary underline decoration-primary/40 decoration-2 underline-offset-2">
+          {match}
+        </span>
+        {after}
+      </>
+    );
+  }
+
   async function handleSubmit() {
     if (!userTranslation.trim()) return;
 
@@ -144,9 +166,11 @@ export function TranslationPlayer({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="p-4 rounded-md bg-muted">
-            <p className="text-lg font-medium">{question.ukrainianSentence}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Vocabulary: {question.sourceTerm}
+            <p className="text-lg font-medium">
+              {renderHighlightedSentence(
+                question.ukrainianSentence,
+                question.highlightText,
+              )}
             </p>
           </div>
 
@@ -201,9 +225,34 @@ export function TranslationPlayer({
                 </span>
               </div>
 
-              <div className="p-3 rounded-md bg-muted space-y-2">
-                <p className="text-sm font-medium">AI Feedback:</p>
-                <p className="text-sm">{evaluation.feedback}</p>
+              <div className="p-3 rounded-md bg-muted space-y-1">
+                <p className="text-sm font-medium">Feedback:</p>
+                <div className="text-sm space-y-0.5">
+                  {evaluation.feedback.split("\n").map((line, i) => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return null;
+                    const isPass = trimmed.startsWith("✓");
+                    const isFail = trimmed.startsWith("✗");
+                    const isSuggested =
+                      trimmed.toLowerCase().startsWith("suggested");
+                    return (
+                      <p
+                        key={i}
+                        className={
+                          isSuggested
+                            ? "text-muted-foreground italic mt-1"
+                            : isFail
+                              ? "text-red-500"
+                              : isPass
+                                ? "text-green-600 dark:text-green-400"
+                                : ""
+                        }
+                      >
+                        {trimmed}
+                      </p>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="p-3 rounded-md bg-muted space-y-1">

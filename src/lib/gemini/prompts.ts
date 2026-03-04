@@ -367,33 +367,52 @@ export function getTranslationPrompt(
     config.grammarChallenge,
   );
 
+  const termList = terms
+    .map((t) => `  - English: "${t.term}" | Ukrainian: "${t.definition}"`)
+    .join("\n");
+
   return `You are an expert in creating language translation exercises for English learners whose native language is Ukrainian.
 Your task is to generate a set of exactly ${terms.length} translation challenges.
 
-CRITICAL LEVEL INSTRUCTION:
-1. **Student Proficiency:** The student is at level **${config.cefrLevel}**. The complexity of vocabulary (outside the target words), sentence length, and context must match this level.
-2. **Grammar Target:** The sentences MUST specifically test the grammatical structures listed below.
-   *Example:* If a B2 student is practicing an A2 topic (e.g., First Conditional), create a sophisticated B2-level sentence that happens to use the First Conditional structure.
+═══ MANDATORY RULES (VIOLATION = REJECTED OUTPUT) ═══
 
+RULE 1 — ONE VOCABULARY WORD PER SENTENCE:
+Each sentence must use EXACTLY ONE word/phrase from the provided vocabulary list. NEVER combine multiple vocabulary words in a single sentence.
+
+RULE 2 — VOCABULARY MUST BE PRESENT:
+The Ukrainian translation of the target vocabulary word MUST appear in the Ukrainian sentence. The word may be conjugated, declined, or otherwise inflected — but it must be recognizably derived from the provided Ukrainian translation.
+- Example: if the word is "гора" (mountain), you may use "гору", "горі", "гір" — but "пагорб" (hill) is NOT acceptable.
+
+RULE 3 — HIGHLIGHT THE TARGET WORD:
+Return the exact form of the Ukrainian vocabulary word as it appears in your sentence in the "highlightText" field. This will be bolded in the UI for the student.
+
+RULE 4 — GRAMMAR TOPIC COMPLIANCE:
+The ENGLISH translation of each sentence MUST require the grammatical structure(s) listed below. The Ukrainian sentence should be crafted so that translating it naturally into English forces the student to use the target grammar.
+
+RULE 5 — CEFR LEVEL COMPLIANCE:
+The student is at level **${config.cefrLevel}**. Sentence complexity, vocabulary (outside target words), and length MUST match this level. NEVER exceed it.
+
+RULE 6 — SENSIBLE SENTENCES:
+Every sentence must make logical sense in the real world. No absurd, nonsensical, or contradictory statements.
+
+═══ CONTEXT ═══
 ${difficultyInstruction}
 ${grammarRules}
 ${topicInstruction}
 
-For each word, create one complete UKRAINIAN sentence that uses the Ukrainian translation in a natural context and implicitly requires the specified grammar for its English translation.
-Then, provide a correct and natural-sounding ENGLISH translation. This English translation must demonstrate the target grammar.
-Ensure the 'sourceTerm' field matches the English word from the input list exactly.
+═══ VOCABULARY LIST (one sentence per entry) ═══
+${termList}
 
-Vocabulary terms:
-${formatTerms(terms)}
-
+═══ OUTPUT FORMAT ═══
 Respond with JSON in this exact format:
 {
   "questions": [
     {
       "id": 1,
-      "ukrainianSentence": "Ukrainian sentence here",
-      "englishReference": "English translation here",
-      "sourceTerm": "vocabulary term used"
+      "ukrainianSentence": "Ukrainian sentence containing the target word",
+      "englishReference": "Natural English translation demonstrating target grammar",
+      "sourceTerm": "original English word from the list exactly as provided",
+      "highlightText": "exact Ukrainian word form as it appears in ukrainianSentence"
     }
   ]
 }`;
@@ -574,13 +593,28 @@ ${rubric}
 
 ${specialInstructions}
 
-Score the translation from 0 to 100 and provide constructive feedback.
-Consider: accuracy, grammar, vocabulary usage, and naturalness.
+═══ EVALUATION CHECKLIST (perform ALL checks in order) ═══
+You MUST evaluate the student's translation against these 5 categories. For each category, determine PASS (✓) or FAIL (✗).
+
+1. **Vocabulary Accuracy** — Did the student translate the target vocabulary word/phrase correctly?
+2. **Grammar Compliance** — Did the student use the required grammatical structure(s)? (If no grammar was specified, check general grammar correctness.)
+3. **Meaning & Completeness** — Is the full meaning of the original sentence preserved? Nothing added or lost?
+4. **Mechanics** — Capitalization, punctuation, spelling — are they all correct?
+5. **Naturalness** — Does the sentence sound like natural English, not a word-for-word translation?
+
+Score the translation from 0 to 100 based on these checks.
+
+═══ FEEDBACK FORMAT ═══
+Return feedback as a CONCISE checklist. One line per category. Use ✓ for pass, ✗ for fail.
+After the checklist, add a short "Suggested answer:" line only if the student made mistakes.
+
+Example feedback:
+"✓ Vocabulary: 'mountain' translated correctly.\n✗ Grammar: Expected Past Simple, but Present Simple was used.\n✓ Meaning: Core meaning preserved.\n✗ Mechanics: Missing period at the end.\n✓ Naturalness: Reads naturally.\n\nSuggested: She climbed the mountain yesterday."
 
 Respond with JSON in this exact format:
 {
   "score": 85,
-  "feedback": "Detailed feedback here"
+  "feedback": "checklist feedback here"
 }`;
 }
 

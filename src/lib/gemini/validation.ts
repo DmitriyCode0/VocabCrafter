@@ -32,6 +32,7 @@ const translationQuestionSchema = z.object({
   ukrainianSentence: z.string(),
   englishReference: z.string(),
   sourceTerm: z.string(),
+  highlightText: z.string().optional(),
 });
 
 export const translationResponseSchema = z.object({
