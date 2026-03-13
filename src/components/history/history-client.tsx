@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, {
+  startTransition,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   Card,
   CardContent,
@@ -17,36 +23,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { History, ChevronDown, ChevronUp, User } from "lucide-react";
+import { History, ChevronDown, ChevronUp, Loader2, User } from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
+import {
+  HISTORY_PAGE_SIZE,
+  type HistoryAttempt,
+  type HistoryStudent,
+} from "@/lib/history/fetch-history-page-data";
 import type { Role } from "@/types/roles";
 import { AttemptDetail } from "./attempt-detail";
 
-interface ExtendedAttempt {
-  id: string;
-  student_id: string;
-  score: number | null;
-  max_score: number | null;
-  completed_at: string;
-  quizzes?: {
-    title: string;
-    type: string;
-    cefr_level: string;
-  } | null;
-  profiles?: {
-    full_name: string | null;
-    email: string;
-    avatar_url: string | null;
-  } | null;
-  [key: string]: any;
-}
-
 interface HistoryClientProps {
   role: Role;
-  attempts: any[];
-  students: any[];
+  initialAttempts: HistoryAttempt[];
+  initialHasMore: boolean;
+  students: HistoryStudent[];
   userId?: string;
   initialStudentFilter?: string;
+}
+
+interface HistoryResponse {
+  attempts: HistoryAttempt[];
+  hasMore: boolean;
+}
+
+interface HistoryErrorResponse {
+  error?: string;
+}
+
+function mergeAttempts(
+  existingAttempts: HistoryAttempt[],
+  nextAttempts: HistoryAttempt[],
+) {
+  const seenIds = new Set(existingAttempts.map((attempt) => attempt.id));
+
+  return [
+    ...existingAttempts,
+    ...nextAttempts.filter((attempt) => !seenIds.has(attempt.id)),
+  ];
 }
 
 const AttemptCard = React.memo(function AttemptCard({
@@ -56,7 +70,7 @@ const AttemptCard = React.memo(function AttemptCard({
   isExpanded,
   onToggleExpand,
 }: {
-  attempt: ExtendedAttempt;
+  attempt: HistoryAttempt;
   isTutor: boolean;
   userId?: string;
   isExpanded: boolean;
@@ -151,39 +165,180 @@ const AttemptCard = React.memo(function AttemptCard({
 
 export function HistoryClient({
   role,
-  attempts,
+  initialAttempts,
+  initialHasMore,
   students,
   userId,
   initialStudentFilter,
 }: HistoryClientProps) {
+  const isTutor = role === "tutor" || role === "superadmin";
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState<HistoryAttempt[]>(initialAttempts);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [initialLoading, setInitialLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStudent, setFilterStudent] = useState<string>(
-    initialStudentFilter || "all"
+    initialStudentFilter ?? "all",
+  );
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const initialFilterEffectRef = useRef(true);
+  const initialLoadingRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+
+  const activeStudentFilter = isTutor ? filterStudent : "all";
+  const hasActiveFilters = filterType !== "all" || activeStudentFilter !== "all";
+  const queryKey = `${filterType}:${activeStudentFilter}`;
+  const latestQueryKeyRef = useRef(queryKey);
+  const quizTypes = Object.keys(ACTIVITY_LABELS);
+
+  latestQueryKeyRef.current = queryKey;
+
+  const fetchAttemptsPage = useCallback(
+    async (offset: number) => {
+      const searchParams = new URLSearchParams({
+        limit: String(HISTORY_PAGE_SIZE),
+        offset: String(offset),
+      });
+
+      if (filterType !== "all") {
+        searchParams.set("type", filterType);
+      }
+
+      if (activeStudentFilter !== "all") {
+        searchParams.set("student", activeStudentFilter);
+      }
+
+      const response = await fetch(`/api/quiz-attempts?${searchParams.toString()}`, {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as HistoryResponse | HistoryErrorResponse;
+
+      if (!response.ok) {
+        const errorMessage =
+          "error" in payload ? payload.error : undefined;
+
+        throw new Error(errorMessage || "Failed to load history");
+      }
+
+      return payload as HistoryResponse;
+    },
+    [activeStudentFilter, filterType],
   );
 
-  const typedAttempts = useMemo(() => attempts as ExtendedAttempt[], [attempts]);
+  const reloadAttempts = useCallback(async () => {
+    if (initialLoadingRef.current) {
+      return;
+    }
 
-  const filtered = useMemo(() => {
-    return typedAttempts.filter((a) => {
-      const quiz = a.quizzes;
-      if (filterType !== "all" && quiz?.type !== filterType) return false;
-      if (filterStudent !== "all" && a.student_id !== filterStudent) return false;
-      return true;
-    });
-  }, [typedAttempts, filterType, filterStudent]);
+    const requestQueryKey = queryKey;
 
-  const isTutor = role === "tutor" || role === "superadmin";
+    initialLoadingRef.current = true;
+    setInitialLoading(true);
+    setLoadError(null);
+    setExpandedId(null);
+    setHasMore(false);
 
-  const quizTypes = useMemo(() => {
-    return [
-      ...new Set(
-        typedAttempts
-          .map((a) => a.quizzes?.type)
-          .filter((t): t is string => !!t)
-      ),
-    ];
-  }, [typedAttempts]);
+    try {
+      const nextPage = await fetchAttemptsPage(0);
+
+      if (latestQueryKeyRef.current !== requestQueryKey) {
+        return;
+      }
+
+      startTransition(() => {
+        setAttempts(nextPage.attempts);
+        setHasMore(nextPage.hasMore);
+      });
+    } catch (error) {
+      if (latestQueryKeyRef.current !== requestQueryKey) {
+        return;
+      }
+
+      setAttempts([]);
+      setLoadError(
+        error instanceof Error ? error.message : "Failed to load history",
+      );
+    } finally {
+      if (latestQueryKeyRef.current === requestQueryKey) {
+        initialLoadingRef.current = false;
+        setInitialLoading(false);
+      }
+    }
+  }, [fetchAttemptsPage, queryKey]);
+
+  const loadMoreAttempts = useCallback(async () => {
+    if (!hasMore || initialLoadingRef.current || loadingMoreRef.current) {
+      return;
+    }
+
+    const requestQueryKey = queryKey;
+
+    loadingMoreRef.current = true;
+    setIsLoadingMore(true);
+    setLoadError(null);
+
+    try {
+      const nextPage = await fetchAttemptsPage(attempts.length);
+
+      if (latestQueryKeyRef.current !== requestQueryKey) {
+        return;
+      }
+
+      startTransition(() => {
+        setAttempts((currentAttempts) =>
+          mergeAttempts(currentAttempts, nextPage.attempts),
+        );
+        setHasMore(nextPage.hasMore);
+      });
+    } catch (error) {
+      if (latestQueryKeyRef.current !== requestQueryKey) {
+        return;
+      }
+
+      setLoadError(
+        error instanceof Error ? error.message : "Failed to load more attempts",
+      );
+    } finally {
+      if (latestQueryKeyRef.current === requestQueryKey) {
+        loadingMoreRef.current = false;
+        setIsLoadingMore(false);
+      }
+    }
+  }, [attempts.length, fetchAttemptsPage, hasMore, queryKey]);
+
+  useEffect(() => {
+    if (initialFilterEffectRef.current) {
+      initialFilterEffectRef.current = false;
+      return;
+    }
+
+    void reloadAttempts();
+  }, [activeStudentFilter, filterType, reloadAttempts]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+
+    if (!sentinel || !hasMore) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void loadMoreAttempts();
+        }
+      },
+      { rootMargin: "240px 0px" },
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasMore, loadMoreAttempts]);
 
   const handleToggleExpand = React.useCallback((id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -227,8 +382,8 @@ export function HistoryClient({
               <SelectItem value="all">All Students</SelectItem>
               {userId && <SelectItem value={userId}>My Attempts</SelectItem>}
               {students.map((s) => (
-                <SelectItem key={s.id as string} value={s.id as string}>
-                  {(s.full_name as string) || (s.email as string)}
+                <SelectItem key={s.id} value={s.id}>
+                  {s.full_name || s.email || "Unknown"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -236,25 +391,42 @@ export function HistoryClient({
         )}
 
         <span className="text-sm text-muted-foreground">
-          {filtered.length} attempt{filtered.length !== 1 ? "s" : ""}
+          Loaded {attempts.length} attempt{attempts.length !== 1 ? "s" : ""}
         </span>
       </div>
 
-      {filtered.length === 0 ? (
+      {initialLoading ? (
+        <Card>
+          <CardContent className="flex items-center justify-center gap-3 py-12 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading history...
+          </CardContent>
+        </Card>
+      ) : attempts.length === 0 ? (
         <Card>
           <CardHeader className="items-center text-center py-12">
             <History className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">No attempts yet</CardTitle>
+            <CardTitle className="text-lg">
+              {loadError
+                ? "Couldn't load history"
+                : hasActiveFilters
+                  ? "No matching attempts"
+                  : "No attempts yet"}
+            </CardTitle>
             <CardDescription>
-              {isTutor
-                ? "Your students' quiz attempts will appear here once they complete activities."
-                : "Complete quizzes to see your history here."}
+              {loadError
+                ? "The history request failed. Try again to reload the list."
+                : hasActiveFilters
+                  ? "Try a different filter to load more matching attempts."
+                  : isTutor
+                    ? "Your students' quiz attempts will appear here once they complete activities."
+                    : "Complete quizzes to see your history here."}
             </CardDescription>
           </CardHeader>
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map((attempt) => (
+          {attempts.map((attempt) => (
             <AttemptCard
               key={attempt.id}
               attempt={attempt}
@@ -264,6 +436,50 @@ export function HistoryClient({
               onToggleExpand={handleToggleExpand}
             />
           ))}
+
+          <div ref={sentinelRef} className="h-1" aria-hidden />
+
+          {isLoadingMore && (
+            <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading more attempts...
+            </div>
+          )}
+
+          {loadError && (
+            <div className="flex items-center justify-center gap-3 py-4 text-sm text-destructive">
+              <span>{loadError}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (attempts.length === 0) {
+                    void reloadAttempts();
+                    return;
+                  }
+
+                  void loadMoreAttempts();
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+
+          {!hasMore && !isLoadingMore && !loadError && (
+            <p className="py-2 text-center text-sm text-muted-foreground">
+              You&apos;ve reached the end of the history list.
+            </p>
+          )}
+        </div>
+      )}
+
+      {!initialLoading && attempts.length === 0 && loadError && (
+        <div className="flex items-center justify-center gap-3 text-sm text-destructive">
+          <span>{loadError}</span>
+          <Button variant="outline" size="sm" onClick={() => void reloadAttempts()}>
+            Retry
+          </Button>
         </div>
       )}
     </div>

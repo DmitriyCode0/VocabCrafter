@@ -3,12 +3,22 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 import { extractWordResults, upsertWordMastery } from "@/lib/mastery/engine";
+import { fetchHistoryPageData, HISTORY_PAGE_SIZE } from "@/lib/history/fetch-history-page-data";
+import type { Role } from "@/types/roles";
 
 const createAttemptSchema = z.object({
   quizId: z.string().uuid(),
   answers: z.record(z.string(), z.unknown()),
   score: z.number().min(0).nullable(),
   maxScore: z.number().min(0).nullable(),
+});
+
+const getAttemptsQuerySchema = z.object({
+  quizId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(HISTORY_PAGE_SIZE),
+  offset: z.coerce.number().int().min(0).default(0),
+  student: z.string().uuid().optional(),
+  type: z.string().min(1).optional(),
 });
 
 export async function POST(request: Request) {
@@ -109,29 +119,51 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const quizId = searchParams.get("quizId");
+    const parsed = getAttemptsQuerySchema.safeParse({
+      quizId: searchParams.get("quizId") ?? undefined,
+      limit: searchParams.get("limit") ?? undefined,
+      offset: searchParams.get("offset") ?? undefined,
+      student: searchParams.get("student") ?? undefined,
+      type: searchParams.get("type") ?? undefined,
+    });
 
-    let query = supabase
-      .from("quiz_attempts")
-      .select("*, quizzes(title, type, cefr_level)")
-      .eq("student_id", user.id)
-      .order("completed_at", { ascending: false });
-
-    if (quizId) {
-      query = query.eq("quiz_id", quizId);
-    }
-
-    const { data: attempts, error } = await query;
-
-    if (error) {
-      console.error("Fetch attempts error:", error);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Failed to fetch attempts" },
-        { status: 500 },
+        { error: "Invalid request", details: parsed.error.flatten() },
+        { status: 400 },
       );
     }
 
-    return NextResponse.json({ attempts });
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile) {
+      console.error("Fetch attempts profile error:", profileError);
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    const { quizId, limit, offset, student, type } = parsed.data;
+    const { attempts, hasMore, activeStudentFilter } = await fetchHistoryPageData({
+      role: profile.role as Role,
+      userId: user.id,
+      limit,
+      offset,
+      studentId: student,
+      quizType: type,
+      quizId,
+    });
+
+    return NextResponse.json({
+      attempts,
+      hasMore,
+      activeStudentFilter,
+    });
   } catch (error) {
     console.error("Fetch attempts error:", error);
     return NextResponse.json(
