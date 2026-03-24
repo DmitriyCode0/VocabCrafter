@@ -1,3 +1,5 @@
+import type { LearningLanguage, SourceLanguage } from "@/lib/languages";
+
 export type CEFRLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
 export type QuizType =
@@ -21,11 +23,14 @@ export interface QuizTerm {
 
 export interface QuizConfig {
   cefrLevel: CEFRLevel;
+  targetLanguage?: LearningLanguage;
+  sourceLanguage?: SourceLanguage;
   vocabularyChallenge: VocabularyChallenge;
   grammarChallenge: GrammarChallenge;
   teacherPersona: TeacherPersona;
   timedMode: boolean;
   grammarTopics?: string[];
+  grammarTopicDetails?: Record<string, string>;
   customTopic?: string;
 }
 
@@ -68,6 +73,8 @@ export interface TranslationQuestion {
   englishReference: string;
   sourceTerm: string;
   highlightText?: string;
+  validatedGrammarTopic?: string;
+  grammarValidationReason?: string;
 }
 
 export interface TranslationAnswer {

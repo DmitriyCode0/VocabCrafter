@@ -17,7 +17,6 @@ import {
   GraduationCap,
   TrendingUp,
   Users,
-  ClipboardList,
   MessageSquare,
   BarChart3,
   PlusCircle,
@@ -26,8 +25,14 @@ import {
   Clock,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { fmtLimit, getPlan } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
+
+function pct(used: number, total: number) {
+  if (!isFinite(total) || total === 0) return 0;
+  return Math.min(100, Math.round((used / total) * 100));
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -65,7 +70,9 @@ export default async function DashboardPage() {
       </div>
 
       {role === "student" && <StudentDashboard userId={user.id} />}
-      {role === "tutor" && <TutorDashboard userId={user.id} />}
+      {role === "tutor" && (
+        <TutorDashboard userId={user.id} planKey={profile.plan} />
+      )}
       {role === "superadmin" && <AdminDashboard />}
     </div>
   );
@@ -371,107 +378,69 @@ async function StudentDashboard({ userId }: { userId: string }) {
   );
 }
 
-async function TutorDashboard({ userId }: { userId: string }) {
+async function TutorDashboard({
+  userId,
+  planKey,
+}: {
+  userId: string;
+  planKey?: string | null;
+}) {
   const supabase = await createClient();
+  const supabaseAdmin = createAdminClient();
+  const plan = getPlan(planKey);
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
 
   const [
-    { count: classCount },
-    { count: assignmentCount },
-    { data: recentClasses },
+    { data: classes },
+    { count: monthlyQuizCount },
   ] = await Promise.all([
     supabase
       .from("classes")
-      .select("*", { count: "exact", head: true })
+      .select("id")
       .eq("tutor_id", userId),
     supabase
-      .from("assignments")
+      .from("quizzes")
       .select("*", { count: "exact", head: true })
-      .eq("tutor_id", userId),
-    supabase
-      .from("classes")
-      .select("id, name, cefr_level, is_active, created_at")
-      .eq("tutor_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(3),
+      .eq("creator_id", userId)
+      .gte("created_at", monthStart.toISOString()),
   ]);
 
-  // Get total student count across all classes
+  const classIds = classes?.map((classItem) => classItem.id) ?? [];
   let totalStudents = 0;
-  if (recentClasses && recentClasses.length > 0) {
-    const classIds = recentClasses.map((c) => c.id);
-    const { count } = await supabase
+
+  if (classIds.length > 0) {
+    const { data: members } = await supabaseAdmin
       .from("class_members")
-      .select("*", { count: "exact", head: true })
+      .select("student_id")
       .in("class_id", classIds);
-    totalStudents = count ?? 0;
+
+    totalStudents = new Set(
+      (members ?? []).map((member) => member.student_id),
+    ).size;
   }
+
+  const quizLimit = plan.quizzesPerMonth;
+  const quizPercentage = pct(monthlyQuizCount ?? 0, quizLimit);
+  const isQuizWarning = quizPercentage >= 80;
+  const isQuizOver = quizPercentage >= 100;
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Classes</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{classCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground">active classes</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Students</CardTitle>
-            <GraduationCap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalStudents}</div>
-            <p className="text-xs text-muted-foreground">enrolled students</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Assignments</CardTitle>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{assignmentCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground">total assignments</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
+            <PlusCircle className="h-5 w-5 text-primary" />
             <div>
-              <CardTitle className="text-base">Classes</CardTitle>
-              <CardDescription>
-                Manage your classes and students
-              </CardDescription>
+              <CardTitle className="text-base">New Quiz</CardTitle>
+              <CardDescription>Generate a new AI-powered quiz</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
             <Button asChild className="w-full">
-              <Link href="/classes">Manage Classes</Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <ClipboardList className="h-5 w-5 text-primary" />
-            <div>
-              <CardTitle className="text-base">Assignments</CardTitle>
-              <CardDescription>Create and manage assignments</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/assignments">View Assignments</Link>
+              <Link href="/quizzes/new">Create Quiz</Link>
             </Button>
           </CardContent>
         </Card>
@@ -488,6 +457,46 @@ async function TutorDashboard({ userId }: { userId: string }) {
             <Button asChild variant="outline" className="w-full">
               <Link href="/review">Review Work</Link>
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Students</CardTitle>
+            <GraduationCap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalStudents}</div>
+            <p className="text-xs text-muted-foreground">enrolled students</p>
+            <Button asChild variant="outline" className="mt-4 w-full">
+              <Link href="/students">View Students</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Quizzes Created</CardTitle>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="text-2xl font-bold">
+              {(monthlyQuizCount ?? 0).toLocaleString()}{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                / {fmtLimit(quizLimit)}
+              </span>
+            </div>
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full rounded-full transition-all ${isQuizOver ? "bg-red-500" : isQuizWarning ? "bg-amber-500" : "bg-blue-500"}`}
+                style={{ width: `${Math.min(quizPercentage, 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {isFinite(quizLimit)
+                ? `${Math.max(0, quizLimit - (monthlyQuizCount ?? 0)).toLocaleString()} remaining this month`
+                : "Unlimited"}
+            </p>
           </CardContent>
         </Card>
       </div>

@@ -10,9 +10,14 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, Star, Clock, TrendingUp, Zap } from "lucide-react";
+import { PagePagination } from "@/components/shared/page-pagination";
+import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
+import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
+import { BookOpen, Clock, Star, TrendingUp, Zap } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+const VOCABULARY_PAGE_SIZE = 24;
 
 const LEVEL_LABELS = [
   "New",
@@ -44,8 +49,15 @@ interface WordMasteryRow {
   next_review: string | null;
 }
 
-export default async function VocabularyPage() {
+export default async function VocabularyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const supabase = await createClient();
+  const resolvedSearchParams = await searchParams;
+  const currentPage = getCurrentPage(resolvedSearchParams.page);
+  const { from, to } = getPaginationRange(currentPage, VOCABULARY_PAGE_SIZE);
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -53,47 +65,81 @@ export default async function VocabularyPage() {
   if (!user) redirect("/login");
 
   const supabaseAdmin = createAdminClient();
+  const nowIso = new Date().toISOString();
 
-  const { data: words } = await supabaseAdmin
-    .from("word_mastery")
-    .select("*")
-    .eq("student_id", user.id)
-    .order("mastery_level", { ascending: true })
-    .order("last_practiced", { ascending: false });
+  const [
+    totalWordsResult,
+    masteredCountResult,
+    dueForReviewResult,
+    levelRowsResult,
+    wordsResult,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("word_mastery")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", user.id),
+    supabaseAdmin
+      .from("word_mastery")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", user.id)
+      .gte("mastery_level", 5),
+    supabaseAdmin
+      .from("word_mastery")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", user.id)
+      .not("next_review", "is", null)
+      .lte("next_review", nowIso),
+    supabaseAdmin
+      .from("word_mastery")
+      .select("mastery_level")
+      .eq("student_id", user.id),
+    supabaseAdmin
+      .from("word_mastery")
+      .select("*")
+      .eq("student_id", user.id)
+      .order("mastery_level", { ascending: true })
+      .order("last_practiced", { ascending: false })
+      .range(from, to),
+  ]);
 
-  const allWords = (words ?? []) as WordMasteryRow[];
+  const totalWords = totalWordsResult.count ?? 0;
+  const masteredCount = masteredCountResult.count ?? 0;
+  const dueForReview = dueForReviewResult.count ?? 0;
+  const levelRows = levelRowsResult.data ?? [];
+  const visibleWords = (wordsResult.data ?? []) as WordMasteryRow[];
 
-  // Stats
-  const totalWords = allWords.length;
-  const masteredCount = allWords.filter((w) => w.mastery_level >= 5).length;
-  const dueForReview = allWords.filter(
-    (w) => w.next_review && new Date(w.next_review) <= new Date(),
-  ).length;
   const avgLevel =
-    totalWords > 0
+    levelRows.length > 0
       ? (
-          allWords.reduce((sum, w) => sum + w.mastery_level, 0) / totalWords
+          levelRows.reduce((sum, row) => sum + (row.mastery_level ?? 0), 0) /
+          levelRows.length
         ).toFixed(1)
       : "0";
 
-  // Group by level
+  const levelCounts = new Map<number, number>();
+  for (const row of levelRows) {
+    const level = row.mastery_level ?? 0;
+    levelCounts.set(level, (levelCounts.get(level) ?? 0) + 1);
+  }
+
   const wordsByLevel = new Map<number, WordMasteryRow[]>();
-  for (const w of allWords) {
-    const level = w.mastery_level;
-    if (!wordsByLevel.has(level)) wordsByLevel.set(level, []);
-    wordsByLevel.get(level)!.push(w);
+  for (const word of visibleWords) {
+    const level = word.mastery_level;
+    if (!wordsByLevel.has(level)) {
+      wordsByLevel.set(level, []);
+    }
+    wordsByLevel.get(level)!.push(word);
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">My Vocabulary</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Vocab Mastery</h1>
         <p className="text-muted-foreground">
           Track your word mastery with spaced-repetition levels.
         </p>
       </div>
 
-      {/* Summary cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -149,7 +195,6 @@ export default async function VocabularyPage() {
         </Card>
       </div>
 
-      {/* Level legend */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Mastery Levels</CardTitle>
@@ -159,18 +204,15 @@ export default async function VocabularyPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            {LEVEL_LABELS.map((label, i) => {
-              const count = wordsByLevel.get(i)?.length ?? 0;
-              return (
-                <Badge
-                  key={i}
-                  variant="outline"
-                  className={`${LEVEL_COLORS[i]} border-0 px-3 py-1`}
-                >
-                  {i}: {label} ({count})
-                </Badge>
-              );
-            })}
+            {LEVEL_LABELS.map((label, index) => (
+              <Badge
+                key={index}
+                variant="outline"
+                className={`${LEVEL_COLORS[index]} border-0 px-3 py-1`}
+              >
+                {index}: {label} ({levelCounts.get(index) ?? 0})
+              </Badge>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -178,61 +220,72 @@ export default async function VocabularyPage() {
       {totalWords === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Zap className="h-12 w-12 text-muted-foreground/50 mb-4" />
+            <Zap className="mb-4 h-12 w-12 text-muted-foreground/50" />
             <h3 className="text-lg font-medium">No vocabulary tracked yet</h3>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="mt-1 text-sm text-muted-foreground">
               Complete quizzes to start building your word mastery profile.
             </p>
           </CardContent>
         </Card>
       ) : (
-        /* Words grouped by level (ascending— weakest first) */
-        Array.from(wordsByLevel.entries())
-          .sort(([a], [b]) => a - b)
-          .map(([level, levelWords]) => (
-            <Card key={level}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={`${LEVEL_COLORS[level]} border-0`}
-                    >
-                      Level {level}
-                    </Badge>
-                    {LEVEL_LABELS[level]}
-                  </CardTitle>
-                  <span className="text-sm text-muted-foreground">
-                    {levelWords.length} word
-                    {levelWords.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {levelWords.map((w) => {
-                    const total = w.correct_count + w.incorrect_count;
-                    const accuracy =
-                      total > 0
-                        ? Math.round((w.correct_count / total) * 100)
-                        : 0;
-                    const isDue =
-                      w.next_review && new Date(w.next_review) <= new Date();
-
-                    return (
-                      <div
-                        key={w.id}
-                        className="flex flex-col gap-1 rounded-lg border p-3"
+        <div className="space-y-6">
+          {Array.from(wordsByLevel.entries())
+            .sort(([leftLevel], [rightLevel]) => leftLevel - rightLevel)
+            .map(([level, levelWords]) => (
+              <Card key={level}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className={`${LEVEL_COLORS[level]} border-0`}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-sm">{w.term}</span>
+                        Level {level}
+                      </Badge>
+                      {LEVEL_LABELS[level]}
+                    </CardTitle>
+                    <span className="text-sm text-muted-foreground">
+                      {levelWords.length} word
+                      {levelWords.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {levelWords.map((word) => {
+                      const totalAttempts =
+                        word.correct_count + word.incorrect_count;
+                      const accuracy =
+                        totalAttempts > 0
+                          ? Math.round(
+                              (word.correct_count / totalAttempts) * 100,
+                            )
+                          : 0;
+                      const isDue =
+                        word.next_review &&
+                        new Date(word.next_review) <= new Date();
+
+                      return (
+                        <div
+                          key={word.id}
+                          className="flex flex-col gap-1 rounded-lg border p-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="truncate text-sm font-medium">
+                              {word.term}
+                            </span>
+                            <DeleteMasteryWordButton
+                              wordId={word.id}
+                              term={word.term}
+                            />
+                          </div>
                           <div className="flex items-center gap-1.5">
-                            {w.streak > 0 && (
+                            {word.streak > 0 && (
                               <Badge
                                 variant="outline"
                                 className="text-xs px-1.5"
                               >
-                                🔥 {w.streak}
+                                🔥 {word.streak}
                               </Badge>
                             )}
                             {isDue && (
@@ -244,30 +297,40 @@ export default async function VocabularyPage() {
                               </Badge>
                             )}
                           </div>
-                        </div>
-                        {w.definition && (
-                          <p className="text-xs text-muted-foreground truncate">
-                            {w.definition}
-                          </p>
-                        )}
-                        <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
-                          <span>
-                            {w.correct_count}✓ {w.incorrect_count}✗ ({accuracy}
-                            %)
-                          </span>
-                          {w.last_practiced && (
-                            <span>
-                              {new Date(w.last_practiced).toLocaleDateString()}
-                            </span>
+                          {word.definition && (
+                            <p className="truncate text-xs text-muted-foreground">
+                              {word.definition}
+                            </p>
                           )}
+                          <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                            <span>
+                              {word.correct_count}✓ {word.incorrect_count}✗ (
+                              {accuracy}%)
+                            </span>
+                            {word.last_practiced && (
+                              <span>
+                                {new Date(
+                                  word.last_practiced,
+                                ).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+          <PagePagination
+            pathname="/vocabulary"
+            currentPage={currentPage}
+            pageSize={VOCABULARY_PAGE_SIZE}
+            totalItems={totalWords}
+            searchParams={resolvedSearchParams}
+          />
+        </div>
       )}
     </div>
   );

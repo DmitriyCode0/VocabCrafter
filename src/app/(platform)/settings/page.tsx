@@ -22,23 +22,60 @@ import {
 } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Loader2, Save } from "lucide-react";
-
-const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1"] as const;
+import {
+  TARGET_LANGUAGE_OPTIONS,
+  SOURCE_LANGUAGE_OPTIONS,
+  getAllowedCefrLevels,
+  getDefaultCefrLevelForLanguage,
+  normalizeLearningLanguage,
+  normalizeSourceLanguage,
+  type LearningLanguage,
+  type SourceLanguage,
+} from "@/lib/languages";
 
 export default function SettingsPage() {
   const { profile, isLoading: profileLoading } = useUser();
   const [fullName, setFullName] = useState("");
   const [cefrLevel, setCefrLevel] = useState("B1");
+  const [learningLanguage, setLearningLanguage] =
+    useState<LearningLanguage>("english");
+  const [sourceLanguage, setSourceLanguage] =
+    useState<SourceLanguage>("ukrainian");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const allowedCefrLevels = getAllowedCefrLevels(learningLanguage);
+
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name || "");
-      setCefrLevel(profile.cefr_level || "B1");
+      const normalizedLearningLanguage = normalizeLearningLanguage(
+        profile.preferred_language,
+      );
+      setLearningLanguage(normalizedLearningLanguage);
+      setSourceLanguage(normalizeSourceLanguage(profile.source_language));
+
+      const allowedLevels = getAllowedCefrLevels(normalizedLearningLanguage);
+      const nextCefrLevel = allowedLevels.includes(
+        profile.cefr_level as (typeof allowedLevels)[number],
+      )
+        ? profile.cefr_level
+        : getDefaultCefrLevelForLanguage(normalizedLearningLanguage);
+
+      setCefrLevel(nextCefrLevel);
     }
   }, [profile]);
+
+  useEffect(() => {
+    if (
+      !allowedCefrLevels.includes(
+        cefrLevel as (typeof allowedCefrLevels)[number],
+      )
+    ) {
+      setCefrLevel(getDefaultCefrLevelForLanguage(learningLanguage));
+    }
+  }, [allowedCefrLevels, cefrLevel, learningLanguage]);
 
   async function handleSave() {
     if (!profile) return;
@@ -54,6 +91,8 @@ export default function SettingsPage() {
       .update({
         full_name: fullName || null,
         cefr_level: cefrLevel,
+        preferred_language: learningLanguage,
+        source_language: sourceLanguage,
       })
       .eq("id", profile.id);
 
@@ -102,15 +141,57 @@ export default function SettingsPage() {
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="learningLanguage">Language You Are Learning</Label>
+            <Select
+              value={learningLanguage}
+              onValueChange={(value) =>
+                setLearningLanguage(value as LearningLanguage)
+              }
+            >
+              <SelectTrigger id="learningLanguage">
+                <SelectValue placeholder="Select a learning language" />
+              </SelectTrigger>
+              <SelectContent>
+                {TARGET_LANGUAGE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="sourceLanguage">Language You Learn From</Label>
+            <Select
+              value={sourceLanguage}
+              onValueChange={(value) =>
+                setSourceLanguage(value as SourceLanguage)
+              }
+            >
+              <SelectTrigger id="sourceLanguage">
+                <SelectValue placeholder="Select a source language" />
+              </SelectTrigger>
+              <SelectContent>
+                {SOURCE_LANGUAGE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {profile?.role === "student" && (
             <div className="space-y-2">
-              <Label htmlFor="cefrLevel">English Level (CEFR)</Label>
+              <Label htmlFor="cefrLevel">Level (CEFR)</Label>
               <Select value={cefrLevel} onValueChange={setCefrLevel}>
                 <SelectTrigger id="cefrLevel">
                   <SelectValue placeholder="Select your level" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CEFR_LEVELS.map((level) => (
+                  {allowedCefrLevels.map((level) => (
                     <SelectItem key={level} value={level}>
                       {level}
                     </SelectItem>
@@ -119,6 +200,7 @@ export default function SettingsPage() {
               </Select>
               <p className="text-xs text-muted-foreground">
                 This determines quiz difficulty and available grammar topics.
+                Spanish is currently limited to A1 for testing.
               </p>
             </div>
           )}

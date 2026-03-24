@@ -12,7 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
-import type { FlashcardItem } from "@/types/quiz";
+import type { FlashcardItem, QuizConfig } from "@/types/quiz";
+import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
+import {
+  normalizeLearningLanguage,
+  normalizeSourceLanguage,
+} from "@/lib/languages";
 
 export interface FlashcardResult {
   term: string;
@@ -21,6 +26,7 @@ export interface FlashcardResult {
 
 interface FlashcardPlayerProps {
   cards: FlashcardItem[];
+  quizConfig?: QuizConfig;
   onComplete: (
     results: FlashcardResult[],
     known: number,
@@ -28,13 +34,19 @@ interface FlashcardPlayerProps {
   ) => void;
 }
 
-export function FlashcardPlayer({ cards, onComplete }: FlashcardPlayerProps) {
+export function FlashcardPlayer({
+  cards,
+  quizConfig,
+  onComplete,
+}: FlashcardPlayerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [known, setKnown] = useState<Set<number>>(new Set());
   const [learning, setLearning] = useState<Set<number>>(new Set());
 
   const card = cards[currentIndex];
+  const targetLanguage = normalizeLearningLanguage(quizConfig?.targetLanguage);
+  const sourceLanguage = normalizeSourceLanguage(quizConfig?.sourceLanguage);
   const progress = ((known.size + learning.size) / cards.length) * 100;
 
   function handleKnow() {
@@ -98,6 +110,13 @@ export function FlashcardPlayer({ cards, onComplete }: FlashcardPlayerProps) {
         onClick={() => setIsFlipped(!isFlipped)}
       >
         <CardContent className="text-center py-12 px-8">
+          <div className="mb-6 flex justify-end">
+            <BrowserTtsButton
+              text={isFlipped ? card.definition : card.term}
+              language={isFlipped ? sourceLanguage : targetLanguage}
+              label="Listen"
+            />
+          </div>
           {!isFlipped ? (
             <div>
               <p className="text-2xl font-bold mb-2">{card.term}</p>

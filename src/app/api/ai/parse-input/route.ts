@@ -3,9 +3,17 @@ import { createClient } from "@/lib/supabase/server";
 import { generateFromGemini } from "@/lib/gemini/client";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { z } from "zod";
+import {
+  getLearningLanguageLabel,
+  getSourceLanguageLabel,
+  normalizeLearningLanguage,
+  normalizeSourceLanguage,
+} from "@/lib/languages";
 
 const requestSchema = z.object({
   text: z.string().min(1).max(10000),
+  targetLanguage: z.enum(["english", "spanish"]).optional(),
+  sourceLanguage: z.enum(["english", "ukrainian"]).optional(),
 });
 
 const parsedTermSchema = z.object({
@@ -39,6 +47,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const targetLanguage = normalizeLearningLanguage(
+      parsed.data.targetLanguage,
+    );
+    const sourceLanguage = normalizeSourceLanguage(parsed.data.sourceLanguage);
+    const targetLanguageLabel = getLearningLanguageLabel(targetLanguage);
+    const sourceLanguageLabel = getSourceLanguageLabel(sourceLanguage);
     const { text } = parsed.data;
 
     // --- Enforce AI quota ---
@@ -53,9 +67,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const prompt = `You are a vocabulary extraction assistant. Analyze the following text and extract individual English words or short phrases (2-3 words max) that would be useful vocabulary for an English language learner.
+    const prompt = `You are a vocabulary extraction assistant. Analyze the following input and extract individual ${targetLanguageLabel} words or short phrases (2-3 words max) that would be useful for a ${targetLanguageLabel} learner.
 
-For each extracted word/phrase, provide its Ukrainian translation.
+For each extracted word or phrase, provide its meaning in ${sourceLanguageLabel}.
 
 Input text:
 """
@@ -65,17 +79,18 @@ ${text}
 Rules:
 - Extract meaningful vocabulary words (nouns, verbs, adjectives, adverbs, useful phrases)
 - Skip common articles (a, an, the), prepositions, and very basic words unless they form part of a phrase
-- If the input already contains word-definition pairs (e.g., tab-separated or formatted lists), preserve them
+- The input text is primarily written in ${sourceLanguageLabel}. Use it as context to infer useful ${targetLanguageLabel} vocabulary.
+- If the input already contains word-definition pairs (e.g., tab-separated or formatted lists), preserve them when possible
 - If the input is a raw text or paragraph, extract the most useful vocabulary from it
-- Provide accurate Ukrainian translations
+- Provide accurate ${sourceLanguageLabel} meanings
 - Output format must be valid JSON only, no markdown
 
 Respond with JSON in this exact format:
 {
   "terms": [
     {
-      "term": "English word or phrase",
-      "definition": "Ukrainian translation"
+      "term": "${targetLanguageLabel} word or phrase",
+      "definition": "${sourceLanguageLabel} meaning"
     }
   ]
 }`;
@@ -83,8 +98,7 @@ Respond with JSON in this exact format:
     const result = await generateFromGemini(
       {
         prompt,
-        systemInstruction:
-          "You are a professional English-Ukrainian vocabulary extraction tool. Always respond with valid JSON only. Do not include any markdown formatting or code blocks.",
+        systemInstruction: `You are a professional ${targetLanguageLabel}-${sourceLanguageLabel} vocabulary extraction tool. Always respond with valid JSON only. Do not include any markdown formatting or code blocks.`,
         temperature: 0.3,
       },
       parsedTermSchema,

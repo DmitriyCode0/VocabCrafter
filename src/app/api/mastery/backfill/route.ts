@@ -51,6 +51,19 @@ export async function POST() {
       return NextResponse.json({ processed: 0, skipped: 0 });
     }
 
+    const { error: resetError } = await supabaseAdmin
+      .from("word_mastery")
+      .delete()
+      .not("id", "is", null);
+
+    if (resetError) {
+      console.error("Backfill: failed to reset word_mastery", resetError);
+      return NextResponse.json(
+        { error: "Failed to reset word mastery" },
+        { status: 500 },
+      );
+    }
+
     // Pre-fetch all quizzes we need
     const quizIds = [...new Set(attempts.map((a) => a.quiz_id))];
     const { data: quizzes } = await supabaseAdmin

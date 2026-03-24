@@ -13,6 +13,7 @@ export interface Database {
           onboarding_completed: boolean;
           cefr_level: string;
           preferred_language: string;
+          source_language: string;
           plan: string;
           ai_calls_this_month: number;
           ai_calls_reset_at: string;
@@ -28,6 +29,7 @@ export interface Database {
           onboarding_completed?: boolean;
           cefr_level?: string;
           preferred_language?: string;
+          source_language?: string;
           plan?: string;
           ai_calls_this_month?: number;
           ai_calls_reset_at?: string;
@@ -43,6 +45,7 @@ export interface Database {
           onboarding_completed?: boolean;
           cefr_level?: string;
           preferred_language?: string;
+          source_language?: string;
           plan?: string;
           ai_calls_this_month?: number;
           ai_calls_reset_at?: string;
@@ -298,6 +301,41 @@ export interface Database {
           },
         ];
       };
+      grammar_topic_prompt_overrides: {
+        Row: {
+          topic_key: string;
+          rule_text: string | null;
+          guidance_text: string | null;
+          updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          topic_key: string;
+          rule_text?: string | null;
+          guidance_text?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          topic_key?: string;
+          rule_text?: string | null;
+          guidance_text?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "grammar_topic_prompt_overrides_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       word_banks: {
         Row: {
           id: string;
@@ -381,6 +419,7 @@ export interface Database {
           mastery_level: number;
           correct_count: number;
           incorrect_count: number;
+          translation_correct_count: number;
           streak: number;
           last_practiced: string;
           next_review: string;
@@ -394,6 +433,7 @@ export interface Database {
           mastery_level?: number;
           correct_count?: number;
           incorrect_count?: number;
+          translation_correct_count?: number;
           streak?: number;
           last_practiced?: string;
           next_review?: string;
@@ -406,6 +446,7 @@ export interface Database {
           mastery_level?: number;
           correct_count?: number;
           incorrect_count?: number;
+          translation_correct_count?: number;
           streak?: number;
           last_practiced?: string;
           next_review?: string;
@@ -443,6 +484,9 @@ export type Quiz = Database["public"]["Tables"]["quizzes"]["Row"];
 export type QuizAttempt = Database["public"]["Tables"]["quiz_attempts"]["Row"];
 export type Assignment = Database["public"]["Tables"]["assignments"]["Row"];
 export type Feedback = Database["public"]["Tables"]["feedback"]["Row"];
+export type GrammarTopicPromptOverride =
+  Database["public"]["Tables"]["grammar_topic_prompt_overrides"]["Row"];
 export type WordBank = Database["public"]["Tables"]["word_banks"]["Row"];
-export type TutorStudent = Database["public"]["Tables"]["tutor_students"]["Row"];
+export type TutorStudent =
+  Database["public"]["Tables"]["tutor_students"]["Row"];
 export type WordMastery = Database["public"]["Tables"]["word_mastery"]["Row"];

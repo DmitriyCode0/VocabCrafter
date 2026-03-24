@@ -43,7 +43,7 @@ export default async function QuizDetailPage({
         isOwner={quiz.creator_id === user.id}
       />
 
-      <QuizPlayer quiz={quiz as Quiz} />
+      <QuizPlayer quiz={quiz as Quiz} isOwner={quiz.creator_id === user.id} />
     </div>
   );
 }

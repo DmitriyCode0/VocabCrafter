@@ -21,13 +21,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Role, CEFRLevel } from "@/types";
+import {
+  TARGET_LANGUAGE_OPTIONS,
+  SOURCE_LANGUAGE_OPTIONS,
+  getAllowedCefrLevels,
+  getDefaultCefrLevelForLanguage,
+  type LearningLanguage,
+  type SourceLanguage,
+} from "@/lib/languages";
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   student: "Create and take quizzes, join classes, track your progress",
   tutor: "Manage classes, assign quizzes, review student work",
 };
-
-const CEFR_LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
 export function OnboardingForm() {
   const router = useRouter();
@@ -35,9 +41,25 @@ export function OnboardingForm() {
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [fullName, setFullName] = useState("");
+  const [learningLanguage, setLearningLanguage] =
+    useState<LearningLanguage>("english");
+  const [sourceLanguage, setSourceLanguage] =
+    useState<SourceLanguage>("ukrainian");
   const [cefrLevel, setCefrLevel] = useState<CEFRLevel>("B1");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const allowedCefrLevels = getAllowedCefrLevels(learningLanguage);
+
+  function handleLearningLanguageChange(value: string) {
+    const nextLanguage = value as LearningLanguage;
+    setLearningLanguage(nextLanguage);
+
+    const nextAllowedLevels = getAllowedCefrLevels(nextLanguage);
+    if (!nextAllowedLevels.includes(cefrLevel)) {
+      setCefrLevel(getDefaultCefrLevelForLanguage(nextLanguage));
+    }
+  }
 
   const handleRoleSelect = (role: Role) => {
     setSelectedRole(role);
@@ -67,6 +89,10 @@ export function OnboardingForm() {
         role: selectedRole,
         full_name: fullName || null,
         cefr_level: selectedRole === "student" ? cefrLevel : undefined,
+        preferred_language:
+          selectedRole === "student" ? learningLanguage : undefined,
+        source_language:
+          selectedRole === "student" ? sourceLanguage : undefined,
         onboarding_completed: true,
       })
       .eq("id", user.id);
@@ -139,27 +165,72 @@ export function OnboardingForm() {
           </div>
 
           {selectedRole === "student" && (
-            <div className="space-y-2">
-              <Label htmlFor="cefrLevel">Your English Level (CEFR)</Label>
-              <Select
-                value={cefrLevel}
-                onValueChange={(value) => setCefrLevel(value as CEFRLevel)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select your level" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CEFR_LEVELS.map((level) => (
-                    <SelectItem key={level} value={level}>
-                      {level}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                This helps us tailor quizzes to your proficiency level
-              </p>
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="learningLanguage">
+                  Language You Are Learning
+                </Label>
+                <Select
+                  value={learningLanguage}
+                  onValueChange={handleLearningLanguageChange}
+                >
+                  <SelectTrigger id="learningLanguage">
+                    <SelectValue placeholder="Select a learning language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TARGET_LANGUAGE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sourceLanguage">Language You Learn From</Label>
+                <Select
+                  value={sourceLanguage}
+                  onValueChange={(value) =>
+                    setSourceLanguage(value as SourceLanguage)
+                  }
+                >
+                  <SelectTrigger id="sourceLanguage">
+                    <SelectValue placeholder="Select a source language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOURCE_LANGUAGE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cefrLevel">Your Level (CEFR)</Label>
+                <Select
+                  value={cefrLevel}
+                  onValueChange={(value) => setCefrLevel(value as CEFRLevel)}
+                >
+                  <SelectTrigger id="cefrLevel">
+                    <SelectValue placeholder="Select your level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allowedCefrLevels.map((level) => (
+                      <SelectItem key={level} value={level}>
+                        {level}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This helps us tailor quizzes to your proficiency level.
+                  Spanish is currently limited to A1 for testing.
+                </p>
+              </div>
+            </>
           )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}

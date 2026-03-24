@@ -6,20 +6,32 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader2, Sparkles } from "lucide-react";
 import type { QuizTerm } from "@/types/quiz";
+import {
+  getLearningLanguageLabel,
+  getSourceLanguageLabel,
+  type LearningLanguage,
+  type SourceLanguage,
+} from "@/lib/languages";
 
 interface WordInputProps {
   onParsed: (terms: QuizTerm[]) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
+  targetLanguage: LearningLanguage;
+  sourceLanguage: SourceLanguage;
 }
 
 export function WordInput({
   onParsed,
   isLoading,
   setIsLoading,
+  targetLanguage,
+  sourceLanguage,
 }: WordInputProps) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const targetLanguageLabel = getLearningLanguageLabel(targetLanguage);
+  const sourceLanguageLabel = getSourceLanguageLabel(sourceLanguage);
 
   async function handleParse() {
     if (!text.trim()) return;
@@ -31,7 +43,11 @@ export function WordInput({
       const res = await fetch("/api/ai/parse-input", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.trim() }),
+        body: JSON.stringify({
+          text: text.trim(),
+          targetLanguage,
+          sourceLanguage,
+        }),
       });
 
       if (!res.ok) {
@@ -54,7 +70,7 @@ export function WordInput({
         <Label htmlFor="word-input">Paste your vocabulary</Label>
         <Textarea
           id="word-input"
-          placeholder={`Paste words, sentences, or text here...\n\nExamples:\n- Raw text: "The resilient community persevered through adversity"\n- Word list: "resilient, persevere, adversity"\n- Tab-separated: "resilient\tстійкий"`}
+          placeholder={`Paste words, sentences, or text here...\n\nExamples:\n- Raw text in ${sourceLanguageLabel}: sample text or short phrases\n- Word list: comma-separated vocabulary\n- Tab-separated: target word + ${sourceLanguageLabel.toLowerCase()} meaning`}
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={8}
@@ -63,13 +79,12 @@ export function WordInput({
         />
         <p className="text-xs text-muted-foreground">
           Paste raw text, word lists, or tab-separated vocabulary. AI will
-          extract English words and create Ukrainian translations.
+          extract useful {targetLanguageLabel} words and create{" "}
+          {sourceLanguageLabel.toLowerCase()} meanings.
         </p>
       </div>
 
-      {error && (
-        <p className="text-sm text-destructive">{error}</p>
-      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <Button
         onClick={handleParse}
@@ -79,12 +94,12 @@ export function WordInput({
         {isLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Parsing words...
+            Parsing vocabulary...
           </>
         ) : (
           <>
             <Sparkles className="mr-2 h-4 w-4" />
-            Parse Words with AI
+            Parse with AI
           </>
         )}
       </Button>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FlashcardPlayer, type FlashcardResult } from "./flashcard-player";
 import { GapFillPlayer, type GapFillResult } from "./gap-fill-player";
@@ -9,6 +8,10 @@ import {
   TranslationPlayer,
   type TranslationResult,
 } from "./translation-player";
+import {
+  TextTranslationPlayer,
+  type TextTranslationResult,
+} from "./text-translation-player";
 import { QuizResults } from "./quiz-results";
 import {
   Card,
@@ -25,19 +28,23 @@ import type { Quiz } from "@/types/database";
 import type {
   FlashcardItem,
   GapFillQuestion,
+  TextTranslationContent,
   TranslationQuestion,
 } from "@/types/quiz";
 
 interface QuizPlayerProps {
   quiz: Quiz;
+  isOwner?: boolean;
 }
 
-export function QuizPlayer({ quiz }: QuizPlayerProps) {
-  const router = useRouter();
+export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
   const [showResults, setShowResults] = useState(false);
   const [gapFillResults, setGapFillResults] = useState<GapFillResult[]>([]);
   const [translationResults, setTranslationResults] = useState<
     TranslationResult[]
+  >([]);
+  const [textTranslationResults, setTextTranslationResults] = useState<
+    TextTranslationResult[]
   >([]);
   const [flashcardKnown, setFlashcardKnown] = useState(0);
   const [flashcardTotal, setFlashcardTotal] = useState(0);
@@ -52,6 +59,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     setShowResults(false);
     setGapFillResults([]);
     setTranslationResults([]);
+    setTextTranslationResults([]);
     setFlashcardKnown(0);
     setFlashcardTotal(0);
   }
@@ -121,7 +129,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
     const cards = (content.cards || []) as FlashcardItem[];
     return (
-      <FlashcardPlayer cards={cards} onComplete={handleFlashcardComplete} />
+      <FlashcardPlayer
+        cards={cards}
+        quizConfig={quizConfig ?? undefined}
+        onComplete={handleFlashcardComplete}
+      />
     );
   }
 
@@ -141,6 +153,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     return (
       <GapFillPlayer
         questions={questions}
+        quizConfig={quizConfig ?? undefined}
         onComplete={(results) => {
           setGapFillResults(results);
           setShowResults(true);
@@ -156,6 +169,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
           type="translation"
           quizId={quiz.id}
           translationResults={translationResults}
+          quizConfig={quizConfig ?? undefined}
           onRestart={handleRestart}
         />
       );
@@ -167,8 +181,37 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         questions={questions}
         cefrLevel={quiz.cefr_level}
         quizConfig={quizConfig ?? undefined}
+        canPreviewQuestions={isOwner}
         onComplete={(results) => {
           setTranslationResults(results);
+          setShowResults(true);
+        }}
+      />
+    );
+  }
+
+  if (quiz.type === "text_translation") {
+    if (showResults) {
+      return (
+        <QuizResults
+          type="text_translation"
+          quizId={quiz.id}
+          textTranslationResults={textTranslationResults}
+          quizConfig={quizConfig ?? undefined}
+          onRestart={handleRestart}
+        />
+      );
+    }
+
+    const textTranslationContent = content.content as TextTranslationContent;
+
+    return (
+      <TextTranslationPlayer
+        content={textTranslationContent}
+        cefrLevel={quiz.cefr_level}
+        quizConfig={quizConfig ?? undefined}
+        onComplete={(result) => {
+          setTextTranslationResults([result]);
           setShowResults(true);
         }}
       />

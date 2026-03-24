@@ -1,4 +1,6 @@
-export const GRAMMAR_TOPICS: Record<string, string[]> = {
+import type { LearningLanguage } from "@/lib/languages";
+
+const ENGLISH_GRAMMAR_TOPICS: Record<string, string[]> = {
   A1: [
     // Present
     "Present Simple with verb: positive",
@@ -217,18 +219,77 @@ export const GRAMMAR_TOPICS: Record<string, string[]> = {
   ],
 };
 
+const SPANISH_GRAMMAR_TOPICS: Record<string, string[]> = {
+  A1: [
+    "Spanish Subject Pronouns",
+    "Ser: basic identity and origin",
+    "Definite and Indefinite Articles",
+    "Noun Gender and Number",
+    "Adjective Agreement",
+    "Hay (there is / there are)",
+    "Regular -AR Verbs (Present)",
+    "Regular -ER and -IR Verbs (Present)",
+    "Tener: age and possession",
+    "Basic Negation with No",
+    "Simple Yes/No and Wh- Questions",
+    "Gustar: singular things",
+  ],
+};
+
 const LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1"];
+
+export function getGrammarTopicCatalog(
+  language: LearningLanguage = "english",
+): { level: string; topics: string[] }[] {
+  const topicMap =
+    language === "spanish" ? SPANISH_GRAMMAR_TOPICS : ENGLISH_GRAMMAR_TOPICS;
+
+  return LEVEL_ORDER.filter((lvl) => topicMap[lvl]).map((lvl) => ({
+    level: lvl,
+    topics: topicMap[lvl],
+  }));
+}
+
+export function getUniqueGrammarTopicCatalog(
+  language: LearningLanguage = "english",
+): { level: string; topics: string[] }[] {
+  const seen = new Set<string>();
+
+  return getGrammarTopicCatalog(language)
+    .map(({ level, topics }) => ({
+      level,
+      topics: topics.filter((topic) => {
+        if (seen.has(topic)) {
+          return false;
+        }
+
+        seen.add(topic);
+        return true;
+      }),
+    }))
+    .filter(({ topics }) => topics.length > 0);
+}
+
+export function getAllGrammarTopicKeys(): string[] {
+  const seen = new Set<string>();
+
+  for (const language of ["english", "spanish"] as const) {
+    for (const { topics } of getUniqueGrammarTopicCatalog(language)) {
+      for (const topic of topics) {
+        seen.add(topic);
+      }
+    }
+  }
+
+  return Array.from(seen);
+}
 
 export function getTopicsForLevel(
   level: string,
+  language: LearningLanguage = "english",
 ): { level: string; topics: string[] }[] {
   const targetIndex = LEVEL_ORDER.indexOf(level);
   if (targetIndex === -1) return [];
 
-  return LEVEL_ORDER.slice(0, targetIndex + 1)
-    .filter((lvl) => GRAMMAR_TOPICS[lvl])
-    .map((lvl) => ({
-      level: lvl,
-      topics: GRAMMAR_TOPICS[lvl],
-    }));
+  return getGrammarTopicCatalog(language).slice(0, targetIndex + 1);
 }

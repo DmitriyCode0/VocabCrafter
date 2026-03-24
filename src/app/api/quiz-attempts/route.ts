@@ -3,7 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 import { extractWordResults, upsertWordMastery } from "@/lib/mastery/engine";
-import { fetchHistoryPageData, HISTORY_PAGE_SIZE } from "@/lib/history/fetch-history-page-data";
+import {
+  fetchHistoryPageData,
+  HISTORY_PAGE_SIZE,
+} from "@/lib/history/fetch-history-page-data";
 import type { Role } from "@/types/roles";
 
 const createAttemptSchema = z.object({
@@ -142,22 +145,20 @@ export async function GET(request: Request) {
 
     if (profileError || !profile) {
       console.error("Fetch attempts profile error:", profileError);
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { quizId, limit, offset, student, type } = parsed.data;
-    const { attempts, hasMore, activeStudentFilter } = await fetchHistoryPageData({
-      role: profile.role as Role,
-      userId: user.id,
-      limit,
-      offset,
-      studentId: student,
-      quizType: type,
-      quizId,
-    });
+    const { attempts, hasMore, activeStudentFilter } =
+      await fetchHistoryPageData({
+        role: profile.role as Role,
+        userId: user.id,
+        limit,
+        offset,
+        studentId: student,
+        quizType: type,
+        quizId,
+      });
 
     return NextResponse.json({
       attempts,

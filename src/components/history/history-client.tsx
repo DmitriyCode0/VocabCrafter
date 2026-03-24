@@ -25,11 +25,13 @@ import {
 } from "@/components/ui/select";
 import { History, ChevronDown, ChevronUp, Loader2, User } from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
+import { getPrimaryGrammarTopic } from "@/lib/utils";
 import {
   HISTORY_PAGE_SIZE,
   type HistoryAttempt,
   type HistoryStudent,
 } from "@/lib/history/fetch-history-page-data";
+import type { TranslationScoreSaveResult } from "@/components/review/editable-translation-results";
 import type { Role } from "@/types/roles";
 import { AttemptDetail } from "./attempt-detail";
 
@@ -63,18 +65,60 @@ function mergeAttempts(
   ];
 }
 
+function updateAttemptTranslationScore(
+  attempts: HistoryAttempt[],
+  attemptId: string,
+  result: TranslationScoreSaveResult,
+) {
+  return attempts.map((attempt) => {
+    if (attempt.id !== attemptId) {
+      return attempt;
+    }
+
+    const currentAnswers =
+      attempt.answers && typeof attempt.answers === "object"
+        ? (attempt.answers as Record<string, unknown>)
+        : {};
+    const currentResults = Array.isArray(currentAnswers.results)
+      ? [...(currentAnswers.results as Record<string, unknown>[])]
+      : [];
+
+    if (currentResults[result.questionIndex]) {
+      currentResults[result.questionIndex] = {
+        ...currentResults[result.questionIndex],
+        score: result.score,
+      };
+    }
+
+    return {
+      ...attempt,
+      score: result.overallScore,
+      max_score: result.maxScore,
+      answers: {
+        ...currentAnswers,
+        results: currentResults,
+      },
+    };
+  });
+}
+
 const AttemptCard = React.memo(function AttemptCard({
   attempt,
   isTutor,
   userId,
   isExpanded,
   onToggleExpand,
+  onTranslationScoreSaved,
 }: {
   attempt: HistoryAttempt;
   isTutor: boolean;
   userId?: string;
   isExpanded: boolean;
   onToggleExpand: (id: string) => void;
+  onTranslationScoreSaved: (
+    attemptId: string,
+    result: TranslationScoreSaveResult,
+  ) => void;
 }) {
   const quiz = attempt.quizzes;
   const student = attempt.profiles;
@@ -83,12 +127,13 @@ const AttemptCard = React.memo(function AttemptCard({
     ? Math.round((Number(attempt.score) / Number(attempt.max_score)) * 100)
     : null;
   const isOwnAttempt = userId && attempt.student_id === userId;
+  const grammarTopic = getPrimaryGrammarTopic(quiz?.config);
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-center gap-2">
             {isTutor && (
               <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
                 <User className="h-3.5 w-3.5" />
@@ -103,10 +148,18 @@ const AttemptCard = React.memo(function AttemptCard({
               {quiz?.title ?? "Quiz"}
             </CardTitle>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex min-w-0 flex-wrap items-start gap-2 sm:justify-end">
             {quiz && (
               <Badge variant="outline">
                 {ACTIVITY_LABELS[quiz.type ?? ""] || quiz.type}
+              </Badge>
+            )}
+            {quiz?.type === "translation" && grammarTopic && (
+              <Badge
+                variant="outline"
+                className="h-auto max-w-full justify-start whitespace-normal break-words border-amber-300 bg-amber-50 px-3 py-1 text-left leading-tight text-amber-900"
+              >
+                {grammarTopic}
               </Badge>
             )}
             {quiz?.cefr_level && (
@@ -115,7 +168,11 @@ const AttemptCard = React.memo(function AttemptCard({
             {pct !== null && (
               <Badge
                 variant={
-                  pct >= 80 ? "default" : pct >= 50 ? "secondary" : "destructive"
+                  pct >= 80
+                    ? "default"
+                    : pct >= 50
+                      ? "secondary"
+                      : "destructive"
                 }
               >
                 {pct}%
@@ -125,7 +182,7 @@ const AttemptCard = React.memo(function AttemptCard({
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             {new Date(attempt.completed_at).toLocaleString()}
             {scored && (
@@ -137,6 +194,7 @@ const AttemptCard = React.memo(function AttemptCard({
           <Button
             variant="ghost"
             size="sm"
+            className="self-start sm:self-auto"
             onClick={() => onToggleExpand(attempt.id)}
           >
             {isExpanded ? (
@@ -155,7 +213,13 @@ const AttemptCard = React.memo(function AttemptCard({
 
         {isExpanded && (
           <div className="mt-4 border-t pt-4">
-            <AttemptDetail attempt={attempt as Record<string, unknown>} />
+            <AttemptDetail
+              attempt={attempt as Record<string, unknown>}
+              canEditTranslationScores={isTutor && quiz?.type === "translation"}
+              onTranslationScoreSaved={(result) =>
+                onTranslationScoreSaved(attempt.id, result)
+              }
+            />
           </div>
         )}
       </CardContent>
@@ -188,7 +252,8 @@ export function HistoryClient({
   const loadingMoreRef = useRef(false);
 
   const activeStudentFilter = isTutor ? filterStudent : "all";
-  const hasActiveFilters = filterType !== "all" || activeStudentFilter !== "all";
+  const hasActiveFilters =
+    filterType !== "all" || activeStudentFilter !== "all";
   const queryKey = `${filterType}:${activeStudentFilter}`;
   const latestQueryKeyRef = useRef(queryKey);
   const quizTypes = Object.keys(ACTIVITY_LABELS);
@@ -210,14 +275,18 @@ export function HistoryClient({
         searchParams.set("student", activeStudentFilter);
       }
 
-      const response = await fetch(`/api/quiz-attempts?${searchParams.toString()}`, {
-        cache: "no-store",
-      });
-      const payload = (await response.json()) as HistoryResponse | HistoryErrorResponse;
+      const response = await fetch(
+        `/api/quiz-attempts?${searchParams.toString()}`,
+        {
+          cache: "no-store",
+        },
+      );
+      const payload = (await response.json()) as
+        | HistoryResponse
+        | HistoryErrorResponse;
 
       if (!response.ok) {
-        const errorMessage =
-          "error" in payload ? payload.error : undefined;
+        const errorMessage = "error" in payload ? payload.error : undefined;
 
         throw new Error(errorMessage || "Failed to load history");
       }
@@ -344,6 +413,15 @@ export function HistoryClient({
     setExpandedId((prev) => (prev === id ? null : id));
   }, []);
 
+  const handleTranslationScoreSaved = useCallback(
+    (attemptId: string, result: TranslationScoreSaveResult) => {
+      setAttempts((currentAttempts) =>
+        updateAttemptTranslationScore(currentAttempts, attemptId, result),
+      );
+    },
+    [],
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -434,6 +512,7 @@ export function HistoryClient({
               userId={userId}
               isExpanded={expandedId === attempt.id}
               onToggleExpand={handleToggleExpand}
+              onTranslationScoreSaved={handleTranslationScoreSaved}
             />
           ))}
 
@@ -477,7 +556,11 @@ export function HistoryClient({
       {!initialLoading && attempts.length === 0 && loadError && (
         <div className="flex items-center justify-center gap-3 text-sm text-destructive">
           <span>{loadError}</span>
-          <Button variant="outline" size="sm" onClick={() => void reloadAttempts()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void reloadAttempts()}
+          >
             Retry
           </Button>
         </div>

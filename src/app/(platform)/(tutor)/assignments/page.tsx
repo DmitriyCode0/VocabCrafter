@@ -15,11 +15,22 @@ import { ClipboardList } from "lucide-react";
 import { DeleteAssignmentButton } from "@/components/assignments/delete-assignment-button";
 import { CreateAssignmentDialog } from "@/components/assignments/create-assignment-dialog";
 import { ACTIVITY_LABELS } from "@/lib/constants";
+import { PagePagination } from "@/components/shared/page-pagination";
+import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
-export default async function AssignmentsPage() {
+const ASSIGNMENTS_PAGE_SIZE = 10;
+
+export default async function AssignmentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const supabase = await createClient();
+  const resolvedSearchParams = await searchParams;
+  const currentPage = getCurrentPage(resolvedSearchParams.page);
+  const { from, to } = getPaginationRange(currentPage, ASSIGNMENTS_PAGE_SIZE);
 
   const {
     data: { user },
@@ -36,15 +47,27 @@ export default async function AssignmentsPage() {
   const role = profile?.role ?? "student";
 
   if (role === "student") {
-    return <StudentAssignments supabaseUserId={user.id} />;
+    return (
+      <StudentAssignments
+        supabaseUserId={user.id}
+        currentPage={currentPage}
+        searchParams={resolvedSearchParams}
+      />
+    );
   }
 
   // Tutor / superadmin view
+  const { count: totalAssignments } = await supabase
+    .from("assignments")
+    .select("id", { count: "exact", head: true })
+    .eq("tutor_id", user.id);
+
   const { data: assignments } = await supabase
     .from("assignments")
     .select("*, classes(name, id), quizzes(title, type)")
     .eq("tutor_id", user.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   return (
     <div className="space-y-6">
@@ -72,74 +95,84 @@ export default async function AssignmentsPage() {
           </CardHeader>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {assignments.map((assignment) => {
-            const cls = assignment.classes as unknown as {
-              name: string;
-              id: string;
-            } | null;
-            const quiz = assignment.quizzes as unknown as {
-              title: string;
-              type: string;
-            } | null;
-            const isPastDue =
-              assignment.due_date && new Date(assignment.due_date) < new Date();
+        <div className="space-y-6">
+          <div className="space-y-3">
+            {assignments.map((assignment) => {
+              const cls = assignment.classes as unknown as {
+                name: string;
+                id: string;
+              } | null;
+              const quiz = assignment.quizzes as unknown as {
+                title: string;
+                type: string;
+              } | null;
+              const isPastDue =
+                assignment.due_date &&
+                new Date(assignment.due_date) < new Date();
 
-            return (
-              <Card key={assignment.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">
-                      {assignment.title}
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      {assignment.due_date && (
-                        <Badge
-                          variant={isPastDue ? "destructive" : "outline"}
-                          className="text-xs"
-                        >
-                          {isPastDue ? "Past due" : "Due"}{" "}
-                          {new Date(assignment.due_date).toLocaleDateString(
-                            "en-US",
-                          )}
-                        </Badge>
-                      )}
-                      <DeleteAssignmentButton assignmentId={assignment.id} />
+              return (
+                <Card key={assignment.id}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">
+                        {assignment.title}
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        {assignment.due_date && (
+                          <Badge
+                            variant={isPastDue ? "destructive" : "outline"}
+                            className="text-xs"
+                          >
+                            {isPastDue ? "Past due" : "Due"}{" "}
+                            {new Date(assignment.due_date).toLocaleDateString(
+                              "en-US",
+                            )}
+                          </Badge>
+                        )}
+                        <DeleteAssignmentButton assignmentId={assignment.id} />
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    {cls && (
-                      <Link
-                        href={`/classes/${cls.id}`}
-                        className="hover:text-primary"
-                      >
-                        Class: {cls.name}
-                      </Link>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      {cls && (
+                        <Link
+                          href={`/classes/${cls.id}`}
+                          className="hover:text-primary"
+                        >
+                          Class: {cls.name}
+                        </Link>
+                      )}
+                      {quiz && (
+                        <span>
+                          Quiz: {quiz.title} (
+                          {ACTIVITY_LABELS[quiz.type] || quiz.type})
+                        </span>
+                      )}
+                    </div>
+                    {assignment.instructions && (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {assignment.instructions}
+                      </p>
                     )}
-                    {quiz && (
-                      <span>
-                        Quiz: {quiz.title} (
-                        {ACTIVITY_LABELS[quiz.type] || quiz.type})
-                      </span>
-                    )}
-                  </div>
-                  {assignment.instructions && (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      {assignment.instructions}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Created{" "}
+                      {new Date(assignment.created_at).toLocaleDateString(
+                        "en-US",
+                      )}
                     </p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Created{" "}
-                    {new Date(assignment.created_at).toLocaleDateString(
-                      "en-US",
-                    )}
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          <PagePagination
+            pathname="/assignments"
+            currentPage={currentPage}
+            pageSize={ASSIGNMENTS_PAGE_SIZE}
+            totalItems={totalAssignments ?? assignments.length}
+            searchParams={resolvedSearchParams}
+          />
         </div>
       )}
     </div>
@@ -150,10 +183,15 @@ export default async function AssignmentsPage() {
 
 async function StudentAssignments({
   supabaseUserId,
+  currentPage,
+  searchParams,
 }: {
   supabaseUserId: string;
+  currentPage: number;
+  searchParams: { page?: string };
 }) {
   const supabase = await createClient();
+  const { from, to } = getPaginationRange(currentPage, ASSIGNMENTS_PAGE_SIZE);
 
   // Get classes the student has joined
   const { data: memberships } = await supabase
@@ -190,11 +228,17 @@ async function StudentAssignments({
 
   // Get assignments for those classes (admin client to bypass RLS on joined tables)
   const supabaseAdmin = createAdminClient();
+  const { count: totalAssignments } = await supabaseAdmin
+    .from("assignments")
+    .select("id", { count: "exact", head: true })
+    .in("class_id", classIds);
+
   const { data: assignments } = await supabaseAdmin
     .from("assignments")
     .select("*, classes(name), quizzes(id, title, type, cefr_level)")
     .in("class_id", classIds)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   // Check completion status
   const quizIds = assignments?.map((a) => a.quiz_id).filter(Boolean) ?? [];
@@ -244,85 +288,95 @@ async function StudentAssignments({
           </CardHeader>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {assignments.map((assignment) => {
-            const cls = assignment.classes as unknown as {
-              name: string;
-            } | null;
-            const quiz = assignment.quizzes as unknown as {
-              id: string;
-              title: string;
-              type: string;
-              cefr_level: string;
-            } | null;
-            const isPastDue =
-              assignment.due_date && new Date(assignment.due_date) < new Date();
-            const attempt = quiz ? attemptMap[quiz.id] : null;
-            const isCompleted = !!attempt;
-            const pct =
-              attempt?.score != null && attempt?.max_score != null
-                ? Math.round((attempt.score / attempt.max_score) * 100)
-                : null;
+        <div className="space-y-6">
+          <div className="space-y-3">
+            {assignments.map((assignment) => {
+              const cls = assignment.classes as unknown as {
+                name: string;
+              } | null;
+              const quiz = assignment.quizzes as unknown as {
+                id: string;
+                title: string;
+                type: string;
+                cefr_level: string;
+              } | null;
+              const isPastDue =
+                assignment.due_date &&
+                new Date(assignment.due_date) < new Date();
+              const attempt = quiz ? attemptMap[quiz.id] : null;
+              const isCompleted = !!attempt;
+              const pct =
+                attempt?.score != null && attempt?.max_score != null
+                  ? Math.round((attempt.score / attempt.max_score) * 100)
+                  : null;
 
-            return (
-              <Card key={assignment.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">
-                      {assignment.title}
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      {isCompleted ? (
-                        <Badge variant="secondary">
-                          {pct !== null ? `${pct}%` : "Done"}
-                        </Badge>
-                      ) : isPastDue ? (
-                        <Badge variant="destructive">Past due</Badge>
-                      ) : assignment.due_date ? (
-                        <Badge variant="outline">
-                          Due{" "}
-                          {new Date(assignment.due_date).toLocaleDateString(
-                            "en-US",
-                          )}
-                        </Badge>
-                      ) : null}
+              return (
+                <Card key={assignment.id}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">
+                        {assignment.title}
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        {isCompleted ? (
+                          <Badge variant="secondary">
+                            {pct !== null ? `${pct}%` : "Done"}
+                          </Badge>
+                        ) : isPastDue ? (
+                          <Badge variant="destructive">Past due</Badge>
+                        ) : assignment.due_date ? (
+                          <Badge variant="outline">
+                            Due{" "}
+                            {new Date(assignment.due_date).toLocaleDateString(
+                              "en-US",
+                            )}
+                          </Badge>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        {cls && <span>Class: {cls.name}</span>}
-                        {quiz && (
-                          <span>
-                            {ACTIVITY_LABELS[quiz.type] || quiz.type} &middot;{" "}
-                            {quiz.cefr_level}
-                          </span>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                          {cls && <span>Class: {cls.name}</span>}
+                          {quiz && (
+                            <span>
+                              {ACTIVITY_LABELS[quiz.type] || quiz.type} &middot;{" "}
+                              {quiz.cefr_level}
+                            </span>
+                          )}
+                        </div>
+                        {assignment.instructions && (
+                          <p className="text-sm text-muted-foreground">
+                            {assignment.instructions}
+                          </p>
                         )}
                       </div>
-                      {assignment.instructions && (
-                        <p className="text-sm text-muted-foreground">
-                          {assignment.instructions}
-                        </p>
+                      {quiz && (
+                        <Button
+                          asChild
+                          size="sm"
+                          variant={isCompleted ? "outline" : "default"}
+                        >
+                          <Link href={`/quizzes/${quiz.id}`}>
+                            {isCompleted ? "Retry" : "Start"}
+                          </Link>
+                        </Button>
                       )}
                     </div>
-                    {quiz && (
-                      <Button
-                        asChild
-                        size="sm"
-                        variant={isCompleted ? "outline" : "default"}
-                      >
-                        <Link href={`/quizzes/${quiz.id}`}>
-                          {isCompleted ? "Retry" : "Start"}
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          <PagePagination
+            pathname="/assignments"
+            currentPage={currentPage}
+            pageSize={ASSIGNMENTS_PAGE_SIZE}
+            totalItems={totalAssignments ?? assignments.length}
+            searchParams={searchParams}
+          />
         </div>
       )}
     </div>

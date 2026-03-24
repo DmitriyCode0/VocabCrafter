@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateFromGemini } from "@/lib/gemini/client";
 import { getQuizPrompt, getSystemInstruction } from "@/lib/gemini/prompts";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
+import { resolveGrammarTopicPromptDetails } from "@/lib/grammar/prompt-overrides";
 import type { GenerateQuizRequest } from "@/types/quiz";
 import { z } from "zod";
 import {
@@ -38,6 +39,8 @@ const requestSchema = z.object({
     .max(50),
   config: z.object({
     cefrLevel: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]),
+    targetLanguage: z.enum(["english", "spanish"]).optional(),
+    sourceLanguage: z.enum(["english", "ukrainian"]).optional(),
     vocabularyChallenge: z.enum(["Simple", "Standard", "Complex"]),
     grammarChallenge: z.enum(["Simple", "Standard", "Complex"]),
     teacherPersona: z.enum(["learning", "strict", "standard"]),
@@ -90,6 +93,10 @@ export async function POST(request: Request) {
         .replace(/[{}\[\]`]/g, "")
         .slice(0, 200);
     }
+
+    config.grammarTopicDetails = await resolveGrammarTopicPromptDetails(
+      config.grammarTopics,
+    );
 
     const prompt = getQuizPrompt(type, terms, config);
     const systemInstruction = getSystemInstruction(config);

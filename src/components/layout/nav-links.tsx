@@ -18,6 +18,7 @@ import {
   History,
   UserCheck,
   UserPlus,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types/roles";
@@ -62,7 +63,7 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["student"],
   },
   {
-    label: "Vocabulary",
+    label: "Vocab Mastery",
     href: "/vocabulary",
     icon: Zap,
     roles: ["student"],
@@ -105,7 +106,7 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["tutor"],
   },
   {
-    label: "Mastery",
+    label: "Vocab Mastery",
     href: "/mastery",
     icon: Brain,
     roles: ["tutor"],
@@ -134,6 +135,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Users",
     href: "/users",
     icon: Users,
+    roles: ["superadmin"],
+  },
+  {
+    label: "Grammar Rules",
+    href: "/grammar-rules",
+    icon: FileText,
     roles: ["superadmin"],
   },
   {

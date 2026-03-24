@@ -94,7 +94,8 @@ export async function fetchHistoryPageData({
   const normalizedQuizType = normalizeFilterValue(quizType);
   const normalizedQuizId = normalizeFilterValue(quizId);
   const requestedStudentId = normalizeFilterValue(studentId);
-  const students = role === "student" ? [] : await fetchConnectedStudents(userId);
+  const students =
+    role === "student" ? [] : await fetchConnectedStudents(userId);
   const allowedStudentIds =
     role === "student"
       ? [userId]

@@ -13,14 +13,26 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { CheckCircle2, XCircle, RotateCcw, Home } from "lucide-react";
 import { saveAttempt } from "@/lib/save-attempt";
+import { removeSuggestedAnswerLines, stripMarkdownEmphasis } from "@/lib/utils";
 import type { GapFillResult } from "./gap-fill-player";
+import type { TextTranslationResult } from "./text-translation-player";
 import type { TranslationResult } from "./translation-player";
+import type { QuizConfig } from "@/types/quiz";
+import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
+import {
+  getLearningLanguageLabel,
+  getSourceLanguageLabel,
+  normalizeLearningLanguage,
+  normalizeSourceLanguage,
+} from "@/lib/languages";
 
 interface QuizResultsProps {
-  type: "gap_fill" | "translation";
+  type: "gap_fill" | "translation" | "text_translation";
   quizId: string;
   gapFillResults?: GapFillResult[];
   translationResults?: TranslationResult[];
+  textTranslationResults?: TextTranslationResult[];
+  quizConfig?: QuizConfig;
   onRestart: () => void;
 }
 
@@ -29,9 +41,17 @@ export function QuizResults({
   quizId,
   gapFillResults,
   translationResults,
+  textTranslationResults,
+  quizConfig,
   onRestart,
 }: QuizResultsProps) {
   const savedRef = useRef(false);
+  const targetLanguageLabel = getLearningLanguageLabel(
+    normalizeLearningLanguage(quizConfig?.targetLanguage),
+  );
+  const sourceLanguageLabel = getSourceLanguageLabel(
+    normalizeSourceLanguage(quizConfig?.sourceLanguage),
+  );
 
   useEffect(() => {
     if (savedRef.current) return;
@@ -56,8 +76,19 @@ export function QuizResults({
         avgScore,
         100,
       );
+    } else if (type === "text_translation" && textTranslationResults) {
+      const averageScore = Math.round(
+        textTranslationResults.reduce((sum, result) => sum + result.score, 0) /
+          textTranslationResults.length,
+      );
+      saveAttempt(
+        quizId,
+        { type: "text_translation", results: textTranslationResults },
+        averageScore,
+        100,
+      );
     }
-  }, [type, quizId, gapFillResults, translationResults]);
+  }, [type, quizId, gapFillResults, textTranslationResults, translationResults]);
   if (type === "gap_fill" && gapFillResults) {
     const correct = gapFillResults.filter((r) => r.isCorrect).length;
     const total = gapFillResults.length;
@@ -149,37 +180,150 @@ export function QuizResults({
                     {result.score}/100
                   </Badge>
                 </div>
-                <p className="text-sm">{result.ukrainianSentence}</p>
+                <p className="text-sm">
+                  {stripMarkdownEmphasis(result.ukrainianSentence)}
+                </p>
                 <p className="text-sm">
                   Your translation: <em>{result.userTranslation}</em>
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Reference: <em>{result.referenceTranslation}</em>
+                <div className="space-y-2 rounded-md bg-background/70 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm text-muted-foreground">
+                      Reference ({targetLanguageLabel}):{" "}
+                      <em>{result.referenceTranslation}</em>
+                    </p>
+                    <BrowserTtsButton
+                      text={result.referenceTranslation}
+                      language={quizConfig?.targetLanguage}
+                      label="Listen"
+                      className="shrink-0"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Source sentence ({sourceLanguageLabel})
                 </p>
                 <div className="text-xs text-muted-foreground space-y-0.5">
-                  {result.feedback.split("\n").map((line, i) => {
-                    const trimmed = line.trim();
-                    if (!trimmed) return null;
-                    const isPass = trimmed.startsWith("✓");
-                    const isFail = trimmed.startsWith("✗");
-                    return (
-                      <p
-                        key={i}
-                        className={
-                          isFail
-                            ? "text-red-500"
-                            : isPass
-                              ? "text-green-600 dark:text-green-400"
-                              : ""
-                        }
-                      >
-                        {trimmed}
-                      </p>
-                    );
-                  })}
+                  {removeSuggestedAnswerLines(result.feedback)
+                    .split("\n")
+                    .map((line, i) => {
+                      const trimmed = line.trim();
+                      if (!trimmed) return null;
+                      const isPass = trimmed.startsWith("✓");
+                      const isFail = trimmed.startsWith("✗");
+                      return (
+                        <p
+                          key={i}
+                          className={
+                            isFail
+                              ? "text-red-500"
+                              : isPass
+                                ? "text-green-600 dark:text-green-400"
+                                : ""
+                          }
+                        >
+                          {trimmed}
+                        </p>
+                      );
+                    })}
                 </div>
               </div>
             ))}
+
+            <div className="flex gap-2 pt-4">
+              <Button variant="outline" onClick={onRestart}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+              <Button asChild className="flex-1">
+                <Link href="/quizzes">
+                  <Home className="mr-2 h-4 w-4" />
+                  My Quizzes
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (type === "text_translation" && textTranslationResults) {
+    const result = textTranslationResults[0];
+
+    if (!result) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Text Translation Complete!</CardTitle>
+            <CardDescription>Score: {result.score}/100</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-md bg-muted p-4 space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Source text ({sourceLanguageLabel})
+              </p>
+              <p className="whitespace-pre-line text-sm leading-relaxed">
+                {stripMarkdownEmphasis(result.originalText)}
+              </p>
+            </div>
+
+            <div className="rounded-md bg-muted p-4 space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Your translation
+              </p>
+              <p className="whitespace-pre-line text-sm">
+                <em>{result.userTranslation}</em>
+              </p>
+            </div>
+
+            <div className="space-y-2 rounded-md bg-background/70 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Reference ({targetLanguageLabel}):
+                  </p>
+                  <p className="whitespace-pre-line text-sm italic">
+                    {result.referenceTranslation}
+                  </p>
+                </div>
+                <BrowserTtsButton
+                  text={result.referenceTranslation}
+                  language={quizConfig?.targetLanguage}
+                  label="Listen"
+                  className="shrink-0"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground space-y-0.5">
+              {removeSuggestedAnswerLines(result.feedback)
+                .split("\n")
+                .map((line, index) => {
+                  const trimmed = line.trim();
+                  if (!trimmed) return null;
+                  const isPass = trimmed.startsWith("✓");
+                  const isFail = trimmed.startsWith("✗");
+                  return (
+                    <p
+                      key={index}
+                      className={
+                        isFail
+                          ? "text-red-500"
+                          : isPass
+                            ? "text-green-600 dark:text-green-400"
+                            : ""
+                      }
+                    >
+                      {trimmed}
+                    </p>
+                  );
+                })}
+            </div>
 
             <div className="flex gap-2 pt-4">
               <Button variant="outline" onClick={onRestart}>

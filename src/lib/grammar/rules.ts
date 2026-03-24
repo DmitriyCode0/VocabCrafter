@@ -1,6 +1,89 @@
 export const GRAMMAR_RULES: Record<string, string> = {
   // ===== A1 =====
 
+  "Spanish Subject Pronouns": `Basic subject pronouns: yo, tu, el, ella, usted, nosotros/nosotras, vosotros/vosotras, ellos, ellas, ustedes.
+Use them to identify who performs the action. In Spanish they are often omitted, but at A1 they may be included for clarity.
+Examples:
+- Yo soy Ana.
+- Ella vive en Madrid.
+- Nosotros estudiamos espanol.`,
+
+  "Ser: basic identity and origin": `Use 'ser' for identity, nationality, origin, profession, and basic description.
+Present forms: soy, eres, es, somos, sois, son.
+Examples:
+- Soy estudiante.
+- Ella es de Ucrania.
+- Somos amigos.`,
+
+  "Definite and Indefinite Articles": `Definite articles: el, la, los, las. Indefinite articles: un, una, unos, unas.
+Articles must agree with the noun in gender and number.
+Examples:
+- el libro / la casa
+- un profesor / una amiga
+- los estudiantes / unas mesas`,
+
+  "Noun Gender and Number": `Spanish nouns are masculine or feminine and singular or plural.
+Many masculine nouns end in -o; many feminine nouns end in -a, but there are exceptions.
+Plural usually adds -s or -es.
+Examples:
+- amigo / amigos
+- casa / casas
+- profesor / profesores`,
+
+  "Adjective Agreement": `Adjectives must agree with the noun in gender and number.
+Examples:
+- un chico alto
+- una chica alta
+- libros interesantes
+- casas bonitas`,
+
+  "Hay (there is / there are)": `Use 'hay' to say that something exists.
+It works for both singular and plural.
+Examples:
+- Hay un libro en la mesa.
+- Hay dos estudiantes en la clase.
+- No hay leche.`,
+
+  "Regular -AR Verbs (Present)": `Present tense endings for regular -ar verbs: -o, -as, -a, -amos, -ais, -an.
+Examples with hablar:
+- hablo, hablas, habla, hablamos, hablais, hablan
+- Yo hablo espanol.
+- Ella trabaja en casa.`,
+
+  "Regular -ER and -IR Verbs (Present)": `Present tense endings for regular -er verbs: -o, -es, -e, -emos, -eis, -en.
+Present tense endings for regular -ir verbs: -o, -es, -e, -imos, -is, -en.
+Examples:
+- como / comes / come
+- vivo / vives / vive
+- Nosotros vivimos en Kyiv.`,
+
+  "Tener: age and possession": `Use 'tener' for possession and age.
+Present forms: tengo, tienes, tiene, tenemos, teneis, tienen.
+Examples:
+- Tengo un libro.
+- Ella tiene veinte anos.
+- Tenemos una clase hoy.`,
+
+  "Basic Negation with No": `Place 'no' before the conjugated verb to make a sentence negative.
+Examples:
+- No hablo frances.
+- Ella no es profesora.
+- No tenemos tiempo.`,
+
+  "Simple Yes/No and Wh- Questions": `Basic Spanish questions use rising intonation and can use question words like que, donde, cuando, quien, como.
+Use opening and closing question marks.
+Examples:
+- ?Hablas espanol?
+- ?Donde vives?
+- ?Como te llamas?`,
+
+  "Gustar: singular things": `Use 'gustar' with indirect object pronouns: me, te, le, nos, os, les.
+With one thing liked, use 'gusta'.
+Examples:
+- Me gusta el cafe.
+- Te gusta la musica.
+- No me gusta la lluvia.`,
+
   "Present Simple with verb: positive": `Structure: Subject + base verb (add -s/-es for he/she/it).
 Use for habits, routines, facts, and permanent states.
 Examples:
@@ -913,3 +996,62 @@ Examples:
 - On the other hand, there are some risks involved.
 - To sum up, the project was a success.`,
 };
+
+export const GRAMMAR_PROMPT_GUIDANCE: Record<string, string> = {
+  "Deduction (Must, Might, Can't)": `Generate epistemic deduction only, not obligation, advice, or permission.
+Required logic: every item must contain observable evidence plus a deduction that follows from it.
+Allowed present-time patterns:
+- Stative: subject + modal + be + adjective/noun
+- Continuous: subject + modal + be + verb-ing
+- Possession/ability: subject + modal + bare infinitive
+Modal meaning constraints:
+- must = strong positive deduction from evidence
+- might/may/could = possible but uncertain deduction
+- can't = strong negative deduction / impossibility
+- for weak negative possibility, prefer may not or might not
+Never use must as obligation, and never use could not/couldn't for a weak negative guess.
+Do not add redundant adverbs such as maybe or perhaps in the same clause as the modal.
+If the evidence is a physical fact, the deduction must be logically and contextually consistent with that fact.`,
+
+  "Deduction (Must have / Can't have)": `Generate epistemic deduction about the past only, not past obligation or regret.
+Required logic: every item must contain evidence plus a past deduction that follows from it.
+Allowed past-time patterns:
+- must have + past participle = strong positive deduction about the past
+- may/might have + past participle = uncertain past deduction
+- can't have + past participle = strong negative deduction about the past
+Never use should have or could have when the goal is deduction.
+Do not add redundant adverbs such as maybe or perhaps in the same clause as the modal.
+If the evidence contradicts the deduction, prioritize the evidence and reject the sentence.`,
+
+  "Speculation & Deduction (Advanced)": `Use epistemic meaning only.
+Every item must present evidence first and a deduction second.
+Keep the time reference aligned with the form:
+- modal + be + verb-ing for what is probably happening now
+- modal + have been + verb-ing for what was probably in progress in the past
+- modal + be + adjective/noun for current state-based deduction
+Avoid obligation readings and avoid redundant hedging adverbs with the modal.
+Prefer natural, evidence-based reasoning over abstract or unsupported speculation.`,
+};
+
+export function buildGrammarPromptDetails(
+  ruleText: string | null | undefined,
+  guidanceText: string | null | undefined,
+): string {
+  const normalizedRule = ruleText?.trim() ?? "";
+  const normalizedGuidance = guidanceText?.trim() ?? "";
+
+  if (normalizedRule && normalizedGuidance) {
+    return `${normalizedRule}\nAdditional generation guidance:\n${normalizedGuidance}`;
+  }
+
+  return normalizedRule || normalizedGuidance;
+}
+
+export function getGrammarPromptDetails(topic: string): string {
+  const combined = buildGrammarPromptDetails(
+    GRAMMAR_RULES[topic],
+    GRAMMAR_PROMPT_GUIDANCE[topic],
+  );
+
+  return combined || topic;
+}

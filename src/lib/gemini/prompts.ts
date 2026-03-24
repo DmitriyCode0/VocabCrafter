@@ -7,12 +7,39 @@ import type {
   GrammarChallenge,
   TeacherPersona,
 } from "@/types/quiz";
-import { GRAMMAR_RULES } from "@/lib/grammar/rules";
+import { formatGrammarRulesSection } from "@/lib/grammar/prompt-sections";
+import {
+  getLearningLanguageLabel,
+  getSourceLanguageLabel,
+  normalizeLearningLanguage,
+  normalizeSourceLanguage,
+} from "@/lib/languages";
 
 // ─── Formatting helpers ──────────────────────────────────────────
 
-function formatTerms(terms: QuizTerm[]): string {
-  return terms.map((t) => `- ${t.term}: ${t.definition}`).join("\n");
+function getLanguageContext(config: QuizConfig) {
+  const targetLanguage = normalizeLearningLanguage(config.targetLanguage);
+  const sourceLanguage = normalizeSourceLanguage(config.sourceLanguage);
+
+  return {
+    targetLanguage,
+    sourceLanguage,
+    targetLanguageLabel: getLearningLanguageLabel(targetLanguage),
+    sourceLanguageLabel: getSourceLanguageLabel(sourceLanguage),
+  };
+}
+
+function formatTerms(
+  terms: QuizTerm[],
+  targetLanguageLabel: string,
+  sourceLanguageLabel: string,
+): string {
+  return terms
+    .map(
+      (t) =>
+        `- ${targetLanguageLabel}: ${t.term}; ${sourceLanguageLabel}: ${t.definition}`,
+    )
+    .join("\n");
 }
 
 /** Shuffle array and take first `n` items */
@@ -100,49 +127,23 @@ CRITICAL GRAMMAR INSTRUCTION: ${grammarInstruction} The sentence structure must 
   return "";
 }
 
-// ─── Grammar rules extraction ────────────────────────────────────
-
 function getGrammarRulesSection(
   topics: string[] | undefined,
   difficulty: GrammarChallenge,
+  topicDetails?: Record<string, string>,
 ): string {
-  if (!topics || topics.length === 0) return "";
-
-  const rules = topics.map((topicKey) => {
-    const rule = GRAMMAR_RULES[topicKey];
-    if (!rule) return `- ${topicKey}`;
-
-    let constraint = "";
-    switch (difficulty) {
-      case "Simple":
-        constraint =
-          "Use the most basic form of this structure. Keep sentences short.";
-        break;
-      case "Standard":
-        constraint =
-          "Use standard forms of this structure as demonstrated in the examples.";
-        break;
-      case "Complex":
-        constraint =
-          "Combine this structure with others. Use in complex sentences with multiple clauses.";
-        break;
-    }
-
-    return `
-- TOPIC: ${topicKey}
-  * Rule: ${rule.split("\n").slice(0, 2).join(" ")}
-  * Constraint: ${constraint}`;
-  });
-
-  return `
-The content must specifically test the following grammatical structures. Follow the constraints precisely:
-${rules.join("\n")}
-`;
+  return formatGrammarRulesSection(topics, difficulty, topicDetails);
 }
 
 // ─── Teacher Persona ─────────────────────────────────────────────
 
-function getTeacherPersonaInstruction(persona: TeacherPersona): string {
+function getTeacherPersonaInstruction(
+  persona: TeacherPersona,
+  config: QuizConfig,
+): string {
+  const { targetLanguageLabel, sourceLanguageLabel } =
+    getLanguageContext(config);
+
   switch (persona) {
     case "learning":
       return `
@@ -166,12 +167,12 @@ OVERRIDE INSTRUCTION: You are a strict, perfectionist editor. Apply **NATIVE-LEV
     default:
       return `
 **TEACHER PERSONA: The Expert Tutor (20+ years experience)**
-You are an expert English-Ukrainian teacher with 20+ years of experience.
-**SCORING ALGORITHM (Start at 100%, Max 110%):**
+You are an expert ${targetLanguageLabel}-${sourceLanguageLabel} teacher with 20+ years of experience.
+**SCORING ALGORITHM (Start at 100%, Max 100%):**
 1. **Grammar/Topic Compliance:** Deduct 25% IMMEDIATELY if the requested grammar topic rules are violated, even minor violations.
 2. **Mechanics (Capitalization):** Deduct 5% if the sentence start or "I" is not capitalized.
 3. **Spelling & Lexis:** Deduct 5% PER spelling error. Extra 5% for each contextually incorrect word.
-4. **Bonuses (Max 110%):** +5% for correct internal punctuation. +5% for using valid vocabulary above target CEFR level.
+4. **Bonuses (Cap remains 100%):** You may use correct internal punctuation or strong vocabulary choice to justify fewer deductions, but the final score must NEVER exceed 100.
 **FEEDBACK FORMAT:**
 - Keep explanations short and direct.
 - For errors use format: "[Where the mistake is] -> [What should be there]. Correct: [Correct phrase]"
@@ -263,6 +264,7 @@ function getEvaluationRubric(level: CEFRLevel): {
 // ─── System instruction ──────────────────────────────────────────
 
 export function getSystemInstruction(config: QuizConfig): string {
+  const { targetLanguageLabel } = getLanguageContext(config);
   const personaLine =
     config.teacherPersona === "learning"
       ? "You are a friendly, encouraging language tutor who gives supportive feedback."
@@ -271,13 +273,15 @@ export function getSystemInstruction(config: QuizConfig): string {
         : "You are a professional language teacher who gives clear, balanced feedback.";
 
   return `${personaLine}
-You generate English language learning content for students at CEFR level ${config.cefrLevel}.
+You generate ${targetLanguageLabel} language learning content for students at CEFR level ${config.cefrLevel}.
 Always respond with valid JSON only. Do not include any markdown formatting or code blocks.`;
 }
 
 // ─── Per-type prompt constructors ────────────────────────────────
 
 export function getMCQPrompt(terms: QuizTerm[], config: QuizConfig): string {
+  const { targetLanguageLabel, sourceLanguageLabel } =
+    getLanguageContext(config);
   const difficultyInstruction = getDifficultyInstruction(
     config.vocabularyChallenge,
     config.grammarChallenge,
@@ -285,19 +289,19 @@ export function getMCQPrompt(terms: QuizTerm[], config: QuizConfig): string {
   );
   const topicInstruction = getTopicInstruction(config.customTopic);
 
-  return `You are an expert quiz creator specializing in English vocabulary for language learners.
-Your task is to generate a multiple-choice quiz from a list of English words and their Ukrainian translations.
-The Ukrainian translation is provided ONLY to give you context for the intended meaning of the English word, especially for words with multiple meanings. The entire quiz (questions, options, and answers) must be in ENGLISH.
+  return `You are an expert quiz creator specializing in ${targetLanguageLabel} vocabulary for language learners.
+Your task is to generate a multiple-choice quiz from a list of ${targetLanguageLabel} words and their ${sourceLanguageLabel} meanings.
+The ${sourceLanguageLabel} meaning is provided ONLY to give you context for the intended meaning of the ${targetLanguageLabel} word, especially for words with multiple meanings. The entire quiz (questions, options, and answers) must be in ${targetLanguageLabel.toUpperCase()}.
 The difficulty of the vocabulary used in questions and incorrect options should be appropriate for a Student at CEFR ${config.cefrLevel} proficiency.
 ${difficultyInstruction}
 ${topicInstruction}
 
 For each word in the provided list, create one question that tests its meaning. The question could be a definition, a synonym, an antonym, or a fill-in-the-blank sentence.
 Generate four options for each question: one correct answer and three plausible but incorrect distractors. Crucially, all four options should be of similar length and grammatical structure to prevent the correct answer from being obvious.
-Ensure the 'originalTerm' field matches the English word from the input list exactly.
+Ensure the 'originalTerm' field matches the ${targetLanguageLabel} word from the input list exactly.
 
 Vocabulary terms:
-${formatTerms(terms)}
+${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
 
 Respond with JSON in this exact format:
 {
@@ -317,6 +321,8 @@ export function getGapFillPrompt(
   terms: QuizTerm[],
   config: QuizConfig,
 ): string {
+  const { targetLanguageLabel, sourceLanguageLabel } =
+    getLanguageContext(config);
   const difficultyInstruction = getDifficultyInstruction(
     config.vocabularyChallenge,
     config.grammarChallenge,
@@ -324,19 +330,19 @@ export function getGapFillPrompt(
   );
   const topicInstruction = getTopicInstruction(config.customTopic);
 
-  return `You are an expert quiz creator specializing in English vocabulary for language learners.
-Your task is to generate a set of gap-fill (fill-in-the-blank) exercises from a list of English words and their Ukrainian translations.
+  return `You are an expert quiz creator specializing in ${targetLanguageLabel} vocabulary for language learners.
+Your task is to generate a set of gap-fill (fill-in-the-blank) exercises from a list of ${targetLanguageLabel} words and their ${sourceLanguageLabel} meanings.
 The difficulty of the sentence structure and vocabulary should be appropriate for a Student at CEFR ${config.cefrLevel} proficiency.
 ${difficultyInstruction}
 ${topicInstruction}
 
-For each word in the provided list, create one ENGLISH sentence that uses the word in a natural context. In the sentence, replace the target English word with '___' to create a blank.
+For each word in the provided list, create one ${targetLanguageLabel.toUpperCase()} sentence that uses the word in a natural context. In the sentence, replace the target ${targetLanguageLabel} word with '___' to create a blank.
 - The 'correctAnswer' field should be the exact word that fits in the blank. This might be a conjugated form of the original term (e.g., 'goes' instead of 'go').
-- The 'sourceTerm' field MUST be the original English word from the input list, exactly as provided.
-- The 'hint' field must be the original Ukrainian translation from the input list.
+- The 'sourceTerm' field MUST be the original ${targetLanguageLabel} word from the input list, exactly as provided.
+- The 'hint' field must be the original ${sourceLanguageLabel} meaning from the input list.
 
 Vocabulary terms:
-${formatTerms(terms)}
+${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
 
 Respond with JSON in this exact format:
 {
@@ -356,6 +362,8 @@ export function getTranslationPrompt(
   terms: QuizTerm[],
   config: QuizConfig,
 ): string {
+  const { targetLanguageLabel, sourceLanguageLabel } =
+    getLanguageContext(config);
   const difficultyInstruction = getDifficultyInstruction(
     config.vocabularyChallenge,
     config.grammarChallenge,
@@ -365,13 +373,17 @@ export function getTranslationPrompt(
   const grammarRules = getGrammarRulesSection(
     config.grammarTopics,
     config.grammarChallenge,
+    config.grammarTopicDetails,
   );
 
   const termList = terms
-    .map((t) => `  - English: "${t.term}" | Ukrainian: "${t.definition}"`)
+    .map(
+      (t) =>
+        `  - ${targetLanguageLabel}: "${t.term}" | ${sourceLanguageLabel}: "${t.definition}"`,
+    )
     .join("\n");
 
-  return `You are an expert in creating language translation exercises for English learners whose native language is Ukrainian.
+  return `You are an expert in creating language translation exercises for ${targetLanguageLabel} learners working from ${sourceLanguageLabel}.
 Your task is to generate a set of exactly ${terms.length} translation challenges.
 
 ═══ MANDATORY RULES (VIOLATION = REJECTED OUTPUT) ═══
@@ -380,14 +392,17 @@ RULE 1 — ONE VOCABULARY WORD PER SENTENCE:
 Each sentence must use EXACTLY ONE word/phrase from the provided vocabulary list. NEVER combine multiple vocabulary words in a single sentence.
 
 RULE 2 — VOCABULARY MUST BE PRESENT:
-The Ukrainian translation of the target vocabulary word MUST appear in the Ukrainian sentence. The word may be conjugated, declined, or otherwise inflected — but it must be recognizably derived from the provided Ukrainian translation.
+The ${sourceLanguageLabel} meaning of the target vocabulary word MUST appear in the source sentence. The word may be inflected — but it must be recognizably derived from the provided ${sourceLanguageLabel} meaning.
 - Example: if the word is "гора" (mountain), you may use "гору", "горі", "гір" — but "пагорб" (hill) is NOT acceptable.
 
 RULE 3 — HIGHLIGHT THE TARGET WORD:
-Return the exact form of the Ukrainian vocabulary word as it appears in your sentence in the "highlightText" field. This will be bolded in the UI for the student.
+Return the exact form of the source-language vocabulary word as it appears in your sentence in the "highlightText" field. This will be bolded in the UI for the student.
+Do NOT wrap the word in markdown markers like **bold** or __underline__ inside "ukrainianSentence".
 
 RULE 4 — GRAMMAR TOPIC COMPLIANCE:
-The ENGLISH translation of each sentence MUST require the grammatical structure(s) listed below. The Ukrainian sentence should be crafted so that translating it naturally into English forces the student to use the target grammar.
+The ${targetLanguageLabel.toUpperCase()} translation of each sentence MUST require the grammatical structure(s) listed below. The source sentence should be crafted so that translating it naturally into ${targetLanguageLabel} forces the student to use the target grammar.
+Before finalizing any question, reject it if a natural ${targetLanguageLabel} translation could avoid the target grammar topic.
+Only keep questions where the reference translation clearly demonstrates the requested grammar.
 
 RULE 5 — CEFR LEVEL COMPLIANCE:
 The student is at level **${config.cefrLevel}**. Sentence complexity, vocabulary (outside target words), and length MUST match this level. NEVER exceed it.
@@ -409,10 +424,10 @@ Respond with JSON in this exact format:
   "questions": [
     {
       "id": 1,
-      "ukrainianSentence": "Ukrainian sentence containing the target word",
-      "englishReference": "Natural English translation demonstrating target grammar",
-      "sourceTerm": "original English word from the list exactly as provided",
-      "highlightText": "exact Ukrainian word form as it appears in ukrainianSentence"
+      "ukrainianSentence": "${sourceLanguageLabel} sentence containing the target word",
+      "englishReference": "Natural ${targetLanguageLabel} translation demonstrating target grammar",
+      "sourceTerm": "original ${targetLanguageLabel} word from the list exactly as provided",
+      "highlightText": "exact ${sourceLanguageLabel} word form as it appears in ukrainianSentence"
     }
   ]
 }`;
@@ -422,6 +437,8 @@ export function getTextTranslationPrompt(
   terms: QuizTerm[],
   config: QuizConfig,
 ): string {
+  const { targetLanguageLabel, sourceLanguageLabel } =
+    getLanguageContext(config);
   const difficultyInstruction = getDifficultyInstruction(
     config.vocabularyChallenge,
     config.grammarChallenge,
@@ -431,9 +448,10 @@ export function getTextTranslationPrompt(
   const grammarRules = getGrammarRulesSection(
     config.grammarTopics,
     config.grammarChallenge,
+    config.grammarTopicDetails,
   );
 
-  return `You are an expert in creating language translation exercises for English learners whose native language is Ukrainian.
+  return `You are an expert in creating language translation exercises for ${targetLanguageLabel} learners working from ${sourceLanguageLabel}.
 Your task is to generate a short, cohesive text for translation.
 
 CRITICAL LEVEL INSTRUCTION:
@@ -441,22 +459,22 @@ CRITICAL LEVEL INSTRUCTION:
 2. **Grammar Target:** The sentences MUST specifically test the grammatical structures listed below.
 
 CRITICAL INSTRUCTION:
-1. Create a cohesive text in UKRAINIAN that is approximately 5 sentences long.
+1. Create a cohesive text in ${sourceLanguageLabel.toUpperCase()} that is approximately 5 sentences long.
 2. The text should be on a single, clear topic.
 3. Naturally incorporate several words from the provided vocabulary list. You DO NOT need to use all the words; prioritize creating a text that reads naturally.
 ${difficultyInstruction}
 ${grammarRules}
 ${topicInstruction}
-4. After creating the Ukrainian text, provide a correct and natural-sounding ENGLISH translation for the entire text.
+4. After creating the ${sourceLanguageLabel} text, provide a correct and natural-sounding ${targetLanguageLabel.toUpperCase()} translation for the entire text.
 
 Vocabulary terms:
-${formatTerms(terms)}
+${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
 
 Respond with JSON in this exact format:
 {
   "content": {
-    "originalText": "Ukrainian paragraph here",
-    "referenceTranslation": "English translation here"
+    "originalText": "${sourceLanguageLabel} paragraph here",
+    "referenceTranslation": "${targetLanguageLabel} translation here"
   }
 }`;
 }
@@ -465,6 +483,8 @@ export function getMatchingPrompt(
   terms: QuizTerm[],
   config: QuizConfig,
 ): string {
+  const { targetLanguageLabel, sourceLanguageLabel } =
+    getLanguageContext(config);
   const topicInstruction = getTopicInstruction(config.customTopic);
 
   return `Generate a matching exercise using the following vocabulary terms.
@@ -474,7 +494,7 @@ Vocabulary Complexity: ${config.vocabularyChallenge}
 ${topicInstruction}
 
 Vocabulary terms:
-${formatTerms(terms)}
+${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
 
 Create term-definition pairs for matching. Use the provided terms and their definitions, but rephrase the definitions to test deeper understanding.
 
@@ -493,6 +513,8 @@ export function getFlashcardsPrompt(
   terms: QuizTerm[],
   config: QuizConfig,
 ): string {
+  const { targetLanguageLabel, sourceLanguageLabel } =
+    getLanguageContext(config);
   const topicInstruction = getTopicInstruction(config.customTopic);
 
   return `Generate flashcard content using the following vocabulary terms.
@@ -501,7 +523,7 @@ CEFR Level: ${config.cefrLevel}
 ${topicInstruction}
 
 Vocabulary terms:
-${formatTerms(terms)}
+${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
 
 For each term, provide the definition and an example sentence using the term at the appropriate CEFR level.
 
@@ -521,6 +543,8 @@ export function getDiscussionPrompt(
   terms: QuizTerm[],
   config: QuizConfig,
 ): string {
+  const { targetLanguageLabel, sourceLanguageLabel } =
+    getLanguageContext(config);
   const difficultyInstruction = getDifficultyInstruction(
     config.vocabularyChallenge,
     config.grammarChallenge,
@@ -528,8 +552,8 @@ export function getDiscussionPrompt(
   );
   const topicInstruction = getTopicInstruction(config.customTopic);
 
-  return `You are an expert in creating engaging educational materials for English language learners.
-Your task is to generate a list of prompts based on a list of English words and their Ukrainian translations. The Ukrainian translation is for context only. All output must be in ENGLISH.
+  return `You are an expert in creating engaging educational materials for ${targetLanguageLabel} language learners.
+Your task is to generate a list of prompts based on a list of ${targetLanguageLabel} words and their ${sourceLanguageLabel} meanings. The ${sourceLanguageLabel} meaning is for context only. All output must be in ${targetLanguageLabel.toUpperCase()}.
 The complexity and subject matter of the prompts should be appropriate for a Student at CEFR ${config.cefrLevel} proficiency.
 ${difficultyInstruction}
 ${topicInstruction}
@@ -537,7 +561,7 @@ ${topicInstruction}
 Based on the list of words provided, generate thought-provoking prompts. Mix open-ended discussion questions with agree/disagree statements.
 
 Vocabulary terms:
-${formatTerms(terms)}
+${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
 
 Respond with JSON in this exact format:
 {
@@ -556,17 +580,23 @@ Respond with JSON in this exact format:
 export function getEvaluationPrompt(
   userTranslation: string,
   referenceTranslation: string,
+  targetTerm: string | undefined,
+  grammarValidationReason: string | undefined,
   config: QuizConfig,
 ): string {
+  const { targetLanguageLabel, sourceLanguageLabel } =
+    getLanguageContext(config);
   const { personality, rubric, specialInstructions } = getEvaluationRubric(
     config.cefrLevel,
   );
   const personaInstruction = getTeacherPersonaInstruction(
     config.teacherPersona,
+    config,
   );
   const grammarRules = getGrammarRulesSection(
     config.grammarTopics,
     config.grammarChallenge,
+    config.grammarTopicDetails,
   );
 
   const grammarCheckInstruction =
@@ -574,15 +604,21 @@ export function getEvaluationPrompt(
       ? `CRITICAL GRAMMAR CHECK: The user MUST demonstrate usage of ${config.grammarTopics.map((t) => `"${t}"`).join(" AND ")}. If they used a different structure (even if grammatically correct in general English), deduct 25 points as per the 'Grammar/Topic Compliance' rule.`
       : "";
 
+  const validatedGrammarInstruction = grammarValidationReason
+    ? `This question was validated during quiz generation as genuinely requiring the selected grammar. Validation note: ${grammarValidationReason}`
+    : "";
+
   return `${personality}
 ${personaInstruction}
 
 **CRITICAL GIBBERISH RULE:**
 If the student's answer is random letters (e.g., "asdf", "kjlhg", "123123"), nonsense, or clearly not an attempt at translation, the score MUST be 0. Do not attempt to grade grammar or vocabulary for gibberish.
 
-**Task:** Evaluate the student's translation of a Ukrainian sentence into English.
+**Task:** Evaluate the student's translation of a ${sourceLanguageLabel} sentence into ${targetLanguageLabel}.
 **Student Proficiency Level:** ${config.cefrLevel}
 **Target Grammar:** ${grammarCheckInstruction}
+${targetTerm ? `**Target Vocabulary:** ${targetTerm}` : ""}
+${validatedGrammarInstruction}
 ${grammarRules}
 
 **Input Data:**
@@ -596,13 +632,13 @@ ${specialInstructions}
 ═══ EVALUATION CHECKLIST (perform ALL checks in order) ═══
 You MUST evaluate the student's translation against these 5 categories. For each category, determine PASS (✓) or FAIL (✗).
 
-1. **Vocabulary Accuracy** — Did the student translate the target vocabulary word/phrase correctly?
+1. **Vocabulary Accuracy** — Did the student use the required target vocabulary word/phrase correctly, and is it spelled correctly?
 2. **Grammar Compliance** — Did the student use the required grammatical structure(s)? (If no grammar was specified, check general grammar correctness.)
 3. **Meaning & Completeness** — Is the full meaning of the original sentence preserved? Nothing added or lost?
 4. **Mechanics** — Capitalization, punctuation, spelling — are they all correct?
-5. **Naturalness** — Does the sentence sound like natural English, not a word-for-word translation?
+5. **Naturalness** — Does the sentence sound like natural ${targetLanguageLabel}, not a word-for-word translation?
 
-Score the translation from 0 to 100 based on these checks.
+Score the translation from 0 to 100 based on these checks. The final numeric score must always be an integer between 0 and 100.
 
 ═══ FEEDBACK FORMAT ═══
 Return feedback as a CONCISE checklist. One line per category. Use ✓ for pass, ✗ for fail.

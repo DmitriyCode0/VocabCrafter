@@ -1,7 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
-import type { z } from "zod";
+import { ZodError, type z } from "zod";
 
 export const GEMINI_MODEL = "gemini-2.0-flash";
+export const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
 let _genai: GoogleGenAI | null = null;
 
@@ -33,6 +34,7 @@ async function withRetry<T>(
       lastError = error;
       // Don't retry on validation errors (Zod) or client-level issues
       if (error instanceof SyntaxError) throw error;
+      if (error instanceof ZodError) throw error;
       if (attempt < retries - 1) {
         const delay = INITIAL_DELAY_MS * Math.pow(2, attempt);
         await new Promise((resolve) => setTimeout(resolve, delay));
@@ -48,6 +50,33 @@ interface GenerateOptions {
   prompt: string;
   systemInstruction: string;
   temperature?: number;
+}
+
+function extractJsonPayload(text: string) {
+  const cleaned = text
+    .replace(/```(?:json)?\s*\n?/g, "")
+    .replace(/\n?```\s*$/g, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const objectStart = cleaned.indexOf("{");
+    const objectEnd = cleaned.lastIndexOf("}");
+
+    if (objectStart !== -1 && objectEnd !== -1 && objectEnd > objectStart) {
+      return JSON.parse(cleaned.slice(objectStart, objectEnd + 1));
+    }
+
+    const arrayStart = cleaned.indexOf("[");
+    const arrayEnd = cleaned.lastIndexOf("]");
+
+    if (arrayStart !== -1 && arrayEnd !== -1 && arrayEnd > arrayStart) {
+      return JSON.parse(cleaned.slice(arrayStart, arrayEnd + 1));
+    }
+
+    throw new SyntaxError("AI returned invalid JSON");
+  }
 }
 
 /**
@@ -74,13 +103,7 @@ export async function generateFromGemini<T>(
       throw new Error("AI returned empty response");
     }
 
-    // Strip markdown code fences just in case
-    const cleaned = text
-      .replace(/```(?:json)?\s*\n?/g, "")
-      .replace(/\n?```\s*$/g, "")
-      .trim();
-
-    const parsed = JSON.parse(cleaned);
+    const parsed = extractJsonPayload(text);
     return schema.parse(parsed);
   });
 }

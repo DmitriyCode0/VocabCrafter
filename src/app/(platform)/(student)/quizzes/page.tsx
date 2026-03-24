@@ -10,11 +10,22 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { BookOpen, PlusCircle } from "lucide-react";
 import { QuizCard } from "@/components/quiz/quiz-card";
+import { PagePagination } from "@/components/shared/page-pagination";
+import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
-export default async function QuizzesPage() {
+const QUIZZES_PAGE_SIZE = 12;
+
+export default async function QuizzesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const supabase = await createClient();
+  const resolvedSearchParams = await searchParams;
+  const currentPage = getCurrentPage(resolvedSearchParams.page);
+  const { from, to } = getPaginationRange(currentPage, QUIZZES_PAGE_SIZE);
 
   const {
     data: { user },
@@ -22,11 +33,17 @@ export default async function QuizzesPage() {
 
   if (!user) redirect("/login");
 
+  const { count: totalQuizzes } = await supabase
+    .from("quizzes")
+    .select("id", { count: "exact", head: true })
+    .eq("creator_id", user.id);
+
   const { data: quizzes, error: quizzesError } = await supabase
     .from("quizzes")
     .select("*")
     .eq("creator_id", user.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   if (quizzesError) {
     console.error("Failed to load quizzes:", quizzesError);
@@ -64,10 +81,19 @@ export default async function QuizzesPage() {
           </CardHeader>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {quizzes.map((quiz) => (
-            <QuizCard key={quiz.id} quiz={quiz} />
-          ))}
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {quizzes.map((quiz) => (
+              <QuizCard key={quiz.id} quiz={quiz} />
+            ))}
+          </div>
+          <PagePagination
+            pathname="/quizzes"
+            currentPage={currentPage}
+            pageSize={QUIZZES_PAGE_SIZE}
+            totalItems={totalQuizzes ?? quizzes.length}
+            searchParams={resolvedSearchParams}
+          />
         </div>
       )}
     </div>

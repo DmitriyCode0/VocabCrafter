@@ -12,11 +12,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, ArrowRight } from "lucide-react";
-import type { GapFillQuestion } from "@/types/quiz";
+import { CheckCircle2, XCircle, ArrowLeft, ArrowRight } from "lucide-react";
+import type { GapFillQuestion, QuizConfig } from "@/types/quiz";
+import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
+import { normalizeLearningLanguage } from "@/lib/languages";
 
 interface GapFillPlayerProps {
   questions: GapFillQuestion[];
+  quizConfig?: QuizConfig;
   onComplete: (results: GapFillResult[]) => void;
 }
 
@@ -27,44 +30,92 @@ export interface GapFillResult {
   isCorrect: boolean;
 }
 
-export function GapFillPlayer({ questions, onComplete }: GapFillPlayerProps) {
+export function GapFillPlayer({
+  questions,
+  quizConfig,
+  onComplete,
+}: GapFillPlayerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [userAnswer, setUserAnswer] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [results, setResults] = useState<GapFillResult[]>([]);
+  const [answers, setAnswers] = useState<string[]>(() =>
+    questions.map(() => ""),
+  );
+  const [submittedByIndex, setSubmittedByIndex] = useState<boolean[]>(() =>
+    questions.map(() => false),
+  );
 
   const question = questions[currentIndex];
-  const progress =
-    ((currentIndex + (submitted ? 1 : 0)) / questions.length) * 100;
+  const targetLanguage = normalizeLearningLanguage(quizConfig?.targetLanguage);
+  const spokenSentence = question.sentence.replace(
+    "___",
+    question.correctAnswer,
+  );
+  const userAnswer = answers[currentIndex] ?? "";
+  const submitted = submittedByIndex[currentIndex] ?? false;
+  const results: GapFillResult[] = questions
+    .map((currentQuestion, index) => ({
+      questionId: currentQuestion.id,
+      userAnswer: answers[index] ?? "",
+      correctAnswer: currentQuestion.correctAnswer,
+      isCorrect:
+        (answers[index] ?? "").trim().toLowerCase() ===
+        currentQuestion.correctAnswer.toLowerCase(),
+    }))
+    .filter((_, index) => submittedByIndex[index]);
+  const completedCount = submittedByIndex.filter(Boolean).length;
+  const progress = (completedCount / questions.length) * 100;
   const isCorrect =
     submitted &&
     userAnswer.trim().toLowerCase() === question.correctAnswer.toLowerCase();
+  const allCompleted = completedCount === questions.length;
 
   function handleSubmit() {
     if (!userAnswer.trim()) return;
 
-    const result: GapFillResult = {
-      questionId: question.id,
-      userAnswer: userAnswer.trim(),
-      correctAnswer: question.correctAnswer,
-      isCorrect:
-        userAnswer.trim().toLowerCase() ===
-        question.correctAnswer.toLowerCase(),
-    };
+    setAnswers((currentAnswers) => {
+      const nextAnswers = [...currentAnswers];
+      nextAnswers[currentIndex] = userAnswer.trim();
+      return nextAnswers;
+    });
+    setSubmittedByIndex((currentSubmitted) => {
+      const nextSubmitted = [...currentSubmitted];
+      nextSubmitted[currentIndex] = true;
+      return nextSubmitted;
+    });
+  }
 
-    setResults([...results, result]);
-    setSubmitted(true);
+  function handleSkip() {
+    setAnswers((currentAnswers) => {
+      const nextAnswers = [...currentAnswers];
+      nextAnswers[currentIndex] = "";
+      return nextAnswers;
+    });
+    setSubmittedByIndex((currentSubmitted) => {
+      const nextSubmitted = [...currentSubmitted];
+      nextSubmitted[currentIndex] = true;
+      return nextSubmitted;
+    });
   }
 
   function handleNext() {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex(currentIndex + 1);
-      setUserAnswer("");
-      setSubmitted(false);
     } else {
-      const finalResults = [...results];
-      onComplete(finalResults);
+      onComplete(results);
     }
+  }
+
+  function handlePrev() {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    }
+  }
+
+  function handleAnswerChange(value: string) {
+    setAnswers((currentAnswers) => {
+      const nextAnswers = [...currentAnswers];
+      nextAnswers[currentIndex] = value;
+      return nextAnswers;
+    });
   }
 
   const correctCount = results.filter((r) => r.isCorrect).length;
@@ -76,16 +127,49 @@ export function GapFillPlayer({ questions, onComplete }: GapFillPlayerProps) {
           <span className="text-muted-foreground">
             Question {currentIndex + 1} of {questions.length}
           </span>
-          <Badge variant="outline">
-            Score: {correctCount}/{results.length}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handlePrev}
+                disabled={currentIndex === 0}
+                aria-label="Previous question"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleNext}
+                disabled={currentIndex === questions.length - 1}
+                aria-label="Next question"
+              >
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <Badge variant="outline">
+              Score: {correctCount}/{completedCount}
+            </Badge>
+          </div>
         </div>
         <Progress value={progress} />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Fill in the blank</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-lg">Fill in the blank</CardTitle>
+            <BrowserTtsButton
+              text={spokenSentence}
+              language={targetLanguage}
+              label="Listen"
+            />
+          </div>
           <CardDescription>
             Type the missing word to complete the sentence.
           </CardDescription>
@@ -98,13 +182,14 @@ export function GapFillPlayer({ questions, onComplete }: GapFillPlayerProps) {
           <div className="flex gap-2">
             <Input
               value={userAnswer}
-              onChange={(e) => setUserAnswer(e.target.value)}
+              onChange={(e) => handleAnswerChange(e.target.value)}
               placeholder="Type your answer..."
               disabled={submitted}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  if (submitted) handleNext();
-                  else handleSubmit();
+                  if (submitted && currentIndex < questions.length - 1) {
+                    handleNext();
+                  } else handleSubmit();
                 }
               }}
               className={
@@ -116,11 +201,21 @@ export function GapFillPlayer({ questions, onComplete }: GapFillPlayerProps) {
               }
             />
             {!submitted ? (
-              <Button onClick={handleSubmit} disabled={!userAnswer.trim()}>
-                Check
-              </Button>
+              <>
+                <Button variant="outline" onClick={handleSkip}>
+                  Skip
+                </Button>
+                <Button onClick={handleSubmit} disabled={!userAnswer.trim()}>
+                  Check
+                </Button>
+              </>
             ) : (
-              <Button onClick={handleNext}>
+              <Button
+                onClick={handleNext}
+                disabled={
+                  !allCompleted && currentIndex === questions.length - 1
+                }
+              >
                 {currentIndex < questions.length - 1 ? (
                   <>
                     Next
@@ -132,6 +227,14 @@ export function GapFillPlayer({ questions, onComplete }: GapFillPlayerProps) {
               </Button>
             )}
           </div>
+
+          {currentIndex === questions.length - 1 &&
+            submitted &&
+            !allCompleted && (
+              <p className="text-xs text-muted-foreground">
+                Use the arrows to review unanswered questions before finishing.
+              </p>
+            )}
 
           {submitted && (
             <div

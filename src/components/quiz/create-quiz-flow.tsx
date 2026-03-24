@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -27,8 +27,16 @@ import { ParsedWordList } from "@/components/quiz/parsed-word-list";
 import { WordBankPicker } from "@/components/quiz/word-bank-picker";
 import { QuizWordPicker } from "@/components/quiz/quiz-word-picker";
 import { GrammarTopicSelector } from "@/components/quiz/grammar-topic-selector";
+import { getTopicsForLevel } from "@/lib/grammar/topics";
 import { useUser } from "@/hooks/use-user";
-import { Switch } from "@/components/ui/switch";
+import {
+  getAllowedCefrLevels,
+  getDefaultCefrLevelForLanguage,
+  getLearningLanguageLabel,
+  getSourceLanguageLabel,
+  normalizeLearningLanguage,
+  normalizeSourceLanguage,
+} from "@/lib/languages";
 import {
   Select,
   SelectContent,
@@ -43,8 +51,8 @@ import {
   Loader2,
   PenLine,
   Languages,
+  FileText,
   Save,
-  Globe,
   GraduationCap,
 } from "lucide-react";
 import type { QuizTerm, CEFRLevel } from "@/types/quiz";
@@ -60,45 +68,63 @@ const CEFR_DESCRIPTIONS: Record<CEFRLevel, string> = {
   C2: "Proficiency",
 };
 
+const GRAMMAR_TOPIC_STORAGE_KEY = "vocab-crafter:last-grammar-topic";
+
 type Step = "input" | "edit" | "activity";
-type ActivityType = "flashcards" | "gap_fill" | "translation";
+type ActivityType =
+  | "flashcards"
+  | "gap_fill"
+  | "translation"
+  | "text_translation";
 
 const ACTIVITIES: {
   type: ActivityType;
   label: string;
-  description: string;
   icon: React.ReactNode;
 }[] = [
   {
     type: "flashcards",
     label: "Flashcards",
-    description: "Flip cards to memorize terms and definitions",
     icon: <BookOpen className="h-8 w-8" />,
   },
   {
     type: "gap_fill",
     label: "Fill in the Gap",
-    description: "Complete sentences with the correct vocabulary word",
     icon: <PenLine className="h-8 w-8" />,
   },
   {
     type: "translation",
     label: "Sentence Translation",
-    description: "Translate Ukrainian sentences to English using vocabulary",
     icon: <Languages className="h-8 w-8" />,
+  },
+  {
+    type: "text_translation",
+    label: "Text Translation",
+    icon: <FileText className="h-8 w-8" />,
   },
 ];
 
 export function CreateQuizFlow() {
   const router = useRouter();
   const { profile } = useUser();
+  const grammarTopicStorageKey = profile?.id
+    ? `${GRAMMAR_TOPIC_STORAGE_KEY}:${profile.id}`
+    : GRAMMAR_TOPIC_STORAGE_KEY;
   const isTutor = profile?.role === "tutor" || profile?.role === "superadmin";
-  const defaultCefr: CEFRLevel = (profile?.cefr_level as CEFRLevel) || "B1";
+  const profileCefrLevel = profile?.cefr_level as CEFRLevel | undefined;
+  const targetLanguage = normalizeLearningLanguage(profile?.preferred_language);
+  const sourceLanguage = normalizeSourceLanguage(profile?.source_language);
+  const targetLanguageLabel = getLearningLanguageLabel(targetLanguage);
+  const sourceLanguageLabel = getSourceLanguageLabel(sourceLanguage);
+  const allowedCefrLevels = getAllowedCefrLevels(targetLanguage);
+  const defaultCefr =
+    profileCefrLevel && allowedCefrLevels.includes(profileCefrLevel)
+      ? profileCefrLevel
+      : getDefaultCefrLevelForLanguage(targetLanguage);
 
   const [step, setStep] = useState<Step>("input");
-  const [cefrLevel, setCefrLevel] = useState<CEFRLevel>(
-    isTutor ? "B1" : defaultCefr,
-  );
+  const [cefrLevel, setCefrLevel] = useState<CEFRLevel>(defaultCefr);
+  const [hasCustomCefrLevel, setHasCustomCefrLevel] = useState(false);
   const [terms, setTerms] = useState<QuizTerm[]>([]);
   const [title, setTitle] = useState("");
   const [selectedActivity, setSelectedActivity] = useState<ActivityType | null>(
@@ -111,14 +137,95 @@ export function CreateQuizFlow() {
   // Grammar topics state
   const [grammarTopics, setGrammarTopics] = useState<string[]>([]);
 
-  // Public toggle
-  const [isPublic, setIsPublic] = useState(false);
-
   // Save to word bank state
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [bankName, setBankName] = useState("");
   const [isSavingBank, setIsSavingBank] = useState(false);
   const [bankSaved, setBankSaved] = useState(false);
+
+  useEffect(() => {
+    if (hasCustomCefrLevel) {
+      return;
+    }
+
+    setCefrLevel(defaultCefr);
+  }, [defaultCefr, hasCustomCefrLevel]);
+
+  useEffect(() => {
+    if (!allowedCefrLevels.includes(cefrLevel)) {
+      setCefrLevel(getDefaultCefrLevelForLanguage(targetLanguage));
+      setHasCustomCefrLevel(false);
+    }
+  }, [allowedCefrLevels, cefrLevel, targetLanguage]);
+
+  useEffect(() => {
+    if (selectedActivity !== "translation" || grammarTopics.length > 0) {
+      return;
+    }
+
+    const availableTopics = getTopicsForLevel(
+      cefrLevel,
+      targetLanguage,
+    ).flatMap(({ topics }) => topics);
+    const savedTopic = window.localStorage.getItem(grammarTopicStorageKey);
+
+    if (savedTopic && availableTopics.includes(savedTopic)) {
+      setGrammarTopics([savedTopic]);
+    }
+  }, [
+    cefrLevel,
+    grammarTopicStorageKey,
+    grammarTopics.length,
+    selectedActivity,
+    targetLanguage,
+  ]);
+
+  useEffect(() => {
+    const selectedTopic = grammarTopics[0];
+
+    if (selectedTopic) {
+      window.localStorage.setItem(grammarTopicStorageKey, selectedTopic);
+      return;
+    }
+
+    window.localStorage.removeItem(grammarTopicStorageKey);
+  }, [grammarTopicStorageKey, grammarTopics]);
+
+  useEffect(() => {
+    const availableTopics = getTopicsForLevel(
+      cefrLevel,
+      targetLanguage,
+    ).flatMap(({ topics }) => topics);
+
+    if (grammarTopics.length === 0) {
+      return;
+    }
+
+    if (!availableTopics.includes(grammarTopics[0])) {
+      setGrammarTopics([]);
+    }
+  }, [cefrLevel, grammarTopics, targetLanguage]);
+
+  function handleCefrLevelChange(value: string) {
+    setHasCustomCefrLevel(true);
+    setCefrLevel(value as CEFRLevel);
+  }
+
+  function getActivityDescription(type: ActivityType) {
+    if (type === "text_translation") {
+      return `Translate a short ${sourceLanguageLabel.toLowerCase()} passage into ${targetLanguageLabel.toLowerCase()} with one full-text score.`;
+    }
+
+    if (type === "translation") {
+      return `Translate ${sourceLanguageLabel.toLowerCase()} sentences into ${targetLanguageLabel.toLowerCase()} using your vocabulary.`;
+    }
+
+    if (type === "gap_fill") {
+      return `Complete ${targetLanguageLabel.toLowerCase()} sentences with the correct vocabulary word.`;
+    }
+
+    return `Flip cards to memorize ${targetLanguageLabel.toLowerCase()} terms and ${sourceLanguageLabel.toLowerCase()} meanings.`;
+  }
 
   function handleTermsParsed(parsed: QuizTerm[]) {
     setTerms(parsed);
@@ -161,6 +268,10 @@ export function CreateQuizFlow() {
     try {
       const config = {
         cefrLevel: cefrLevel as "A1" | "A2" | "B1" | "B2" | "C1" | "C2",
+        studentProfileCefrLevel: profileCefrLevel ?? null,
+        selectedCefrLevel: cefrLevel,
+        targetLanguage,
+        sourceLanguage,
         vocabularyChallenge: "Standard" as const,
         grammarChallenge: "Standard" as const,
         teacherPersona: "standard" as const,
@@ -209,7 +320,6 @@ export function CreateQuizFlow() {
           vocabularyTerms: terms,
           generatedContent: content,
           config,
-          isPublic,
         }),
       });
 
@@ -293,6 +403,8 @@ export function CreateQuizFlow() {
                   onParsed={handleTermsParsed}
                   isLoading={isParseLoading}
                   setIsLoading={setIsParseLoading}
+                  targetLanguage={targetLanguage}
+                  sourceLanguage={sourceLanguage}
                 />
               </TabsContent>
               <TabsContent value="saved">
@@ -317,16 +429,25 @@ export function CreateQuizFlow() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ParsedWordList terms={terms} onTermsChange={setTerms} />
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setStep("input")}>
+            <ParsedWordList
+              terms={terms}
+              onTermsChange={setTerms}
+              targetLanguage={targetLanguage}
+              sourceLanguage={sourceLanguage}
+            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                variant="outline"
+                onClick={() => setStep("input")}
+                className="w-full sm:w-auto"
+              >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
 
               <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="w-full sm:w-auto">
                     <Save className="mr-2 h-4 w-4" />
                     Save to Word Bank
                   </Button>
@@ -371,7 +492,7 @@ export function CreateQuizFlow() {
               <Button
                 onClick={() => setStep("activity")}
                 disabled={terms.length === 0}
-                className="flex-1"
+                className="w-full sm:flex-1"
               >
                 Choose Activity
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -416,30 +537,12 @@ export function CreateQuizFlow() {
                     {activity.icon}
                   </div>
                   <CardTitle className="text-base">{activity.label}</CardTitle>
-                  <CardDescription>{activity.description}</CardDescription>
+                  <CardDescription>
+                    {getActivityDescription(activity.type)}
+                  </CardDescription>
                 </CardHeader>
               </Card>
             ))}
-          </div>
-
-          {/* Public toggle */}
-          <div className="flex items-center justify-between rounded-lg border p-4">
-            <div className="flex items-center gap-3">
-              <Globe className="h-5 w-5 text-muted-foreground" />
-              <div className="space-y-0.5">
-                <Label htmlFor="is-public" className="font-medium">
-                  Make quiz public
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Allow other users to discover and take this quiz.
-                </p>
-              </div>
-            </div>
-            <Switch
-              id="is-public"
-              checked={isPublic}
-              onCheckedChange={setIsPublic}
-            />
           </div>
 
           {/* Difficulty (CEFR level) selector */}
@@ -454,18 +557,20 @@ export function CreateQuizFlow() {
                   {isTutor
                     ? "Choose the CEFR difficulty for this quiz"
                     : "Defaults to your profile level — override if needed"}
+                  {targetLanguage === "spanish"
+                    ? " Spanish is currently limited to A1."
+                    : ""}
                 </p>
               </div>
             </div>
-            <Select
-              value={cefrLevel}
-              onValueChange={(v) => setCefrLevel(v as CEFRLevel)}
-            >
+            <Select value={cefrLevel} onValueChange={handleCefrLevelChange}>
               <SelectTrigger id="cefr-select" className="w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {CEFR_LEVELS.map((lvl) => (
+                {CEFR_LEVELS.filter((lvl) =>
+                  allowedCefrLevels.includes(lvl),
+                ).map((lvl) => (
                   <SelectItem key={lvl} value={lvl}>
                     {lvl} — {CEFR_DESCRIPTIONS[lvl]}
                   </SelectItem>
@@ -480,6 +585,7 @@ export function CreateQuizFlow() {
               <CardContent className="pt-6">
                 <GrammarTopicSelector
                   cefrLevel={cefrLevel}
+                  targetLanguage={targetLanguage}
                   selectedTopics={grammarTopics}
                   onTopicsChange={setGrammarTopics}
                 />
@@ -489,15 +595,19 @@ export function CreateQuizFlow() {
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setStep("edit")}>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => setStep("edit")}
+              className="w-full sm:w-auto"
+            >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
             <Button
               onClick={handleGenerate}
               disabled={!selectedActivity || isGenerating}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               {isGenerating ? (
                 <>

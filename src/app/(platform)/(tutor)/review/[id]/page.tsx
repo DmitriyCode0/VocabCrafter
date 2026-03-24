@@ -13,7 +13,9 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import { ReviewFeedbackForm } from "@/components/review/review-feedback-form";
+import { EditableTranslationResults } from "@/components/review/editable-translation-results";
 import { ACTIVITY_LABELS } from "@/lib/constants";
+import { removeSuggestedAnswerLines, stripMarkdownEmphasis } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -203,64 +205,18 @@ export default async function ReviewDetailPage({
           )}
 
           {quiz?.type === "translation" && answerResults.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="font-medium text-sm">Translation Answers</h3>
-              {answerResults.map((result, index) => {
-                const r = result as {
+            <EditableTranslationResults
+              attemptId={id}
+              results={
+                answerResults as {
                   ukrainianSentence?: string;
                   userTranslation?: string;
                   referenceTranslation?: string;
                   score?: number;
                   feedback?: string;
-                };
-                return (
-                  <div
-                    key={index}
-                    className="bg-muted/50 rounded px-3 py-2 space-y-1"
-                  >
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-mono text-muted-foreground">
-                        Q{index + 1}:
-                      </span>
-                      {r.score != null && (
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${
-                            r.score >= 80
-                              ? "text-green-600"
-                              : r.score >= 50
-                                ? "text-orange-600"
-                                : "text-red-600"
-                          }`}
-                        >
-                          {r.score}/100
-                        </Badge>
-                      )}
-                    </div>
-                    {r.ukrainianSentence && (
-                      <p className="text-sm text-muted-foreground">
-                        {r.ukrainianSentence}
-                      </p>
-                    )}
-                    {r.userTranslation && (
-                      <p className="text-sm">
-                        Student: <em>{r.userTranslation}</em>
-                      </p>
-                    )}
-                    {r.referenceTranslation && (
-                      <p className="text-sm text-muted-foreground">
-                        Reference: <em>{r.referenceTranslation}</em>
-                      </p>
-                    )}
-                    {r.feedback && (
-                      <p className="text-xs text-muted-foreground">
-                        AI: {r.feedback}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                }[]
+              }
+            />
           )}
 
           {quiz?.type === "flashcards" && (

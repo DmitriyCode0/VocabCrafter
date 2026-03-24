@@ -12,11 +12,22 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { ACTIVITY_LABELS } from "@/lib/constants";
+import { PagePagination } from "@/components/shared/page-pagination";
+import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReviewPage() {
+const REVIEW_PAGE_SIZE = 12;
+
+export default async function ReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const supabase = await createClient();
+  const resolvedSearchParams = await searchParams;
+  const currentPage = getCurrentPage(resolvedSearchParams.page);
+  const { from, to } = getPaginationRange(currentPage, REVIEW_PAGE_SIZE);
 
   const {
     data: { user },
@@ -131,13 +142,19 @@ export default async function ReviewPage() {
   }
 
   // Get quiz attempts for assigned/owned quizzes by students in tutor's classes
+  const { count: totalAttempts } = await supabaseAdmin
+    .from("quiz_attempts")
+    .select("id", { count: "exact", head: true })
+    .in("quiz_id", allQuizIds)
+    .in("student_id", studentIds);
+
   const { data: attempts } = await supabaseAdmin
     .from("quiz_attempts")
     .select("*, quizzes(title, type), profiles(full_name, email)")
     .in("quiz_id", allQuizIds)
     .in("student_id", studentIds)
     .order("completed_at", { ascending: false })
-    .limit(50);
+    .range(from, to);
 
   // Get existing feedback from this tutor
   const attemptIds = attempts?.map((a) => a.id) ?? [];
@@ -172,75 +189,84 @@ export default async function ReviewPage() {
           </CardHeader>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {attempts.map((attempt) => {
-            const quiz = attempt.quizzes as unknown as {
-              title: string;
-              type: string;
-            } | null;
-            const student = attempt.profiles as unknown as {
-              full_name: string | null;
-              email: string;
-            } | null;
-            const scored = attempt.score != null && attempt.max_score != null;
-            const pct = scored
-              ? Math.round(
-                  (Number(attempt.score) / Number(attempt.max_score)) * 100,
-                )
-              : null;
-            const reviewed = reviewedSet.has(attempt.id);
+        <div className="space-y-6">
+          <div className="space-y-3">
+            {attempts.map((attempt) => {
+              const quiz = attempt.quizzes as unknown as {
+                title: string;
+                type: string;
+              } | null;
+              const student = attempt.profiles as unknown as {
+                full_name: string | null;
+                email: string;
+              } | null;
+              const scored = attempt.score != null && attempt.max_score != null;
+              const pct = scored
+                ? Math.round(
+                    (Number(attempt.score) / Number(attempt.max_score)) * 100,
+                  )
+                : null;
+              const reviewed = reviewedSet.has(attempt.id);
 
-            return (
-              <Link
-                key={attempt.id}
-                href={`/review/${attempt.id}`}
-                className="block"
-              >
-                <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">
-                        {student?.full_name ?? student?.email ?? "Unknown"}
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        {reviewed ? (
-                          <Badge variant="secondary">Reviewed</Badge>
-                        ) : (
-                          <Badge>Needs Review</Badge>
-                        )}
-                        {pct !== null && (
-                          <Badge
-                            variant={
-                              pct >= 80
-                                ? "default"
-                                : pct >= 50
-                                  ? "secondary"
-                                  : "destructive"
-                            }
-                          >
-                            {pct}%
-                          </Badge>
-                        )}
+              return (
+                <Link
+                  key={attempt.id}
+                  href={`/review/${attempt.id}`}
+                  className="block"
+                >
+                  <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">
+                          {student?.full_name ?? student?.email ?? "Unknown"}
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          {reviewed ? (
+                            <Badge variant="secondary">Reviewed</Badge>
+                          ) : (
+                            <Badge>Needs Review</Badge>
+                          )}
+                          {pct !== null && (
+                            <Badge
+                              variant={
+                                pct >= 80
+                                  ? "default"
+                                  : pct >= 50
+                                    ? "secondary"
+                                    : "destructive"
+                              }
+                            >
+                              {pct}%
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      {quiz && (
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        {quiz && (
+                          <span>
+                            {quiz.title} (
+                            {ACTIVITY_LABELS[quiz.type] || quiz.type})
+                          </span>
+                        )}
                         <span>
-                          {quiz.title} (
-                          {ACTIVITY_LABELS[quiz.type] || quiz.type})
+                          {new Date(attempt.completed_at).toLocaleDateString()}
                         </span>
-                      )}
-                      <span>
-                        {new Date(attempt.completed_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+          <PagePagination
+            pathname="/review"
+            currentPage={currentPage}
+            pageSize={REVIEW_PAGE_SIZE}
+            totalItems={totalAttempts ?? attempts.length}
+            searchParams={resolvedSearchParams}
+          />
         </div>
       )}
     </div>

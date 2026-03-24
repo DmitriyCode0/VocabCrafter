@@ -6,19 +6,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { getTopicsForLevel } from "@/lib/grammar/topics";
+import type { LearningLanguage } from "@/lib/languages";
 
 interface GrammarTopicSelectorProps {
   cefrLevel: string;
+  targetLanguage?: LearningLanguage;
   selectedTopics: string[];
   onTopicsChange: (topics: string[]) => void;
 }
 
 export function GrammarTopicSelector({
   cefrLevel,
+  targetLanguage,
   selectedTopics,
   onTopicsChange,
 }: GrammarTopicSelectorProps) {
-  const levels = getTopicsForLevel(cefrLevel);
+  const levels = getTopicsForLevel(cefrLevel, targetLanguage);
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(
     () => new Set([cefrLevel]),
   );
@@ -39,17 +42,7 @@ export function GrammarTopicSelector({
     if (selectedTopics.includes(topic)) {
       onTopicsChange(selectedTopics.filter((t) => t !== topic));
     } else {
-      onTopicsChange([...selectedTopics, topic]);
-    }
-  }
-
-  function toggleAll(levelTopics: string[]) {
-    const allSelected = levelTopics.every((t) => selectedTopics.includes(t));
-    if (allSelected) {
-      onTopicsChange(selectedTopics.filter((t) => !levelTopics.includes(t)));
-    } else {
-      const toAdd = levelTopics.filter((t) => !selectedTopics.includes(t));
-      onTopicsChange([...selectedTopics, ...toAdd]);
+      onTopicsChange([topic]);
     }
   }
 
@@ -67,7 +60,7 @@ export function GrammarTopicSelector({
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Select grammar topics to focus on in the generated sentences.
+        Select one grammar topic to focus on in the generated sentences.
       </p>
 
       <div className="rounded-md border divide-y">
@@ -98,16 +91,16 @@ export function GrammarTopicSelector({
                     </Badge>
                   )}
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto p-0 text-xs text-muted-foreground"
-                  onClick={() => toggleAll(topics)}
-                >
-                  {topics.every((t) => selectedTopics.includes(t))
-                    ? "Deselect all"
-                    : "Select all"}
-                </Button>
+                {selectedCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-xs text-muted-foreground"
+                    onClick={() => onTopicsChange([])}
+                  >
+                    Clear
+                  </Button>
+                )}
               </div>
 
               {isExpanded && (

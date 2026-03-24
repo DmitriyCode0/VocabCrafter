@@ -22,6 +22,7 @@ import {
 import { Trash2, Loader2 } from "lucide-react";
 import type { Quiz } from "@/types/database";
 import { ACTIVITY_LABELS } from "@/lib/constants";
+import { getPrimaryGrammarTopic } from "@/lib/utils";
 
 interface QuizCardProps {
   quiz: Quiz;
@@ -35,6 +36,7 @@ export function QuizCard({ quiz }: QuizCardProps) {
     term: string;
     definition: string;
   }[];
+  const grammarTopic = getPrimaryGrammarTopic(quiz.config);
 
   async function handleDelete(e: React.MouseEvent) {
     e.preventDefault();
@@ -62,15 +64,33 @@ export function QuizCard({ quiz }: QuizCardProps) {
       <Link href={`/quizzes/${quiz.id}`}>
         <Card className="h-full transition-colors hover:border-primary cursor-pointer">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">{quiz.title}</CardTitle>
-              <Badge variant="secondary" className="text-xs shrink-0">
-                {ACTIVITY_LABELS[quiz.type] || quiz.type}
-              </Badge>
+            <div className="space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <CardTitle className="min-w-0 text-base">
+                  {quiz.title}
+                </CardTitle>
+                <Badge variant="secondary" className="text-xs shrink-0">
+                  {ACTIVITY_LABELS[quiz.type] || quiz.type}
+                </Badge>
+              </div>
+              <div className="flex min-w-0 flex-wrap items-start gap-2">
+                {quiz.cefr_level && (
+                  <Badge variant="secondary" className="text-xs shrink-0">
+                    {quiz.cefr_level}
+                  </Badge>
+                )}
+                {quiz.type === "translation" && grammarTopic && (
+                  <Badge
+                    variant="outline"
+                    className="h-auto max-w-full justify-start whitespace-normal break-words border-amber-300 bg-amber-50 px-3 py-1 text-left text-xs leading-tight text-amber-900"
+                  >
+                    {grammarTopic}
+                  </Badge>
+                )}
+              </div>
             </div>
             <CardDescription>
-              {Array.isArray(terms) ? terms.length : 0} terms &middot;{" "}
-              {quiz.cefr_level}
+              {Array.isArray(terms) ? terms.length : 0} terms
             </CardDescription>
             <p className="text-xs text-muted-foreground">
               {new Date(quiz.created_at).toLocaleDateString("en-US")}

@@ -33,6 +33,8 @@ const translationQuestionSchema = z.object({
   englishReference: z.string(),
   sourceTerm: z.string(),
   highlightText: z.string().optional(),
+  validatedGrammarTopic: z.string().optional(),
+  grammarValidationReason: z.string().optional(),
 });
 
 export const translationResponseSchema = z.object({

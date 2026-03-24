@@ -1,24 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import {
+  getPrimaryGrammarTopic,
+  removeSuggestedAnswerLines,
+  stripMarkdownEmphasis,
+} from "@/lib/utils";
 import type { TranslationQuestion, QuizConfig } from "@/types/quiz";
+import {
+  getLearningLanguageLabel,
+  getSourceLanguageLabel,
+  normalizeLearningLanguage,
+  normalizeSourceLanguage,
+} from "@/lib/languages";
+import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 
 interface TranslationPlayerProps {
   questions: TranslationQuestion[];
   cefrLevel?: string;
   quizConfig?: QuizConfig;
+  canPreviewQuestions?: boolean;
   onComplete: (results: TranslationResult[]) => void;
 }
 
@@ -35,11 +42,13 @@ export function TranslationPlayer({
   questions,
   cefrLevel,
   quizConfig,
+  canPreviewQuestions = false,
   onComplete,
 }: TranslationPlayerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userTranslation, setUserTranslation] = useState("");
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [showLearningNote, setShowLearningNote] = useState(false);
   const [evaluation, setEvaluation] = useState<{
     score: number;
     feedback: string;
@@ -47,20 +56,38 @@ export function TranslationPlayer({
   const [results, setResults] = useState<TranslationResult[]>([]);
 
   const question = questions[currentIndex];
+  const grammarTopic = getPrimaryGrammarTopic(quizConfig);
+  const targetLanguageLabel = getLearningLanguageLabel(
+    normalizeLearningLanguage(quizConfig?.targetLanguage),
+  );
+  const sourceLanguageLabel = getSourceLanguageLabel(
+    normalizeSourceLanguage(quizConfig?.sourceLanguage),
+  );
+  const visibleFeedback = evaluation
+    ? removeSuggestedAnswerLines(evaluation.feedback)
+    : "";
+  const canUsePreviewArrows =
+    canPreviewQuestions && results.length === 0 && !evaluation && !isEvaluating;
   const progress =
     ((currentIndex + (evaluation ? 1 : 0)) / questions.length) * 100;
+  const displayedGrammarTopic = question.validatedGrammarTopic ?? grammarTopic;
 
-  /** Bold the target vocabulary word in the Ukrainian sentence */
+  /** Bold the target vocabulary word in the source sentence */
   function renderHighlightedSentence(
     sentence: string,
     highlight?: string,
   ): React.ReactNode {
-    if (!highlight) return sentence;
-    const idx = sentence.toLowerCase().indexOf(highlight.toLowerCase());
-    if (idx === -1) return sentence;
-    const before = sentence.slice(0, idx);
-    const match = sentence.slice(idx, idx + highlight.length);
-    const after = sentence.slice(idx + highlight.length);
+    const cleanSentence = stripMarkdownEmphasis(sentence);
+
+    if (!highlight) return cleanSentence;
+
+    const idx = cleanSentence.toLowerCase().indexOf(highlight.toLowerCase());
+    if (idx === -1) return cleanSentence;
+
+    const before = cleanSentence.slice(0, idx);
+    const match = cleanSentence.slice(idx, idx + highlight.length);
+    const after = cleanSentence.slice(idx + highlight.length);
+
     return (
       <>
         {before}
@@ -84,13 +111,20 @@ export function TranslationPlayer({
         body: JSON.stringify({
           userTranslation: userTranslation.trim(),
           referenceTranslation: question.englishReference,
+          targetTerm: question.sourceTerm,
+          validatedGrammarTopic: question.validatedGrammarTopic,
+          grammarValidationReason: question.grammarValidationReason,
           cefrLevel: cefrLevel ?? "B1",
           config: quizConfig,
         }),
       });
 
       if (!res.ok) {
-        throw new Error("Evaluation failed");
+        const errorPayload = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+
+        throw new Error(errorPayload?.error || "Evaluation failed");
       }
 
       const data = await res.json();
@@ -98,7 +132,7 @@ export function TranslationPlayer({
 
       const result: TranslationResult = {
         questionId: question.id,
-        ukrainianSentence: question.ukrainianSentence,
+        ukrainianSentence: stripMarkdownEmphasis(question.ukrainianSentence),
         userTranslation: userTranslation.trim(),
         referenceTranslation: question.englishReference,
         score: data.score,
@@ -106,10 +140,13 @@ export function TranslationPlayer({
       };
 
       setResults([...results, result]);
-    } catch {
+    } catch (error) {
       setEvaluation({
         score: -1,
-        feedback: "Could not evaluate your translation. Please try again.",
+        feedback:
+          error instanceof Error
+            ? error.message
+            : "Could not evaluate your translation. Please try again.",
       });
     } finally {
       setIsEvaluating(false);
@@ -121,6 +158,7 @@ export function TranslationPlayer({
       setCurrentIndex(currentIndex + 1);
       setUserTranslation("");
       setEvaluation(null);
+      setShowLearningNote(false);
     } else {
       onComplete(results);
     }
@@ -128,6 +166,14 @@ export function TranslationPlayer({
 
   function handleRetry() {
     setEvaluation(null);
+    setShowLearningNote(false);
+  }
+
+  function handlePreviewNavigation(nextIndex: number) {
+    setCurrentIndex(nextIndex);
+    setUserTranslation("");
+    setEvaluation(null);
+    setShowLearningNote(false);
   }
 
   function getScoreColor(score: number) {
@@ -150,22 +196,70 @@ export function TranslationPlayer({
           <span className="text-muted-foreground">
             Sentence {currentIndex + 1} of {questions.length}
           </span>
-          {results.length > 0 && (
-            <Badge variant="outline">Avg Score: {avgScore}/100</Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {canUsePreviewArrows && questions.length > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => handlePreviewNavigation(currentIndex - 1)}
+                  disabled={currentIndex === 0}
+                  aria-label="Previous sentence"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => handlePreviewNavigation(currentIndex + 1)}
+                  disabled={currentIndex === questions.length - 1}
+                  aria-label="Next sentence"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            {results.length > 0 && (
+              <Badge variant="outline">Avg Score: {avgScore}/100</Badge>
+            )}
+          </div>
         </div>
         <Progress value={progress} />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Translate to English</CardTitle>
-          <CardDescription>
-            Read the Ukrainian sentence and write your English translation.
-          </CardDescription>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-lg">
+              Translate to {targetLanguageLabel}
+            </CardTitle>
+            <BrowserTtsButton
+              text={stripMarkdownEmphasis(question.ukrainianSentence)}
+              language={quizConfig?.sourceLanguage}
+              label="Listen"
+            />
+          </div>
+
+          {grammarTopic && (
+            <div>
+              <Badge
+                variant="outline"
+                className="mt-2 h-auto w-fit max-w-full whitespace-normal break-words border-amber-300 bg-amber-50 text-left leading-tight text-amber-900"
+              >
+                Grammar Focus: {grammarTopic}
+              </Badge>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="p-4 rounded-md bg-muted">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {sourceLanguageLabel}
+            </p>
             <p className="text-lg font-medium">
               {renderHighlightedSentence(
                 question.ukrainianSentence,
@@ -189,7 +283,7 @@ export function TranslationPlayer({
                 handleSubmit();
               }
             }}
-            placeholder="Type your English translation... (Enter to submit, Shift+Enter for new line)"
+            placeholder={`Type your ${targetLanguageLabel} translation... (Enter to submit, Shift+Enter for new line)`}
             rows={3}
             disabled={!!evaluation || isEvaluating}
           />
@@ -240,25 +334,20 @@ export function TranslationPlayer({
               <div className="p-3 rounded-md bg-muted space-y-1">
                 <p className="text-sm font-medium">Feedback:</p>
                 <div className="text-sm space-y-0.5">
-                  {evaluation.feedback.split("\n").map((line, i) => {
+                  {visibleFeedback.split("\n").map((line, i) => {
                     const trimmed = line.trim();
                     if (!trimmed) return null;
                     const isPass = trimmed.startsWith("✓");
                     const isFail = trimmed.startsWith("✗");
-                    const isSuggested = trimmed
-                      .toLowerCase()
-                      .startsWith("suggested");
                     return (
                       <p
                         key={i}
                         className={
-                          isSuggested
-                            ? "text-muted-foreground italic mt-1"
-                            : isFail
-                              ? "text-red-500"
-                              : isPass
-                                ? "text-green-600 dark:text-green-400"
-                                : ""
+                          isFail
+                            ? "text-red-500"
+                            : isPass
+                              ? "text-green-600 dark:text-green-400"
+                              : ""
                         }
                       >
                         {trimmed}
@@ -268,9 +357,60 @@ export function TranslationPlayer({
                 </div>
               </div>
 
-              <div className="p-3 rounded-md bg-muted space-y-1">
-                <p className="text-sm font-medium">Reference translation:</p>
-                <p className="text-sm italic">{question.englishReference}</p>
+              <div className="p-3 rounded-md bg-muted space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      Reference translation ({targetLanguageLabel}):
+                    </p>
+                    <p className="text-sm italic">
+                      {question.englishReference}
+                    </p>
+                  </div>
+                  <BrowserTtsButton
+                    text={question.englishReference}
+                    language={quizConfig?.targetLanguage}
+                    label="Listen"
+                    className="shrink-0"
+                  />
+                </div>
+
+                <div className="border-t border-border/60 pt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto px-0 text-xs font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    onClick={() => setShowLearningNote((current) => !current)}
+                  >
+                    {showLearningNote ? "Hide learning note" : "Reveal learning note"}
+                  </Button>
+
+                  {showLearningNote && (
+                    <div className="mt-2 rounded-md bg-background/70 p-3 text-sm text-muted-foreground space-y-2">
+                      <p>
+                        <span className="font-medium text-foreground">
+                          Small translation:
+                        </span>{" "}
+                        {question.englishReference}
+                      </p>
+                      <p>
+                        <span className="font-medium text-foreground">
+                          Target vocab:
+                        </span>{" "}
+                        {question.sourceTerm}
+                      </p>
+                      {displayedGrammarTopic && (
+                        <p>
+                          <span className="font-medium text-foreground">
+                            Grammar:
+                          </span>{" "}
+                          {displayedGrammarTopic}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <Button onClick={handleNext} className="w-full">

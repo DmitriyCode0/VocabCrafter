@@ -18,9 +18,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PagePagination } from "@/components/shared/page-pagination";
+import { EditMasteryWordDialog } from "@/components/mastery/edit-mastery-word-dialog";
+import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
+import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { BookOpen, Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+const MASTERY_PAGE_SIZE = 10;
 
 const LEVEL_LABELS = [
   "New",
@@ -41,12 +47,14 @@ const LEVEL_COLORS = [
 ] as const;
 
 interface MasteryRow {
+  id: string;
   student_id: string;
   term: string;
   definition: string | null;
   mastery_level: number;
   correct_count: number;
   incorrect_count: number;
+  translation_correct_count: number;
   streak: number;
   last_practiced: string | null;
 }
@@ -57,8 +65,15 @@ interface StudentProfile {
   email: string;
 }
 
-export default async function TutorMasteryPage() {
+export default async function TutorMasteryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const supabase = await createClient();
+  const resolvedSearchParams = await searchParams;
+  const currentPage = getCurrentPage(resolvedSearchParams.page);
+  const { from, to } = getPaginationRange(currentPage, MASTERY_PAGE_SIZE);
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -80,7 +95,7 @@ export default async function TutorMasteryPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Student Vocabulary Mastery
+            Student Vocab Mastery
           </h1>
           <p className="text-muted-foreground">
             See how well your students know their vocabulary.
@@ -113,7 +128,7 @@ export default async function TutorMasteryPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Student Vocabulary Mastery
+            Student Vocab Mastery
           </h1>
           <p className="text-muted-foreground">
             See how well your students know their vocabulary.
@@ -142,27 +157,31 @@ export default async function TutorMasteryPage() {
     ((profiles ?? []) as StudentProfile[]).map((p) => [p.id, p]),
   );
 
-  // Get word mastery for all students
-  const { data: masteryData } = await supabaseAdmin
+  // Load mastery rows once, then derive both class-wide and per-student summaries.
+  const { data: allMasteryRows } = await supabaseAdmin
     .from("word_mastery")
     .select(
-      "student_id, term, definition, mastery_level, correct_count, incorrect_count, streak, last_practiced",
+      "id, student_id, term, definition, mastery_level, correct_count, incorrect_count, translation_correct_count, streak, last_practiced",
     )
     .in("student_id", studentIds);
 
-  const allMastery = (masteryData ?? []) as MasteryRow[];
+  const visibleMastery = (allMasteryRows ?? []) as MasteryRow[];
 
   // Group by student
   const studentMastery = new Map<string, MasteryRow[]>();
-  for (const row of allMastery) {
-    if (!studentMastery.has(row.student_id)) {
-      studentMastery.set(row.student_id, []);
+  for (const row of visibleMastery) {
+    const studentId = row.student_id;
+    if (!studentId) {
+      continue;
     }
-    studentMastery.get(row.student_id)!.push(row);
+
+    if (!studentMastery.has(studentId)) {
+      studentMastery.set(studentId, []);
+    }
+    studentMastery.get(studentId)!.push(row);
   }
 
-  // Per-student summary
-  const studentSummaries = studentIds.map((sid) => {
+  const summarizeStudent = (sid: string) => {
     const profile = profileMap.get(sid);
     const words = studentMastery.get(sid) ?? [];
     const total = words.length;
@@ -188,14 +207,41 @@ export default async function TutorMasteryPage() {
       avgLevel: Math.round(avgLevel * 10) / 10,
       weakWords,
     };
-  });
+  };
+
+  const studentsWithMastery = Array.from(studentMastery.keys())
+    .filter((sid) => studentIds.includes(sid))
+    .map(summarizeStudent)
+    .sort((left, right) => {
+      if (right.totalWords !== left.totalWords) {
+        return right.totalWords - left.totalWords;
+      }
+
+      return left.name.localeCompare(right.name, undefined, {
+        sensitivity: "base",
+      });
+    });
+
+  const studentsWithoutMastery = studentIds
+    .filter((sid) => !studentMastery.has(sid))
+    .map(summarizeStudent)
+    .sort((left, right) =>
+      left.name.localeCompare(right.name, undefined, { sensitivity: "base" }),
+    );
+
+  const allStudentSummaries = [
+    ...studentsWithMastery,
+    ...studentsWithoutMastery,
+  ];
+  const totalStudents = allStudentSummaries.length;
+  const studentSummaries = allStudentSummaries.slice(from, to + 1);
 
   // Class-wide weak words: terms where the average mastery is lowest
   const termStats = new Map<
     string,
     { definition: string; totalLevel: number; count: number }
   >();
-  for (const row of allMastery) {
+  for (const row of visibleMastery) {
     const existing = termStats.get(row.term) ?? {
       definition: row.definition ?? "",
       totalLevel: 0,
@@ -221,7 +267,7 @@ export default async function TutorMasteryPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
-          Student Vocabulary Mastery
+          Student Vocab Mastery
         </h1>
         <p className="text-muted-foreground">
           See how well your students know their vocabulary across all classes.
@@ -335,6 +381,14 @@ export default async function TutorMasteryPage() {
         </CardContent>
       </Card>
 
+      <PagePagination
+        pathname="/mastery"
+        currentPage={currentPage}
+        pageSize={MASTERY_PAGE_SIZE}
+        totalItems={totalStudents}
+        searchParams={resolvedSearchParams}
+      />
+
       {/* Per-student detailed breakdown */}
       {studentSummaries
         .filter((s) => s.totalWords > 0)
@@ -377,16 +431,26 @@ export default async function TutorMasteryPage() {
                     .sort((a, b) => a.mastery_level - b.mastery_level)
                     .map((w) => (
                       <div
-                        key={w.term}
-                        className="flex items-center justify-between rounded border px-2.5 py-1.5 text-sm"
+                        key={w.id}
+                        className="flex items-center justify-between gap-2 rounded border px-2.5 py-1.5 text-sm"
                       >
                         <span className="truncate mr-2">{w.term}</span>
-                        <Badge
-                          variant="outline"
-                          className={`${LEVEL_COLORS[w.mastery_level]} border-0 text-xs shrink-0`}
-                        >
-                          {w.mastery_level}
-                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <Badge
+                            variant="outline"
+                            className={`${LEVEL_COLORS[w.mastery_level]} border-0 text-xs shrink-0`}
+                          >
+                            {w.mastery_level}
+                          </Badge>
+                          <EditMasteryWordDialog word={w} />
+                          <DeleteMasteryWordButton
+                            wordId={w.id}
+                            term={w.term}
+                            title="Delete word for student"
+                            description={`${w.term} will be removed from this student's Vocab Mastery list.`}
+                            successMessage={`Deleted ${w.term} from the student's Vocab Mastery list`}
+                          />
+                        </div>
                       </div>
                     ))}
                 </div>

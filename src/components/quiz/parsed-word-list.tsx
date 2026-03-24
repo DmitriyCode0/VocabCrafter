@@ -13,17 +13,36 @@ import {
 } from "@/components/ui/table";
 import { Plus, Trash2 } from "lucide-react";
 import type { QuizTerm } from "@/types/quiz";
+import {
+  getLearningLanguageLabel,
+  getSourceLanguageLabel,
+  type LearningLanguage,
+  type SourceLanguage,
+} from "@/lib/languages";
 
 interface ParsedWordListProps {
   terms: QuizTerm[];
   onTermsChange: (terms: QuizTerm[]) => void;
+  targetLanguage: LearningLanguage;
+  sourceLanguage: SourceLanguage;
 }
 
-export function ParsedWordList({ terms, onTermsChange }: ParsedWordListProps) {
+export function ParsedWordList({
+  terms,
+  onTermsChange,
+  targetLanguage,
+  sourceLanguage,
+}: ParsedWordListProps) {
   const [newTerm, setNewTerm] = useState("");
   const [newDefinition, setNewDefinition] = useState("");
+  const targetLanguageLabel = getLearningLanguageLabel(targetLanguage);
+  const sourceLanguageLabel = getSourceLanguageLabel(sourceLanguage);
 
-  function updateTerm(index: number, field: "term" | "definition", value: string) {
+  function updateTerm(
+    index: number,
+    field: "term" | "definition",
+    value: string,
+  ) {
     const updated = [...terms];
     updated[index] = { ...updated[index], [field]: value };
     onTermsChange(updated);
@@ -35,7 +54,10 @@ export function ParsedWordList({ terms, onTermsChange }: ParsedWordListProps) {
 
   function addTerm() {
     if (!newTerm.trim() || !newDefinition.trim()) return;
-    onTermsChange([...terms, { term: newTerm.trim(), definition: newDefinition.trim() }]);
+    onTermsChange([
+      ...terms,
+      { term: newTerm.trim(), definition: newDefinition.trim() },
+    ]);
     setNewTerm("");
     setNewDefinition("");
   }
@@ -44,7 +66,8 @@ export function ParsedWordList({ terms, onTermsChange }: ParsedWordListProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {terms.length} term{terms.length !== 1 ? "s" : ""} parsed. Edit, remove, or add more below.
+          {terms.length} term{terms.length !== 1 ? "s" : ""} parsed. Edit,
+          remove, or add more below.
         </p>
       </div>
 
@@ -52,8 +75,8 @@ export function ParsedWordList({ terms, onTermsChange }: ParsedWordListProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40%]">English</TableHead>
-              <TableHead className="w-[40%]">Ukrainian</TableHead>
+              <TableHead className="w-[40%]">{targetLanguageLabel}</TableHead>
+              <TableHead className="w-[40%]">{sourceLanguageLabel}</TableHead>
               <TableHead className="w-[20%]" />
             </TableRow>
           </TableHeader>
@@ -70,7 +93,9 @@ export function ParsedWordList({ terms, onTermsChange }: ParsedWordListProps) {
                 <TableCell>
                   <Input
                     value={term.definition}
-                    onChange={(e) => updateTerm(index, "definition", e.target.value)}
+                    onChange={(e) =>
+                      updateTerm(index, "definition", e.target.value)
+                    }
                     className="h-8"
                   />
                 </TableCell>
@@ -91,7 +116,7 @@ export function ParsedWordList({ terms, onTermsChange }: ParsedWordListProps) {
                 <Input
                   value={newTerm}
                   onChange={(e) => setNewTerm(e.target.value)}
-                  placeholder="Add English term..."
+                  placeholder={`Add ${targetLanguageLabel} term...`}
                   className="h-8"
                   onKeyDown={(e) => e.key === "Enter" && addTerm()}
                 />
@@ -100,7 +125,7 @@ export function ParsedWordList({ terms, onTermsChange }: ParsedWordListProps) {
                 <Input
                   value={newDefinition}
                   onChange={(e) => setNewDefinition(e.target.value)}
-                  placeholder="Add Ukrainian translation..."
+                  placeholder={`Add ${sourceLanguageLabel.toLowerCase()} meaning...`}
                   className="h-8"
                   onKeyDown={(e) => e.key === "Enter" && addTerm()}
                 />

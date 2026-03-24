@@ -1,9 +1,16 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import {
+  EditableTranslationResults,
+  type TranslationScoreSaveResult,
+} from "@/components/review/editable-translation-results";
+import { removeSuggestedAnswerLines, stripMarkdownEmphasis } from "@/lib/utils";
 
 interface AttemptDetailProps {
   attempt: Record<string, unknown>;
+  canEditTranslationScores?: boolean;
+  onTranslationScoreSaved?: (result: TranslationScoreSaveResult) => void;
 }
 
 interface GapFillResult {
@@ -28,6 +35,14 @@ interface TranslationResult {
   feedback?: string;
 }
 
+interface TextTranslationResult {
+  originalText?: string;
+  userTranslation?: string;
+  referenceTranslation?: string;
+  score?: number;
+  feedback?: string;
+}
+
 interface MatchingResult {
   term?: string;
   selected?: string;
@@ -35,7 +50,11 @@ interface MatchingResult {
   isCorrect?: boolean;
 }
 
-export function AttemptDetail({ attempt }: AttemptDetailProps) {
+export function AttemptDetail({
+  attempt,
+  canEditTranslationScores = false,
+  onTranslationScoreSaved,
+}: AttemptDetailProps) {
   const quiz = attempt.quizzes as Record<string, unknown> | null;
   const rawAnswers = attempt.answers as Record<string, unknown> | null;
   const quizType = quiz?.type as string;
@@ -61,7 +80,18 @@ export function AttemptDetail({ attempt }: AttemptDetailProps) {
   if (quizType === "translation") {
     return (
       <TranslationDetail
+        attemptId={typeof attempt.id === "string" ? attempt.id : ""}
         results={results as unknown as TranslationResult[]}
+        canEdit={canEditTranslationScores}
+        onScoreSaved={onTranslationScoreSaved}
+      />
+    );
+  }
+
+  if (quizType === "text_translation") {
+    return (
+      <TextTranslationDetail
+        results={results as unknown as TextTranslationResult[]}
       />
     );
   }
@@ -156,9 +186,7 @@ function MCQDetail({ results }: { results: MCQResult[] }) {
           </span>
           <div className="flex-1 min-w-0">
             {r.question && (
-              <p className="text-xs text-muted-foreground mb-1">
-                {r.question}
-              </p>
+              <p className="text-xs text-muted-foreground mb-1">{r.question}</p>
             )}
             <p>
               Selected: <strong>{r.selected ?? "—"}</strong>
@@ -181,21 +209,40 @@ function MCQDetail({ results }: { results: MCQResult[] }) {
   );
 }
 
-function TranslationDetail({ results }: { results: TranslationResult[] }) {
+function TranslationDetail({
+  attemptId,
+  results,
+  canEdit,
+  onScoreSaved,
+}: {
+  attemptId: string;
+  results: TranslationResult[];
+  canEdit: boolean;
+  onScoreSaved?: (result: TranslationScoreSaveResult) => void;
+}) {
   if (results.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">No answers recorded.</p>
     );
   }
+
+  if (canEdit && attemptId) {
+    return (
+      <EditableTranslationResults
+        attemptId={attemptId}
+        results={results}
+        onScoreSaved={onScoreSaved}
+      />
+    );
+  }
+
   return (
     <div className="space-y-2">
       <h4 className="text-sm font-medium">Translation Answers</h4>
       {results.map((r, i) => (
         <div key={i} className="bg-muted/50 rounded px-3 py-2 space-y-1">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-mono text-muted-foreground">
-              Q{i + 1}:
-            </span>
+            <span className="font-mono text-muted-foreground">Q{i + 1}:</span>
             {r.score != null && (
               <Badge
                 variant="outline"
@@ -213,7 +260,7 @@ function TranslationDetail({ results }: { results: TranslationResult[] }) {
           </div>
           {r.ukrainianSentence && (
             <p className="text-sm text-muted-foreground">
-              {r.ukrainianSentence}
+              {stripMarkdownEmphasis(r.ukrainianSentence)}
             </p>
           )}
           {r.userTranslation && (
@@ -228,34 +275,36 @@ function TranslationDetail({ results }: { results: TranslationResult[] }) {
           )}
           {r.feedback && (
             <div className="text-xs text-muted-foreground whitespace-pre-line mt-1">
-              {r.feedback.split("\n").map((line, j) => {
-                const trimmed = line.trim();
-                if (trimmed.startsWith("✓")) {
-                  return (
-                    <p key={j} className="text-green-600">
-                      {trimmed}
-                    </p>
-                  );
-                }
-                if (trimmed.startsWith("✗")) {
-                  return (
-                    <p key={j} className="text-red-600">
-                      {trimmed}
-                    </p>
-                  );
-                }
-                if (
-                  trimmed.startsWith("Suggested") ||
-                  trimmed.startsWith("suggested")
-                ) {
-                  return (
-                    <p key={j} className="italic">
-                      {trimmed}
-                    </p>
-                  );
-                }
-                return <p key={j}>{trimmed}</p>;
-              })}
+              {removeSuggestedAnswerLines(r.feedback)
+                .split("\n")
+                .map((line, j) => {
+                  const trimmed = line.trim();
+                  if (trimmed.startsWith("✓")) {
+                    return (
+                      <p key={j} className="text-green-600">
+                        {trimmed}
+                      </p>
+                    );
+                  }
+                  if (trimmed.startsWith("✗")) {
+                    return (
+                      <p key={j} className="text-red-600">
+                        {trimmed}
+                      </p>
+                    );
+                  }
+                  if (
+                    trimmed.startsWith("Suggested") ||
+                    trimmed.startsWith("suggested")
+                  ) {
+                    return (
+                      <p key={j} className="italic">
+                        {trimmed}
+                      </p>
+                    );
+                  }
+                  return <p key={j}>{trimmed}</p>;
+                })}
             </div>
           )}
         </div>
@@ -264,11 +313,7 @@ function TranslationDetail({ results }: { results: TranslationResult[] }) {
   );
 }
 
-function FlashcardDetail({
-  answers,
-}: {
-  answers: Record<string, unknown>;
-}) {
+function FlashcardDetail({ answers }: { answers: Record<string, unknown> }) {
   const known = answers.known as number | undefined;
   const total = answers.total as number | undefined;
 
@@ -281,6 +326,92 @@ function FlashcardDetail({
           : "completed"}
         .
       </p>
+    </div>
+  );
+}
+
+function TextTranslationDetail({
+  results,
+}: {
+  results: TextTranslationResult[];
+}) {
+  const result = results[0];
+
+  if (!result) {
+    return (
+      <p className="text-sm text-muted-foreground">No answers recorded.</p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <h4 className="text-sm font-medium">Text Translation</h4>
+      <div className="bg-muted/50 rounded px-3 py-2 space-y-2">
+        {result.score != null && (
+          <div className="flex justify-end">
+            <Badge
+              variant="outline"
+              className={`text-xs ${
+                result.score >= 80
+                  ? "text-green-600"
+                  : result.score >= 50
+                    ? "text-orange-600"
+                    : "text-red-600"
+              }`}
+            >
+              {result.score}/100
+            </Badge>
+          </div>
+        )}
+        {result.originalText && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Source text</p>
+            <p className="text-sm whitespace-pre-line">
+              {stripMarkdownEmphasis(result.originalText)}
+            </p>
+          </div>
+        )}
+        {result.userTranslation && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Student</p>
+            <p className="text-sm whitespace-pre-line">
+              <em>{result.userTranslation}</em>
+            </p>
+          </div>
+        )}
+        {result.referenceTranslation && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Reference</p>
+            <p className="text-sm whitespace-pre-line text-muted-foreground">
+              <em>{result.referenceTranslation}</em>
+            </p>
+          </div>
+        )}
+        {result.feedback && (
+          <div className="text-xs text-muted-foreground whitespace-pre-line mt-1">
+            {removeSuggestedAnswerLines(result.feedback)
+              .split("\n")
+              .map((line, index) => {
+                const trimmed = line.trim();
+                if (trimmed.startsWith("✓")) {
+                  return (
+                    <p key={index} className="text-green-600">
+                      {trimmed}
+                    </p>
+                  );
+                }
+                if (trimmed.startsWith("✗")) {
+                  return (
+                    <p key={index} className="text-red-600">
+                      {trimmed}
+                    </p>
+                  );
+                }
+                return <p key={index}>{trimmed}</p>;
+              })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
