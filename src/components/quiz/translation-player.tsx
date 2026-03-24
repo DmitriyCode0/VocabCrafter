@@ -383,7 +383,9 @@ export function TranslationPlayer({
                     className="h-auto px-0 text-xs font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
                     onClick={() => setShowLearningNote((current) => !current)}
                   >
-                    {showLearningNote ? "Hide learning note" : "Reveal learning note"}
+                    {showLearningNote
+                      ? "Hide learning note"
+                      : "Reveal learning note"}
                   </Button>
 
                   {showLearningNote && (

@@ -78,7 +78,9 @@ export async function saveGrammarTopicPromptOverride(input: {
       },
       { onConflict: "topic_key" },
     )
-    .select("topic_key, rule_text, guidance_text, updated_by, created_at, updated_at")
+    .select(
+      "topic_key, rule_text, guidance_text, updated_by, created_at, updated_at",
+    )
     .single();
 
   if (error) {

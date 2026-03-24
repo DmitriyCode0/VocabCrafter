@@ -19,7 +19,8 @@ async function validateTranslationQuestion(
   topic: string,
   config: QuizConfig,
 ): Promise<{ valid: boolean; reason: string }> {
-  const rule = config.grammarTopicDetails?.[topic] ?? getGrammarPromptDetails(topic);
+  const rule =
+    config.grammarTopicDetails?.[topic] ?? getGrammarPromptDetails(topic);
   const targetLanguageLabel = getLearningLanguageLabel(
     normalizeLearningLanguage(config.targetLanguage),
   );

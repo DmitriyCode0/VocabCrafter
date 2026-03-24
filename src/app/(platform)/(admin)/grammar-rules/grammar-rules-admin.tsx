@@ -34,7 +34,9 @@ interface GrammarRulesAdminProps {
 
 type LanguageTab = "english" | "spanish";
 
-function flattenTopics(catalog: { level: string; topics: GrammarTopicPromptConfig[] }[]) {
+function flattenTopics(
+  catalog: { level: string; topics: GrammarTopicPromptConfig[] }[],
+) {
   return catalog.flatMap(({ level, topics }) =>
     topics.map((topic) => ({
       ...topic,
@@ -55,7 +57,9 @@ export function GrammarRulesAdmin({
     spanish: flattenTopics(spanishCatalog),
   });
   const [selectedTopicKey, setSelectedTopicKey] = useState<string | null>(
-    topicsState.english[0]?.topicKey ?? topicsState.spanish[0]?.topicKey ?? null,
+    topicsState.english[0]?.topicKey ??
+      topicsState.spanish[0]?.topicKey ??
+      null,
   );
   const [draftRule, setDraftRule] = useState("");
   const [draftGuidance, setDraftGuidance] = useState("");
@@ -92,11 +96,18 @@ export function GrammarRulesAdmin({
       return "";
     }
 
-    const effectiveDetails = buildGrammarPromptDetails(draftRule, draftGuidance);
+    const effectiveDetails = buildGrammarPromptDetails(
+      draftRule,
+      draftGuidance,
+    );
 
-    return formatGrammarRulesSection([selectedTopic.topicKey], previewDifficulty, {
-      [selectedTopic.topicKey]: effectiveDetails || selectedTopic.topicKey,
-    }).trim();
+    return formatGrammarRulesSection(
+      [selectedTopic.topicKey],
+      previewDifficulty,
+      {
+        [selectedTopic.topicKey]: effectiveDetails || selectedTopic.topicKey,
+      },
+    ).trim();
   }, [draftGuidance, draftRule, previewDifficulty, selectedTopic]);
 
   useEffect(() => {
@@ -166,7 +177,9 @@ export function GrammarRulesAdmin({
         router.refresh();
       } catch (error) {
         toast.error(
-          error instanceof Error ? error.message : "Failed to reset topic rules",
+          error instanceof Error
+            ? error.message
+            : "Failed to reset topic rules",
         );
       }
     });
@@ -177,7 +190,8 @@ export function GrammarRulesAdmin({
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Grammar Rules</h1>
         <p className="text-muted-foreground">
-          Review and override the prompt rules sent to AI for each grammar topic.
+          Review and override the prompt rules sent to AI for each grammar
+          topic.
         </p>
       </div>
 
@@ -261,7 +275,8 @@ export function GrammarRulesAdmin({
               <CardContent className="space-y-5">
                 {!selectedTopic ? (
                   <p className="text-sm text-muted-foreground">
-                    Select a topic from the list to edit its prompt instructions.
+                    Select a topic from the list to edit its prompt
+                    instructions.
                   </p>
                 ) : (
                   <>
@@ -291,8 +306,8 @@ export function GrammarRulesAdmin({
                         rows={8}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Use this for stricter generation constraints, edge cases,
-                        and anti-hallucination rules.
+                        Use this for stricter generation constraints, edge
+                        cases, and anti-hallucination rules.
                       </p>
                     </div>
 
@@ -312,9 +327,12 @@ export function GrammarRulesAdmin({
                     <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                          <p className="text-sm font-medium">Exact final AI prompt</p>
+                          <p className="text-sm font-medium">
+                            Exact final AI prompt
+                          </p>
                           <p className="text-xs text-muted-foreground">
-                            This is the exact grammar section injected into generation and evaluation prompts.
+                            This is the exact grammar section injected into
+                            generation and evaluation prompts.
                           </p>
                         </div>
                         <div className="w-full lg:w-52">
@@ -422,7 +440,8 @@ export function GrammarRulesAdmin({
               <CardContent className="space-y-5">
                 {!selectedTopic ? (
                   <p className="text-sm text-muted-foreground">
-                    Select a topic from the list to edit its prompt instructions.
+                    Select a topic from the list to edit its prompt
+                    instructions.
                   </p>
                 ) : (
                   <>
@@ -466,9 +485,12 @@ export function GrammarRulesAdmin({
                     <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                          <p className="text-sm font-medium">Exact final AI prompt</p>
+                          <p className="text-sm font-medium">
+                            Exact final AI prompt
+                          </p>
                           <p className="text-xs text-muted-foreground">
-                            This is the exact grammar section injected into generation and evaluation prompts.
+                            This is the exact grammar section injected into
+                            generation and evaluation prompts.
                           </p>
                         </div>
                         <div className="w-full lg:w-52">

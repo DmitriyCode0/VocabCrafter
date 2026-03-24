@@ -59,7 +59,10 @@ export function applyGrammarTopicPromptOverride(
   override?: GrammarTopicPromptOverrideRow | null,
 ): GrammarTopicPromptConfig {
   const defaults = getDefaultGrammarTopicPromptConfig(topicKey);
-  const effectiveRule = getOverrideValue(override?.rule_text, defaults.defaultRule);
+  const effectiveRule = getOverrideValue(
+    override?.rule_text,
+    defaults.defaultRule,
+  );
   const effectiveGuidance = getOverrideValue(
     override?.guidance_text,
     defaults.defaultGuidance,
@@ -85,7 +88,9 @@ export async function fetchGrammarTopicPromptOverrides(
   const admin = createAdminClient();
   let query = admin
     .from("grammar_topic_prompt_overrides")
-    .select("topic_key, rule_text, guidance_text, updated_by, created_at, updated_at");
+    .select(
+      "topic_key, rule_text, guidance_text, updated_by, created_at, updated_at",
+    );
 
   if (topicKeys && topicKeys.length > 0) {
     query = query.in("topic_key", Array.from(new Set(topicKeys)));

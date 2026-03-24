@@ -22,7 +22,8 @@ export function formatGrammarRulesSection(
   const constraint = getGrammarDifficultyConstraint(difficulty);
 
   const rules = topics.map((topicKey) => {
-    const ruleDetails = topicDetails?.[topicKey] ?? getGrammarPromptDetails(topicKey);
+    const ruleDetails =
+      topicDetails?.[topicKey] ?? getGrammarPromptDetails(topicKey);
     if (!ruleDetails) return `- TOPIC: ${topicKey}`;
 
     return `

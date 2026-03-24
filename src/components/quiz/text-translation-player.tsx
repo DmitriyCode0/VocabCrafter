@@ -1,12 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
@@ -80,9 +75,9 @@ export function TextTranslationPlayer({
       });
 
       if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
+        const errorPayload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
 
         throw new Error(errorPayload?.error || "Evaluation failed");
       }
@@ -197,7 +192,11 @@ export function TextTranslationPlayer({
               <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                 {evaluation.feedback}
               </div>
-              <Button onClick={handleRetry} className="w-full" variant="outline">
+              <Button
+                onClick={handleRetry}
+                className="w-full"
+                variant="outline"
+              >
                 Retry Evaluation
               </Button>
             </div>
@@ -207,7 +206,9 @@ export function TextTranslationPlayer({
             <div className="space-y-3">
               <div className="flex items-center justify-between rounded-md bg-muted p-3">
                 <span className="font-medium">Score</span>
-                <span className={`text-2xl font-bold ${getScoreColor(evaluation.score)}`}>
+                <span
+                  className={`text-2xl font-bold ${getScoreColor(evaluation.score)}`}
+                >
                   {evaluation.score}/100
                 </span>
               </div>

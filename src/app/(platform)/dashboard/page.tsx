@@ -393,14 +393,8 @@ async function TutorDashboard({
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  const [
-    { data: classes },
-    { count: monthlyQuizCount },
-  ] = await Promise.all([
-    supabase
-      .from("classes")
-      .select("id")
-      .eq("tutor_id", userId),
+  const [{ data: classes }, { count: monthlyQuizCount }] = await Promise.all([
+    supabase.from("classes").select("id").eq("tutor_id", userId),
     supabase
       .from("quizzes")
       .select("*", { count: "exact", head: true })
@@ -417,9 +411,8 @@ async function TutorDashboard({
       .select("student_id")
       .in("class_id", classIds);
 
-    totalStudents = new Set(
-      (members ?? []).map((member) => member.student_id),
-    ).size;
+    totalStudents = new Set((members ?? []).map((member) => member.student_id))
+      .size;
   }
 
   const quizLimit = plan.quizzesPerMonth;
@@ -476,7 +469,9 @@ async function TutorDashboard({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Quizzes Created</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Quizzes Created
+            </CardTitle>
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="space-y-2">

@@ -88,7 +88,13 @@ export function QuizResults({
         100,
       );
     }
-  }, [type, quizId, gapFillResults, textTranslationResults, translationResults]);
+  }, [
+    type,
+    quizId,
+    gapFillResults,
+    textTranslationResults,
+    translationResults,
+  ]);
   if (type === "gap_fill" && gapFillResults) {
     const correct = gapFillResults.filter((r) => r.isCorrect).length;
     const total = gapFillResults.length;
@@ -259,7 +265,9 @@ export function QuizResults({
       <div className="space-y-6">
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Text Translation Complete!</CardTitle>
+            <CardTitle className="text-2xl">
+              Text Translation Complete!
+            </CardTitle>
             <CardDescription>Score: {result.score}/100</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

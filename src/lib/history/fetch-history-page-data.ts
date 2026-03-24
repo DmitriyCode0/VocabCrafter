@@ -72,12 +72,23 @@ async function fetchConnectedStudents(userId: string) {
     throw error;
   }
 
-  return (data ?? [])
-    .map((connection) => connection.profiles)
-    .filter(
-      (profile): profile is HistoryStudent =>
-        Boolean(profile) && typeof profile.id === "string",
-    );
+  return (data ?? []).flatMap((connection) => {
+    const profile = connection.profiles;
+
+    if (!profile || typeof profile.id !== "string") {
+      return [];
+    }
+
+    return [
+      {
+        id: profile.id,
+        full_name: profile.full_name ?? null,
+        email: profile.email ?? null,
+        avatar_url: profile.avatar_url ?? null,
+        cefr_level: profile.cefr_level ?? null,
+      } satisfies HistoryStudent,
+    ];
+  });
 }
 
 export async function fetchHistoryPageData({
@@ -141,7 +152,7 @@ export async function fetchHistoryPageData({
     throw error;
   }
 
-  const attempts = (data ?? []) as HistoryAttempt[];
+  const attempts = (data ?? []) as unknown as HistoryAttempt[];
 
   return {
     attempts: attempts.slice(0, safeLimit),
