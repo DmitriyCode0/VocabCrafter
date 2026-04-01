@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "motion/react";
 import {
   LayoutDashboard,
   BookOpen,
@@ -168,26 +169,43 @@ export function NavLinks({ role }: NavLinksProps) {
   const filteredItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
   return (
-    <nav className="flex flex-col gap-1">
+    <motion.nav
+      className="flex flex-col gap-1"
+      initial="hidden"
+      animate="visible"
+      variants={{
+        hidden: {},
+        visible: { transition: { staggerChildren: 0.04 } },
+      }}
+    >
       {filteredItems.map((item) => {
         const isActive =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
-          <Link
+          <motion.div
             key={item.href + item.label}
-            href={item.href}
-            className={cn(
-              "flex items-center gap-4 rounded-lg px-4 py-3 text-base transition-colors",
-              isActive
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
+            variants={{
+              hidden: { opacity: 0, x: -12 },
+              visible: { opacity: 1, x: 0 },
+            }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <item.icon className="h-6 w-6" />
-            {item.label}
-          </Link>
+            <Link
+              href={item.href}
+              data-active={isActive}
+              className={cn(
+                "nav-link-animated flex items-center gap-4 rounded-lg px-4 py-3 text-base",
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              <item.icon className="h-6 w-6" />
+              {item.label}
+            </Link>
+          </motion.div>
         );
       })}
-    </nav>
+    </motion.nav>
   );
 }

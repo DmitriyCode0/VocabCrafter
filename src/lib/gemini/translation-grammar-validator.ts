@@ -19,6 +19,7 @@ async function validateTranslationQuestion(
   topic: string,
   config: QuizConfig,
 ): Promise<{ valid: boolean; reason: string }> {
+  const topicLabel = config.grammarTopicLabels?.[topic] ?? topic;
   const rule =
     config.grammarTopicDetails?.[topic] ?? getGrammarPromptDetails(topic);
   const targetLanguageLabel = getLearningLanguageLabel(
@@ -32,7 +33,7 @@ async function validateTranslationQuestion(
 
 Check whether this exercise REALLY forces the target grammar topic.
 
-TARGET GRAMMAR TOPIC: ${topic}
+TARGET GRAMMAR TOPIC: ${topicLabel}
 GRAMMAR RULE: ${rule}
 CEFR LEVEL: ${config.cefrLevel}
 
@@ -100,6 +101,7 @@ export async function validateTranslationQuestions(
     validatedQuestions.push({
       ...question,
       validatedGrammarTopic: topic,
+      validatedGrammarTopicLabel: config.grammarTopicLabels?.[topic] ?? topic,
       grammarValidationReason: validation.reason,
     });
   }

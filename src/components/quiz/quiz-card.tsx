@@ -22,7 +22,7 @@ import {
 import { Trash2, Loader2 } from "lucide-react";
 import type { Quiz } from "@/types/database";
 import { ACTIVITY_LABELS } from "@/lib/constants";
-import { getPrimaryGrammarTopic } from "@/lib/utils";
+import { getGrammarTopicDisplayName, getPrimaryGrammarTopic } from "@/lib/utils";
 
 interface QuizCardProps {
   quiz: Quiz;
@@ -36,7 +36,10 @@ export function QuizCard({ quiz }: QuizCardProps) {
     term: string;
     definition: string;
   }[];
-  const grammarTopic = getPrimaryGrammarTopic(quiz.config);
+  const grammarTopicKey = getPrimaryGrammarTopic(quiz.config);
+  const grammarTopic = grammarTopicKey
+    ? getGrammarTopicDisplayName(quiz.config, grammarTopicKey)
+    : null;
 
   async function handleDelete(e: React.MouseEvent) {
     e.preventDefault();

@@ -3,7 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { generateFromGemini } from "@/lib/gemini/client";
 import { getQuizPrompt, getSystemInstruction } from "@/lib/gemini/prompts";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
-import { resolveGrammarTopicPromptDetails } from "@/lib/grammar/prompt-overrides";
+import {
+  resolveGrammarTopicLabels,
+  resolveGrammarTopicPromptDetails,
+} from "@/lib/grammar/prompt-overrides";
 import type { GenerateQuizRequest } from "@/types/quiz";
 import { z } from "zod";
 import {
@@ -95,6 +98,9 @@ export async function POST(request: Request) {
     }
 
     config.grammarTopicDetails = await resolveGrammarTopicPromptDetails(
+      config.grammarTopics,
+    );
+    config.grammarTopicLabels = await resolveGrammarTopicLabels(
       config.grammarTopics,
     );
 

@@ -15,7 +15,7 @@ export function LoadingSkeleton({
         <div
           key={i}
           className={cn(
-            "h-4 animate-pulse rounded bg-muted",
+            "h-4 rounded-md skeleton-shimmer",
             i === lines - 1 && "w-3/4",
           )}
         />

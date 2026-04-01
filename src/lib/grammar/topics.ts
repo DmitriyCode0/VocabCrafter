@@ -1,5 +1,12 @@
 import type { LearningLanguage } from "@/lib/languages";
 
+export interface DefaultGrammarTopicDefinition {
+  topicKey: string;
+  displayName: string;
+  level: string;
+  learningLanguage: LearningLanguage;
+}
+
 const ENGLISH_GRAMMAR_TOPICS: Record<string, string[]> = {
   A1: [
     // Present
@@ -236,7 +243,7 @@ const SPANISH_GRAMMAR_TOPICS: Record<string, string[]> = {
   ],
 };
 
-const LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1"];
+export const LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
 export function getGrammarTopicCatalog(
   language: LearningLanguage = "english",
@@ -248,6 +255,33 @@ export function getGrammarTopicCatalog(
     level: lvl,
     topics: topicMap[lvl],
   }));
+}
+
+export function getDefaultGrammarTopicDefinitions(
+  language: LearningLanguage = "english",
+): DefaultGrammarTopicDefinition[] {
+  return getUniqueGrammarTopicCatalog(language).flatMap(({ level, topics }) =>
+    topics.map((topicKey) => ({
+      topicKey,
+      displayName: topicKey,
+      level,
+      learningLanguage: language,
+    })),
+  );
+}
+
+export function getDefaultGrammarTopicDefinitionMap(): Map<
+  string,
+  DefaultGrammarTopicDefinition
+> {
+  return new Map(
+    (["english", "spanish"] as const).flatMap((language) =>
+      getDefaultGrammarTopicDefinitions(language).map((definition) => [
+        definition.topicKey,
+        definition,
+      ]),
+    ),
+  );
 }
 
 export function getUniqueGrammarTopicCatalog(

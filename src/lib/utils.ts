@@ -31,3 +31,18 @@ export function getPrimaryGrammarTopic(config: unknown) {
 
   return grammarTopics[0];
 }
+
+export function getGrammarTopicDisplayName(config: unknown, topicKey: string) {
+  if (!config || typeof config !== "object") {
+    return topicKey;
+  }
+
+  const labels = (config as { grammarTopicLabels?: unknown }).grammarTopicLabels;
+
+  if (!labels || typeof labels !== "object") {
+    return topicKey;
+  }
+
+  const label = (labels as Record<string, unknown>)[topicKey];
+  return typeof label === "string" && label.trim() ? label : topicKey;
+}

@@ -27,7 +27,6 @@ import { ParsedWordList } from "@/components/quiz/parsed-word-list";
 import { WordBankPicker } from "@/components/quiz/word-bank-picker";
 import { QuizWordPicker } from "@/components/quiz/quiz-word-picker";
 import { GrammarTopicSelector } from "@/components/quiz/grammar-topic-selector";
-import { getTopicsForLevel } from "@/lib/grammar/topics";
 import { useUser } from "@/hooks/use-user";
 import {
   getAllowedCefrLevels,
@@ -77,6 +76,23 @@ type ActivityType =
   | "translation"
   | "text_translation";
 
+interface GrammarTopicOption {
+  topicKey: string;
+  displayName: string;
+}
+
+interface GrammarTopicLevelGroup {
+  level: string;
+  topics: GrammarTopicOption[];
+}
+
+interface CreateQuizFlowProps {
+  grammarTopicCatalog: {
+    english: GrammarTopicLevelGroup[];
+    spanish: GrammarTopicLevelGroup[];
+  };
+}
+
 const ACTIVITIES: {
   type: ActivityType;
   label: string;
@@ -104,7 +120,7 @@ const ACTIVITIES: {
   },
 ];
 
-export function CreateQuizFlow() {
+export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
   const router = useRouter();
   const { profile } = useUser();
   const grammarTopicStorageKey = profile?.id
@@ -133,6 +149,20 @@ export function CreateQuizFlow() {
   const [isParseLoading, setIsParseLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const availableGrammarLevels =
+    grammarTopicCatalog[targetLanguage === "spanish" ? "spanish" : "english"]
+      .filter(({ level }) => {
+        const levelIndex = CEFR_LEVELS.indexOf(level as CEFRLevel);
+        const selectedLevelIndex = CEFR_LEVELS.indexOf(cefrLevel);
+
+        return levelIndex !== -1 && selectedLevelIndex !== -1
+          ? levelIndex <= selectedLevelIndex
+          : false;
+      });
+  const availableTopicKeys = availableGrammarLevels.flatMap(({ topics }) =>
+    topics.map((topic) => topic.topicKey),
+  );
 
   // Grammar topics state
   const [grammarTopics, setGrammarTopics] = useState<string[]>([]);
@@ -163,21 +193,16 @@ export function CreateQuizFlow() {
       return;
     }
 
-    const availableTopics = getTopicsForLevel(
-      cefrLevel,
-      targetLanguage,
-    ).flatMap(({ topics }) => topics);
     const savedTopic = window.localStorage.getItem(grammarTopicStorageKey);
 
-    if (savedTopic && availableTopics.includes(savedTopic)) {
+    if (savedTopic && availableTopicKeys.includes(savedTopic)) {
       setGrammarTopics([savedTopic]);
     }
   }, [
-    cefrLevel,
+    availableTopicKeys,
     grammarTopicStorageKey,
     grammarTopics.length,
     selectedActivity,
-    targetLanguage,
   ]);
 
   useEffect(() => {
@@ -192,19 +217,14 @@ export function CreateQuizFlow() {
   }, [grammarTopicStorageKey, grammarTopics]);
 
   useEffect(() => {
-    const availableTopics = getTopicsForLevel(
-      cefrLevel,
-      targetLanguage,
-    ).flatMap(({ topics }) => topics);
-
     if (grammarTopics.length === 0) {
       return;
     }
 
-    if (!availableTopics.includes(grammarTopics[0])) {
+    if (!availableTopicKeys.includes(grammarTopics[0])) {
       setGrammarTopics([]);
     }
-  }, [cefrLevel, grammarTopics, targetLanguage]);
+  }, [availableTopicKeys, grammarTopics]);
 
   function handleCefrLevelChange(value: string) {
     setHasCustomCefrLevel(true);
@@ -266,6 +286,11 @@ export function CreateQuizFlow() {
     setIsGenerating(true);
 
     try {
+      const grammarTopicLabels = Object.fromEntries(
+        availableGrammarLevels.flatMap(({ topics }) =>
+          topics.map((topic) => [topic.topicKey, topic.displayName]),
+        ),
+      );
       const config = {
         cefrLevel: cefrLevel as "A1" | "A2" | "B1" | "B2" | "C1" | "C2",
         studentProfileCefrLevel: profileCefrLevel ?? null,
@@ -277,6 +302,8 @@ export function CreateQuizFlow() {
         teacherPersona: "standard" as const,
         timedMode: false,
         grammarTopics: grammarTopics.length > 0 ? grammarTopics : undefined,
+        grammarTopicLabels:
+          grammarTopics.length > 0 ? grammarTopicLabels : undefined,
       };
 
       let content: Record<string, unknown>;
@@ -584,8 +611,7 @@ export function CreateQuizFlow() {
             <Card>
               <CardContent className="pt-6">
                 <GrammarTopicSelector
-                  cefrLevel={cefrLevel}
-                  targetLanguage={targetLanguage}
+                  levels={availableGrammarLevels}
                   selectedTopics={grammarTopics}
                   onTopicsChange={setGrammarTopics}
                 />

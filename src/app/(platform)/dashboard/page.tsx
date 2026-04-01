@@ -26,6 +26,10 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { fmtLimit, getPlan } from "@/lib/plans";
+import {
+  AnimatedDashboard,
+  AnimatedCard,
+} from "@/components/ui/animated-dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -160,57 +164,65 @@ async function StudentDashboard({ userId }: { userId: string }) {
   return (
     <div className="space-y-6">
       {/* Stats cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Quizzes</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{quizCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground">quizzes created</p>
-          </CardContent>
-        </Card>
+      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Total Quizzes</CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{quizCount ?? 0}</div>
+              <p className="text-xs text-muted-foreground">quizzes created</p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Attempts</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{attemptCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground">quizzes completed</p>
-          </CardContent>
-        </Card>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Attempts</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{attemptCount ?? 0}</div>
+              <p className="text-xs text-muted-foreground">quizzes completed</p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Avg Score</CardTitle>
-            <Trophy className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {avgScore > 0 ? `${avgScore}%` : "—"}
-            </div>
-            <p className="text-xs text-muted-foreground">recent performance</p>
-          </CardContent>
-        </Card>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Avg Score</CardTitle>
+              <Trophy className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {avgScore > 0 ? `${avgScore}%` : "—"}
+              </div>
+              <p className="text-xs text-muted-foreground">recent performance</p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Last Active</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {recentAttempts && recentAttempts.length > 0
-                ? new Date(recentAttempts[0].completed_at).toLocaleDateString()
-                : "—"}
-            </div>
-            <p className="text-xs text-muted-foreground">last quiz attempt</p>
-          </CardContent>
-        </Card>
-      </div>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Last Active</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {recentAttempts && recentAttempts.length > 0
+                  ? new Date(recentAttempts[0].completed_at).toLocaleDateString()
+                  : "—"}
+              </div>
+              <p className="text-xs text-muted-foreground">last quiz attempt</p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
+      </AnimatedDashboard>
 
       {/* Pending assignments */}
       {pendingAssignments.length > 0 && (
@@ -328,52 +340,58 @@ async function StudentDashboard({ userId }: { userId: string }) {
       )}
 
       {/* Quick actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <PlusCircle className="h-5 w-5 text-primary" />
-            <div>
-              <CardTitle className="text-base">Create Quiz</CardTitle>
-              <CardDescription>Generate a new AI-powered quiz</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <Link href="/quizzes/new">New Quiz</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2">
+              <PlusCircle className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-base">Create Quiz</CardTitle>
+                <CardDescription>Generate a new AI-powered quiz</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full">
+                <Link href="/quizzes/new">New Quiz</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <BookOpen className="h-5 w-5 text-primary" />
-            <div>
-              <CardTitle className="text-base">My Quizzes</CardTitle>
-              <CardDescription>View and retake your quizzes</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/quizzes">View Quizzes</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-base">My Quizzes</CardTitle>
+                <CardDescription>View and retake your quizzes</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/quizzes">View Quizzes</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-primary" />
-            <div>
-              <CardTitle className="text-base">Progress</CardTitle>
-              <CardDescription>Track your learning journey</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/progress">View Progress</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-base">Progress</CardTitle>
+                <CardDescription>Track your learning journey</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/progress">View Progress</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
+      </AnimatedDashboard>
     </div>
   );
 }
@@ -422,79 +440,87 @@ async function TutorDashboard({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <PlusCircle className="h-5 w-5 text-primary" />
-            <div>
-              <CardTitle className="text-base">New Quiz</CardTitle>
-              <CardDescription>Generate a new AI-powered quiz</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <Link href="/quizzes/new">Create Quiz</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2">
+              <PlusCircle className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-base">New Quiz</CardTitle>
+                <CardDescription>Generate a new AI-powered quiz</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full">
+                <Link href="/quizzes/new">Create Quiz</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-primary" />
-            <div>
-              <CardTitle className="text-base">Review</CardTitle>
-              <CardDescription>Review student submissions</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/review">Review Work</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-base">Review</CardTitle>
+                <CardDescription>Review student submissions</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/review">Review Work</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Students</CardTitle>
-            <GraduationCap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalStudents}</div>
-            <p className="text-xs text-muted-foreground">enrolled students</p>
-            <Button asChild variant="outline" className="mt-4 w-full">
-              <Link href="/students">View Students</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Students</CardTitle>
+              <GraduationCap className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalStudents}</div>
+              <p className="text-xs text-muted-foreground">enrolled students</p>
+              <Button asChild variant="outline" className="mt-4 w-full">
+                <Link href="/students">View Students</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Quizzes Created
-            </CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-2xl font-bold">
-              {(monthlyQuizCount ?? 0).toLocaleString()}{" "}
-              <span className="text-sm font-normal text-muted-foreground">
-                / {fmtLimit(quizLimit)}
-              </span>
-            </div>
-            <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className={`h-full rounded-full transition-all ${isQuizOver ? "bg-red-500" : isQuizWarning ? "bg-amber-500" : "bg-blue-500"}`}
-                style={{ width: `${Math.min(quizPercentage, 100)}%` }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {isFinite(quizLimit)
-                ? `${Math.max(0, quizLimit - (monthlyQuizCount ?? 0)).toLocaleString()} remaining this month`
-                : "Unlimited"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">
+                Quizzes Created
+              </CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="text-2xl font-bold">
+                {(monthlyQuizCount ?? 0).toLocaleString()}{" "}
+                <span className="text-sm font-normal text-muted-foreground">
+                  / {fmtLimit(quizLimit)}
+                </span>
+              </div>
+              <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full rounded-full transition-all ${isQuizOver ? "bg-red-500" : isQuizWarning ? "bg-amber-500" : "bg-blue-500"}`}
+                  style={{ width: `${Math.min(quizPercentage, 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {isFinite(quizLimit)
+                  ? `${Math.max(0, quizLimit - (monthlyQuizCount ?? 0)).toLocaleString()} remaining this month`
+                  : "Unlimited"}
+              </p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
+      </AnimatedDashboard>
     </div>
   );
 }
@@ -516,83 +542,95 @@ async function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{userCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground">registered users</p>
-          </CardContent>
-        </Card>
+      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{userCount ?? 0}</div>
+              <p className="text-xs text-muted-foreground">registered users</p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Quizzes</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{quizCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground">quizzes created</p>
-          </CardContent>
-        </Card>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Quizzes</CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{quizCount ?? 0}</div>
+              <p className="text-xs text-muted-foreground">quizzes created</p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Classes</CardTitle>
-            <GraduationCap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{classCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground">active classes</p>
-          </CardContent>
-        </Card>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Classes</CardTitle>
+              <GraduationCap className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{classCount ?? 0}</div>
+              <p className="text-xs text-muted-foreground">active classes</p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Attempts</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{attemptCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground">quiz attempts</p>
-          </CardContent>
-        </Card>
-      </div>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Attempts</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{attemptCount ?? 0}</div>
+              <p className="text-xs text-muted-foreground">quiz attempts</p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
+      </AnimatedDashboard>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            <div>
-              <CardTitle className="text-base">Analytics</CardTitle>
-              <CardDescription>Platform usage and metrics</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <Link href="/analytics">View Analytics</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-base">Analytics</CardTitle>
+                <CardDescription>Platform usage and metrics</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full">
+                <Link href="/analytics">View Analytics</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            <div>
-              <CardTitle className="text-base">Users</CardTitle>
-              <CardDescription>Manage platform users</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/users">Manage Users</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-base">Users</CardTitle>
+                <CardDescription>Manage platform users</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/users">Manage Users</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
+      </AnimatedDashboard>
     </div>
   );
 }

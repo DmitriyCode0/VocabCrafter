@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { History, ChevronDown, ChevronUp, Loader2, User } from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
-import { getPrimaryGrammarTopic } from "@/lib/utils";
+import { getGrammarTopicDisplayName, getPrimaryGrammarTopic } from "@/lib/utils";
 import {
   HISTORY_PAGE_SIZE,
   type HistoryAttempt,
@@ -127,7 +127,10 @@ const AttemptCard = React.memo(function AttemptCard({
     ? Math.round((Number(attempt.score) / Number(attempt.max_score)) * 100)
     : null;
   const isOwnAttempt = userId && attempt.student_id === userId;
-  const grammarTopic = getPrimaryGrammarTopic(quiz?.config);
+  const grammarTopicKey = getPrimaryGrammarTopic(quiz?.config);
+  const grammarTopic = grammarTopicKey
+    ? getGrammarTopicDisplayName(quiz?.config, grammarTopicKey)
+    : null;
 
   return (
     <Card>

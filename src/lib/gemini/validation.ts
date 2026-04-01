@@ -34,6 +34,7 @@ const translationQuestionSchema = z.object({
   sourceTerm: z.string(),
   highlightText: z.string().optional(),
   validatedGrammarTopic: z.string().optional(),
+  validatedGrammarTopicLabel: z.string().optional(),
   grammarValidationReason: z.string().optional(),
 });
 

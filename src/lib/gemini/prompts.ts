@@ -131,8 +131,14 @@ function getGrammarRulesSection(
   topics: string[] | undefined,
   difficulty: GrammarChallenge,
   topicDetails?: Record<string, string>,
+  topicLabels?: Record<string, string>,
 ): string {
-  return formatGrammarRulesSection(topics, difficulty, topicDetails);
+  return formatGrammarRulesSection(
+    topics,
+    difficulty,
+    topicDetails,
+    topicLabels,
+  );
 }
 
 // ─── Teacher Persona ─────────────────────────────────────────────
@@ -374,6 +380,7 @@ export function getTranslationPrompt(
     config.grammarTopics,
     config.grammarChallenge,
     config.grammarTopicDetails,
+    config.grammarTopicLabels,
   );
 
   const termList = terms
@@ -449,6 +456,7 @@ export function getTextTranslationPrompt(
     config.grammarTopics,
     config.grammarChallenge,
     config.grammarTopicDetails,
+    config.grammarTopicLabels,
   );
 
   return `You are an expert in creating language translation exercises for ${targetLanguageLabel} learners working from ${sourceLanguageLabel}.
@@ -597,11 +605,30 @@ export function getEvaluationPrompt(
     config.grammarTopics,
     config.grammarChallenge,
     config.grammarTopicDetails,
+    config.grammarTopicLabels,
   );
+
+  const evaluationInstruction =
+    config.grammarTopics && config.grammarTopics.length > 0
+      ? config.grammarTopics
+          .map((topicKey) => {
+            const topicLabel = config.grammarTopicLabels?.[topicKey] ?? topicKey;
+            const instruction =
+              config.grammarTopicEvaluationInstructions?.[topicKey]?.trim() ?? "";
+
+            if (!instruction) {
+              return null;
+            }
+
+            return `- ${topicLabel}: ${instruction}`;
+          })
+          .filter((value): value is string => Boolean(value))
+          .join("\n")
+      : "";
 
   const grammarCheckInstruction =
     config.grammarTopics && config.grammarTopics.length > 0
-      ? `CRITICAL GRAMMAR CHECK: The user MUST demonstrate usage of ${config.grammarTopics.map((t) => `"${t}"`).join(" AND ")}. If they used a different structure (even if grammatically correct in general English), deduct 25 points as per the 'Grammar/Topic Compliance' rule.`
+      ? `CRITICAL GRAMMAR CHECK: The user MUST demonstrate usage of ${config.grammarTopics.map((topicKey) => `"${config.grammarTopicLabels?.[topicKey] ?? topicKey}"`).join(" AND ")}. Judge grammar compliance by the required structure itself, not by matching the reference translation word-for-word. If they used a different structure (even if grammatically correct in general English), deduct 25 points as per the 'Grammar/Topic Compliance' rule.`
       : "";
 
   const validatedGrammarInstruction = grammarValidationReason
@@ -620,6 +647,7 @@ If the student's answer is random letters (e.g., "asdf", "kjlhg", "123123"), non
 ${targetTerm ? `**Target Vocabulary:** ${targetTerm}` : ""}
 ${validatedGrammarInstruction}
 ${grammarRules}
+${evaluationInstruction ? `**Topic-Specific Evaluation Instructions:**\n${evaluationInstruction}` : ""}
 
 **Input Data:**
 - Reference translation (ideal): "${referenceTranslation}"

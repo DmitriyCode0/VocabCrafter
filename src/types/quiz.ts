@@ -31,6 +31,8 @@ export interface QuizConfig {
   timedMode: boolean;
   grammarTopics?: string[];
   grammarTopicDetails?: Record<string, string>;
+  grammarTopicLabels?: Record<string, string>;
+  grammarTopicEvaluationInstructions?: Record<string, string>;
   customTopic?: string;
 }
 
@@ -74,6 +76,7 @@ export interface TranslationQuestion {
   sourceTerm: string;
   highlightText?: string;
   validatedGrammarTopic?: string;
+  validatedGrammarTopicLabel?: string;
   grammarValidationReason?: string;
 }
 

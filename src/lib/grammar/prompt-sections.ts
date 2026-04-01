@@ -16,6 +16,7 @@ export function formatGrammarRulesSection(
   topics: string[] | undefined,
   difficulty: GrammarChallenge,
   topicDetails?: Record<string, string>,
+  topicLabels?: Record<string, string>,
 ): string {
   if (!topics || topics.length === 0) return "";
 
@@ -24,10 +25,11 @@ export function formatGrammarRulesSection(
   const rules = topics.map((topicKey) => {
     const ruleDetails =
       topicDetails?.[topicKey] ?? getGrammarPromptDetails(topicKey);
-    if (!ruleDetails) return `- TOPIC: ${topicKey}`;
+    const topicLabel = topicLabels?.[topicKey] ?? topicKey;
+    if (!ruleDetails) return `- TOPIC: ${topicLabel}`;
 
     return `
-- TOPIC: ${topicKey}
+- TOPIC: ${topicLabel}
   * Rule Details: ${ruleDetails.replace(/\n/g, " ")}
   * Constraint: ${constraint}`;
   });

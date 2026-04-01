@@ -3,7 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { generateFromGemini } from "@/lib/gemini/client";
 import { getEvaluationPrompt } from "@/lib/gemini/prompts";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
-import { resolveGrammarTopicPromptDetails } from "@/lib/grammar/prompt-overrides";
+import {
+  resolveGrammarTopicEvaluationInstructions,
+  resolveGrammarTopicLabels,
+  resolveGrammarTopicPromptDetails,
+} from "@/lib/grammar/prompt-overrides";
 import { z } from "zod";
 import type { QuizConfig } from "@/types/quiz";
 
@@ -123,6 +127,11 @@ export async function POST(request: Request) {
     evalConfig.grammarTopicDetails = await resolveGrammarTopicPromptDetails(
       evalConfig.grammarTopics,
     );
+    evalConfig.grammarTopicLabels = await resolveGrammarTopicLabels(
+      evalConfig.grammarTopics,
+    );
+    evalConfig.grammarTopicEvaluationInstructions =
+      await resolveGrammarTopicEvaluationInstructions(evalConfig.grammarTopics);
 
     const prompt = getEvaluationPrompt(
       userTranslation,

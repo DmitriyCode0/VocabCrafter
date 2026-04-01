@@ -39,7 +39,9 @@ export default async function PlatformLayout({
       <Sidebar profile={profile as Profile} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header profile={profile as Profile} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="animate-page-enter">{children}</div>
+        </main>
       </div>
     </div>
   );

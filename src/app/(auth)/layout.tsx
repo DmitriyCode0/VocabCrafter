@@ -5,7 +5,7 @@ export default function AuthLayout({
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      {children}
+      <div className="animate-page-enter">{children}</div>
     </div>
   );
 }

@@ -5,25 +5,30 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { getTopicsForLevel } from "@/lib/grammar/topics";
-import type { LearningLanguage } from "@/lib/languages";
+
+interface GrammarTopicOption {
+  topicKey: string;
+  displayName: string;
+}
+
+interface GrammarTopicLevelGroup {
+  level: string;
+  topics: GrammarTopicOption[];
+}
 
 interface GrammarTopicSelectorProps {
-  cefrLevel: string;
-  targetLanguage?: LearningLanguage;
+  levels: GrammarTopicLevelGroup[];
   selectedTopics: string[];
   onTopicsChange: (topics: string[]) => void;
 }
 
 export function GrammarTopicSelector({
-  cefrLevel,
-  targetLanguage,
+  levels,
   selectedTopics,
   onTopicsChange,
 }: GrammarTopicSelectorProps) {
-  const levels = getTopicsForLevel(cefrLevel, targetLanguage);
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(
-    () => new Set([cefrLevel]),
+    () => new Set(levels[0] ? [levels[0].level] : []),
   );
 
   function toggleLevel(level: string) {
@@ -107,15 +112,15 @@ export function GrammarTopicSelector({
                 <div className="px-3 pb-3 grid gap-2 sm:grid-cols-2">
                   {topics.map((topic) => (
                     <label
-                      key={topic}
+                      key={topic.topicKey}
                       className="flex items-start gap-2 cursor-pointer rounded-md p-1.5 hover:bg-muted text-sm"
                     >
                       <Checkbox
-                        checked={selectedTopics.includes(topic)}
-                        onCheckedChange={() => toggleTopic(topic)}
+                        checked={selectedTopics.includes(topic.topicKey)}
+                        onCheckedChange={() => toggleTopic(topic.topicKey)}
                         className="mt-0.5"
                       />
-                      <span>{topic}</span>
+                      <span>{topic.displayName}</span>
                     </label>
                   ))}
                 </div>

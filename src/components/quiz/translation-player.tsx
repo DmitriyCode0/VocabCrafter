@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import {
+  getGrammarTopicDisplayName,
   getPrimaryGrammarTopic,
   removeSuggestedAnswerLines,
   stripMarkdownEmphasis,
@@ -70,7 +71,13 @@ export function TranslationPlayer({
     canPreviewQuestions && results.length === 0 && !evaluation && !isEvaluating;
   const progress =
     ((currentIndex + (evaluation ? 1 : 0)) / questions.length) * 100;
-  const displayedGrammarTopic = question.validatedGrammarTopic ?? grammarTopic;
+  const displayedGrammarTopic =
+    question.validatedGrammarTopicLabel ??
+    (question.validatedGrammarTopic
+      ? getGrammarTopicDisplayName(quizConfig, question.validatedGrammarTopic)
+      : grammarTopic
+        ? getGrammarTopicDisplayName(quizConfig, grammarTopic)
+        : null);
 
   /** Bold the target vocabulary word in the source sentence */
   function renderHighlightedSentence(

@@ -304,24 +304,42 @@ export interface Database {
       grammar_topic_prompt_overrides: {
         Row: {
           topic_key: string;
+          display_name: string | null;
+          learning_language: string | null;
+          cefr_level: string | null;
           rule_text: string | null;
           guidance_text: string | null;
+          evaluation_instructions: string | null;
+          is_custom: boolean;
+          is_archived: boolean;
           updated_by: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           topic_key: string;
+          display_name?: string | null;
+          learning_language?: string | null;
+          cefr_level?: string | null;
           rule_text?: string | null;
           guidance_text?: string | null;
+          evaluation_instructions?: string | null;
+          is_custom?: boolean;
+          is_archived?: boolean;
           updated_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           topic_key?: string;
+          display_name?: string | null;
+          learning_language?: string | null;
+          cefr_level?: string | null;
           rule_text?: string | null;
           guidance_text?: string | null;
+          evaluation_instructions?: string | null;
+          is_custom?: boolean;
+          is_archived?: boolean;
           updated_by?: string | null;
           created_at?: string;
           updated_at?: string;
