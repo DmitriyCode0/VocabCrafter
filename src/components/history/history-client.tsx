@@ -25,7 +25,10 @@ import {
 } from "@/components/ui/select";
 import { History, ChevronDown, ChevronUp, Loader2, User } from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
-import { getGrammarTopicDisplayName, getPrimaryGrammarTopic } from "@/lib/utils";
+import {
+  getGrammarTopicDisplayName,
+  getPrimaryGrammarTopic,
+} from "@/lib/utils";
 import {
   HISTORY_PAGE_SIZE,
   type HistoryAttempt,

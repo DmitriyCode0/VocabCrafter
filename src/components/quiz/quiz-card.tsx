@@ -22,7 +22,10 @@ import {
 import { Trash2, Loader2 } from "lucide-react";
 import type { Quiz } from "@/types/database";
 import { ACTIVITY_LABELS } from "@/lib/constants";
-import { getGrammarTopicDisplayName, getPrimaryGrammarTopic } from "@/lib/utils";
+import {
+  getGrammarTopicDisplayName,
+  getPrimaryGrammarTopic,
+} from "@/lib/utils";
 
 interface QuizCardProps {
   quiz: Quiz;

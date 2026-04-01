@@ -168,7 +168,9 @@ async function StudentDashboard({ userId }: { userId: string }) {
         <AnimatedCard>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Quizzes</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total Quizzes
+              </CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -201,7 +203,9 @@ async function StudentDashboard({ userId }: { userId: string }) {
               <div className="text-2xl font-bold">
                 {avgScore > 0 ? `${avgScore}%` : "—"}
               </div>
-              <p className="text-xs text-muted-foreground">recent performance</p>
+              <p className="text-xs text-muted-foreground">
+                recent performance
+              </p>
             </CardContent>
           </Card>
         </AnimatedCard>
@@ -215,7 +219,9 @@ async function StudentDashboard({ userId }: { userId: string }) {
             <CardContent>
               <div className="text-2xl font-bold">
                 {recentAttempts && recentAttempts.length > 0
-                  ? new Date(recentAttempts[0].completed_at).toLocaleDateString()
+                  ? new Date(
+                      recentAttempts[0].completed_at,
+                    ).toLocaleDateString()
                   : "—"}
               </div>
               <p className="text-xs text-muted-foreground">last quiz attempt</p>
@@ -347,7 +353,9 @@ async function StudentDashboard({ userId }: { userId: string }) {
               <PlusCircle className="h-5 w-5 text-primary" />
               <div>
                 <CardTitle className="text-base">Create Quiz</CardTitle>
-                <CardDescription>Generate a new AI-powered quiz</CardDescription>
+                <CardDescription>
+                  Generate a new AI-powered quiz
+                </CardDescription>
               </div>
             </CardHeader>
             <CardContent>
@@ -447,7 +455,9 @@ async function TutorDashboard({
               <PlusCircle className="h-5 w-5 text-primary" />
               <div>
                 <CardTitle className="text-base">New Quiz</CardTitle>
-                <CardDescription>Generate a new AI-powered quiz</CardDescription>
+                <CardDescription>
+                  Generate a new AI-powered quiz
+                </CardDescription>
               </div>
             </CardHeader>
             <CardContent>

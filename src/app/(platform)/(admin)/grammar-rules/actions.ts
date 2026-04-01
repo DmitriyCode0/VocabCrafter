@@ -288,8 +288,7 @@ export async function saveGrammarTopicPromptOverride(input: {
     .upsert(
       {
         topic_key: input.topicKey,
-        display_name:
-          displayName === defaults.displayName ? null : displayName,
+        display_name: displayName === defaults.displayName ? null : displayName,
         learning_language:
           input.learningLanguage === defaults.learningLanguage
             ? null
@@ -365,18 +364,16 @@ export async function deleteGrammarTopic(topicKey: string) {
     return;
   }
 
-  const { error } = await admin
-    .from("grammar_topic_prompt_overrides")
-    .upsert(
-      {
-        topic_key: topicKey,
-        is_custom: false,
-        is_archived: true,
-        updated_by: userId,
-        updated_at: now,
-      },
-      { onConflict: "topic_key" },
-    );
+  const { error } = await admin.from("grammar_topic_prompt_overrides").upsert(
+    {
+      topic_key: topicKey,
+      is_custom: false,
+      is_archived: true,
+      updated_by: userId,
+      updated_at: now,
+    },
+    { onConflict: "topic_key" },
+  );
 
   if (error) {
     throw toGrammarTopicActionError(error);

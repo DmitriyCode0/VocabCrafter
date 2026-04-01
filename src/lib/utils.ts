@@ -37,7 +37,8 @@ export function getGrammarTopicDisplayName(config: unknown, topicKey: string) {
     return topicKey;
   }
 
-  const labels = (config as { grammarTopicLabels?: unknown }).grammarTopicLabels;
+  const labels = (config as { grammarTopicLabels?: unknown })
+    .grammarTopicLabels;
 
   if (!labels || typeof labels !== "object") {
     return topicKey;

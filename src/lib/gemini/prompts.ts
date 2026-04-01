@@ -612,9 +612,11 @@ export function getEvaluationPrompt(
     config.grammarTopics && config.grammarTopics.length > 0
       ? config.grammarTopics
           .map((topicKey) => {
-            const topicLabel = config.grammarTopicLabels?.[topicKey] ?? topicKey;
+            const topicLabel =
+              config.grammarTopicLabels?.[topicKey] ?? topicKey;
             const instruction =
-              config.grammarTopicEvaluationInstructions?.[topicKey]?.trim() ?? "";
+              config.grammarTopicEvaluationInstructions?.[topicKey]?.trim() ??
+              "";
 
             if (!instruction) {
               return null;

@@ -50,7 +50,9 @@ function isMissingGrammarTopicColumnsError(error: unknown) {
   return (
     candidate.code === "42703" ||
     candidate.code === "PGRST204" ||
-    candidate.message?.includes("grammar_topic_prompt_overrides.display_name") ||
+    candidate.message?.includes(
+      "grammar_topic_prompt_overrides.display_name",
+    ) ||
     candidate.message?.includes("display_name") ||
     false
   );
@@ -59,7 +61,12 @@ function isMissingGrammarTopicColumnsError(error: unknown) {
 function normalizeLegacyOverrideRow(
   row: Pick<
     GrammarTopicPromptOverrideRow,
-    "topic_key" | "rule_text" | "guidance_text" | "updated_by" | "created_at" | "updated_at"
+    | "topic_key"
+    | "rule_text"
+    | "guidance_text"
+    | "updated_by"
+    | "created_at"
+    | "updated_at"
   >,
 ): GrammarTopicPromptOverrideRow {
   return {
@@ -103,12 +110,12 @@ function hasBuiltInOverride(
 
   return Boolean(
     override.display_name !== null ||
-      override.learning_language !== null ||
-      override.cefr_level !== null ||
-      override.rule_text !== null ||
-      override.guidance_text !== null ||
-      override.evaluation_instructions !== null ||
-      override.is_archived,
+    override.learning_language !== null ||
+    override.cefr_level !== null ||
+    override.rule_text !== null ||
+    override.guidance_text !== null ||
+    override.evaluation_instructions !== null ||
+    override.is_archived,
   );
 }
 
@@ -334,7 +341,9 @@ export async function getGrammarTopicPromptCatalog(
 
   const orderedLevels = [
     ...LEVEL_ORDER,
-    ...Array.from(grouped.keys()).filter((level) => !LEVEL_ORDER.includes(level)),
+    ...Array.from(grouped.keys()).filter(
+      (level) => !LEVEL_ORDER.includes(level),
+    ),
   ];
 
   return orderedLevels

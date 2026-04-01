@@ -118,7 +118,10 @@ export function GrammarRulesAdmin({
     );
   }, [activeLanguage, isCreatingTopic, selectedTopicKey, topicsState]);
 
-  function loadTopicDraft(topic: GrammarTopicPromptConfig | null, language: LanguageTab) {
+  function loadTopicDraft(
+    topic: GrammarTopicPromptConfig | null,
+    language: LanguageTab,
+  ) {
     if (!topic) {
       setDraftDisplayName("");
       setDraftLevel(topicsState[language][0]?.level ?? "A1");
@@ -138,7 +141,10 @@ export function GrammarRulesAdmin({
   const exactFinalPrompt = useMemo(() => {
     const previewTopicKey = selectedTopic?.topicKey ?? "__preview_topic__";
     const previewDisplayName = draftDisplayName.trim() || "New Topic";
-    const effectiveDetails = buildGrammarPromptDetails(draftRule, draftGuidance);
+    const effectiveDetails = buildGrammarPromptDetails(
+      draftRule,
+      draftGuidance,
+    );
 
     return formatGrammarRulesSection(
       [previewTopicKey],
@@ -150,7 +156,13 @@ export function GrammarRulesAdmin({
         [previewTopicKey]: previewDisplayName,
       },
     ).trim();
-  }, [draftDisplayName, draftGuidance, draftRule, previewDifficulty, selectedTopic]);
+  }, [
+    draftDisplayName,
+    draftGuidance,
+    draftRule,
+    previewDifficulty,
+    selectedTopic,
+  ]);
 
   function upsertTopicState(nextTopic: GrammarTopicPromptConfig) {
     setTopicsState((current) => {
@@ -325,7 +337,9 @@ export function GrammarRulesAdmin({
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <CardTitle className="text-base">
-              {isCreatingTopic ? "New Topic" : draftDisplayName || "Untitled Topic"}
+              {isCreatingTopic
+                ? "New Topic"
+                : draftDisplayName || "Untitled Topic"}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
               {isCreatingTopic
@@ -334,7 +348,9 @@ export function GrammarRulesAdmin({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {showTopic?.isCustom && <Badge variant="secondary">Custom topic</Badge>}
+            {showTopic?.isCustom && (
+              <Badge variant="secondary">Custom topic</Badge>
+            )}
             {showTopic?.hasOverride && !showTopic.isCustom && (
               <Badge variant="outline">Override active</Badge>
             )}
@@ -432,7 +448,9 @@ export function GrammarRulesAdmin({
         <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-sm font-medium">Exact final generation prompt</p>
+              <p className="text-sm font-medium">
+                Exact final generation prompt
+              </p>
               <p className="text-xs text-muted-foreground">
                 This is the grammar section injected into AI generation.
               </p>
@@ -466,7 +484,11 @@ export function GrammarRulesAdmin({
             {isCreatingTopic ? "Create Topic" : "Save Changes"}
           </Button>
           {isCreatingTopic ? (
-            <Button variant="outline" onClick={handleCancelCreate} disabled={isPending}>
+            <Button
+              variant="outline"
+              onClick={handleCancelCreate}
+              disabled={isPending}
+            >
               Cancel
             </Button>
           ) : (
@@ -479,7 +501,11 @@ export function GrammarRulesAdmin({
                 <RotateCcw className="mr-2 h-4 w-4" />
                 Reset To Default
               </Button>
-              <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isPending}
+              >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete Topic
               </Button>
@@ -533,7 +559,11 @@ export function GrammarRulesAdmin({
                 <CardHeader className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <CardTitle className="text-base">Topics</CardTitle>
-                    <Button size="sm" onClick={handleStartCreate} disabled={isPending}>
+                    <Button
+                      size="sm"
+                      onClick={handleStartCreate}
+                      disabled={isPending}
+                    >
                       <Plus className="mr-2 h-4 w-4" />
                       New Topic
                     </Button>
@@ -551,7 +581,8 @@ export function GrammarRulesAdmin({
                         type="button"
                         onClick={() => handleSelectTopic(topic.topicKey)}
                         className={`w-full rounded-lg border px-3 py-3 text-left transition-colors ${
-                          !isCreatingTopic && topic.topicKey === selectedTopicKey
+                          !isCreatingTopic &&
+                          topic.topicKey === selectedTopicKey
                             ? "border-primary bg-primary/5"
                             : "hover:border-primary/40"
                         }`}
@@ -586,10 +617,12 @@ export function GrammarRulesAdmin({
                   <CardTitle className="text-base">
                     {isCreatingTopic
                       ? "Create Topic"
-                      : selectedTopic?.displayName ?? "Topic Editor"}
+                      : (selectedTopic?.displayName ?? "Topic Editor")}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-5">{renderTopicEditor()}</CardContent>
+                <CardContent className="space-y-5">
+                  {renderTopicEditor()}
+                </CardContent>
               </Card>
             </div>
           </TabsContent>
