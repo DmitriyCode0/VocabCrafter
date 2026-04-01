@@ -72,7 +72,7 @@ export function GrammarTopicSelector({
         {levels.map(({ level, topics }) => {
           const isExpanded = expandedLevels.has(level);
           const selectedCount = topics.filter((t) =>
-            selectedTopics.includes(t),
+            selectedTopics.includes(t.topicKey),
           ).length;
 
           return (
