@@ -299,14 +299,10 @@ export function StudentsClient({
                         {student?.full_name || student?.email || "Unknown"}
                       </CardTitle>
                       {student?.cefr_level && (
-                        <Badge variant="secondary">
-                          {student.cefr_level}
-                        </Badge>
+                        <Badge variant="secondary">{student.cefr_level}</Badge>
                       )}
                     </div>
-                    <CardDescription>
-                      {student?.email}
-                    </CardDescription>
+                    <CardDescription>{student?.email}</CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-1 flex-col space-y-3">
                     <div className="text-xs text-muted-foreground">
@@ -326,8 +322,7 @@ export function StudentsClient({
                           const pct =
                             a.score != null && a.max_score != null
                               ? Math.round(
-                                  (Number(a.score) / Number(a.max_score)) *
-                                    100,
+                                  (Number(a.score) / Number(a.max_score)) * 100,
                                 )
                               : null;
 
@@ -363,7 +358,9 @@ export function StudentsClient({
                   </CardContent>
                   <CardFooter className="mt-auto justify-between border-t pt-4">
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/history?student=${conn.student_id as string}`}>
+                      <Link
+                        href={`/history?student=${conn.student_id as string}`}
+                      >
                         View History
                       </Link>
                     </Button>

@@ -130,9 +130,7 @@ export function TutorsClient({ connections }: TutorsClientProps) {
                   id="connect-code"
                   placeholder="e.g., A1B2C3D4"
                   value={connectCode}
-                  onChange={(e) =>
-                    setConnectCode(e.target.value.toUpperCase())
-                  }
+                  onChange={(e) => setConnectCode(e.target.value.toUpperCase())}
                   className="uppercase font-mono text-lg tracking-widest"
                 />
               </div>
@@ -177,15 +175,11 @@ export function TutorsClient({ connections }: TutorsClientProps) {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">
-                      {tutor?.full_name ||
-                        tutor?.email ||
-                        "Tutor"}
+                      {tutor?.full_name || tutor?.email || "Tutor"}
                     </CardTitle>
                     <Badge variant="default">Connected</Badge>
                   </div>
-                  <CardDescription>
-                    {tutor?.email}
-                  </CardDescription>
+                  <CardDescription>{tutor?.email}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">

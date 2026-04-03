@@ -179,7 +179,9 @@ export default async function UsersPage() {
                             {profile.cefr_level ?? "—"}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground text-sm">—</span>
+                          <span className="text-muted-foreground text-sm">
+                            —
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>{userQuizMap[profile.id] ?? 0}</TableCell>

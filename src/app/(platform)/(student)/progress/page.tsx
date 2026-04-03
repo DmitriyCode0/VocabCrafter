@@ -272,8 +272,7 @@ export default async function ProgressPage() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {ACTIVITY_LABELS[quizData?.type || ""] || quizData?.type}{" "}
-                    &middot;{" "}
-                    {formatAppDate(attempt.completed_at)}
+                    &middot; {formatAppDate(attempt.completed_at)}
                   </p>
                 </div>
                 {pct !== null && (

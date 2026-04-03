@@ -266,7 +266,10 @@ export function DashboardHowItWorksButton({ role }: { role: Role }) {
                 <motion.div
                   className="absolute inset-0 rounded-[inherit] ring-2 ring-emerald-100/75"
                   animate={{ opacity: [0.45, 1, 0.45] }}
-                  transition={{ duration: 1.8, repeat: Number.POSITIVE_INFINITY }}
+                  transition={{
+                    duration: 1.8,
+                    repeat: Number.POSITIVE_INFINITY,
+                  }}
                 />
               </motion.div>
             )}
@@ -323,7 +326,11 @@ export function DashboardHowItWorksButton({ role }: { role: Role }) {
 
               <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-between">
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  <Button variant="outline" onClick={closeTour} className="w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    onClick={closeTour}
+                    className="w-full sm:w-auto"
+                  >
                     Close
                   </Button>
                   {stepIndex > 0 && (
