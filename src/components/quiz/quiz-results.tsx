@@ -170,73 +170,75 @@ export function QuizResults({
           </CardHeader>
           <CardContent className="space-y-4">
             {translationResults.map((result, index) => {
-              const visibleFeedback = removeSuggestedAnswerLines(result.feedback)
+              const visibleFeedback = removeSuggestedAnswerLines(
+                result.feedback,
+              )
                 .split("\n")
                 .map((line) => line.trim())
                 .filter(Boolean);
 
               return (
                 <div key={index} className="p-3 rounded-md bg-muted space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Sentence {index + 1}</p>
-                  <Badge
-                    variant="outline"
-                    className={
-                      result.score >= 80
-                        ? "text-green-600"
-                        : result.score >= 50
-                          ? "text-orange-600"
-                          : "text-red-600"
-                    }
-                  >
-                    {result.score}/100
-                  </Badge>
-                </div>
-                <p className="text-sm">
-                  {stripMarkdownEmphasis(result.ukrainianSentence)}
-                </p>
-                <p className="text-sm">
-                  Your translation: <em>{result.userTranslation}</em>
-                </p>
-                <div className="space-y-2 rounded-md bg-background/70 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm text-muted-foreground">
-                      Reference ({targetLanguageLabel}):{" "}
-                      <em>{result.referenceTranslation}</em>
-                    </p>
-                    <BrowserTtsButton
-                      text={result.referenceTranslation}
-                      language={quizConfig?.targetLanguage}
-                      label="Listen"
-                      className="shrink-0"
-                    />
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Sentence {index + 1}</p>
+                    <Badge
+                      variant="outline"
+                      className={
+                        result.score >= 80
+                          ? "text-green-600"
+                          : result.score >= 50
+                            ? "text-orange-600"
+                            : "text-red-600"
+                      }
+                    >
+                      {result.score}/100
+                    </Badge>
                   </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Source sentence ({sourceLanguageLabel})
-                </p>
-                {visibleFeedback.length > 0 && (
-                  <div className="text-xs text-muted-foreground space-y-0.5">
-                    {visibleFeedback.map((line, i) => {
-                      const isPass = line.startsWith("✓");
-                      const isFail = line.startsWith("✗");
-                      return (
-                        <p
-                          key={i}
-                          className={
-                            isFail
-                              ? "text-red-500"
-                              : isPass
-                                ? "text-green-600 dark:text-green-400"
-                                : ""
-                          }
-                        >
-                          {line}
-                        </p>
-                      );
-                    })}
+                  <p className="text-sm">
+                    {stripMarkdownEmphasis(result.ukrainianSentence)}
+                  </p>
+                  <p className="text-sm">
+                    Your translation: <em>{result.userTranslation}</em>
+                  </p>
+                  <div className="space-y-2 rounded-md bg-background/70 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm text-muted-foreground">
+                        Reference ({targetLanguageLabel}):{" "}
+                        <em>{result.referenceTranslation}</em>
+                      </p>
+                      <BrowserTtsButton
+                        text={result.referenceTranslation}
+                        language={quizConfig?.targetLanguage}
+                        label="Listen"
+                        className="shrink-0"
+                      />
+                    </div>
                   </div>
-                )}
+                  <p className="text-xs text-muted-foreground">
+                    Source sentence ({sourceLanguageLabel})
+                  </p>
+                  {visibleFeedback.length > 0 && (
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      {visibleFeedback.map((line, i) => {
+                        const isPass = line.startsWith("✓");
+                        const isFail = line.startsWith("✗");
+                        return (
+                          <p
+                            key={i}
+                            className={
+                              isFail
+                                ? "text-red-500"
+                                : isPass
+                                  ? "text-green-600 dark:text-green-400"
+                                  : ""
+                            }
+                          >
+                            {line}
+                          </p>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}

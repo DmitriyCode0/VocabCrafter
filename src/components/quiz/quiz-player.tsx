@@ -228,7 +228,9 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
         <div className="space-y-6">
           <Card>
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl">Live Discussion Complete!</CardTitle>
+              <CardTitle className="text-2xl">
+                Live Discussion Complete!
+              </CardTitle>
               <CardDescription>
                 You reviewed {discussionPromptCount} discussion prompt
                 {discussionPromptCount === 1 ? "" : "s"}.

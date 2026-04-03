@@ -6,10 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader2, Sparkles } from "lucide-react";
 import type { QuizTerm } from "@/types/quiz";
-import {
-  type LearningLanguage,
-  type SourceLanguage,
-} from "@/lib/languages";
+import { type LearningLanguage, type SourceLanguage } from "@/lib/languages";
 
 interface WordInputProps {
   onParsed: (terms: QuizTerm[]) => void;

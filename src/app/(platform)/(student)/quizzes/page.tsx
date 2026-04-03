@@ -58,12 +58,19 @@ export default async function QuizzesPage({
             View and manage your vocabulary quizzes.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/quizzes/new">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            New Quiz
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link href="/quizzes/review">
+              Review Activity
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/quizzes/new">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              New Quiz
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {!quizzes || quizzes.length === 0 ? (

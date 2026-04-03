@@ -399,6 +399,23 @@ async function StudentDashboard({ userId }: { userId: string }) {
             </CardContent>
           </Card>
         </AnimatedCard>
+
+        <AnimatedCard>
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-base">Review Activity</CardTitle>
+                <CardDescription>Practice your least known words</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/quizzes/review">Start Review</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
       </AnimatedDashboard>
     </div>
   );
