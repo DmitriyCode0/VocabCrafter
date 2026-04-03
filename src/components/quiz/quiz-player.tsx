@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import { FlashcardPlayer, type FlashcardResult } from "./flashcard-player";
 import { GapFillPlayer, type GapFillResult } from "./gap-fill-player";
+import { DiscussionPlayer } from "./discussion-player";
 import {
   TranslationPlayer,
   type TranslationResult,
@@ -26,6 +27,7 @@ import { RotateCcw, Home } from "lucide-react";
 import { saveAttempt } from "@/lib/save-attempt";
 import type { Quiz } from "@/types/database";
 import type {
+  DiscussionPrompt,
   FlashcardItem,
   GapFillQuestion,
   TextTranslationContent,
@@ -46,6 +48,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
   const [textTranslationResults, setTextTranslationResults] = useState<
     TextTranslationResult[]
   >([]);
+  const [discussionPromptCount, setDiscussionPromptCount] = useState(0);
   const [flashcardKnown, setFlashcardKnown] = useState(0);
   const [flashcardTotal, setFlashcardTotal] = useState(0);
 
@@ -60,6 +63,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
     setGapFillResults([]);
     setTranslationResults([]);
     setTextTranslationResults([]);
+    setDiscussionPromptCount(0);
     setFlashcardKnown(0);
     setFlashcardTotal(0);
   }
@@ -212,6 +216,59 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
         quizConfig={quizConfig ?? undefined}
         onComplete={(result) => {
           setTextTranslationResults([result]);
+          setShowResults(true);
+        }}
+      />
+    );
+  }
+
+  if (quiz.type === "discussion") {
+    if (showResults) {
+      return (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl">Live Discussion Complete!</CardTitle>
+              <CardDescription>
+                You reviewed {discussionPromptCount} discussion prompt
+                {discussionPromptCount === 1 ? "" : "s"}.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" onClick={handleRestart}>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Reopen Prompts
+                </Button>
+                <Button asChild className="flex-1">
+                  <Link href="/quizzes">
+                    <Home className="mr-2 h-4 w-4" />
+                    My Quizzes
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    const prompts = (content.prompts || []) as DiscussionPrompt[];
+    return (
+      <DiscussionPlayer
+        prompts={prompts}
+        quizConfig={quizConfig ?? undefined}
+        onComplete={(usedPrompts) => {
+          saveAttempt(
+            quiz.id,
+            {
+              type: "discussion",
+              prompts: usedPrompts,
+            },
+            null,
+            null,
+          );
+          setDiscussionPromptCount(usedPrompts.length);
           setShowResults(true);
         }}
       />

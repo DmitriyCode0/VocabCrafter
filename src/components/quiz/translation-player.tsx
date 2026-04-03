@@ -67,6 +67,7 @@ export function TranslationPlayer({
   const visibleFeedback = evaluation
     ? removeSuggestedAnswerLines(evaluation.feedback)
     : "";
+  const hasVisibleFeedback = visibleFeedback.trim().length > 0;
   const canUsePreviewArrows =
     canPreviewQuestions && results.length === 0 && !evaluation && !isEvaluating;
   const progress =
@@ -158,6 +159,24 @@ export function TranslationPlayer({
     } finally {
       setIsEvaluating(false);
     }
+  }
+
+  function handleShowTranslation() {
+    if (evaluation) {
+      return;
+    }
+
+    const result: TranslationResult = {
+      questionId: question.id,
+      ukrainianSentence: stripMarkdownEmphasis(question.ukrainianSentence),
+      userTranslation: userTranslation.trim(),
+      referenceTranslation: question.englishReference,
+      score: 0,
+      feedback: "",
+    };
+
+    setEvaluation({ score: 0, feedback: "" });
+    setResults([...results, result]);
   }
 
   function handleNext() {
@@ -296,20 +315,31 @@ export function TranslationPlayer({
           />
 
           {!evaluation && (
-            <Button
-              onClick={handleSubmit}
-              disabled={!userTranslation.trim() || isEvaluating}
-              className="w-full"
-            >
-              {isEvaluating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Evaluating...
-                </>
-              ) : (
-                "Submit Translation"
-              )}
-            </Button>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button
+                onClick={handleSubmit}
+                disabled={!userTranslation.trim() || isEvaluating}
+                className="w-full"
+              >
+                {isEvaluating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Evaluating...
+                  </>
+                ) : (
+                  "Submit Translation"
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={isEvaluating}
+                onClick={handleShowTranslation}
+              >
+                Show Translation (0/100)
+              </Button>
+            </div>
           )}
 
           {evaluation && evaluation.score === -1 && (
@@ -338,31 +368,33 @@ export function TranslationPlayer({
                 </span>
               </div>
 
-              <div className="p-3 rounded-md bg-muted space-y-1">
-                <p className="text-sm font-medium">Feedback:</p>
-                <div className="text-sm space-y-0.5">
-                  {visibleFeedback.split("\n").map((line, i) => {
-                    const trimmed = line.trim();
-                    if (!trimmed) return null;
-                    const isPass = trimmed.startsWith("✓");
-                    const isFail = trimmed.startsWith("✗");
-                    return (
-                      <p
-                        key={i}
-                        className={
-                          isFail
-                            ? "text-red-500"
-                            : isPass
-                              ? "text-green-600 dark:text-green-400"
-                              : ""
-                        }
-                      >
-                        {trimmed}
-                      </p>
-                    );
-                  })}
+              {hasVisibleFeedback && (
+                <div className="p-3 rounded-md bg-muted space-y-1">
+                  <p className="text-sm font-medium">Feedback:</p>
+                  <div className="text-sm space-y-0.5">
+                    {visibleFeedback.split("\n").map((line, i) => {
+                      const trimmed = line.trim();
+                      if (!trimmed) return null;
+                      const isPass = trimmed.startsWith("✓");
+                      const isFail = trimmed.startsWith("✗");
+                      return (
+                        <p
+                          key={i}
+                          className={
+                            isFail
+                              ? "text-red-500"
+                              : isPass
+                                ? "text-green-600 dark:text-green-400"
+                                : ""
+                          }
+                        >
+                          {trimmed}
+                        </p>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="p-3 rounded-md bg-muted space-y-2">
                 <div className="flex items-start justify-between gap-3">

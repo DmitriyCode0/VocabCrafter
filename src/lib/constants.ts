@@ -6,5 +6,5 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   matching: "Matching",
   text_translation: "Text Translation",
   translation_list: "Translation List",
-  discussion: "Discussion",
+  discussion: "Live Discussion",
 };

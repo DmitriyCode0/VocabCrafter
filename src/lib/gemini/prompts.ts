@@ -560,13 +560,18 @@ export function getDiscussionPrompt(
   );
   const topicInstruction = getTopicInstruction(config.customTopic);
 
-  return `You are an expert in creating engaging educational materials for ${targetLanguageLabel} language learners.
-Your task is to generate a list of prompts based on a list of ${targetLanguageLabel} words and their ${sourceLanguageLabel} meanings. The ${sourceLanguageLabel} meaning is for context only. All output must be in ${targetLanguageLabel.toUpperCase()}.
-The complexity and subject matter of the prompts should be appropriate for a Student at CEFR ${config.cefrLevel} proficiency.
+  return `You are an expert in creating live speaking materials for ${targetLanguageLabel} language learners.
+Your task is to generate CEFR-level topic sentences for live discussion based on a list of ${targetLanguageLabel} words and their ${sourceLanguageLabel} meanings. The ${sourceLanguageLabel} meaning is for context only. All output must be in ${targetLanguageLabel.toUpperCase()}.
+The complexity and subject matter must be appropriate for a Student at CEFR ${config.cefrLevel} proficiency.
 ${difficultyInstruction}
 ${topicInstruction}
 
-Based on the list of words provided, generate thought-provoking prompts. Mix open-ended discussion questions with agree/disagree statements.
+CRITICAL REQUIREMENTS:
+- Generate exactly one discussion sentence per input term.
+- Each sentence must naturally include the corresponding target vocabulary item.
+- Keep each sentence concise and conversation-ready (one line).
+- Mix open-ended prompts and agree/disagree statements.
+- Keep topics practical and suitable for live speaking.
 
 Vocabulary terms:
 ${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}

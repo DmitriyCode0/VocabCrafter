@@ -169,8 +169,14 @@ export function QuizResults({
             <CardDescription>Average score: {avgScore}/100</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {translationResults.map((result, index) => (
-              <div key={index} className="p-3 rounded-md bg-muted space-y-2">
+            {translationResults.map((result, index) => {
+              const visibleFeedback = removeSuggestedAnswerLines(result.feedback)
+                .split("\n")
+                .map((line) => line.trim())
+                .filter(Boolean);
+
+              return (
+                <div key={index} className="p-3 rounded-md bg-muted space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium">Sentence {index + 1}</p>
                   <Badge
@@ -209,14 +215,11 @@ export function QuizResults({
                 <p className="text-xs text-muted-foreground">
                   Source sentence ({sourceLanguageLabel})
                 </p>
-                <div className="text-xs text-muted-foreground space-y-0.5">
-                  {removeSuggestedAnswerLines(result.feedback)
-                    .split("\n")
-                    .map((line, i) => {
-                      const trimmed = line.trim();
-                      if (!trimmed) return null;
-                      const isPass = trimmed.startsWith("✓");
-                      const isFail = trimmed.startsWith("✗");
+                {visibleFeedback.length > 0 && (
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    {visibleFeedback.map((line, i) => {
+                      const isPass = line.startsWith("✓");
+                      const isFail = line.startsWith("✗");
                       return (
                         <p
                           key={i}
@@ -228,13 +231,15 @@ export function QuizResults({
                                 : ""
                           }
                         >
-                          {trimmed}
+                          {line}
                         </p>
                       );
                     })}
+                  </div>
+                )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             <div className="flex gap-2 pt-4">
               <Button variant="outline" onClick={onRestart}>

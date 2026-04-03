@@ -7,8 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Sparkles } from "lucide-react";
 import type { QuizTerm } from "@/types/quiz";
 import {
-  getLearningLanguageLabel,
-  getSourceLanguageLabel,
   type LearningLanguage,
   type SourceLanguage,
 } from "@/lib/languages";
@@ -30,8 +28,6 @@ export function WordInput({
 }: WordInputProps) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const targetLanguageLabel = getLearningLanguageLabel(targetLanguage);
-  const sourceLanguageLabel = getSourceLanguageLabel(sourceLanguage);
 
   async function handleParse() {
     if (!text.trim()) return;
@@ -70,18 +66,12 @@ export function WordInput({
         <Label htmlFor="word-input">Paste your vocabulary</Label>
         <Textarea
           id="word-input"
-          placeholder={`Paste words, sentences, or text here...\n\nExamples:\n- Raw text in ${sourceLanguageLabel}: sample text or short phrases\n- Word list: comma-separated vocabulary\n- Tab-separated: target word + ${sourceLanguageLabel.toLowerCase()} meaning`}
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={8}
           disabled={isLoading}
           className="font-mono text-sm"
         />
-        <p className="text-xs text-muted-foreground">
-          Paste raw text, word lists, or tab-separated vocabulary. AI will
-          extract useful {targetLanguageLabel} words and create{" "}
-          {sourceLanguageLabel.toLowerCase()} meanings.
-        </p>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}

@@ -91,6 +91,12 @@ export function extractWordResults(
   vocabularyTerms: { term: string; definition: string }[],
   generatedContent: Record<string, unknown>,
 ): WordResult[] {
+  // Live discussion is conversational practice only and should not affect
+  // per-word mastery metrics.
+  if (quizType === "discussion") {
+    return [];
+  }
+
   const termMap = new Map(
     vocabularyTerms.map((t) => [t.term.toLowerCase(), t.definition]),
   );

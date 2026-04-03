@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 interface AnimatedDashboardProps {
   children: ReactNode;
@@ -40,7 +41,7 @@ export function AnimatedCard({ children, className }: AnimatedCardProps) {
         visible: { opacity: 1, y: 0, scale: 1 },
       }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className={className}
+      className={cn("h-full [&>*]:h-full", className)}
     >
       {children}
     </motion.div>

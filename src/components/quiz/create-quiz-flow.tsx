@@ -51,6 +51,7 @@ import {
   PenLine,
   Languages,
   FileText,
+  MessageSquare,
   Save,
   GraduationCap,
 } from "lucide-react";
@@ -74,7 +75,8 @@ type ActivityType =
   | "flashcards"
   | "gap_fill"
   | "translation"
-  | "text_translation";
+  | "text_translation"
+  | "discussion";
 
 interface GrammarTopicOption {
   topicKey: string;
@@ -117,6 +119,11 @@ const ACTIVITIES: {
     type: "text_translation",
     label: "Text Translation",
     icon: <FileText className="h-8 w-8" />,
+  },
+  {
+    type: "discussion",
+    label: "Live Discussion",
+    icon: <MessageSquare className="h-8 w-8" />,
   },
 ];
 
@@ -242,6 +249,10 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
 
     if (type === "gap_fill") {
       return `Complete ${targetLanguageLabel.toLowerCase()} sentences with the correct vocabulary word.`;
+    }
+
+    if (type === "discussion") {
+      return `Generate CEFR-level topic sentences that naturally use your ${targetLanguageLabel.toLowerCase()} vocabulary for live speaking practice.`;
     }
 
     return `Flip cards to memorize ${targetLanguageLabel.toLowerCase()} terms and ${sourceLanguageLabel.toLowerCase()} meanings.`;
@@ -413,10 +424,6 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
         <Card>
           <CardHeader>
             <CardTitle>Add Vocabulary</CardTitle>
-            <CardDescription>
-              Parse new words with AI, load from a saved word bank, or reuse
-              vocabulary from a previous quiz.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="parse">

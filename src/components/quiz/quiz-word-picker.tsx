@@ -30,7 +30,7 @@ const TYPE_LABELS: Record<string, string> = {
   translation: "Translation",
   mcq: "Multiple Choice",
   matching: "Matching",
-  discussion: "Discussion",
+  discussion: "Live Discussion",
   text_translation: "Text Translation",
   translation_list: "Translation List",
 };
