@@ -46,14 +46,12 @@ export function LoginForm() {
   };
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center">
+    <Card className="w-full">
+      <CardHeader className="text-center lg:px-8 lg:pt-8">
         <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
-        <CardDescription>
-          Sign in to your VocabCrafter 2.0 account
-        </CardDescription>
+        <CardDescription>Sign in to your account</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="lg:px-8">
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -104,7 +102,7 @@ export function LoginForm() {
 
         <OAuthButtons />
       </CardContent>
-      <CardFooter className="justify-center">
+      <CardFooter className="justify-center lg:px-8 lg:pb-8">
         <p className="text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link
