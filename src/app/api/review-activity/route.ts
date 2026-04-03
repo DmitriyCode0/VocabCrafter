@@ -44,13 +44,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch least known words (mastery_level 0-1) - limit to 5
+    // Fetch least known words (mastery_level 0-4) - limit to 5
     const supabaseAdmin = createAdminClient();
     const { data: leastKnownWords, error: wordError } = await supabaseAdmin
       .from("word_mastery")
       .select("term, definition, mastery_level")
       .eq("student_id", user.id)
-      .in("mastery_level", [0, 1])
+      .lte("mastery_level", 4)
       .order("mastery_level", { ascending: true })
       .order("last_practiced", { ascending: true, nullsFirst: true })
       .limit(5);
