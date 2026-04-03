@@ -68,7 +68,8 @@ export async function POST(request: Request) {
       // Could return a message or generate from scratch - for now we'll error
       return NextResponse.json(
         {
-          error: "No words to review. Practice more quizzes to build your vocabulary.",
+          error:
+            "No words to review. Practice more quizzes to build your vocabulary.",
           code: "NO_WORDS_TO_REVIEW",
         },
         { status: 404 },
@@ -113,7 +114,10 @@ export async function POST(request: Request) {
         title: `Review Activity - ${new Date().toLocaleDateString()}`,
         type: "gap_fill",
         cefr_level: cefrLevel,
-        vocabulary_terms: vocabularyTerms as unknown as Record<string, unknown>[],
+        vocabulary_terms: vocabularyTerms as unknown as Record<
+          string,
+          unknown
+        >[],
         generated_content: generatedContent,
         config: config,
         is_public: false,

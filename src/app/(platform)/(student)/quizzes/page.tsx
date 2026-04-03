@@ -60,9 +60,7 @@ export default async function QuizzesPage({
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link href="/quizzes/review">
-              Review Activity
-            </Link>
+            <Link href="/quizzes/review">Review Activity</Link>
           </Button>
           <Button asChild>
             <Link href="/quizzes/new">

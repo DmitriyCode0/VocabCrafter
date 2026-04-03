@@ -406,7 +406,9 @@ async function StudentDashboard({ userId }: { userId: string }) {
               <Target className="h-5 w-5 text-primary" />
               <div>
                 <CardTitle className="text-base">Review Activity</CardTitle>
-                <CardDescription>Practice your least known words</CardDescription>
+                <CardDescription>
+                  Practice your least known words
+                </CardDescription>
               </div>
             </CardHeader>
             <CardContent>
