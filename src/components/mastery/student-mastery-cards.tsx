@@ -1,0 +1,255 @@
+"use client";
+
+import { useState } from "react";
+import { ChevronDown, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { EditMasteryWordDialog } from "@/components/mastery/edit-mastery-word-dialog";
+import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
+
+const LEVEL_LABELS = [
+  "New",
+  "Seen",
+  "Learning",
+  "Familiar",
+  "Practiced",
+  "Mastered",
+] as const;
+
+const LEVEL_COLORS = [
+  "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
+  "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+  "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+  "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+] as const;
+
+interface StudentMasterySummary {
+  studentId: string;
+  name: string;
+  totalWords: number;
+  mastered: number;
+  avgLevel: number;
+  levelCounts: number[];
+}
+
+interface StudentWord {
+  id: string;
+  term: string;
+  definition: string | null;
+  mastery_level: number;
+  correct_count: number;
+  incorrect_count: number;
+  translation_correct_count: number;
+  streak: number;
+  last_practiced: string | null;
+}
+
+export function StudentMasteryCards({
+  students,
+}: {
+  students: StudentMasterySummary[];
+}) {
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(
+    null,
+  );
+  const [wordsByStudent, setWordsByStudent] = useState<
+    Record<string, StudentWord[]>
+  >({});
+  const [loadingByStudent, setLoadingByStudent] = useState<
+    Record<string, boolean>
+  >({});
+  const [errorByStudent, setErrorByStudent] = useState<Record<string, string>>(
+    {},
+  );
+
+  async function loadWords(studentId: string) {
+    setLoadingByStudent((current) => ({ ...current, [studentId]: true }));
+    setErrorByStudent((current) => {
+      const next = { ...current };
+      delete next[studentId];
+      return next;
+    });
+
+    try {
+      const response = await fetch(`/api/mastery/students/${studentId}/words`, {
+        cache: "no-store",
+      });
+      const data = (await response.json().catch(() => null)) as
+        | { words?: StudentWord[]; error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to load words");
+      }
+
+      setWordsByStudent((current) => ({
+        ...current,
+        [studentId]: data?.words ?? [],
+      }));
+    } catch (error) {
+      setErrorByStudent((current) => ({
+        ...current,
+        [studentId]:
+          error instanceof Error ? error.message : "Failed to load words",
+      }));
+    } finally {
+      setLoadingByStudent((current) => ({ ...current, [studentId]: false }));
+    }
+  }
+
+  async function handleToggle(studentId: string, totalWords: number) {
+    if (expandedStudentId === studentId) {
+      setExpandedStudentId(null);
+      return;
+    }
+
+    setExpandedStudentId(studentId);
+
+    if (totalWords === 0 || wordsByStudent[studentId] || loadingByStudent[studentId]) {
+      return;
+    }
+
+    await loadWords(studentId);
+  }
+
+  if (students.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+        No students found on this page.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {students.map((student) => {
+        const isExpanded = expandedStudentId === student.studentId;
+        const isLoading = loadingByStudent[student.studentId] === true;
+        const words = wordsByStudent[student.studentId] ?? [];
+        const error = errorByStudent[student.studentId];
+
+        return (
+          <div
+            key={student.studentId}
+            className="rounded-lg border bg-card px-4 py-4"
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold">{student.name}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {student.totalWords} words · avg level {student.avgLevel} ·{" "}
+                  {student.mastered} mastered
+                </p>
+              </div>
+
+              {student.totalWords > 0 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void handleToggle(student.studentId, student.totalWords)}
+                  aria-expanded={isExpanded}
+                >
+                  {isExpanded ? "Hide words" : "Show words"}
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                  />
+                </Button>
+              ) : (
+                <span className="text-sm text-muted-foreground">No words yet</span>
+              )}
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex flex-wrap gap-1.5">
+                {LEVEL_LABELS.map((label, index) => {
+                  const count = student.levelCounts[index] ?? 0;
+                  if (count === 0) {
+                    return null;
+                  }
+
+                  return (
+                    <Badge
+                      key={`${student.studentId}-${index}`}
+                      variant="outline"
+                      className={`${LEVEL_COLORS[index]} border-0 text-xs`}
+                    >
+                      {label}: {count}
+                    </Badge>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-3 xl:min-w-64">
+                <span className="shrink-0 text-sm text-muted-foreground">
+                  {student.mastered}/{student.totalWords}
+                </span>
+                <Progress
+                  value={
+                    student.totalWords > 0
+                      ? (student.mastered / student.totalWords) * 100
+                      : 0
+                  }
+                  className="h-2 w-full"
+                />
+              </div>
+            </div>
+
+            {isExpanded && (
+              <div className="mt-4 border-t pt-4">
+                {isLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading words...
+                  </div>
+                ) : error ? (
+                  <div className="flex items-center gap-3 text-sm text-destructive">
+                    <span>{error}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void loadWords(student.studentId)}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                ) : words.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No words found.</p>
+                ) : (
+                  <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {words.map((word) => (
+                      <div
+                        key={word.id}
+                        className="flex items-center justify-between gap-2 rounded border px-2.5 py-1.5 text-sm"
+                      >
+                        <span className="mr-2 truncate">{word.term}</span>
+                        <div className="flex items-center gap-1">
+                          <Badge
+                            variant="outline"
+                            className={`${LEVEL_COLORS[word.mastery_level]} border-0 text-xs shrink-0`}
+                          >
+                            {word.mastery_level}
+                          </Badge>
+                          <EditMasteryWordDialog word={word} />
+                          <DeleteMasteryWordButton
+                            wordId={word.id}
+                            term={word.term}
+                            title="Delete word for student"
+                            description={`${word.term} will be removed from this student's Vocab Mastery list.`}
+                            successMessage={`Deleted ${word.term} from the student's Vocab Mastery list`}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}

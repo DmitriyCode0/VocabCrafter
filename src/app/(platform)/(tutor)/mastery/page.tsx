@@ -8,55 +8,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { PagePagination } from "@/components/shared/page-pagination";
-import { EditMasteryWordDialog } from "@/components/mastery/edit-mastery-word-dialog";
-import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
+import { StudentMasteryCards } from "@/components/mastery/student-mastery-cards";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
-import { BookOpen, Users } from "lucide-react";
+import { Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 const MASTERY_PAGE_SIZE = 10;
 
-const LEVEL_LABELS = [
-  "New",
-  "Seen",
-  "Learning",
-  "Familiar",
-  "Practiced",
-  "Mastered",
-] as const;
-
-const LEVEL_COLORS = [
-  "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-  "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-  "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-  "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-  "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-] as const;
-
-interface MasteryRow {
-  id: string;
+interface MasteryLevelRow {
   student_id: string;
-  term: string;
-  definition: string | null;
   mastery_level: number;
-  correct_count: number;
-  incorrect_count: number;
-  translation_correct_count: number;
-  streak: number;
-  last_practiced: string | null;
 }
 
 interface StudentProfile {
@@ -157,18 +120,16 @@ export default async function TutorMasteryPage({
     ((profiles ?? []) as StudentProfile[]).map((p) => [p.id, p]),
   );
 
-  // Load mastery rows once, then derive both class-wide and per-student summaries.
+  // Load only per-student mastery levels for the page summary.
   const { data: allMasteryRows } = await supabaseAdmin
     .from("word_mastery")
-    .select(
-      "id, student_id, term, definition, mastery_level, correct_count, incorrect_count, translation_correct_count, streak, last_practiced",
-    )
+    .select("student_id, mastery_level")
     .in("student_id", studentIds);
 
-  const visibleMastery = (allMasteryRows ?? []) as MasteryRow[];
+  const visibleMastery = (allMasteryRows ?? []) as MasteryLevelRow[];
 
-  // Group by student
-  const studentMastery = new Map<string, MasteryRow[]>();
+  // Group by student for lightweight summary statistics.
+  const studentMastery = new Map<string, number[]>();
   for (const row of visibleMastery) {
     const studentId = row.student_id;
     if (!studentId) {
@@ -178,26 +139,24 @@ export default async function TutorMasteryPage({
     if (!studentMastery.has(studentId)) {
       studentMastery.set(studentId, []);
     }
-    studentMastery.get(studentId)!.push(row);
+    studentMastery.get(studentId)!.push(row.mastery_level);
   }
 
   const summarizeStudent = (sid: string) => {
     const profile = profileMap.get(sid);
-    const words = studentMastery.get(sid) ?? [];
-    const total = words.length;
-    const mastered = words.filter((w) => w.mastery_level >= 5).length;
+    const levels = studentMastery.get(sid) ?? [];
+    const total = levels.length;
+    const mastered = levels.filter((level) => level >= 5).length;
     const avgLevel =
       total > 0
-        ? words.reduce((sum, w) => sum + w.mastery_level, 0) / total
+        ? levels.reduce((sum, level) => sum + level, 0) / total
         : 0;
-    const weakWords = words
-      .filter((w) => w.mastery_level <= 1)
-      .sort(
-        (a, b) =>
-          a.correct_count / Math.max(1, a.correct_count + a.incorrect_count) -
-          b.correct_count / Math.max(1, b.correct_count + b.incorrect_count),
-      )
-      .slice(0, 5);
+    const levelCounts = [0, 0, 0, 0, 0, 0];
+
+    for (const level of levels) {
+      const normalizedLevel = Math.min(Math.max(level, 0), 5);
+      levelCounts[normalizedLevel]++;
+    }
 
     return {
       studentId: sid,
@@ -205,7 +164,7 @@ export default async function TutorMasteryPage({
       totalWords: total,
       mastered,
       avgLevel: Math.round(avgLevel * 10) / 10,
-      weakWords,
+      levelCounts,
     };
   };
 
@@ -236,33 +195,6 @@ export default async function TutorMasteryPage({
   const totalStudents = allStudentSummaries.length;
   const studentSummaries = allStudentSummaries.slice(from, to + 1);
 
-  // Class-wide weak words: terms where the average mastery is lowest
-  const termStats = new Map<
-    string,
-    { definition: string; totalLevel: number; count: number }
-  >();
-  for (const row of visibleMastery) {
-    const existing = termStats.get(row.term) ?? {
-      definition: row.definition ?? "",
-      totalLevel: 0,
-      count: 0,
-    };
-    existing.totalLevel += row.mastery_level;
-    existing.count++;
-    if (row.definition) existing.definition = row.definition;
-    termStats.set(row.term, existing);
-  }
-
-  const classWeakWords = Array.from(termStats.entries())
-    .map(([term, s]) => ({
-      term,
-      definition: s.definition,
-      avgLevel: Math.round((s.totalLevel / s.count) * 10) / 10,
-      studentCount: s.count,
-    }))
-    .sort((a, b) => a.avgLevel - b.avgLevel)
-    .slice(0, 10);
-
   return (
     <div className="space-y-6">
       <div>
@@ -274,110 +206,15 @@ export default async function TutorMasteryPage({
         </p>
       </div>
 
-      {/* Class-wide weak words */}
-      {classWeakWords.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <BookOpen className="h-4 w-4" />
-              Class-wide Weak Words
-            </CardTitle>
-            <CardDescription>
-              Words your students struggle with most (lowest avg mastery)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {classWeakWords.map((w) => (
-                <Badge
-                  key={w.term}
-                  variant="outline"
-                  className={`${LEVEL_COLORS[Math.min(Math.round(w.avgLevel), 5)]} border-0 px-3 py-1.5`}
-                >
-                  <span className="font-medium">{w.term}</span>
-                  <span className="ml-1.5 opacity-70">
-                    lvl {w.avgLevel} · {w.studentCount} student
-                    {w.studentCount !== 1 ? "s" : ""}
-                  </span>
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Per-student table */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Student Overview</CardTitle>
           <CardDescription>
-            Vocabulary mastery for each student in your classes
+            Student summaries load first. Expand a student to load their words.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead className="text-center">Words</TableHead>
-                <TableHead className="text-center">Mastered</TableHead>
-                <TableHead className="text-center">Avg Level</TableHead>
-                <TableHead>Weakest Words</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {studentSummaries.map((s) => (
-                <TableRow key={s.studentId}>
-                  <TableCell className="font-medium">{s.name}</TableCell>
-                  <TableCell className="text-center">{s.totalWords}</TableCell>
-                  <TableCell className="text-center">
-                    {s.totalWords > 0 ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-green-600">{s.mastered}</span>
-                        <Progress
-                          value={(s.mastered / s.totalWords) * 100}
-                          className="h-2 w-16"
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {s.totalWords > 0 ? (
-                      <Badge
-                        variant="outline"
-                        className={`${LEVEL_COLORS[Math.min(Math.round(s.avgLevel), 5)]} border-0`}
-                      >
-                        {s.avgLevel}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {s.weakWords.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {s.weakWords.map((w) => (
-                          <Badge
-                            key={w.term}
-                            variant="secondary"
-                            className="text-xs"
-                          >
-                            {w.term}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        {s.totalWords > 0 ? "All good!" : "No data"}
-                      </span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <CardContent className="space-y-4">
+          <StudentMasteryCards students={studentSummaries} />
         </CardContent>
       </Card>
 
@@ -388,76 +225,6 @@ export default async function TutorMasteryPage({
         totalItems={totalStudents}
         searchParams={resolvedSearchParams}
       />
-
-      {/* Per-student detailed breakdown */}
-      {studentSummaries
-        .filter((s) => s.totalWords > 0)
-        .map((s) => {
-          const words = studentMastery.get(s.studentId) ?? [];
-          // Group by level
-          const byLevel = new Map<number, MasteryRow[]>();
-          for (const w of words) {
-            if (!byLevel.has(w.mastery_level)) byLevel.set(w.mastery_level, []);
-            byLevel.get(w.mastery_level)!.push(w);
-          }
-
-          return (
-            <Card key={s.studentId}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">{s.name}</CardTitle>
-                <CardDescription>
-                  {s.totalWords} words · avg level {s.avgLevel} · {s.mastered}{" "}
-                  mastered
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {LEVEL_LABELS.map((label, i) => {
-                    const count = byLevel.get(i)?.length ?? 0;
-                    if (count === 0) return null;
-                    return (
-                      <Badge
-                        key={i}
-                        variant="outline"
-                        className={`${LEVEL_COLORS[i]} border-0 text-xs`}
-                      >
-                        {label}: {count}
-                      </Badge>
-                    );
-                  })}
-                </div>
-                <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
-                  {words
-                    .sort((a, b) => a.mastery_level - b.mastery_level)
-                    .map((w) => (
-                      <div
-                        key={w.id}
-                        className="flex items-center justify-between gap-2 rounded border px-2.5 py-1.5 text-sm"
-                      >
-                        <span className="truncate mr-2">{w.term}</span>
-                        <div className="flex items-center gap-1">
-                          <Badge
-                            variant="outline"
-                            className={`${LEVEL_COLORS[w.mastery_level]} border-0 text-xs shrink-0`}
-                          >
-                            {w.mastery_level}
-                          </Badge>
-                          <EditMasteryWordDialog word={w} />
-                          <DeleteMasteryWordButton
-                            wordId={w.id}
-                            term={w.term}
-                            title="Delete word for student"
-                            description={`${w.term} will be removed from this student's Vocab Mastery list.`}
-                            successMessage={`Deleted ${w.term} from the student's Vocab Mastery list`}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
     </div>
   );
 }
