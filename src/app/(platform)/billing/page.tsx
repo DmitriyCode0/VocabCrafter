@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { Role } from "@/types/roles";
 import { PLANS, getPlan, fmtLimit, type PlanKey } from "@/lib/plans";
+import { formatAppMonthName } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -481,7 +482,7 @@ async function AdminUsageSection() {
           <CardContent>
             <div className="text-2xl font-bold">${monthlyCost.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              {new Date().toLocaleString("en-US", { month: "long" })}
+              {formatAppMonthName(new Date())}
             </p>
           </CardContent>
         </Card>

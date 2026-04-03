@@ -14,6 +14,7 @@ import Link from "next/link";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
+import { formatAppDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -250,9 +251,7 @@ export default async function ReviewPage({
                             {ACTIVITY_LABELS[quiz.type] || quiz.type})
                           </span>
                         )}
-                        <span>
-                          {new Date(attempt.completed_at).toLocaleDateString()}
-                        </span>
+                        <span>{formatAppDate(attempt.completed_at)}</span>
                       </div>
                     </CardContent>
                   </Card>

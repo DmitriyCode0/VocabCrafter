@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Loader2, FileText } from "lucide-react";
 import type { QuizTerm } from "@/types/quiz";
+import { formatAppDate } from "@/lib/dates";
 
 interface QuizWordPickerProps {
   onSelect: (terms: QuizTerm[]) => void;
@@ -103,7 +104,7 @@ export function QuizWordPicker({ onSelect }: QuizWordPickerProps) {
                 <CardDescription>
                   {quiz.vocabulary_terms.length} term
                   {quiz.vocabulary_terms.length !== 1 ? "s" : ""} &middot;{" "}
-                  {new Date(quiz.created_at).toLocaleDateString("en-US")}
+                  {formatAppDate(quiz.created_at)}
                 </CardDescription>
               </div>
               <div className="flex gap-2">

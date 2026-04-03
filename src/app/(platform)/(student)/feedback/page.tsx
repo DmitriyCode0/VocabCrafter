@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, BookOpen } from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
+import { formatAppDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -127,7 +128,7 @@ export default async function StudentFeedbackPage() {
                     <span>
                       From <strong>{tutor?.full_name ?? "Tutor"}</strong>
                     </span>
-                    <span>{new Date(fb.created_at).toLocaleDateString()}</span>
+                    <span>{formatAppDate(fb.created_at)}</span>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">

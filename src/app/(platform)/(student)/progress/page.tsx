@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -21,6 +22,8 @@ import {
   PlusCircle,
 } from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
+import { calculateDayStreak } from "@/lib/history/calculate-day-streak";
+import { formatAppDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -67,13 +70,15 @@ export default async function ProgressPage() {
               Complete some quizzes to start tracking your learning progress and
               see your improvement over time.
             </CardDescription>
-            <Button asChild className="mt-4">
+          </CardHeader>
+          <CardFooter className="justify-center pb-12">
+            <Button asChild className="w-full max-w-xs">
               <Link href="/quizzes/new">
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Create a Quiz
               </Link>
             </Button>
-          </CardHeader>
+          </CardFooter>
         </Card>
       </div>
     );
@@ -117,25 +122,9 @@ export default async function ProgressPage() {
     });
   }
 
-  // Streak: count consecutive days with attempts
-  const uniqueDays = new Set(
-    attempts.map((a) => new Date(a.completed_at).toISOString().split("T")[0]),
+  const streak = calculateDayStreak(
+    attempts.map((attempt) => attempt.completed_at),
   );
-  const today = new Date().toISOString().split("T")[0];
-  let streak = 0;
-  const checkDate = new Date();
-  while (true) {
-    const dateStr = checkDate.toISOString().split("T")[0];
-    if (uniqueDays.has(dateStr)) {
-      streak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else if (dateStr === today) {
-      // Today hasn't had an attempt yet, check yesterday
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else {
-      break;
-    }
-  }
 
   // Total unique terms practiced — from word_mastery table
   const supabaseAdmin = createAdminClient();
@@ -284,7 +273,7 @@ export default async function ProgressPage() {
                   <p className="text-xs text-muted-foreground">
                     {ACTIVITY_LABELS[quizData?.type || ""] || quizData?.type}{" "}
                     &middot;{" "}
-                    {new Date(attempt.completed_at).toLocaleDateString("en-US")}
+                    {formatAppDate(attempt.completed_at)}
                   </p>
                 </div>
                 {pct !== null && (

@@ -23,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { UserPlus, Users, Loader2, Trash2 } from "lucide-react";
+import { formatAppDate } from "@/lib/dates";
 
 interface TutorProfile {
   id?: string;
@@ -191,9 +192,7 @@ export function TutorsClient({ connections }: TutorsClientProps) {
                     <span className="text-xs text-muted-foreground">
                       Since{" "}
                       {conn.connected_at
-                        ? new Date(
-                            conn.connected_at as string,
-                          ).toLocaleDateString()
+                        ? formatAppDate(conn.connected_at as string)
                         : "—"}
                     </span>
                     <Button

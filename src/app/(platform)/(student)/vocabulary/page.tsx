@@ -14,6 +14,7 @@ import { PagePagination } from "@/components/shared/page-pagination";
 import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { BookOpen, Clock, Star, TrendingUp, Zap } from "lucide-react";
+import { formatAppDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -308,11 +309,7 @@ export default async function VocabularyPage({
                               {accuracy}%)
                             </span>
                             {word.last_practiced && (
-                              <span>
-                                {new Date(
-                                  word.last_practiced,
-                                ).toLocaleDateString()}
-                              </span>
+                              <span>{formatAppDate(word.last_practiced)}</span>
                             )}
                           </div>
                         </div>

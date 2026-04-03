@@ -29,6 +29,7 @@ import {
   getGrammarTopicDisplayName,
   getPrimaryGrammarTopic,
 } from "@/lib/utils";
+import { formatAppDateTime } from "@/lib/dates";
 import {
   HISTORY_PAGE_SIZE,
   type HistoryAttempt,
@@ -190,7 +191,7 @@ const AttemptCard = React.memo(function AttemptCard({
       <CardContent className="pt-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
-            {new Date(attempt.completed_at).toLocaleString()}
+            {formatAppDateTime(attempt.completed_at)}
             {scored && (
               <span className="ml-2">
                 Score: {Number(attempt.score)} / {Number(attempt.max_score)}

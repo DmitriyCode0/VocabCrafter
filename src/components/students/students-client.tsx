@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -32,6 +33,7 @@ import {
 } from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import Link from "next/link";
+import { formatAppDate } from "@/lib/dates";
 
 interface StudentProfile {
   id?: string;
@@ -228,10 +230,7 @@ export function StudentsClient({
                 <CardContent className="pt-0">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">
-                      Created{" "}
-                      {new Date(
-                        conn.created_at as string,
-                      ).toLocaleDateString()}
+                      Created {formatAppDate(conn.created_at as string)}
                     </span>
                     <div className="flex items-center gap-1">
                       <Button
@@ -293,13 +292,11 @@ export function StudentsClient({
               );
 
               return (
-                <Card key={conn.id as string}>
+                <Card key={conn.id as string} className="h-full">
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">
-                        {student?.full_name ||
-                          student?.email ||
-                          "Unknown"}
+                        {student?.full_name || student?.email || "Unknown"}
                       </CardTitle>
                       {student?.cefr_level && (
                         <Badge variant="secondary">
@@ -311,13 +308,11 @@ export function StudentsClient({
                       {student?.email}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="flex flex-1 flex-col space-y-3">
                     <div className="text-xs text-muted-foreground">
                       Connected{" "}
                       {conn.connected_at
-                        ? new Date(
-                            conn.connected_at as string,
-                          ).toLocaleDateString()
+                        ? formatAppDate(conn.connected_at as string)
                         : "—"}
                     </div>
 
@@ -331,9 +326,11 @@ export function StudentsClient({
                           const pct =
                             a.score != null && a.max_score != null
                               ? Math.round(
-                                  (Number(a.score) / Number(a.max_score)) * 100,
+                                  (Number(a.score) / Number(a.max_score)) *
+                                    100,
                                 )
                               : null;
+
                           return (
                             <div
                               key={a.id as string}
@@ -363,30 +360,27 @@ export function StudentsClient({
                         })}
                       </div>
                     )}
-
-                    <div className="flex items-center justify-between pt-2 border-t">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link
-                          href={`/history?student=${conn.student_id as string}`}
-                        >
-                          View History
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive"
-                        onClick={() => handleDelete(conn.id as string)}
-                        disabled={deletingId === (conn.id as string)}
-                      >
-                        {deletingId === (conn.id as string) ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    </div>
                   </CardContent>
+                  <CardFooter className="mt-auto justify-between border-t pt-4">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/history?student=${conn.student_id as string}`}>
+                        View History
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => handleDelete(conn.id as string)}
+                      disabled={deletingId === (conn.id as string)}
+                    >
+                      {deletingId === (conn.id as string) ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </CardFooter>
                 </Card>
               );
             })}

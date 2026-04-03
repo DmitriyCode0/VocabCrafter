@@ -5,6 +5,7 @@ import { generateFromGemini } from "@/lib/gemini/client";
 import { getQuizPrompt, getSystemInstruction } from "@/lib/gemini/prompts";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { gapFillResponseSchema } from "@/lib/gemini/validation";
+import { formatAppDate } from "@/lib/dates";
 
 export async function POST(request: Request) {
   try {
@@ -111,7 +112,7 @@ export async function POST(request: Request) {
       .from("quizzes")
       .insert({
         creator_id: user.id,
-        title: `Review Activity - ${new Date().toLocaleDateString()}`,
+        title: `Review Activity - ${formatAppDate(new Date())}`,
         type: "gap_fill",
         cefr_level: cefrLevel,
         vocabulary_terms: vocabularyTerms as unknown as Record<

@@ -56,6 +56,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import type { QuizTerm, CEFRLevel } from "@/types/quiz";
+import { formatAppDate } from "@/lib/dates";
 
 const CEFR_LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
@@ -352,7 +353,7 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title || `Quiz - ${new Date().toLocaleDateString("en-US")}`,
+          title: title || `Quiz - ${formatAppDate(new Date())}`,
           type: selectedActivity,
           cefrLevel,
           vocabularyTerms: terms,

@@ -2,6 +2,7 @@
 
 import {
   Card,
+  CardFooter,
   CardHeader,
   CardTitle,
   CardDescription,
@@ -25,10 +26,12 @@ export default function DashboardError({
           <CardDescription>
             {error.message || "Failed to load dashboard. Please try again."}
           </CardDescription>
-          <Button onClick={reset} className="mt-4">
+        </CardHeader>
+        <CardFooter className="justify-center pb-12">
+          <Button onClick={reset} className="w-full max-w-xs">
             Try Again
           </Button>
-        </CardHeader>
+        </CardFooter>
       </Card>
     </div>
   );

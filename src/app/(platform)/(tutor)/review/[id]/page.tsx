@@ -16,6 +16,7 @@ import { ReviewFeedbackForm } from "@/components/review/review-feedback-form";
 import { EditableTranslationResults } from "@/components/review/editable-translation-results";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import { removeSuggestedAnswerLines, stripMarkdownEmphasis } from "@/lib/utils";
+import { formatAppDate, formatAppDateTime } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -150,7 +151,7 @@ export default async function ReviewDetailPage({
             </div>
           </div>
           <CardDescription>
-            Completed {new Date(attempt.completed_at).toLocaleString()}
+            Completed {formatAppDateTime(attempt.completed_at)}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -261,7 +262,7 @@ export default async function ReviewDetailPage({
                         </Badge>
                       )}
                       <span className="text-xs text-muted-foreground">
-                        {new Date(fb.created_at).toLocaleDateString()}
+                        {formatAppDate(fb.created_at)}
                       </span>
                     </div>
                   </div>

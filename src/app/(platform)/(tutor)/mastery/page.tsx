@@ -148,9 +148,7 @@ export default async function TutorMasteryPage({
     const total = levels.length;
     const mastered = levels.filter((level) => level >= 5).length;
     const avgLevel =
-      total > 0
-        ? levels.reduce((sum, level) => sum + level, 0) / total
-        : 0;
+      total > 0 ? levels.reduce((sum, level) => sum + level, 0) / total : 0;
     const levelCounts = [0, 0, 0, 0, 0, 0];
 
     for (const level of levels) {

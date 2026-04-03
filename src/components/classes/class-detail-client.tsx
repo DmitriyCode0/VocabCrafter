@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import type { Role } from "@/types/roles";
 import { CreateAssignmentDialog } from "@/components/assignments/create-assignment-dialog";
+import { formatAppDate } from "@/lib/dates";
 
 interface ClassDetailClientProps {
   classData: Record<string, unknown>;
@@ -344,9 +345,7 @@ export function ClassDetailClient({
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {new Date(
-                          member.joined_at as string,
-                        ).toLocaleDateString("en-US")}
+                        {formatAppDate(member.joined_at as string)}
                       </TableCell>
                       {isTutor && (
                         <TableCell>
@@ -439,16 +438,11 @@ export function ClassDetailClient({
                       <div>
                         {!!assignment.due_date && (
                           <p className="text-xs text-muted-foreground">
-                            Due:{" "}
-                            {new Date(
-                              assignment.due_date as string,
-                            ).toLocaleDateString("en-US")}
+                            Due: {formatAppDate(assignment.due_date as string)}
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground">
-                          {new Date(
-                            assignment.created_at as string,
-                          ).toLocaleDateString("en-US")}
+                          {formatAppDate(assignment.created_at as string)}
                         </p>
                       </div>
                       {isTutor && (

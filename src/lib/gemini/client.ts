@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { ZodError, type z } from "zod";
 
-export const GEMINI_MODEL = "gemini-2.0-flash";
+export const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
 export const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
 let _genai: GoogleGenAI | null = null;

@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import { CreateAssignmentDialog } from "@/components/assignments/create-assignme
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
+import { formatAppDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -89,10 +91,10 @@ export default async function AssignmentsPage({
             <CardDescription>
               Create your first assignment by selecting a class and quiz.
             </CardDescription>
-            <div className="mt-4">
-              <CreateAssignmentDialog />
-            </div>
           </CardHeader>
+          <CardFooter className="justify-center pb-12">
+            <CreateAssignmentDialog />
+          </CardFooter>
         </Card>
       ) : (
         <div className="space-y-6">
@@ -124,9 +126,7 @@ export default async function AssignmentsPage({
                             className="text-xs"
                           >
                             {isPastDue ? "Past due" : "Due"}{" "}
-                            {new Date(assignment.due_date).toLocaleDateString(
-                              "en-US",
-                            )}
+                            {formatAppDate(assignment.due_date)}
                           </Badge>
                         )}
                         <DeleteAssignmentButton assignmentId={assignment.id} />
@@ -156,10 +156,7 @@ export default async function AssignmentsPage({
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
-                      Created{" "}
-                      {new Date(assignment.created_at).toLocaleDateString(
-                        "en-US",
-                      )}
+                      Created {formatAppDate(assignment.created_at)}
                     </p>
                   </CardContent>
                 </Card>
@@ -217,10 +214,12 @@ async function StudentAssignments({
             <CardDescription>
               Join a class first to see assignments from your tutors.
             </CardDescription>
-            <Button asChild className="mt-4" variant="outline">
+          </CardHeader>
+          <CardFooter className="justify-center pb-12">
+            <Button asChild className="w-full max-w-xs" variant="outline">
               <Link href="/classes">Go to Classes</Link>
             </Button>
-          </CardHeader>
+          </CardFooter>
         </Card>
       </div>
     );
@@ -326,46 +325,44 @@ async function StudentAssignments({
                           <Badge variant="destructive">Past due</Badge>
                         ) : assignment.due_date ? (
                           <Badge variant="outline">
-                            Due{" "}
-                            {new Date(assignment.due_date).toLocaleDateString(
-                              "en-US",
-                            )}
+                            Due {formatAppDate(assignment.due_date)}
                           </Badge>
                         ) : null}
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                          {cls && <span>Class: {cls.name}</span>}
-                          {quiz && (
-                            <span>
-                              {ACTIVITY_LABELS[quiz.type] || quiz.type} &middot;{" "}
-                              {quiz.cefr_level}
-                            </span>
-                          )}
-                        </div>
-                        {assignment.instructions && (
-                          <p className="text-sm text-muted-foreground">
-                            {assignment.instructions}
-                          </p>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        {cls && <span>Class: {cls.name}</span>}
+                        {quiz && (
+                          <span>
+                            {ACTIVITY_LABELS[quiz.type] || quiz.type} &middot;{" "}
+                            {quiz.cefr_level}
+                          </span>
                         )}
                       </div>
-                      {quiz && (
-                        <Button
-                          asChild
-                          size="sm"
-                          variant={isCompleted ? "outline" : "default"}
-                        >
-                          <Link href={`/quizzes/${quiz.id}`}>
-                            {isCompleted ? "Retry" : "Start"}
-                          </Link>
-                        </Button>
+                      {assignment.instructions && (
+                        <p className="text-sm text-muted-foreground">
+                          {assignment.instructions}
+                        </p>
                       )}
                     </div>
                   </CardContent>
+                  {quiz && (
+                    <CardFooter className="justify-center">
+                      <Button
+                        asChild
+                        className="w-full sm:w-auto"
+                        size="sm"
+                        variant={isCompleted ? "outline" : "default"}
+                      >
+                        <Link href={`/quizzes/${quiz.id}`}>
+                          {isCompleted ? "Retry" : "Start"}
+                        </Link>
+                      </Button>
+                    </CardFooter>
+                  )}
                 </Card>
               );
             })}

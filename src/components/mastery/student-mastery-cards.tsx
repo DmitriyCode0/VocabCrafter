@@ -77,9 +77,10 @@ export function StudentMasteryCards({
       const response = await fetch(`/api/mastery/students/${studentId}/words`, {
         cache: "no-store",
       });
-      const data = (await response.json().catch(() => null)) as
-        | { words?: StudentWord[]; error?: string }
-        | null;
+      const data = (await response.json().catch(() => null)) as {
+        words?: StudentWord[];
+        error?: string;
+      } | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to load words");
@@ -108,7 +109,11 @@ export function StudentMasteryCards({
 
     setExpandedStudentId(studentId);
 
-    if (totalWords === 0 || wordsByStudent[studentId] || loadingByStudent[studentId]) {
+    if (
+      totalWords === 0 ||
+      wordsByStudent[studentId] ||
+      loadingByStudent[studentId]
+    ) {
       return;
     }
 
@@ -149,7 +154,9 @@ export function StudentMasteryCards({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => void handleToggle(student.studentId, student.totalWords)}
+                  onClick={() =>
+                    void handleToggle(student.studentId, student.totalWords)
+                  }
                   aria-expanded={isExpanded}
                 >
                   {isExpanded ? "Hide words" : "Show words"}
@@ -158,7 +165,9 @@ export function StudentMasteryCards({
                   />
                 </Button>
               ) : (
-                <span className="text-sm text-muted-foreground">No words yet</span>
+                <span className="text-sm text-muted-foreground">
+                  No words yet
+                </span>
               )}
             </div>
 
@@ -216,7 +225,9 @@ export function StudentMasteryCards({
                     </Button>
                   </div>
                 ) : words.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No words found.</p>
+                  <p className="text-sm text-muted-foreground">
+                    No words found.
+                  </p>
                 ) : (
                   <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                     {words.map((word) => (

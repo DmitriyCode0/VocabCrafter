@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   Card,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -80,10 +81,12 @@ export default async function QuizzesPage({
               Create your first quiz by pasting vocabulary words and letting AI
               generate activities for you.
             </CardDescription>
-            <Button asChild className="mt-4">
+          </CardHeader>
+          <CardFooter className="justify-center pb-12">
+            <Button asChild className="w-full max-w-xs">
               <Link href="/quizzes/new">Create Your First Quiz</Link>
             </Button>
-          </CardHeader>
+          </CardFooter>
         </Card>
       ) : (
         <div className="space-y-6">

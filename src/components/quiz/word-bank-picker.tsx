@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, Trash2, BookOpen } from "lucide-react";
 import type { QuizTerm } from "@/types/quiz";
+import { formatAppDate } from "@/lib/dates";
 
 interface WordBankPickerProps {
   onSelect: (terms: QuizTerm[]) => void;
@@ -104,8 +105,7 @@ export function WordBankPicker({ onSelect }: WordBankPickerProps) {
                 <CardTitle className="text-base">{bank.name}</CardTitle>
                 <CardDescription>
                   {bank.terms.length} term{bank.terms.length !== 1 ? "s" : ""}{" "}
-                  &middot;{" "}
-                  {new Date(bank.created_at).toLocaleDateString("en-US")}
+                  &middot; {formatAppDate(bank.created_at)}
                 </CardDescription>
               </div>
               <Button

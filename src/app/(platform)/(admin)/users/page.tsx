@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Users, Shield, GraduationCap, BookOpen } from "lucide-react";
 import { RoleSelector } from "./role-selector";
+import { formatAppDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -195,7 +196,7 @@ export default async function UsersPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {new Date(profile.created_at).toLocaleDateString()}
+                        {formatAppDate(profile.created_at)}
                       </TableCell>
                     </TableRow>
                   );

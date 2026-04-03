@@ -26,6 +26,7 @@ import {
   getGrammarTopicDisplayName,
   getPrimaryGrammarTopic,
 } from "@/lib/utils";
+import { formatAppDate } from "@/lib/dates";
 
 interface QuizCardProps {
   quiz: Quiz;
@@ -99,7 +100,7 @@ export function QuizCard({ quiz }: QuizCardProps) {
               {Array.isArray(terms) ? terms.length : 0} terms
             </CardDescription>
             <p className="text-xs text-muted-foreground">
-              {new Date(quiz.created_at).toLocaleDateString("en-US")}
+              {formatAppDate(quiz.created_at)}
             </p>
           </CardHeader>
         </Card>
