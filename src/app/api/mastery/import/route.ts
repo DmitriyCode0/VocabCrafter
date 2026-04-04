@@ -41,7 +41,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const dedupedTerms = new Map<string, { term: string; definition: string }>();
+    const dedupedTerms = new Map<
+      string,
+      { term: string; definition: string }
+    >();
 
     for (const rawTerm of parsed.data.terms) {
       const normalizedTerm = rawTerm.term.trim().toLowerCase();
@@ -109,7 +112,10 @@ export async function POST(request: Request) {
         };
       }
 
-      const nextLevel = Math.max(existing.mastery_level ?? 0, DEFAULT_IMPORTED_LEVEL);
+      const nextLevel = Math.max(
+        existing.mastery_level ?? 0,
+        DEFAULT_IMPORTED_LEVEL,
+      );
       const wasPromoted = nextLevel !== (existing.mastery_level ?? 0);
       const needsCounterSync =
         (existing.correct_count ?? 0) < DEFAULT_IMPORTED_CORRECT_COUNT ||
@@ -130,10 +136,10 @@ export async function POST(request: Request) {
         streak: Math.max(existing.streak ?? 0, DEFAULT_IMPORTED_STREAK),
         last_practiced: shouldReschedule
           ? nowIso
-          : existing.last_practiced ?? nowIso,
+          : (existing.last_practiced ?? nowIso),
         next_review: shouldReschedule
           ? getNextReviewDateForLevel(nextLevel, now)
-          : existing.next_review ?? getNextReviewDateForLevel(nextLevel, now),
+          : (existing.next_review ?? getNextReviewDateForLevel(nextLevel, now)),
       };
     });
 
@@ -152,7 +158,9 @@ export async function POST(request: Request) {
     }
 
     const existingTerms = new Set((existingRows ?? []).map((row) => row.term));
-    const createdCount = terms.filter((term) => !existingTerms.has(term.term)).length;
+    const createdCount = terms.filter(
+      (term) => !existingTerms.has(term.term),
+    ).length;
     const updatedCount = terms.length - createdCount;
 
     return NextResponse.json({

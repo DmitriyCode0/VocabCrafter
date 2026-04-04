@@ -34,9 +34,10 @@ export function RemoveReviewQuizzesButton({
         method: "DELETE",
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | { error?: string; deletedCount?: number }
-        | null;
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+        deletedCount?: number;
+      } | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to remove review sessions");

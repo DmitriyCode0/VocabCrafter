@@ -299,16 +299,27 @@ export function DashboardHowItWorksButton({
                 {targetRect ? (
                   <>
                     <motion.div
-                      className={cn(OVERLAY_PANEL_CLASS, "left-0 right-0 top-0")}
+                      className={cn(
+                        OVERLAY_PANEL_CLASS,
+                        "left-0 right-0 top-0",
+                      )}
                       initial={false}
                       animate={{ height: targetRect.top }}
-                      transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 30,
+                      }}
                     />
                     <motion.div
                       className={cn(OVERLAY_PANEL_CLASS, "inset-x-0 bottom-0")}
                       initial={false}
                       animate={{ top: targetRect.top + targetRect.height }}
-                      transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 30,
+                      }}
                     />
                     <motion.div
                       className={cn(OVERLAY_PANEL_CLASS, "left-0")}
@@ -318,7 +329,11 @@ export function DashboardHowItWorksButton({
                         width: targetRect.left,
                         height: targetRect.height,
                       }}
-                      transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 30,
+                      }}
                     />
                     <motion.div
                       className={cn(OVERLAY_PANEL_CLASS, "right-0")}
@@ -328,7 +343,11 @@ export function DashboardHowItWorksButton({
                         left: targetRect.left + targetRect.width,
                         height: targetRect.height,
                       }}
-                      transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 30,
+                      }}
                     />
                     <motion.div
                       className={OVERLAY_PANEL_CLASS}
@@ -340,43 +359,63 @@ export function DashboardHowItWorksButton({
                         height: SPOTLIGHT_RADIUS,
                       }}
                       style={{ borderBottomRightRadius: SPOTLIGHT_RADIUS }}
-                      transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 30,
+                      }}
                     />
                     <motion.div
                       className={OVERLAY_PANEL_CLASS}
                       initial={false}
                       animate={{
                         top: targetRect.top,
-                        left: targetRect.left + targetRect.width - SPOTLIGHT_RADIUS,
+                        left:
+                          targetRect.left + targetRect.width - SPOTLIGHT_RADIUS,
                         width: SPOTLIGHT_RADIUS,
                         height: SPOTLIGHT_RADIUS,
                       }}
                       style={{ borderBottomLeftRadius: SPOTLIGHT_RADIUS }}
-                      transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 30,
+                      }}
                     />
                     <motion.div
                       className={OVERLAY_PANEL_CLASS}
                       initial={false}
                       animate={{
-                        top: targetRect.top + targetRect.height - SPOTLIGHT_RADIUS,
+                        top:
+                          targetRect.top + targetRect.height - SPOTLIGHT_RADIUS,
                         left: targetRect.left,
                         width: SPOTLIGHT_RADIUS,
                         height: SPOTLIGHT_RADIUS,
                       }}
                       style={{ borderTopRightRadius: SPOTLIGHT_RADIUS }}
-                      transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 30,
+                      }}
                     />
                     <motion.div
                       className={OVERLAY_PANEL_CLASS}
                       initial={false}
                       animate={{
-                        top: targetRect.top + targetRect.height - SPOTLIGHT_RADIUS,
-                        left: targetRect.left + targetRect.width - SPOTLIGHT_RADIUS,
+                        top:
+                          targetRect.top + targetRect.height - SPOTLIGHT_RADIUS,
+                        left:
+                          targetRect.left + targetRect.width - SPOTLIGHT_RADIUS,
                         width: SPOTLIGHT_RADIUS,
                         height: SPOTLIGHT_RADIUS,
                       }}
                       style={{ borderTopLeftRadius: SPOTLIGHT_RADIUS }}
-                      transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 30,
+                      }}
                     />
                   </>
                 ) : (
@@ -422,7 +461,11 @@ export function DashboardHowItWorksButton({
                     </Button>
                   </div>
 
-                  <AnimatePresence initial={false} mode="wait" custom={stepDirection}>
+                  <AnimatePresence
+                    initial={false}
+                    mode="wait"
+                    custom={stepDirection}
+                  >
                     <motion.div
                       key={activeStep.targetId}
                       custom={stepDirection}

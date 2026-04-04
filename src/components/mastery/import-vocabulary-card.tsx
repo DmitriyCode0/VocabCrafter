@@ -47,15 +47,13 @@ export function ImportVocabularyCard({
         body: JSON.stringify({ terms }),
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | {
-            error?: string;
-            importedCount?: number;
-            createdCount?: number;
-            updatedCount?: number;
-            defaultLevel?: number;
-          }
-        | null;
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+        importedCount?: number;
+        createdCount?: number;
+        updatedCount?: number;
+        defaultLevel?: number;
+      } | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to import vocabulary");

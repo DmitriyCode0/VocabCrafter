@@ -16,11 +16,7 @@ interface InfoLabelProps {
   className?: string;
 }
 
-export function InfoLabel({
-  label,
-  description,
-  className,
-}: InfoLabelProps) {
+export function InfoLabel({ label, description, className }: InfoLabelProps) {
   return (
     <span className={cn("inline-flex items-center gap-1.5", className)}>
       <span>{label}</span>

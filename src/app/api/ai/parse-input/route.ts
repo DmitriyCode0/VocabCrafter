@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import {
-  generateFromGeminiWithUsage,
-  GEMINI_MODEL,
-} from "@/lib/gemini/client";
+import { generateFromGeminiWithUsage, GEMINI_MODEL } from "@/lib/gemini/client";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { recordAIUsageEvent } from "@/lib/ai/usage";
 import { z } from "zod";

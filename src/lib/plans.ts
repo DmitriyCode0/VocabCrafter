@@ -105,16 +105,14 @@ export const PLAN_LIMIT_DETAILS: Record<
   },
   aiCalls: {
     title: "AI Calls",
-    description:
-      "One AI call is one completed Gemini request made by the app.",
+    description: "One AI call is one completed Gemini request made by the app.",
     extra:
       "This includes generating quizzes, parsing pasted vocabulary, evaluating translation answers, building Review Activity quizzes, and server-side text-to-speech generation. Replaying already cached audio in the browser does not consume a new AI call.",
     icon: Cpu,
   },
   quizzes: {
     title: "Quizzes Created",
-    description:
-      "How many quizzes a user can create in one calendar month.",
+    description: "How many quizzes a user can create in one calendar month.",
     extra:
       "Saved Review Activity sessions count as quizzes because they are stored in the quizzes table.",
     icon: BookOpen,

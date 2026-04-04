@@ -51,7 +51,10 @@ function formatApproxUsd(value: number) {
   return `$${value.toFixed(digits)}`;
 }
 
-function isCurrentMonth(isoString: string | null | undefined, monthStart: Date) {
+function isCurrentMonth(
+  isoString: string | null | undefined,
+  monthStart: Date,
+) {
   if (!isoString) {
     return false;
   }
@@ -239,35 +242,44 @@ async function SuperadminOverviewCards() {
   monthStart.setHours(0, 0, 0, 0);
   const monthISO = monthStart.toISOString();
 
-  const [profilesResult, totalQuizzesResult, monthlyQuizzesResult, totalAttemptsResult, monthlyAttemptsResult, totalWordBanksResult] =
-    await Promise.all([
-      supabaseAdmin
-        .from("profiles")
-        .select("ai_calls_this_month, ai_calls_reset_at"),
-      supabaseAdmin.from("quizzes").select("id", { count: "exact", head: true }),
-      supabaseAdmin
-        .from("quizzes")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", monthISO),
-      supabaseAdmin
-        .from("quiz_attempts")
-        .select("id", { count: "exact", head: true }),
-      supabaseAdmin
-        .from("quiz_attempts")
-        .select("id", { count: "exact", head: true })
-        .gte("completed_at", monthISO),
-      supabaseAdmin
-        .from("word_banks")
-        .select("id", { count: "exact", head: true }),
-    ]);
+  const [
+    profilesResult,
+    totalQuizzesResult,
+    monthlyQuizzesResult,
+    totalAttemptsResult,
+    monthlyAttemptsResult,
+    totalWordBanksResult,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("profiles")
+      .select("ai_calls_this_month, ai_calls_reset_at"),
+    supabaseAdmin.from("quizzes").select("id", { count: "exact", head: true }),
+    supabaseAdmin
+      .from("quizzes")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", monthISO),
+    supabaseAdmin
+      .from("quiz_attempts")
+      .select("id", { count: "exact", head: true }),
+    supabaseAdmin
+      .from("quiz_attempts")
+      .select("id", { count: "exact", head: true })
+      .gte("completed_at", monthISO),
+    supabaseAdmin
+      .from("word_banks")
+      .select("id", { count: "exact", head: true }),
+  ]);
 
-  const totalAiCallsThisMonth = (profilesResult.data ?? []).reduce((sum, profile) => {
-    if (!isCurrentMonth(profile.ai_calls_reset_at, monthStart)) {
-      return sum;
-    }
+  const totalAiCallsThisMonth = (profilesResult.data ?? []).reduce(
+    (sum, profile) => {
+      if (!isCurrentMonth(profile.ai_calls_reset_at, monthStart)) {
+        return sum;
+      }
 
-    return sum + (profile.ai_calls_this_month ?? 0);
-  }, 0);
+      return sum + (profile.ai_calls_this_month ?? 0);
+    },
+    0,
+  );
   const totalQuizzes = totalQuizzesResult.count ?? 0;
   const monthlyQuizzes = monthlyQuizzesResult.count ?? 0;
   const totalAttempts = totalAttemptsResult.count ?? 0;
@@ -425,13 +437,16 @@ async function AdminUsageSection() {
     );
   }
 
-  const totalAiCallsThisMonth = (profilesResult.data ?? []).reduce((sum, profile) => {
-    if (!isCurrentMonth(profile.ai_calls_reset_at, monthStart)) {
-      return sum;
-    }
+  const totalAiCallsThisMonth = (profilesResult.data ?? []).reduce(
+    (sum, profile) => {
+      if (!isCurrentMonth(profile.ai_calls_reset_at, monthStart)) {
+        return sum;
+      }
 
-    return sum + (profile.ai_calls_this_month ?? 0);
-  }, 0);
+      return sum + (profile.ai_calls_this_month ?? 0);
+    },
+    0,
+  );
   const monthlyUsageEvents = monthlyUsageEventsResult.data ?? [];
   const textEvents = monthlyUsageEvents.filter(
     (event) => event.request_type === "text",
@@ -446,7 +461,10 @@ async function AdminUsageSection() {
   const estimatedEventCount = monthlyUsageEvents.filter(
     (event) => event.is_estimated,
   ).length;
-  const legacyCombinedCalls = Math.max(0, totalAiCallsThisMonth - trackedRequestCount);
+  const legacyCombinedCalls = Math.max(
+    0,
+    totalAiCallsThisMonth - trackedRequestCount,
+  );
 
   const textPromptTokens = textEvents.reduce(
     (sum, event) => sum + (event.prompt_tokens ?? 0),
@@ -478,7 +496,7 @@ async function AdminUsageSection() {
           Platform AI Usage
         </h2>
         <p className="text-sm text-muted-foreground">
-          Paid-tier estimates for {GEMINI_MODEL} text generation and {" "}
+          Paid-tier estimates for {GEMINI_MODEL} text generation and{" "}
           {GEMINI_TTS_MODEL} text-to-speech in {monthLabel}
         </p>
       </div>
@@ -494,7 +512,8 @@ async function AdminUsageSection() {
               {textRequestCount.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              {formatApproxUsd(textCost)} approx. • {textPromptTokens.toLocaleString()} input / {" "}
+              {formatApproxUsd(textCost)} approx. •{" "}
+              {textPromptTokens.toLocaleString()} input /{" "}
               {textResponseTokens.toLocaleString()} output tokens
             </p>
           </CardContent>
@@ -506,9 +525,12 @@ async function AdminUsageSection() {
             <Zap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{ttsRequestCount.toLocaleString()}</div>
+            <div className="text-2xl font-bold">
+              {ttsRequestCount.toLocaleString()}
+            </div>
             <p className="text-xs text-muted-foreground">
-              {formatApproxUsd(ttsCost)} approx. • {ttsPromptTokens.toLocaleString()} text input / {" "}
+              {formatApproxUsd(ttsCost)} approx. •{" "}
+              {ttsPromptTokens.toLocaleString()} text input /{" "}
               {ttsAudioOutputTokens.toLocaleString()} audio output tokens
             </p>
           </CardContent>
@@ -516,7 +538,9 @@ async function AdminUsageSection() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Tracked AI Cost</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Tracked AI Cost
+            </CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -524,14 +548,17 @@ async function AdminUsageSection() {
               {formatApproxUsd(totalTrackedCost)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {trackedRequestCount.toLocaleString()} tracked requests in {monthLabel}
+              {trackedRequestCount.toLocaleString()} tracked requests in{" "}
+              {monthLabel}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Unallocated Calls</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Unallocated Calls
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -551,8 +578,8 @@ async function AdminUsageSection() {
         <CardHeader>
           <CardTitle className="text-lg">Pricing Basis</CardTitle>
           <CardDescription>
-            Official Google AI paid-tier pricing for the models currently used in
-            this app
+            Official Google AI paid-tier pricing for the models currently used
+            in this app
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
@@ -560,38 +587,43 @@ async function AdminUsageSection() {
             <div className="rounded-lg border bg-muted/30 p-3">
               <p className="font-medium text-foreground">{GEMINI_MODEL}</p>
               <p>
-                {formatApproxUsd(GEMINI_TEXT_INPUT_COST_PER_MILLION)} per 1M input
-                tokens
+                {formatApproxUsd(GEMINI_TEXT_INPUT_COST_PER_MILLION)} per 1M
+                input tokens
               </p>
               <p>
-                {formatApproxUsd(GEMINI_TEXT_OUTPUT_COST_PER_MILLION)} per 1M output
-                tokens
+                {formatApproxUsd(GEMINI_TEXT_OUTPUT_COST_PER_MILLION)} per 1M
+                output tokens
               </p>
             </div>
             <div className="rounded-lg border bg-muted/30 p-3">
               <p className="font-medium text-foreground">{GEMINI_TTS_MODEL}</p>
               <p>
-                {formatApproxUsd(GEMINI_TTS_INPUT_COST_PER_MILLION)} per 1M input
-                text tokens
+                {formatApproxUsd(GEMINI_TTS_INPUT_COST_PER_MILLION)} per 1M
+                input text tokens
               </p>
               <p>
-                {formatApproxUsd(GEMINI_TTS_OUTPUT_COST_PER_MILLION)} per 1M output
-                audio tokens
+                {formatApproxUsd(GEMINI_TTS_OUTPUT_COST_PER_MILLION)} per 1M
+                output audio tokens
               </p>
             </div>
           </div>
           <p className="text-xs">
-            Text requests use Gemini response token metadata. If Gemini omits TTS
-            audio token details, output audio is approximated from duration at {" "}
-            {AUDIO_TOKENS_PER_SECOND} audio tokens per second.
+            Text requests use Gemini response token metadata. If Gemini omits
+            TTS audio token details, output audio is approximated from duration
+            at {AUDIO_TOKENS_PER_SECOND} audio tokens per second.
           </p>
           <p className="text-xs">
-            {estimatedEventCount.toLocaleString()} tracked request{estimatedEventCount === 1 ? " uses" : "s use"} fallback estimation this month.
+            {estimatedEventCount.toLocaleString()} tracked request
+            {estimatedEventCount === 1 ? " uses" : "s use"} fallback estimation
+            this month.
           </p>
           {legacyCombinedCalls > 0 && (
             <p className="text-xs">
               Detailed text-vs-TTS tracking started after some {monthLabel} AI
-              usage had already been counted, so {legacyCombinedCalls.toLocaleString()} earlier call{legacyCombinedCalls === 1 ? " remains" : "s remain"} combined and cannot be split across the two model cards.
+              usage had already been counted, so{" "}
+              {legacyCombinedCalls.toLocaleString()} earlier call
+              {legacyCombinedCalls === 1 ? " remains" : "s remain"} combined and
+              cannot be split across the two model cards.
             </p>
           )}
         </CardContent>

@@ -50,12 +50,13 @@ function mergePlanLimitRow(
       row?.attempts_per_month == null
         ? fallback.attemptsPerMonth
         : row.attempts_per_month,
-    wordBanks:
-      row?.word_banks == null ? fallback.wordBanks : row.word_banks,
+    wordBanks: row?.word_banks == null ? fallback.wordBanks : row.word_banks,
   };
 }
 
-export async function getPlansCatalog(): Promise<Record<PlanKey, PlanDefinition>> {
+export async function getPlansCatalog(): Promise<
+  Record<PlanKey, PlanDefinition>
+> {
   const admin = createAdminClient();
   const { data, error } = await admin.from("plan_limits").select("*");
 

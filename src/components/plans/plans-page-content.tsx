@@ -2,12 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Crown,
-  Save,
-  Sparkles,
-  Zap,
-} from "lucide-react";
+import { Crown, Save, Sparkles, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { InfoLabel } from "@/components/shared/info-label";
@@ -119,15 +114,16 @@ export function PlansPageContent({
         {} as Record<PlanKey, PlanDefinition>,
       ),
   );
-  const [editorState, setEditorState] = useState<Record<PlanKey, PlanEditorState>>(
-    () =>
-      plans.reduce(
-        (catalog, plan) => {
-          catalog[plan.key] = toPlanEditorState(plan);
-          return catalog;
-        },
-        {} as Record<PlanKey, PlanEditorState>,
-      ),
+  const [editorState, setEditorState] = useState<
+    Record<PlanKey, PlanEditorState>
+  >(() =>
+    plans.reduce(
+      (catalog, plan) => {
+        catalog[plan.key] = toPlanEditorState(plan);
+        return catalog;
+      },
+      {} as Record<PlanKey, PlanEditorState>,
+    ),
   );
 
   const orderedPlans = useMemo(
@@ -249,7 +245,8 @@ export function PlansPageContent({
                     </span>
                     {plan.price > 0 && (
                       <span className="text-sm text-muted-foreground">
-                        {" "}/ month
+                        {" "}
+                        / month
                       </span>
                     )}
                   </div>
@@ -260,7 +257,9 @@ export function PlansPageContent({
               <CardContent className="space-y-5 pt-0 text-sm">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <p className="font-medium">{fmtLimit(plan.aiCallsPerMonth)}</p>
+                    <p className="font-medium">
+                      {fmtLimit(plan.aiCallsPerMonth)}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
                         label="AI calls"
@@ -269,7 +268,9 @@ export function PlansPageContent({
                     </p>
                   </div>
                   <div>
-                    <p className="font-medium">{fmtLimit(plan.quizzesPerMonth)}</p>
+                    <p className="font-medium">
+                      {fmtLimit(plan.quizzesPerMonth)}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
                         label="Quizzes"
@@ -278,7 +279,9 @@ export function PlansPageContent({
                     </p>
                   </div>
                   <div>
-                    <p className="font-medium">{fmtLimit(plan.attemptsPerMonth)}</p>
+                    <p className="font-medium">
+                      {fmtLimit(plan.attemptsPerMonth)}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
                         label="Attempts"
@@ -372,7 +375,9 @@ export function PlansPageContent({
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor={`${plan.key}-price`}>Monthly price</Label>
+                        <Label htmlFor={`${plan.key}-price`}>
+                          Monthly price
+                        </Label>
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"

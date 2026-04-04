@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  generateFromGeminiWithUsage,
-  GEMINI_MODEL,
-} from "@/lib/gemini/client";
+import { generateFromGeminiWithUsage, GEMINI_MODEL } from "@/lib/gemini/client";
 import { getQuizPrompt, getSystemInstruction } from "@/lib/gemini/prompts";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { recordAIUsageEvent } from "@/lib/ai/usage";
@@ -60,27 +57,29 @@ export async function POST() {
     // the weakest remaining words.
     const supabaseAdmin = createAdminClient();
     const nowIso = new Date().toISOString();
-    const [{ data: dueWords, error: dueWordsError }, { data: fallbackWords, error: fallbackWordsError }] =
-      await Promise.all([
-        supabaseAdmin
-          .from("word_mastery")
-          .select("term, definition, mastery_level, next_review, last_practiced")
-          .eq("student_id", user.id)
-          .not("next_review", "is", null)
-          .lte("next_review", nowIso)
-          .order("next_review", { ascending: true })
-          .order("mastery_level", { ascending: true })
-          .order("last_practiced", { ascending: true, nullsFirst: true })
-          .limit(REVIEW_WORD_LIMIT),
-        supabaseAdmin
-          .from("word_mastery")
-          .select("term, definition, mastery_level, next_review, last_practiced")
-          .eq("student_id", user.id)
-          .lte("mastery_level", 4)
-          .order("mastery_level", { ascending: true })
-          .order("last_practiced", { ascending: true, nullsFirst: true })
-          .limit(REVIEW_WORD_LIMIT * 4),
-      ]);
+    const [
+      { data: dueWords, error: dueWordsError },
+      { data: fallbackWords, error: fallbackWordsError },
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("word_mastery")
+        .select("term, definition, mastery_level, next_review, last_practiced")
+        .eq("student_id", user.id)
+        .not("next_review", "is", null)
+        .lte("next_review", nowIso)
+        .order("next_review", { ascending: true })
+        .order("mastery_level", { ascending: true })
+        .order("last_practiced", { ascending: true, nullsFirst: true })
+        .limit(REVIEW_WORD_LIMIT),
+      supabaseAdmin
+        .from("word_mastery")
+        .select("term, definition, mastery_level, next_review, last_practiced")
+        .eq("student_id", user.id)
+        .lte("mastery_level", 4)
+        .order("mastery_level", { ascending: true })
+        .order("last_practiced", { ascending: true, nullsFirst: true })
+        .limit(REVIEW_WORD_LIMIT * 4),
+    ]);
 
     if (dueWordsError || fallbackWordsError) {
       console.error("Error fetching review activity words:", {
@@ -151,12 +150,12 @@ export async function POST() {
 
     const { data: generatedContent, usageSnapshot } =
       await generateFromGeminiWithUsage(
-      {
-        prompt,
-        systemInstruction,
-        temperature: 0.7,
-      },
-      gapFillResponseSchema,
+        {
+          prompt,
+          systemInstruction,
+          temperature: 0.7,
+        },
+        gapFillResponseSchema,
       );
 
     await recordAIUsageEvent({
@@ -230,11 +229,12 @@ export async function DELETE() {
     }
 
     const supabaseAdmin = createAdminClient();
-    const { data: reviewQuizzes, error: reviewQuizzesError } = await supabaseAdmin
-      .from("quizzes")
-      .select("id")
-      .eq("creator_id", user.id)
-      .ilike("title", `${REVIEW_ACTIVITY_TITLE_PREFIX}%`);
+    const { data: reviewQuizzes, error: reviewQuizzesError } =
+      await supabaseAdmin
+        .from("quizzes")
+        .select("id")
+        .eq("creator_id", user.id)
+        .ilike("title", `${REVIEW_ACTIVITY_TITLE_PREFIX}%`);
 
     if (reviewQuizzesError) {
       console.error("Review cleanup lookup error:", reviewQuizzesError);

@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
-import {
-  extractTtsUsageSnapshot,
-  recordAIUsageEvent,
-} from "@/lib/ai/usage";
+import { extractTtsUsageSnapshot, recordAIUsageEvent } from "@/lib/ai/usage";
 import { getGenAI, GEMINI_TTS_MODEL } from "@/lib/gemini/client";
 import { getSpeechLanguageTag } from "@/lib/languages";
 

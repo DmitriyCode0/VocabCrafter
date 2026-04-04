@@ -36,23 +36,24 @@ export default async function QuizzesPage({
 
   if (!user) redirect("/login");
 
-  const [totalQuizzesResult, reviewQuizzesResult, quizzesResult] = await Promise.all([
-    supabase
-      .from("quizzes")
-      .select("id", { count: "exact", head: true })
-      .eq("creator_id", user.id),
-    supabase
-      .from("quizzes")
-      .select("id", { count: "exact", head: true })
-      .eq("creator_id", user.id)
-      .ilike("title", `${REVIEW_ACTIVITY_TITLE_PREFIX}%`),
-    supabase
-      .from("quizzes")
-      .select("*")
-      .eq("creator_id", user.id)
-      .order("created_at", { ascending: false })
-      .range(from, to),
-  ]);
+  const [totalQuizzesResult, reviewQuizzesResult, quizzesResult] =
+    await Promise.all([
+      supabase
+        .from("quizzes")
+        .select("id", { count: "exact", head: true })
+        .eq("creator_id", user.id),
+      supabase
+        .from("quizzes")
+        .select("id", { count: "exact", head: true })
+        .eq("creator_id", user.id)
+        .ilike("title", `${REVIEW_ACTIVITY_TITLE_PREFIX}%`),
+      supabase
+        .from("quizzes")
+        .select("*")
+        .eq("creator_id", user.id)
+        .order("created_at", { ascending: false })
+        .range(from, to),
+    ]);
 
   const totalQuizzes = totalQuizzesResult.count;
   const reviewQuizCount = reviewQuizzesResult.count ?? 0;
