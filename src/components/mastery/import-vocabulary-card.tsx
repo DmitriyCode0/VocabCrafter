@@ -129,14 +129,20 @@ export function ImportVocabularyCard({
           </div>
 
           <div className="w-full space-y-2 sm:w-[220px]">
-            <Label htmlFor="import-starting-level" className="text-xs text-muted-foreground">
+            <Label
+              htmlFor="import-starting-level"
+              className="text-xs text-muted-foreground"
+            >
               Starting mastery level
             </Label>
             <Select
               value={String(startingLevel)}
               onValueChange={(value) => setStartingLevel(Number(value))}
             >
-              <SelectTrigger id="import-starting-level" className="w-full bg-background">
+              <SelectTrigger
+                id="import-starting-level"
+                className="w-full bg-background"
+              >
                 <SelectValue placeholder="Select a level" />
               </SelectTrigger>
               <SelectContent>
@@ -171,7 +177,9 @@ export function ImportVocabularyCard({
 
             <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <p>
-                Imported words will start at {startingLevelLabel} (Level {startingLevel}). Existing entries are only promoted up to this level and never downgraded.
+                Imported words will start at {startingLevelLabel} (Level{" "}
+                {startingLevel}). Existing entries are only promoted up to this
+                level and never downgraded.
               </p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
