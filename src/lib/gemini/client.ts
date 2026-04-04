@@ -102,6 +102,16 @@ async function generateFromGeminiRequest<T>(
   options: GenerateOptions,
   schema: z.ZodSchema<T>,
 ): Promise<GenerateWithUsageResult<T>> {
+  const result = await generateJsonFromGeminiWithUsage(options);
+  return {
+    data: schema.parse(result.data),
+    usageSnapshot: result.usageSnapshot,
+  };
+}
+
+export async function generateJsonFromGeminiWithUsage(
+  options: GenerateOptions,
+): Promise<GenerateWithUsageResult<unknown>> {
   return withRetry(async () => {
     const response = await getGenAI().models.generateContent({
       model: GEMINI_MODEL,
@@ -120,7 +130,7 @@ async function generateFromGeminiRequest<T>(
 
     const parsed = extractJsonPayload(text);
     return {
-      data: schema.parse(parsed),
+      data: parsed,
       usageSnapshot: extractTextUsageSnapshot({
         prompt: options.prompt,
         responseText: text,

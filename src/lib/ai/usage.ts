@@ -8,6 +8,7 @@ export type AIUsageFeature =
   | "review_activity"
   | "parse_input"
   | "evaluate"
+  | "progress_insights"
   | "tts";
 
 export type AIUsageRequestType = "text" | "tts";
