@@ -30,6 +30,7 @@ import {
   Loader2,
   Clock,
   Link2,
+  TrendingUp,
 } from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import Link from "next/link";
@@ -357,6 +358,14 @@ export function StudentsClient({
                     )}
                   </CardContent>
                   <CardFooter className="mt-auto justify-between border-t pt-4">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link
+                        href={`/students/${conn.student_id as string}/progress`}
+                      >
+                        <TrendingUp className="mr-2 h-4 w-4" />
+                        View Progress
+                      </Link>
+                    </Button>
                     <Button variant="outline" size="sm" asChild>
                       <Link
                         href={`/history?student=${conn.student_id as string}`}

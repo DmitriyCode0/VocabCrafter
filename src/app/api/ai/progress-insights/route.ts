@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { recordAIUsageEvent } from "@/lib/ai/usage";
@@ -8,6 +9,7 @@ import {
   GEMINI_MODEL,
 } from "@/lib/gemini/client";
 import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
+import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
 
 const estimatedBandSchema = z.enum(["A0", "A1", "A2", "B1", "B2", "C1"]);
 
@@ -102,6 +104,46 @@ const FALLBACK_THEMES_BY_BAND: Record<EstimatedBand, string[]> = {
     "Idioms, register, and stylistic range",
   ],
 };
+
+const requestSchema = z.object({
+  studentId: z.string().uuid().optional(),
+});
+
+async function parseOptionalRequestBody(request: Request) {
+  const rawBody = await request.text();
+
+  if (!rawBody.trim()) {
+    return { success: true as const, data: {} };
+  }
+
+  let parsedJson: unknown;
+
+  try {
+    parsedJson = JSON.parse(rawBody);
+  } catch {
+    return {
+      success: false as const,
+      response: NextResponse.json(
+        { error: "Invalid request body" },
+        { status: 400 },
+      ),
+    };
+  }
+
+  const parsed = requestSchema.safeParse(parsedJson);
+
+  if (!parsed.success) {
+    return {
+      success: false as const,
+      response: NextResponse.json(
+        { error: "Invalid request", details: parsed.error.flatten() },
+        { status: 400 },
+      ),
+    };
+  }
+
+  return { success: true as const, data: parsed.data };
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -1016,9 +1058,14 @@ Respond with JSON in this exact structure:
 }`;
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const supabase = await createClient();
+    const parsedRequest = await parseOptionalRequestBody(request);
+
+    if (!parsedRequest.success) {
+      return parsedRequest.response;
+    }
 
     const {
       data: { user },
@@ -1026,6 +1073,46 @@ export async function POST() {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const requestedStudentId = parsedRequest.data.studentId;
+    const supabaseAdmin = createAdminClient();
+    let targetUserId = user.id;
+
+    if (requestedStudentId && requestedStudentId !== user.id) {
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError || !profile) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      if (profile.role !== "tutor" && profile.role !== "superadmin") {
+        return NextResponse.json(
+          { error: "Only tutors can request student progress insights" },
+          { status: 403 },
+        );
+      }
+
+      if (profile.role !== "superadmin") {
+        const hasAccess = await tutorHasStudentAccess(
+          supabaseAdmin,
+          user.id,
+          requestedStudentId,
+        );
+
+        if (!hasAccess) {
+          return NextResponse.json(
+            { error: "You do not have access to this student" },
+            { status: 403 },
+          );
+        }
+      }
+
+      targetUserId = requestedStudentId;
     }
 
     const quota = await checkAIQuota(user.id);
@@ -1039,7 +1126,7 @@ export async function POST() {
       );
     }
 
-    const snapshot = await getStudentProgressSnapshot(user.id);
+    const snapshot = await getStudentProgressSnapshot(targetUserId);
 
     if (
       snapshot.overview.totalAttempts === 0 &&
@@ -1051,7 +1138,7 @@ export async function POST() {
       );
     }
 
-    const prompt = buildProgressInsightsPrompt(user.id, snapshot);
+    const prompt = buildProgressInsightsPrompt(targetUserId, snapshot);
     let result: ProgressInsights;
 
     try {

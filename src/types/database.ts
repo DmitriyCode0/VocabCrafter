@@ -1,5 +1,13 @@
 import type { Role } from "./roles";
 
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 export interface Database {
   public: {
     Tables: {
@@ -514,6 +522,50 @@ export interface Database {
           },
         ];
       };
+      tutor_student_progress_overrides: {
+        Row: {
+          id: string;
+          tutor_id: string;
+          student_id: string;
+          axis_overrides: Json;
+          insights_override: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tutor_id: string;
+          student_id: string;
+          axis_overrides?: Json;
+          insights_override?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          tutor_id?: string;
+          student_id?: string;
+          axis_overrides?: Json;
+          insights_override?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_progress_overrides_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_progress_overrides_tutor_id_fkey";
+            columns: ["tutor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       word_mastery: {
         Row: {
           id: string;
@@ -607,4 +659,6 @@ export type GrammarTopicPromptOverride =
 export type WordBank = Database["public"]["Tables"]["word_banks"]["Row"];
 export type TutorStudent =
   Database["public"]["Tables"]["tutor_students"]["Row"];
+export type TutorStudentProgressOverride =
+  Database["public"]["Tables"]["tutor_student_progress_overrides"]["Row"];
 export type WordMastery = Database["public"]["Tables"]["word_mastery"]["Row"];
