@@ -70,6 +70,9 @@ export default async function AnalyticsPage() {
   quizzes?.forEach((q) => {
     typeCounts[q.type] = (typeCounts[q.type] || 0) + 1;
   });
+  const quizTypeEntries = Object.entries(typeCounts).sort(
+    (left, right) => right[1] - left[1],
+  );
 
   // --- Score stats ---
   const { data: attempts } = await supabase
@@ -138,13 +141,30 @@ export default async function AnalyticsPage() {
             </CardTitle>
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="text-2xl font-bold">{quizCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {Object.entries(typeCounts)
-                .map(([t, c]) => `${c} ${ACTIVITY_LABELS[t] || t}`)
-                .join(", ") || "None yet"}
-            </p>
+            {quizTypeEntries.length > 0 ? (
+              <div className="space-y-3">
+                {quizTypeEntries.map(([type, count]) => {
+                  const total = Math.max(quizCount ?? 0, 1);
+                  const pct = Math.round((count / total) * 100);
+
+                  return (
+                    <div key={type} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>{ACTIVITY_LABELS[type] || type}</span>
+                        <span className="text-muted-foreground">
+                          {count} ({pct}%)
+                        </span>
+                      </div>
+                      <Progress value={pct} className="h-2" />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">None yet</p>
+            )}
           </CardContent>
         </Card>
 

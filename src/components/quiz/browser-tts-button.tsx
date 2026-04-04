@@ -232,7 +232,10 @@ export function BrowserTtsButton({
       type="button"
       variant="outline"
       size="sm"
-      onClick={handleSpeak}
+      onClick={(event) => {
+        event.stopPropagation();
+        void handleSpeak();
+      }}
       disabled={isLoading || !text.trim()}
       className={className}
       aria-label={isSpeaking ? `Stop ${label.toLowerCase()}` : label}

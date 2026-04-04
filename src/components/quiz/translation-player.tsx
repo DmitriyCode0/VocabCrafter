@@ -333,7 +333,7 @@ export function TranslationPlayer({
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
+                className="w-full border-orange-500/25 bg-orange-500/5 text-orange-600 hover:bg-orange-500/10"
                 disabled={isEvaluating}
                 onClick={handleShowTranslation}
               >
