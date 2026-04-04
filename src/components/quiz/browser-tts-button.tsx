@@ -3,12 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Square, Volume2 } from "lucide-react";
-import { GEMINI_TTS_CACHE_NAME } from "@/lib/ai/tts-voices";
+import {
+  GEMINI_TTS_CACHE_NAME,
+  type GeminiTtsVoice,
+} from "@/lib/ai/tts-voices";
 import { getSpeechLanguageTag } from "@/lib/languages";
 
 interface BrowserTtsButtonProps {
   text: string;
   language?: string | null;
+  voice?: GeminiTtsVoice | null;
   label?: string;
   className?: string;
 }
@@ -16,6 +20,7 @@ interface BrowserTtsButtonProps {
 export function BrowserTtsButton({
   text,
   language,
+  voice,
   label = "Listen",
   className,
 }: BrowserTtsButtonProps) {
@@ -96,12 +101,13 @@ export function BrowserTtsButton({
 
   async function createPersistentCacheRequest(textToSpeak: string) {
     const normalizedLanguage = language ?? "default";
+    const normalizedVoice = voice ?? "profile";
     const hashedKey = await hashCacheKey(
-      `${normalizedLanguage}:${textToSpeak}`,
+      `${normalizedLanguage}:${normalizedVoice}:${textToSpeak}`,
     );
 
     return new Request(
-      `/tts-cache/${hashedKey}.wav?lang=${normalizedLanguage}`,
+      `/tts-cache/${hashedKey}.wav?lang=${normalizedLanguage}&voice=${normalizedVoice}`,
       {
         method: "GET",
       },
@@ -160,7 +166,7 @@ export function BrowserTtsButton({
   }
 
   async function fetchGeminiAudio(textToSpeak: string) {
-    const cacheKey = `${language ?? "default"}:${textToSpeak}`;
+    const cacheKey = `${language ?? "default"}:${voice ?? "profile"}:${textToSpeak}`;
 
     if (cachedKeyRef.current === cacheKey && cachedUrlRef.current) {
       return cachedUrlRef.current;
@@ -185,6 +191,7 @@ export function BrowserTtsButton({
       body: JSON.stringify({
         text: textToSpeak,
         language,
+        voice,
       }),
     });
 

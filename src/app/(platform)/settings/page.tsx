@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import { Loader2, Save } from "lucide-react";
 import {
   TARGET_LANGUAGE_OPTIONS,
@@ -36,6 +37,8 @@ import {
   DEFAULT_GEMINI_TTS_VOICE,
   GEMINI_TTS_CACHE_NAMES_TO_CLEAR,
   GEMINI_TTS_VOICE_OPTIONS,
+  getGeminiTtsPreviewSamples,
+  getGeminiTtsVoiceOption,
   normalizeGeminiTtsVoice,
   type GeminiTtsVoice,
 } from "@/lib/ai/tts-voices";
@@ -98,6 +101,13 @@ export default function SettingsPage() {
   const sourceLanguage = draft?.sourceLanguage ?? baseDraft.sourceLanguage;
   const aiVoice = draft?.aiVoice ?? baseDraft.aiVoice;
   const rawCefrLevel = draft?.cefrLevel ?? baseDraft.cefrLevel;
+  const selectedVoiceOption =
+    getGeminiTtsVoiceOption(aiVoice) ?? getGeminiTtsVoiceOption(profileAiVoice);
+  const previewSamples = getGeminiTtsPreviewSamples(learningLanguage);
+  const selectedLearningLanguageLabel =
+    TARGET_LANGUAGE_OPTIONS.find((option) => option.value === learningLanguage)
+      ?.label ?? "English";
+  const isUnsavedVoiceChange = aiVoice !== profileAiVoice;
 
   const allowedCefrLevels = getAllowedCefrLevels(learningLanguage);
   const cefrLevel = allowedCefrLevels.includes(
@@ -279,6 +289,57 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">
               Choose which Gemini voice is used for quiz audio playback.
             </p>
+
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium">
+                      Preview {selectedVoiceOption?.label ?? aiVoice}
+                    </p>
+                    <span className="rounded-full border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      {selectedVoiceOption?.description ?? "Voice sample"}
+                    </span>
+                    {isUnsavedVoiceChange && (
+                      <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                        Not saved yet
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Hear how this voice sounds in {selectedLearningLanguageLabel} before you save it.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {previewSamples.map((sample) => (
+                  <div
+                    key={sample.label}
+                    className="space-y-3 rounded-lg border bg-background p-3"
+                  >
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">{sample.label}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {sample.text}
+                      </p>
+                    </div>
+                    <BrowserTtsButton
+                      text={sample.text}
+                      language={learningLanguage}
+                      voice={aiVoice}
+                      label={`Play ${sample.label.toLowerCase()}`}
+                      className="w-full justify-center"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-3 text-xs text-muted-foreground">
+                Preview uses the selected voice immediately, even before saving.
+                Each preview counts as a regular AI audio request.
+              </p>
+            </div>
           </div>
 
           {profile?.role === "student" && (

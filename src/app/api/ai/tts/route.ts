@@ -17,6 +17,7 @@ const BITS_PER_SAMPLE = 16;
 const requestSchema = z.object({
   text: z.string().trim().min(1).max(3000),
   language: z.enum(["english", "spanish", "ukrainian"]).optional(),
+  voice: z.string().trim().optional(),
 });
 
 function buildTtsPrompt(text: string) {
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { text, language } = parsed.data;
+    const { text, language, voice } = parsed.data;
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("ai_voice")
@@ -97,7 +98,7 @@ export async function POST(request: Request) {
     }
 
     const voiceName = normalizeGeminiTtsVoice(
-      profile?.ai_voice ?? DEFAULT_GEMINI_TTS_VOICE,
+      voice ?? profile?.ai_voice ?? DEFAULT_GEMINI_TTS_VOICE,
     );
     const prompt = buildTtsPrompt(text);
     const response = await getGenAI().models.generateContent({

@@ -54,11 +54,42 @@ export const GEMINI_TTS_VOICE_OPTIONS = [
   { value: "Sulafat", label: "Sulafat", description: "Warm" },
 ] as const;
 
+export const GEMINI_TTS_PREVIEW_SAMPLES = {
+  english: [
+    {
+      label: "Quick Preview",
+      text: "Hello. This is how your selected AI voice sounds during quiz playback.",
+    },
+    {
+      label: "Longer Preview",
+      text: "Let's review a few words together and keep your pronunciation practice steady.",
+    },
+  ],
+  spanish: [
+    {
+      label: "Quick Preview",
+      text: "Hola. Asi suena la voz de IA que elegiste para tus actividades.",
+    },
+    {
+      label: "Longer Preview",
+      text: "Repasemos vocabulario juntos y mantengamos constante tu practica de pronunciacion.",
+    },
+  ],
+} as const;
+
 export type GeminiTtsVoice = (typeof GEMINI_TTS_VOICE_OPTIONS)[number]["value"];
 
+export function getGeminiTtsVoiceOption(value?: string | null) {
+  return GEMINI_TTS_VOICE_OPTIONS.find((option) => option.value === value);
+}
+
+export function getGeminiTtsPreviewSamples(language?: string | null) {
+  return language === "spanish"
+    ? GEMINI_TTS_PREVIEW_SAMPLES.spanish
+    : GEMINI_TTS_PREVIEW_SAMPLES.english;
+}
+
 export function normalizeGeminiTtsVoice(value?: string | null): GeminiTtsVoice {
-  const match = GEMINI_TTS_VOICE_OPTIONS.find(
-    (option) => option.value === value,
-  );
+  const match = getGeminiTtsVoiceOption(value);
   return match?.value ?? DEFAULT_GEMINI_TTS_VOICE;
 }
