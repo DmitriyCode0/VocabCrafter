@@ -8,7 +8,6 @@ import type { QuizTerm } from "@/types/quiz";
 import type { LearningLanguage, SourceLanguage } from "@/lib/languages";
 import { WordInput } from "@/components/quiz/word-input";
 import { ParsedWordList } from "@/components/quiz/parsed-word-list";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,6 +16,30 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const IMPORT_LEVEL_OPTIONS = [
+  { value: 0, label: "New" },
+  { value: 1, label: "Seen" },
+  { value: 2, label: "Learning" },
+  { value: 3, label: "Familiar" },
+  { value: 4, label: "Practiced" },
+  { value: 5, label: "Mastered" },
+] as const;
+
+function getImportLevelLabel(level: number) {
+  return (
+    IMPORT_LEVEL_OPTIONS.find((option) => option.value === level)?.label ??
+    `Level ${level}`
+  );
+}
 
 interface ImportVocabularyCardProps {
   targetLanguage: LearningLanguage;
@@ -29,9 +52,11 @@ export function ImportVocabularyCard({
 }: ImportVocabularyCardProps) {
   const router = useRouter();
   const [terms, setTerms] = useState<QuizTerm[]>([]);
+  const [startingLevel, setStartingLevel] = useState(2);
   const [isParseLoading, setIsParseLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [inputResetKey, setInputResetKey] = useState(0);
+  const startingLevelLabel = getImportLevelLabel(startingLevel);
 
   async function handleImport() {
     if (terms.length === 0) {
@@ -44,7 +69,7 @@ export function ImportVocabularyCard({
       const response = await fetch("/api/mastery/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ terms }),
+        body: JSON.stringify({ terms, startingLevel }),
       });
 
       const data = (await response.json().catch(() => null)) as {
@@ -52,7 +77,7 @@ export function ImportVocabularyCard({
         importedCount?: number;
         createdCount?: number;
         updatedCount?: number;
-        defaultLevel?: number;
+        startingLevel?: number;
       } | null;
 
       if (!response.ok) {
@@ -62,10 +87,12 @@ export function ImportVocabularyCard({
       const importedCount = data?.importedCount ?? terms.length;
       const createdCount = data?.createdCount ?? importedCount;
       const updatedCount = data?.updatedCount ?? 0;
+      const appliedLevel = data?.startingLevel ?? startingLevel;
+      const appliedLevelLabel = getImportLevelLabel(appliedLevel);
       const successMessage =
         updatedCount > 0
-          ? `Imported ${importedCount} words. Added ${createdCount} new and refreshed ${updatedCount} existing entries at level ${data?.defaultLevel ?? 2}.`
-          : `Imported ${importedCount} words into Vocab Mastery at level ${data?.defaultLevel ?? 2}.`;
+          ? `Imported ${importedCount} words. Added ${createdCount} new and refreshed ${updatedCount} existing entries up to ${appliedLevelLabel} (Level ${appliedLevel}).`
+          : `Imported ${importedCount} words into Vocab Mastery at ${appliedLevelLabel} (Level ${appliedLevel}).`;
 
       toast.success(successMessage);
       setTerms([]);
@@ -88,7 +115,7 @@ export function ImportVocabularyCard({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-base">
               <BookPlus className="h-5 w-5 text-primary" />
@@ -100,7 +127,27 @@ export function ImportVocabularyCard({
               quiz.
             </CardDescription>
           </div>
-          <Badge variant="secondary">Default Level 2</Badge>
+
+          <div className="w-full space-y-2 sm:w-[220px]">
+            <Label htmlFor="import-starting-level" className="text-xs text-muted-foreground">
+              Starting mastery level
+            </Label>
+            <Select
+              value={String(startingLevel)}
+              onValueChange={(value) => setStartingLevel(Number(value))}
+            >
+              <SelectTrigger id="import-starting-level" className="w-full bg-background">
+                <SelectValue placeholder="Select a level" />
+              </SelectTrigger>
+              <SelectContent>
+                {IMPORT_LEVEL_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={String(option.value)}>
+                    Level {option.value} - {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -124,8 +171,7 @@ export function ImportVocabularyCard({
 
             <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <p>
-                Imported words start at level 2 so they are immediately ready
-                for spaced-repetition review later.
+                Imported words will start at {startingLevelLabel} (Level {startingLevel}). Existing entries are only promoted up to this level and never downgraded.
               </p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
