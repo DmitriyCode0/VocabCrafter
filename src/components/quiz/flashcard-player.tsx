@@ -70,9 +70,7 @@ export function FlashcardPlayer({
   function goNext() {
     setSlideDirection(1);
     setIsFlipped(false);
-    setCurrentIndex((index) =>
-      index < cards.length - 1 ? index + 1 : index,
-    );
+    setCurrentIndex((index) => (index < cards.length - 1 ? index + 1 : index));
   }
 
   function goPrev() {
@@ -138,12 +136,12 @@ export function FlashcardPlayer({
           <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-primary/10 via-primary/[0.04] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100" />
           <CardContent className="relative w-full px-5 py-5 sm:px-8 sm:py-8 lg:min-h-[255px] lg:px-10 lg:py-8">
             <div className="absolute right-5 top-5 z-10 sm:right-8 sm:top-8 lg:right-10 lg:top-10">
-                <BrowserTtsButton
-                  text={isFlipped ? card.definition : card.term}
-                  language={isFlipped ? sourceLanguage : targetLanguage}
-                  label="Listen"
-                  className="bg-background/80 shadow-sm backdrop-blur-sm hover:bg-background/90"
-                />
+              <BrowserTtsButton
+                text={isFlipped ? card.definition : card.term}
+                language={isFlipped ? sourceLanguage : targetLanguage}
+                label="Listen"
+                className="bg-background/80 shadow-sm backdrop-blur-sm hover:bg-background/90"
+              />
             </div>
 
             <div className="flex h-full min-h-[200px] items-center justify-center py-6 sm:min-h-[220px] sm:py-8 lg:min-h-[205px] lg:py-4">
@@ -157,7 +155,10 @@ export function FlashcardPlayer({
                 <div className="w-full [perspective:1600px]">
                   <motion.div
                     className="relative mx-auto h-[180px] w-full max-w-xl sm:h-[200px] lg:h-[170px]"
-                    animate={{ rotateY: isFlipped ? 180 : 0, scale: isFlipped ? 0.985 : 1 }}
+                    animate={{
+                      rotateY: isFlipped ? 180 : 0,
+                      scale: isFlipped ? 0.985 : 1,
+                    }}
                     transition={{ type: "spring", stiffness: 260, damping: 30 }}
                     style={{ transformStyle: "preserve-3d" }}
                   >
@@ -172,7 +173,10 @@ export function FlashcardPlayer({
 
                     <div
                       className="absolute inset-0 flex items-center justify-center px-4 text-center"
-                      style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+                      style={{
+                        backfaceVisibility: "hidden",
+                        transform: "rotateY(180deg)",
+                      }}
                     >
                       <div className="mx-auto w-full max-w-2xl space-y-5 text-center">
                         <p className="mx-auto text-center text-3xl font-semibold tracking-tight text-primary sm:text-4xl lg:text-5xl">
@@ -188,7 +192,7 @@ export function FlashcardPlayer({
                       </div>
                     </div>
                   </motion.div>
-              </div>
+                </div>
               </motion.div>
             </div>
           </CardContent>
@@ -263,10 +267,12 @@ export function FlashcardPlayer({
             </Button>
             <Button
               onClick={() => {
-                const results: FlashcardResult[] = cards.map((currentCard, idx) => ({
-                  term: currentCard.term,
-                  known: known.has(idx),
-                }));
+                const results: FlashcardResult[] = cards.map(
+                  (currentCard, idx) => ({
+                    term: currentCard.term,
+                    known: known.has(idx),
+                  }),
+                );
                 onComplete(results, known.size, cards.length);
               }}
             >
