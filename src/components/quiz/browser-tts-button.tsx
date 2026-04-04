@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Square, Volume2 } from "lucide-react";
+import { GEMINI_TTS_CACHE_NAME } from "@/lib/ai/tts-voices";
 import { getSpeechLanguageTag } from "@/lib/languages";
-
-const GEMINI_TTS_CACHE_NAME = "gemini-tts-v1";
 
 interface BrowserTtsButtonProps {
   text: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/use-user";
 import {
@@ -32,50 +32,79 @@ import {
   type LearningLanguage,
   type SourceLanguage,
 } from "@/lib/languages";
+import {
+  DEFAULT_GEMINI_TTS_VOICE,
+  GEMINI_TTS_CACHE_NAMES_TO_CLEAR,
+  GEMINI_TTS_VOICE_OPTIONS,
+  normalizeGeminiTtsVoice,
+  type GeminiTtsVoice,
+} from "@/lib/ai/tts-voices";
+
+async function clearGeminiTtsCaches() {
+  if (typeof window === "undefined" || !("caches" in window)) {
+    return;
+  }
+
+  await Promise.all(
+    GEMINI_TTS_CACHE_NAMES_TO_CLEAR.map((cacheName) =>
+      window.caches.delete(cacheName),
+    ),
+  );
+}
+
+interface SettingsDraft {
+  fullName: string;
+  cefrLevel: string;
+  learningLanguage: LearningLanguage;
+  sourceLanguage: SourceLanguage;
+  aiVoice: GeminiTtsVoice;
+}
 
 export default function SettingsPage() {
   const { profile, isLoading: profileLoading } = useUser();
-  const [fullName, setFullName] = useState("");
-  const [cefrLevel, setCefrLevel] = useState("B1");
-  const [learningLanguage, setLearningLanguage] =
-    useState<LearningLanguage>("english");
-  const [sourceLanguage, setSourceLanguage] =
-    useState<SourceLanguage>("ukrainian");
+  const [draft, setDraft] = useState<SettingsDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const profileLearningLanguage = normalizeLearningLanguage(
+    profile?.preferred_language,
+  );
+  const profileSourceLanguage = normalizeSourceLanguage(
+    profile?.source_language,
+  );
+  const profileAiVoice = normalizeGeminiTtsVoice(profile?.ai_voice);
+  const profileAllowedCefrLevels = getAllowedCefrLevels(profileLearningLanguage);
+  const profileCefrLevel = profileAllowedCefrLevels.includes(
+    profile?.cefr_level as (typeof profileAllowedCefrLevels)[number],
+  )
+    ? profile?.cefr_level ?? getDefaultCefrLevelForLanguage(profileLearningLanguage)
+    : getDefaultCefrLevelForLanguage(profileLearningLanguage);
+
+  const baseDraft: SettingsDraft = {
+    fullName: profile?.full_name ?? "",
+    cefrLevel: profileCefrLevel,
+    learningLanguage: profileLearningLanguage,
+    sourceLanguage: profileSourceLanguage,
+    aiVoice: profileAiVoice ?? DEFAULT_GEMINI_TTS_VOICE,
+  };
+
+  const fullName = draft?.fullName ?? baseDraft.fullName;
+  const learningLanguage = draft?.learningLanguage ?? baseDraft.learningLanguage;
+  const sourceLanguage = draft?.sourceLanguage ?? baseDraft.sourceLanguage;
+  const aiVoice = draft?.aiVoice ?? baseDraft.aiVoice;
+  const rawCefrLevel = draft?.cefrLevel ?? baseDraft.cefrLevel;
+
   const allowedCefrLevels = getAllowedCefrLevels(learningLanguage);
+  const cefrLevel = allowedCefrLevels.includes(
+    rawCefrLevel as (typeof allowedCefrLevels)[number],
+  )
+    ? rawCefrLevel
+    : getDefaultCefrLevelForLanguage(learningLanguage);
 
-  useEffect(() => {
-    if (profile) {
-      setFullName(profile.full_name || "");
-      const normalizedLearningLanguage = normalizeLearningLanguage(
-        profile.preferred_language,
-      );
-      setLearningLanguage(normalizedLearningLanguage);
-      setSourceLanguage(normalizeSourceLanguage(profile.source_language));
-
-      const allowedLevels = getAllowedCefrLevels(normalizedLearningLanguage);
-      const nextCefrLevel = allowedLevels.includes(
-        profile.cefr_level as (typeof allowedLevels)[number],
-      )
-        ? profile.cefr_level
-        : getDefaultCefrLevelForLanguage(normalizedLearningLanguage);
-
-      setCefrLevel(nextCefrLevel);
-    }
-  }, [profile]);
-
-  useEffect(() => {
-    if (
-      !allowedCefrLevels.includes(
-        cefrLevel as (typeof allowedCefrLevels)[number],
-      )
-    ) {
-      setCefrLevel(getDefaultCefrLevelForLanguage(learningLanguage));
-    }
-  }, [allowedCefrLevels, cefrLevel, learningLanguage]);
+  function updateDraft(transform: (current: SettingsDraft) => SettingsDraft) {
+    setDraft((current) => transform(current ?? baseDraft));
+  }
 
   async function handleSave() {
     if (!profile) return;
@@ -83,6 +112,8 @@ export default function SettingsPage() {
     setSaving(true);
     setError(null);
     setSaved(false);
+
+    const normalizedAiVoice = normalizeGeminiTtsVoice(aiVoice);
 
     const supabase = createClient();
 
@@ -93,12 +124,21 @@ export default function SettingsPage() {
         cefr_level: cefrLevel,
         preferred_language: learningLanguage,
         source_language: sourceLanguage,
+        ai_voice: normalizedAiVoice,
       })
       .eq("id", profile.id);
 
     if (updateError) {
       setError(updateError.message);
     } else {
+      if (profileAiVoice !== normalizedAiVoice) {
+        try {
+          await clearGeminiTtsCaches();
+        } catch (cacheError) {
+          console.warn("Failed to clear cached TTS audio after voice change.", cacheError);
+        }
+      }
+
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     }
@@ -137,7 +177,12 @@ export default function SettingsPage() {
               id="fullName"
               placeholder="Your full name"
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              onChange={(event) =>
+                updateDraft((current) => ({
+                  ...current,
+                  fullName: event.target.value,
+                }))
+              }
             />
           </div>
 
@@ -145,9 +190,26 @@ export default function SettingsPage() {
             <Label htmlFor="learningLanguage">Language You Are Learning</Label>
             <Select
               value={learningLanguage}
-              onValueChange={(value) =>
-                setLearningLanguage(value as LearningLanguage)
-              }
+              onValueChange={(value) => {
+                const nextLearningLanguage = value as LearningLanguage;
+
+                updateDraft((current) => {
+                  const nextAllowedCefrLevels = getAllowedCefrLevels(
+                    nextLearningLanguage,
+                  );
+                  const nextCefrLevel = nextAllowedCefrLevels.includes(
+                    current.cefrLevel as (typeof nextAllowedCefrLevels)[number],
+                  )
+                    ? current.cefrLevel
+                    : getDefaultCefrLevelForLanguage(nextLearningLanguage);
+
+                  return {
+                    ...current,
+                    learningLanguage: nextLearningLanguage,
+                    cefrLevel: nextCefrLevel,
+                  };
+                });
+              }}
             >
               <SelectTrigger id="learningLanguage">
                 <SelectValue placeholder="Select a learning language" />
@@ -166,9 +228,12 @@ export default function SettingsPage() {
             <Label htmlFor="sourceLanguage">Language You Learn From</Label>
             <Select
               value={sourceLanguage}
-              onValueChange={(value) =>
-                setSourceLanguage(value as SourceLanguage)
-              }
+              onValueChange={(value) => {
+                updateDraft((current) => ({
+                  ...current,
+                  sourceLanguage: value as SourceLanguage,
+                }));
+              }}
             >
               <SelectTrigger id="sourceLanguage">
                 <SelectValue placeholder="Select a source language" />
@@ -183,10 +248,45 @@ export default function SettingsPage() {
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="aiVoice">AI Voice</Label>
+            <Select
+              value={aiVoice}
+              onValueChange={(value) => {
+                updateDraft((current) => ({
+                  ...current,
+                  aiVoice: value as GeminiTtsVoice,
+                }));
+              }}
+            >
+              <SelectTrigger id="aiVoice">
+                <SelectValue placeholder="Select an AI voice" />
+              </SelectTrigger>
+              <SelectContent>
+                {GEMINI_TTS_VOICE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label} - {option.description}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Choose which Gemini voice is used for quiz audio playback.
+            </p>
+          </div>
+
           {profile?.role === "student" && (
             <div className="space-y-2">
               <Label htmlFor="cefrLevel">Level (CEFR)</Label>
-              <Select value={cefrLevel} onValueChange={setCefrLevel}>
+              <Select
+                value={cefrLevel}
+                onValueChange={(value) => {
+                  updateDraft((current) => ({
+                    ...current,
+                    cefrLevel: value,
+                  }));
+                }}
+              >
                 <SelectTrigger id="cefrLevel">
                   <SelectValue placeholder="Select your level" />
                 </SelectTrigger>

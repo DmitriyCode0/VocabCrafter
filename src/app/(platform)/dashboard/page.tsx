@@ -21,6 +21,9 @@ import {
   BarChart3,
   PlusCircle,
   Target,
+  Cpu,
+  Zap,
+  CreditCard,
 } from "lucide-react";
 import { fmtLimit } from "@/lib/plans";
 import { getPlan } from "@/lib/plans-server";
@@ -29,12 +32,19 @@ import {
   AnimatedCard,
 } from "@/components/ui/animated-dashboard";
 import { calculateDayStreak } from "@/lib/history/calculate-day-streak";
+import { formatAppMonthName } from "@/lib/dates";
+import { calculateTextCostUsd, calculateTtsCostUsd } from "@/lib/ai/usage";
 
 export const dynamic = "force-dynamic";
 
 function pct(used: number, total: number) {
   if (!isFinite(total) || total === 0) return 0;
   return Math.min(100, Math.round((used / total) * 100));
+}
+
+function formatApproxUsd(value: number) {
+  const digits = value > 0 && value < 0.01 ? 4 : 2;
+  return `$${value.toFixed(digits)}`;
 }
 
 export default async function DashboardPage() {
@@ -368,25 +378,139 @@ async function TutorDashboard({
 }
 
 async function AdminDashboard() {
-  const supabase = await createClient();
+  const supabaseAdmin = createAdminClient();
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const monthISO = monthStart.toISOString();
+  const monthLabel = formatAppMonthName(new Date());
 
   const [
     { count: userCount },
-    { count: quizCount },
-    { count: classCount },
-    { count: attemptCount },
+    { count: totalQuizCount },
+    { count: monthlyQuizCount },
+    monthlyUsageEventsResult,
   ] = await Promise.all([
-    supabase.from("profiles").select("*", { count: "exact", head: true }),
-    supabase.from("quizzes").select("*", { count: "exact", head: true }),
-    supabase.from("classes").select("*", { count: "exact", head: true }),
-    supabase.from("quiz_attempts").select("*", { count: "exact", head: true }),
+    supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }),
+    supabaseAdmin.from("quizzes").select("id", { count: "exact", head: true }),
+    supabaseAdmin
+      .from("quizzes")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", monthISO),
+    supabaseAdmin
+      .from("ai_usage_events")
+      .select(
+        "request_type, prompt_tokens, response_tokens, audio_output_tokens",
+      )
+      .gte("created_at", monthISO),
   ]);
+
+  if (monthlyUsageEventsResult.error) {
+    console.error("Failed to load admin dashboard AI usage summary:", {
+      message: monthlyUsageEventsResult.error.message,
+    });
+  }
+
+  const monthlyUsageEvents = monthlyUsageEventsResult.data ?? [];
+  const textEvents = monthlyUsageEvents.filter(
+    (event) => event.request_type === "text",
+  );
+  const ttsEvents = monthlyUsageEvents.filter(
+    (event) => event.request_type === "tts",
+  );
+  const textRequestCount = textEvents.length;
+  const ttsRequestCount = ttsEvents.length;
+  const trackedRequestCount = monthlyUsageEvents.length;
+  const textCost = calculateTextCostUsd(
+    textEvents.reduce((sum, event) => sum + (event.prompt_tokens ?? 0), 0),
+    textEvents.reduce((sum, event) => sum + (event.response_tokens ?? 0), 0),
+  );
+  const ttsCost = calculateTtsCostUsd(
+    ttsEvents.reduce((sum, event) => sum + (event.prompt_tokens ?? 0), 0),
+    ttsEvents.reduce((sum, event) => sum + (event.audio_output_tokens ?? 0), 0),
+  );
+  const totalTrackedCost = textCost + ttsCost;
 
   return (
     <div className="space-y-6">
-      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <AnimatedCard>
-          <Card>
+          <Card data-tour-id="admin-quizzes-created">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">
+                Quizzes Created
+              </CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {(totalQuizCount ?? 0).toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {(monthlyQuizCount ?? 0).toLocaleString()} created this month
+              </p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
+
+        <AnimatedCard>
+          <Card data-tour-id="admin-text-requests">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">
+                Text Requests
+              </CardTitle>
+              <Cpu className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {textRequestCount.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {formatApproxUsd(textCost)} tracked in {monthLabel}
+              </p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
+
+        <AnimatedCard>
+          <Card data-tour-id="admin-tts-requests">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">TTS Requests</CardTitle>
+              <Zap className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {ttsRequestCount.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {formatApproxUsd(ttsCost)} tracked in {monthLabel}
+              </p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
+
+        <AnimatedCard>
+          <Card data-tour-id="admin-tracked-cost">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">
+                Tracked Cost
+              </CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {formatApproxUsd(totalTrackedCost)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {trackedRequestCount.toLocaleString()} tracked AI requests in {monthLabel}
+              </p>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
+
+        <AnimatedCard>
+          <Card data-tour-id="admin-total-users">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total Users</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
@@ -394,45 +518,6 @@ async function AdminDashboard() {
             <CardContent>
               <div className="text-2xl font-bold">{userCount ?? 0}</div>
               <p className="text-xs text-muted-foreground">registered users</p>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Quizzes</CardTitle>
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{quizCount ?? 0}</div>
-              <p className="text-xs text-muted-foreground">quizzes created</p>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Classes</CardTitle>
-              <GraduationCap className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{classCount ?? 0}</div>
-              <p className="text-xs text-muted-foreground">active classes</p>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Attempts</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{attemptCount ?? 0}</div>
-              <p className="text-xs text-muted-foreground">quiz attempts</p>
             </CardContent>
           </Card>
         </AnimatedCard>

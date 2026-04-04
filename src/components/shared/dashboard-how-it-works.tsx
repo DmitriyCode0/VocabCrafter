@@ -75,16 +75,39 @@ const TOUR_STEPS: Record<Role, TourStep[]> = {
   ],
   superadmin: [
     {
-      targetId: "admin-analytics",
-      title: "Analytics Page",
+      targetId: "admin-quizzes-created",
+      title: "Quizzes Created",
       description:
-        "See platform-wide metrics, activity volume, and adoption trends across the product.",
+        "This total tracks all quizzes ever generated on the platform, with the helper text showing how many were created this month.",
+      hint: "Use Analytics when you want the creator-by-creator breakdown.",
     },
     {
-      targetId: "admin-users",
-      title: "Users Page",
+      targetId: "admin-text-requests",
+      title: "Text Requests",
       description:
-        "Manage accounts, roles, and onboarding state from one place.",
+        "This shows the current month's tracked text-generation requests using the same Gemini usage data and pricing basis as Billing.",
+      hint: "Open Billing for token totals and the detailed pricing basis.",
+    },
+    {
+      targetId: "admin-tts-requests",
+      title: "TTS Requests",
+      description:
+        "This card counts the current month's tracked text-to-speech requests and summarizes their estimated cost.",
+      hint: "Billing shows the split between text input tokens and audio output tokens.",
+    },
+    {
+      targetId: "admin-tracked-cost",
+      title: "Tracked Cost",
+      description:
+        "This combines the tracked text and TTS spend for the current month so you can see the platform's measured AI cost at a glance.",
+      hint: "It only includes requests captured in ai_usage_events, not older legacy combined counters.",
+    },
+    {
+      targetId: "admin-total-users",
+      title: "Total Users",
+      description:
+        "This is the current number of registered users across the platform.",
+      hint: "Use the Users page to inspect roles, onboarding state, and account changes.",
     },
   ],
 };
@@ -103,7 +126,6 @@ export function DashboardHowItWorksButton({
   const [hasSeen, setHasSeen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const [steps, setSteps] = useState<TourStep[]>([]);
   const [stepIndex, setStepIndex] = useState(0);
   const [stepDirection, setStepDirection] = useState<1 | -1>(1);
@@ -114,21 +136,24 @@ export function DashboardHowItWorksButton({
     height: number;
   } | null>(null);
   const isHeaderPlacement = placement === "header";
+  const portalRoot = typeof document === "undefined" ? null : document.body;
 
   const activeStep = steps[stepIndex] ?? null;
 
   useEffect(() => {
-    setPortalRoot(document.body);
-  }, []);
+    const frameId = window.requestAnimationFrame(() => {
+      setIsHydrated(true);
 
-  useEffect(() => {
-    setIsHydrated(true);
+      try {
+        setHasSeen(window.localStorage.getItem(getStorageKey(role)) === "1");
+      } catch {
+        setHasSeen(false);
+      }
+    });
 
-    try {
-      setHasSeen(window.localStorage.getItem(getStorageKey(role)) === "1");
-    } catch {
-      setHasSeen(false);
-    }
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
   }, [role]);
 
   useEffect(() => {
@@ -148,8 +173,6 @@ export function DashboardHowItWorksButton({
     if (!isOpen || !activeStep || !portalRoot) {
       return;
     }
-
-    setTargetRect(null);
 
     const selector = `[data-tour-id="${activeStep.targetId}"]`;
     const getTarget = () => document.querySelector<HTMLElement>(selector);
@@ -199,6 +222,7 @@ export function DashboardHowItWorksButton({
     });
 
     frameId = window.requestAnimationFrame(() => {
+      setTargetRect(null);
       updateRect();
       settleFrameId = window.requestAnimationFrame(updateRect);
     });

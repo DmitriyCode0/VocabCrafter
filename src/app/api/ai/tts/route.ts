@@ -3,13 +3,16 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { extractTtsUsageSnapshot, recordAIUsageEvent } from "@/lib/ai/usage";
+import {
+  DEFAULT_GEMINI_TTS_VOICE,
+  normalizeGeminiTtsVoice,
+} from "@/lib/ai/tts-voices";
 import { getGenAI, GEMINI_TTS_MODEL } from "@/lib/gemini/client";
 import { getSpeechLanguageTag } from "@/lib/languages";
 
 const SAMPLE_RATE = 24000;
 const CHANNEL_COUNT = 1;
 const BITS_PER_SAMPLE = 16;
-const DEFAULT_VOICE = "Kore";
 
 const requestSchema = z.object({
   text: z.string().trim().min(1).max(3000),
@@ -80,6 +83,22 @@ export async function POST(request: Request) {
     }
 
     const { text, language } = parsed.data;
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("ai_voice")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.warn("Failed to load AI voice preference, using default.", {
+        userId: user.id,
+        message: profileError.message,
+      });
+    }
+
+    const voiceName = normalizeGeminiTtsVoice(
+      profile?.ai_voice ?? DEFAULT_GEMINI_TTS_VOICE,
+    );
     const prompt = buildTtsPrompt(text);
     const response = await getGenAI().models.generateContent({
       model: GEMINI_TTS_MODEL,
@@ -90,7 +109,7 @@ export async function POST(request: Request) {
           languageCode: getSpeechLanguageTag(language),
           voiceConfig: {
             prebuiltVoiceConfig: {
-              voiceName: DEFAULT_VOICE,
+              voiceName,
             },
           },
         },
