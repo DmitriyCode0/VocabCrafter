@@ -54,12 +54,11 @@ export const GEMINI_TTS_VOICE_OPTIONS = [
   { value: "Sulafat", label: "Sulafat", description: "Warm" },
 ] as const;
 
-export type GeminiTtsVoice =
-  (typeof GEMINI_TTS_VOICE_OPTIONS)[number]["value"];
+export type GeminiTtsVoice = (typeof GEMINI_TTS_VOICE_OPTIONS)[number]["value"];
 
-export function normalizeGeminiTtsVoice(
-  value?: string | null,
-): GeminiTtsVoice {
-  const match = GEMINI_TTS_VOICE_OPTIONS.find((option) => option.value === value);
+export function normalizeGeminiTtsVoice(value?: string | null): GeminiTtsVoice {
+  const match = GEMINI_TTS_VOICE_OPTIONS.find(
+    (option) => option.value === value,
+  );
   return match?.value ?? DEFAULT_GEMINI_TTS_VOICE;
 }

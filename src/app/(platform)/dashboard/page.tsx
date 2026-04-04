@@ -476,7 +476,9 @@ async function AdminDashboard() {
         <AnimatedCard>
           <Card data-tour-id="admin-tts-requests">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">TTS Requests</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                TTS Requests
+              </CardTitle>
               <Zap className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -503,7 +505,8 @@ async function AdminDashboard() {
                 {formatApproxUsd(totalTrackedCost)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {trackedRequestCount.toLocaleString()} tracked AI requests in {monthLabel}
+                {trackedRequestCount.toLocaleString()} tracked AI requests in{" "}
+                {monthLabel}
               </p>
             </CardContent>
           </Card>

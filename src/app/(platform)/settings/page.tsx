@@ -74,11 +74,14 @@ export default function SettingsPage() {
     profile?.source_language,
   );
   const profileAiVoice = normalizeGeminiTtsVoice(profile?.ai_voice);
-  const profileAllowedCefrLevels = getAllowedCefrLevels(profileLearningLanguage);
+  const profileAllowedCefrLevels = getAllowedCefrLevels(
+    profileLearningLanguage,
+  );
   const profileCefrLevel = profileAllowedCefrLevels.includes(
     profile?.cefr_level as (typeof profileAllowedCefrLevels)[number],
   )
-    ? profile?.cefr_level ?? getDefaultCefrLevelForLanguage(profileLearningLanguage)
+    ? (profile?.cefr_level ??
+      getDefaultCefrLevelForLanguage(profileLearningLanguage))
     : getDefaultCefrLevelForLanguage(profileLearningLanguage);
 
   const baseDraft: SettingsDraft = {
@@ -90,7 +93,8 @@ export default function SettingsPage() {
   };
 
   const fullName = draft?.fullName ?? baseDraft.fullName;
-  const learningLanguage = draft?.learningLanguage ?? baseDraft.learningLanguage;
+  const learningLanguage =
+    draft?.learningLanguage ?? baseDraft.learningLanguage;
   const sourceLanguage = draft?.sourceLanguage ?? baseDraft.sourceLanguage;
   const aiVoice = draft?.aiVoice ?? baseDraft.aiVoice;
   const rawCefrLevel = draft?.cefrLevel ?? baseDraft.cefrLevel;
@@ -135,7 +139,10 @@ export default function SettingsPage() {
         try {
           await clearGeminiTtsCaches();
         } catch (cacheError) {
-          console.warn("Failed to clear cached TTS audio after voice change.", cacheError);
+          console.warn(
+            "Failed to clear cached TTS audio after voice change.",
+            cacheError,
+          );
         }
       }
 
@@ -194,9 +201,8 @@ export default function SettingsPage() {
                 const nextLearningLanguage = value as LearningLanguage;
 
                 updateDraft((current) => {
-                  const nextAllowedCefrLevels = getAllowedCefrLevels(
-                    nextLearningLanguage,
-                  );
+                  const nextAllowedCefrLevels =
+                    getAllowedCefrLevels(nextLearningLanguage);
                   const nextCefrLevel = nextAllowedCefrLevels.includes(
                     current.cefrLevel as (typeof nextAllowedCefrLevels)[number],
                   )
