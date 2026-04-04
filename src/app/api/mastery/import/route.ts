@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getNextReviewDateForLevel } from "@/lib/mastery/engine";
 
+const DEFAULT_IMPORTED_LEVEL = 2;
+
 const importVocabularySchema = z.object({
   terms: z
     .array(
@@ -21,8 +23,6 @@ const importVocabularySchema = z.object({
     .max(5)
     .default(DEFAULT_IMPORTED_LEVEL),
 });
-
-const DEFAULT_IMPORTED_LEVEL = 2;
 
 function getImportSeedForLevel(level: number) {
   switch (level) {

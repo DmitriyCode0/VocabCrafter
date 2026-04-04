@@ -51,6 +51,15 @@ interface GenerateOptions {
   prompt: string;
   systemInstruction: string;
   temperature?: number;
+  contents?: Array<
+    | { text: string }
+    | {
+        inlineData: {
+          mimeType: string;
+          data: string;
+        };
+      }
+  >;
 }
 
 interface GenerateWithUsageResult<T> {
@@ -96,7 +105,7 @@ async function generateFromGeminiRequest<T>(
   return withRetry(async () => {
     const response = await getGenAI().models.generateContent({
       model: GEMINI_MODEL,
-      contents: options.prompt,
+      contents: options.contents ?? options.prompt,
       config: {
         systemInstruction: options.systemInstruction,
         temperature: options.temperature ?? 0.7,
