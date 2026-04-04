@@ -307,7 +307,8 @@ export default function SettingsPage() {
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Hear how this voice sounds in {selectedLearningLanguageLabel} before you save it.
+                    Hear how this voice sounds in{" "}
+                    {selectedLearningLanguageLabel} before you save it.
                   </p>
                 </div>
               </div>
