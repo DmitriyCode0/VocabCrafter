@@ -123,8 +123,8 @@ export function ImportVocabularyCard({
             </CardTitle>
             <CardDescription>
               Paste a word list, raw text, or screenshots, review the parsed
-              terms, and save them straight into your vocabulary library
-              without creating a quiz.
+              terms, and save them straight into your vocabulary library without
+              creating a quiz.
             </CardDescription>
           </div>
 

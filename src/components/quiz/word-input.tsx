@@ -103,7 +103,9 @@ export function WordInput({
       const dataUrl = await readFileAsDataUrl(file);
       nextDrafts.push({
         id: createScreenshotId(),
-        name: file.name || `Screenshot ${screenshots.length + nextDrafts.length + 1}`,
+        name:
+          file.name ||
+          `Screenshot ${screenshots.length + nextDrafts.length + 1}`,
         mimeType: file.type,
         dataUrl,
       });
@@ -196,7 +198,8 @@ export function WordInput({
           className="font-mono text-sm"
         />
         <p className="text-xs text-muted-foreground">
-          You can paste text directly, upload screenshots, or paste a screenshot from your clipboard.
+          You can paste text directly, upload screenshots, or paste a screenshot
+          from your clipboard.
         </p>
       </div>
 
@@ -205,7 +208,8 @@ export function WordInput({
           <div className="space-y-1">
             <p className="text-sm font-medium">Add screenshots</p>
             <p className="text-xs text-muted-foreground">
-              PNG, JPEG, or WEBP. Up to {MAX_SCREENSHOTS} screenshots, 5 MB each.
+              PNG, JPEG, or WEBP. Up to {MAX_SCREENSHOTS} screenshots, 5 MB
+              each.
             </p>
           </div>
           <>

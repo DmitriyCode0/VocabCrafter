@@ -11,26 +11,28 @@ import {
   normalizeSourceLanguage,
 } from "@/lib/languages";
 
-const requestSchema = z.object({
-  text: z.string().max(10000).default(""),
-  targetLanguage: z.enum(["english", "spanish"]).optional(),
-  sourceLanguage: z.enum(["english", "ukrainian"]).optional(),
-  screenshots: z
-    .array(
-      z.object({
-        mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]),
-        data: z.string().min(1),
-      }),
-    )
-    .max(3)
-    .default([]),
-}).refine(
-  (value) => value.text.trim().length > 0 || value.screenshots.length > 0,
-  {
-    message: "Provide text or at least one screenshot",
-    path: ["text"],
-  },
-);
+const requestSchema = z
+  .object({
+    text: z.string().max(10000).default(""),
+    targetLanguage: z.enum(["english", "spanish"]).optional(),
+    sourceLanguage: z.enum(["english", "ukrainian"]).optional(),
+    screenshots: z
+      .array(
+        z.object({
+          mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]),
+          data: z.string().min(1),
+        }),
+      )
+      .max(3)
+      .default([]),
+  })
+  .refine(
+    (value) => value.text.trim().length > 0 || value.screenshots.length > 0,
+    {
+      message: "Provide text or at least one screenshot",
+      path: ["text"],
+    },
+  );
 
 const parsedTermSchema = z.object({
   terms: z.array(
@@ -124,8 +126,7 @@ User input summary:
 - Screenshot-first extraction mode: ${hasScreenshots ? "enabled" : "disabled"}`;
 
     const contents: Array<
-      | { text: string }
-      | { inlineData: { mimeType: string; data: string } }
+      { text: string } | { inlineData: { mimeType: string; data: string } }
     > = [{ text: prompt }];
 
     if (hasText) {
