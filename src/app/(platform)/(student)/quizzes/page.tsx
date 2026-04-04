@@ -11,8 +11,10 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { BookOpen, PlusCircle } from "lucide-react";
 import { QuizCard } from "@/components/quiz/quiz-card";
+import { RemoveReviewQuizzesButton } from "@/components/quiz/remove-review-quizzes-button";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
+import { REVIEW_ACTIVITY_TITLE_PREFIX } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -34,17 +36,27 @@ export default async function QuizzesPage({
 
   if (!user) redirect("/login");
 
-  const { count: totalQuizzes } = await supabase
-    .from("quizzes")
-    .select("id", { count: "exact", head: true })
-    .eq("creator_id", user.id);
+  const [totalQuizzesResult, reviewQuizzesResult, quizzesResult] = await Promise.all([
+    supabase
+      .from("quizzes")
+      .select("id", { count: "exact", head: true })
+      .eq("creator_id", user.id),
+    supabase
+      .from("quizzes")
+      .select("id", { count: "exact", head: true })
+      .eq("creator_id", user.id)
+      .ilike("title", `${REVIEW_ACTIVITY_TITLE_PREFIX}%`),
+    supabase
+      .from("quizzes")
+      .select("*")
+      .eq("creator_id", user.id)
+      .order("created_at", { ascending: false })
+      .range(from, to),
+  ]);
 
-  const { data: quizzes, error: quizzesError } = await supabase
-    .from("quizzes")
-    .select("*")
-    .eq("creator_id", user.id)
-    .order("created_at", { ascending: false })
-    .range(from, to);
+  const totalQuizzes = totalQuizzesResult.count;
+  const reviewQuizCount = reviewQuizzesResult.count ?? 0;
+  const { data: quizzes, error: quizzesError } = quizzesResult;
 
   if (quizzesError) {
     console.error("Failed to load quizzes:", quizzesError);
@@ -52,18 +64,19 @@ export default async function QuizzesPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">My Quizzes</h1>
           <p className="text-muted-foreground">
             View and manage your vocabulary quizzes.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <RemoveReviewQuizzesButton reviewCount={reviewQuizCount} />
+          <Button asChild variant="outline" className="w-full sm:w-auto">
             <Link href="/quizzes/review">Review Activity</Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/quizzes/new">
               <PlusCircle className="mr-2 h-4 w-4" />
               New Quiz

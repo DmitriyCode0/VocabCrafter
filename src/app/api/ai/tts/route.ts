@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
+import {
+  extractTtsUsageSnapshot,
+  recordAIUsageEvent,
+} from "@/lib/ai/usage";
 import { getGenAI, GEMINI_TTS_MODEL } from "@/lib/gemini/client";
 import { getSpeechLanguageTag } from "@/lib/languages";
 
@@ -79,9 +83,10 @@ export async function POST(request: Request) {
     }
 
     const { text, language } = parsed.data;
+    const prompt = buildTtsPrompt(text);
     const response = await getGenAI().models.generateContent({
       model: GEMINI_TTS_MODEL,
-      contents: buildTtsPrompt(text),
+      contents: prompt,
       config: {
         responseModalities: ["AUDIO"],
         speechConfig: {
@@ -115,6 +120,21 @@ export async function POST(request: Request) {
 
     const pcmBuffer = Buffer.from(audioData, "base64");
     const wavBuffer = pcmToWavBuffer(pcmBuffer);
+
+    await recordAIUsageEvent({
+      userId: user.id,
+      feature: "tts",
+      requestType: "tts",
+      model: GEMINI_TTS_MODEL,
+      snapshot: extractTtsUsageSnapshot({
+        prompt,
+        pcmByteLength: pcmBuffer.length,
+        sampleRate: SAMPLE_RATE,
+        channelCount: CHANNEL_COUNT,
+        bitsPerSample: BITS_PER_SAMPLE,
+        usageMetadata: response.usageMetadata,
+      }),
+    });
 
     await incrementAICalls(user.id);
 

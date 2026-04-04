@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateFromGemini } from "@/lib/gemini/client";
+import {
+  generateFromGeminiWithUsage,
+  GEMINI_MODEL,
+} from "@/lib/gemini/client";
 import { getQuizPrompt, getSystemInstruction } from "@/lib/gemini/prompts";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
+import { recordAIUsageEvent } from "@/lib/ai/usage";
 import {
   resolveGrammarTopicLabels,
   resolveGrammarTopicPromptDetails,
@@ -118,10 +122,23 @@ export async function POST(request: Request) {
       discussion: discussionResponseSchema,
     };
 
-    const generatedContent = await generateFromGemini(
-      { prompt, systemInstruction, temperature: 0.7 },
+    const { data: generatedContent, usageSnapshot } =
+      await generateFromGeminiWithUsage(
+      {
+        prompt,
+        systemInstruction,
+        temperature: 0.7,
+      },
       SCHEMA_MAP[type],
-    );
+      );
+
+    await recordAIUsageEvent({
+      userId: user.id,
+      feature: "generate_quiz",
+      requestType: "text",
+      model: GEMINI_MODEL,
+      snapshot: usageSnapshot,
+    });
 
     // Increment AI call counter after successful generation
     await incrementAICalls(user.id);

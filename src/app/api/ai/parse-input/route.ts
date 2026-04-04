@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateFromGemini } from "@/lib/gemini/client";
+import {
+  generateFromGeminiWithUsage,
+  GEMINI_MODEL,
+} from "@/lib/gemini/client";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
+import { recordAIUsageEvent } from "@/lib/ai/usage";
 import { z } from "zod";
 import {
   getLearningLanguageLabel,
@@ -95,7 +99,7 @@ Respond with JSON in this exact format:
   ]
 }`;
 
-    const result = await generateFromGemini(
+    const { data: result, usageSnapshot } = await generateFromGeminiWithUsage(
       {
         prompt,
         systemInstruction: `You are a professional ${targetLanguageLabel}-${sourceLanguageLabel} vocabulary extraction tool. Always respond with valid JSON only. Do not include any markdown formatting or code blocks.`,
@@ -103,6 +107,14 @@ Respond with JSON in this exact format:
       },
       parsedTermSchema,
     );
+
+    await recordAIUsageEvent({
+      userId: user.id,
+      feature: "parse_input",
+      requestType: "text",
+      model: GEMINI_MODEL,
+      snapshot: usageSnapshot,
+    });
 
     // Increment AI call counter after successful parse
     await incrementAICalls(user.id);

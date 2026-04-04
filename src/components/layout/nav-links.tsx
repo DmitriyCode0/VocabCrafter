@@ -12,6 +12,7 @@ import {
   MessageSquare,
   BarChart3,
   CreditCard,
+  Crown,
   Settings,
   TrendingUp,
   Zap,
@@ -123,7 +124,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "History",
     href: "/history",
     icon: History,
-    roles: ["student", "tutor", "superadmin"],
+    roles: ["student", "tutor"],
   },
   // Admin items
   {
@@ -143,6 +144,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/grammar-rules",
     icon: FileText,
     roles: ["superadmin"],
+  },
+  {
+    label: "Plans",
+    href: "/plans",
+    icon: Crown,
+    roles: ["student", "tutor", "superadmin"],
   },
   {
     label: "Billing",

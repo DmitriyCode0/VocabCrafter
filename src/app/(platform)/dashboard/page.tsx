@@ -22,12 +22,12 @@ import {
   PlusCircle,
   Target,
 } from "lucide-react";
-import { fmtLimit, getPlan } from "@/lib/plans";
+import { fmtLimit } from "@/lib/plans";
+import { getPlan } from "@/lib/plans-server";
 import {
   AnimatedDashboard,
   AnimatedCard,
 } from "@/components/ui/animated-dashboard";
-import { DashboardHowItWorksButton } from "@/components/shared/dashboard-how-it-works";
 import { calculateDayStreak } from "@/lib/history/calculate-day-streak";
 
 export const dynamic = "force-dynamic";
@@ -58,21 +58,18 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Welcome back, {profile.full_name || profile.email}
-          </h1>
-          <p className="text-muted-foreground">
-            {role === "student" &&
-              "Practice vocabulary, take quizzes, and track your progress."}
-            {role === "tutor" &&
-              "Manage your classes, assign quizzes, and review student work."}
-            {role === "superadmin" &&
-              "Monitor platform analytics and manage users."}
-          </p>
-        </div>
-        <DashboardHowItWorksButton role={role} />
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Welcome back, {profile.full_name || profile.email}
+        </h1>
+        <p className="text-muted-foreground">
+          {role === "student" &&
+            "Practice vocabulary, take quizzes, and track your progress."}
+          {role === "tutor" &&
+            "Manage your classes, assign quizzes, and review student work."}
+          {role === "superadmin" &&
+            "Monitor platform analytics and manage users."}
+        </p>
       </div>
 
       {role === "student" && (
@@ -95,7 +92,7 @@ async function StudentDashboard({
 }) {
   const supabase = await createClient();
   const supabaseAdmin = createAdminClient();
-  const plan = getPlan(planKey);
+  const plan = await getPlan(planKey);
 
   const monthStart = new Date();
   monthStart.setDate(1);
@@ -159,7 +156,7 @@ async function StudentDashboard({
               <div>
                 <CardTitle className="text-base">Review Activity</CardTitle>
                 <CardDescription>
-                  Practice your least known words
+                  Practice due and least known words
                 </CardDescription>
               </div>
             </CardHeader>
@@ -246,7 +243,7 @@ async function TutorDashboard({
 }) {
   const supabase = await createClient();
   const supabaseAdmin = createAdminClient();
-  const plan = getPlan(planKey);
+  const plan = await getPlan(planKey);
 
   const monthStart = new Date();
   monthStart.setDate(1);

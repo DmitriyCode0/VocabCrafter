@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { BookOpen, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { NavLinks } from "./nav-links";
 import { UserMenu } from "./user-menu";
+import { DashboardHowItWorksButton } from "@/components/shared/dashboard-how-it-works";
 import type { Profile } from "@/types/database";
 import type { Role } from "@/types/roles";
 
@@ -19,6 +21,9 @@ interface HeaderProps {
 }
 
 export function Header({ profile }: HeaderProps) {
+  const pathname = usePathname();
+  const isDashboard = pathname === "/dashboard";
+
   return (
     <header className="flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
       {/* Mobile sidebar trigger */}
@@ -48,7 +53,15 @@ export function Header({ profile }: HeaderProps) {
 
       <div className="flex-1" />
 
-      <UserMenu profile={profile} />
+      <div className="flex items-center gap-2">
+        {isDashboard && (
+          <DashboardHowItWorksButton
+            role={profile.role as Role}
+            placement="header"
+          />
+        )}
+        <UserMenu profile={profile} />
+      </div>
     </header>
   );
 }

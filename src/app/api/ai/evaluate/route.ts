@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateFromGemini } from "@/lib/gemini/client";
+import {
+  generateFromGeminiWithUsage,
+  GEMINI_MODEL,
+} from "@/lib/gemini/client";
 import { getEvaluationPrompt } from "@/lib/gemini/prompts";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
+import { recordAIUsageEvent } from "@/lib/ai/usage";
 import {
   resolveGrammarTopicEvaluationInstructions,
   resolveGrammarTopicLabels,
@@ -141,7 +145,8 @@ export async function POST(request: Request) {
       evalConfig,
     );
 
-    const result = await generateFromGemini(
+    const { data: result, usageSnapshot } =
+      await generateFromGeminiWithUsage(
       {
         prompt,
         systemInstruction:
@@ -149,7 +154,15 @@ export async function POST(request: Request) {
         temperature: 0.4,
       },
       evaluationResponseSchema,
-    );
+      );
+
+    await recordAIUsageEvent({
+      userId: user.id,
+      feature: "evaluate",
+      requestType: "text",
+      model: GEMINI_MODEL,
+      snapshot: usageSnapshot,
+    });
 
     // Increment AI call counter after successful evaluation
     await incrementAICalls(user.id);

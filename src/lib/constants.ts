@@ -8,3 +8,5 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   translation_list: "Translation List",
   discussion: "Live Discussion",
 };
+
+export const REVIEW_ACTIVITY_TITLE_PREFIX = "Review Activity - ";

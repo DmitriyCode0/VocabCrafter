@@ -34,7 +34,7 @@ export default function ReviewPage() {
         const data = await response.json();
         if (data.code === "NO_WORDS_TO_REVIEW") {
           setError(
-            "No words to review yet. Keep practicing quizzes to build your vocabulary library!",
+            "No words to review yet. Import vocabulary or keep practicing quizzes to build your vocabulary library!",
           );
         } else if (data.code === "QUOTA_EXCEEDED") {
           setError(data.error);
@@ -84,7 +84,8 @@ export default function ReviewPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Review Activity</h1>
         <p className="text-muted-foreground">
-          Practice your least known words with personalized gap-fill exercises.
+          Practice overdue review words first, then your weakest remaining
+          words, with personalized gap-fill exercises.
         </p>
       </div>
 
@@ -102,10 +103,10 @@ export default function ReviewPage() {
                 1
               </div>
               <div>
-                <p className="font-medium">5 Least Known Words</p>
+                <p className="font-medium">Due Words First</p>
                 <p className="text-sm text-muted-foreground">
-                  We'll select your 5 least practiced words from your vocabulary
-                  library.
+                  We'll queue overdue spaced-repetition words first, then fill
+                  the remaining slots with your weakest tracked words.
                 </p>
               </div>
             </div>

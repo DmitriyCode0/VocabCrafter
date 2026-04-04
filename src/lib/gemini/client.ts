@@ -1,5 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { ZodError, type z } from "zod";
+import {
+  extractTextUsageSnapshot,
+  type AIUsageSnapshot,
+} from "@/lib/ai/usage";
 
 export const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
 export const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
@@ -52,6 +56,11 @@ interface GenerateOptions {
   temperature?: number;
 }
 
+interface GenerateWithUsageResult<T> {
+  data: T;
+  usageSnapshot: AIUsageSnapshot;
+}
+
 function extractJsonPayload(text: string) {
   const cleaned = text
     .replace(/```(?:json)?\s*\n?/g, "")
@@ -83,10 +92,10 @@ function extractJsonPayload(text: string) {
  * Call Gemini with retry logic, parse the JSON response, and validate
  * against the provided Zod schema. Strips markdown code fences if present.
  */
-export async function generateFromGemini<T>(
+async function generateFromGeminiRequest<T>(
   options: GenerateOptions,
   schema: z.ZodSchema<T>,
-): Promise<T> {
+): Promise<GenerateWithUsageResult<T>> {
   return withRetry(async () => {
     const response = await getGenAI().models.generateContent({
       model: GEMINI_MODEL,
@@ -104,6 +113,28 @@ export async function generateFromGemini<T>(
     }
 
     const parsed = extractJsonPayload(text);
-    return schema.parse(parsed);
+    return {
+      data: schema.parse(parsed),
+      usageSnapshot: extractTextUsageSnapshot({
+        prompt: options.prompt,
+        responseText: text,
+        usageMetadata: response.usageMetadata,
+      }),
+    };
   });
+}
+
+export async function generateFromGemini<T>(
+  options: GenerateOptions,
+  schema: z.ZodSchema<T>,
+): Promise<T> {
+  const result = await generateFromGeminiRequest(options, schema);
+  return result.data;
+}
+
+export function generateFromGeminiWithUsage<T>(
+  options: GenerateOptions,
+  schema: z.ZodSchema<T>,
+) {
+  return generateFromGeminiRequest(options, schema);
 }

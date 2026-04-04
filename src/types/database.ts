@@ -53,6 +53,36 @@ export interface Database {
         };
         Relationships: [];
       };
+      plan_limits: {
+        Row: {
+          key: string;
+          price: number;
+          ai_calls_per_month: number;
+          quizzes_per_month: number | null;
+          attempts_per_month: number | null;
+          word_banks: number | null;
+          updated_at: string;
+        };
+        Insert: {
+          key: string;
+          price: number;
+          ai_calls_per_month: number;
+          quizzes_per_month?: number | null;
+          attempts_per_month?: number | null;
+          word_banks?: number | null;
+          updated_at?: string;
+        };
+        Update: {
+          key?: string;
+          price?: number;
+          ai_calls_per_month?: number;
+          quizzes_per_month?: number | null;
+          attempts_per_month?: number | null;
+          word_banks?: number | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       classes: {
         Row: {
           id: string;
@@ -301,6 +331,59 @@ export interface Database {
           },
         ];
       };
+      ai_usage_events: {
+        Row: {
+          id: string;
+          user_id: string;
+          feature: string;
+          request_type: string;
+          provider: string;
+          model: string;
+          prompt_tokens: number;
+          response_tokens: number;
+          audio_output_tokens: number;
+          total_tokens: number;
+          is_estimated: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          feature: string;
+          request_type: string;
+          provider?: string;
+          model: string;
+          prompt_tokens?: number;
+          response_tokens?: number;
+          audio_output_tokens?: number;
+          total_tokens?: number;
+          is_estimated?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          feature?: string;
+          request_type?: string;
+          provider?: string;
+          model?: string;
+          prompt_tokens?: number;
+          response_tokens?: number;
+          audio_output_tokens?: number;
+          total_tokens?: number;
+          is_estimated?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_events_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       grammar_topic_prompt_overrides: {
         Row: {
           topic_key: string;
@@ -484,7 +567,21 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      log_ai_usage_event: {
+        Args: {
+          p_user_id: string;
+          p_feature: string;
+          p_request_type: string;
+          p_provider: string;
+          p_model: string;
+          p_prompt_tokens: number;
+          p_response_tokens: number;
+          p_audio_output_tokens: number;
+          p_total_tokens: number;
+          p_is_estimated: boolean;
+        };
+        Returns: string;
+      };
     };
     Enums: {
       [_ in never]: never;

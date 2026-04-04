@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getPlan } from "@/lib/plans";
+import { getPlan } from "@/lib/plans-server";
 
 interface QuotaResult {
   allowed: boolean;
@@ -29,7 +29,7 @@ export async function checkAIQuota(userId: string): Promise<QuotaResult> {
     return { allowed: false, remaining: 0, limit: 0, used: 0 };
   }
 
-  const plan = getPlan(profile.plan);
+  const plan = await getPlan(profile.plan);
   let used = profile.ai_calls_this_month ?? 0;
 
   // Auto-reset if new month

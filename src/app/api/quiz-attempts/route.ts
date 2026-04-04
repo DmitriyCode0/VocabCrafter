@@ -149,6 +149,14 @@ export async function GET(request: Request) {
     }
 
     const { quizId, limit, offset, student, type } = parsed.data;
+
+    if (profile.role === "superadmin") {
+      return NextResponse.json(
+        { error: "History is not available for superadmin" },
+        { status: 403 },
+      );
+    }
+
     const { attempts, hasMore, activeStudentFilter } =
       await fetchHistoryPageData({
         role: profile.role as Role,

@@ -32,6 +32,11 @@ export default async function HistoryPage({
   if (!profile) redirect("/login");
 
   const role = profile.role as Role;
+
+  if (role === "superadmin") {
+    redirect("/dashboard");
+  }
+
   const { attempts, hasMore, students, activeStudentFilter } =
     await fetchHistoryPageData({
       role,

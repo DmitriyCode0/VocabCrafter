@@ -1,0 +1,171 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getNextReviewDateForLevel } from "@/lib/mastery/engine";
+
+const importVocabularySchema = z.object({
+  terms: z
+    .array(
+      z.object({
+        term: z.string().min(1),
+        definition: z.string().min(1),
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+
+const DEFAULT_IMPORTED_LEVEL = 2;
+const DEFAULT_IMPORTED_CORRECT_COUNT = 1;
+const DEFAULT_IMPORTED_STREAK = 1;
+
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const parsed = importVocabularySchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid request", details: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    const dedupedTerms = new Map<string, { term: string; definition: string }>();
+
+    for (const rawTerm of parsed.data.terms) {
+      const normalizedTerm = rawTerm.term.trim().toLowerCase();
+      const normalizedDefinition = rawTerm.definition.trim();
+
+      if (!normalizedTerm || !normalizedDefinition) {
+        continue;
+      }
+
+      dedupedTerms.set(normalizedTerm, {
+        term: normalizedTerm,
+        definition: normalizedDefinition,
+      });
+    }
+
+    const terms = Array.from(dedupedTerms.values());
+
+    if (terms.length === 0) {
+      return NextResponse.json(
+        { error: "No valid vocabulary terms provided" },
+        { status: 400 },
+      );
+    }
+
+    const supabaseAdmin = createAdminClient();
+    const { data: existingRows, error: existingError } = await supabaseAdmin
+      .from("word_mastery")
+      .select(
+        "term, definition, mastery_level, correct_count, incorrect_count, translation_correct_count, streak, last_practiced, next_review",
+      )
+      .eq("student_id", user.id)
+      .in(
+        "term",
+        terms.map((term) => term.term),
+      );
+
+    if (existingError) {
+      return NextResponse.json(
+        { error: "Failed to inspect existing vocabulary" },
+        { status: 500 },
+      );
+    }
+
+    const existingMap = new Map(
+      (existingRows ?? []).map((row) => [row.term, row]),
+    );
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    const upsertRows = terms.map(({ term, definition }) => {
+      const existing = existingMap.get(term);
+
+      if (!existing) {
+        return {
+          student_id: user.id,
+          term,
+          definition,
+          mastery_level: DEFAULT_IMPORTED_LEVEL,
+          correct_count: DEFAULT_IMPORTED_CORRECT_COUNT,
+          incorrect_count: 0,
+          translation_correct_count: 0,
+          streak: DEFAULT_IMPORTED_STREAK,
+          last_practiced: nowIso,
+          next_review: getNextReviewDateForLevel(DEFAULT_IMPORTED_LEVEL, now),
+        };
+      }
+
+      const nextLevel = Math.max(existing.mastery_level ?? 0, DEFAULT_IMPORTED_LEVEL);
+      const wasPromoted = nextLevel !== (existing.mastery_level ?? 0);
+      const needsCounterSync =
+        (existing.correct_count ?? 0) < DEFAULT_IMPORTED_CORRECT_COUNT ||
+        (existing.streak ?? 0) < DEFAULT_IMPORTED_STREAK;
+      const shouldReschedule = wasPromoted || needsCounterSync;
+
+      return {
+        student_id: user.id,
+        term,
+        definition: definition || existing.definition,
+        mastery_level: nextLevel,
+        correct_count: Math.max(
+          existing.correct_count ?? 0,
+          DEFAULT_IMPORTED_CORRECT_COUNT,
+        ),
+        incorrect_count: existing.incorrect_count ?? 0,
+        translation_correct_count: existing.translation_correct_count ?? 0,
+        streak: Math.max(existing.streak ?? 0, DEFAULT_IMPORTED_STREAK),
+        last_practiced: shouldReschedule
+          ? nowIso
+          : existing.last_practiced ?? nowIso,
+        next_review: shouldReschedule
+          ? getNextReviewDateForLevel(nextLevel, now)
+          : existing.next_review ?? getNextReviewDateForLevel(nextLevel, now),
+      };
+    });
+
+    const { error: upsertError } = await supabaseAdmin
+      .from("word_mastery")
+      .upsert(upsertRows, {
+        onConflict: "student_id,term",
+      });
+
+    if (upsertError) {
+      console.error("Import vocabulary upsert error:", upsertError);
+      return NextResponse.json(
+        { error: "Failed to save imported vocabulary" },
+        { status: 500 },
+      );
+    }
+
+    const existingTerms = new Set((existingRows ?? []).map((row) => row.term));
+    const createdCount = terms.filter((term) => !existingTerms.has(term.term)).length;
+    const updatedCount = terms.length - createdCount;
+
+    return NextResponse.json({
+      importedCount: terms.length,
+      createdCount,
+      updatedCount,
+      defaultLevel: DEFAULT_IMPORTED_LEVEL,
+    });
+  } catch (error) {
+    console.error("Import vocabulary error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}

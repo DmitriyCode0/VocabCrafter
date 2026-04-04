@@ -79,6 +79,19 @@ interface MasteryRow {
   streak: number;
 }
 
+export function getNextReviewDateForLevel(
+  level: number,
+  now: Date = new Date(),
+): string {
+  const normalizedLevel = Math.max(0, Math.min(5, level));
+  const intervalDays =
+    normalizedLevel >= 1 ? Math.pow(2, normalizedLevel - 1) : 1;
+
+  return new Date(
+    now.getTime() + intervalDays * 24 * 60 * 60 * 1000,
+  ).toISOString();
+}
+
 // ── Extract per-word results from quiz answers ─────────────
 
 /**
@@ -303,19 +316,13 @@ export function computeNewMastery(
     }
   }
 
-  // Compute next review interval: 1 day × 2^(level-1), min 1 day
-  const intervalDays = newLevel >= 1 ? Math.pow(2, newLevel - 1) : 1;
-  const nextReview = new Date(
-    now.getTime() + intervalDays * 24 * 60 * 60 * 1000,
-  );
-
   return {
     mastery_level: newLevel,
     correct_count: newCorrect,
     incorrect_count: newIncorrect,
     translation_correct_count: newTranslationCorrect,
     streak: newStreak,
-    next_review: nextReview.toISOString(),
+    next_review: getNextReviewDateForLevel(newLevel, now),
   };
 }
 

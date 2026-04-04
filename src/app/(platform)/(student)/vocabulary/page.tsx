@@ -12,9 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
+import { ImportVocabularyCard } from "@/components/mastery/import-vocabulary-card";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { BookOpen, Clock, Star, TrendingUp, Zap } from "lucide-react";
 import { formatAppDate } from "@/lib/dates";
+import {
+  normalizeLearningLanguage,
+  normalizeSourceLanguage,
+} from "@/lib/languages";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +69,15 @@ export default async function VocabularyPage({
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("preferred_language, source_language")
+    .eq("id", user.id)
+    .single();
+
+  const targetLanguage = normalizeLearningLanguage(profile?.preferred_language);
+  const sourceLanguage = normalizeSourceLanguage(profile?.source_language);
 
   const supabaseAdmin = createAdminClient();
   const nowIso = new Date().toISOString();
@@ -196,6 +210,11 @@ export default async function VocabularyPage({
         </Card>
       </div>
 
+      <ImportVocabularyCard
+        targetLanguage={targetLanguage}
+        sourceLanguage={sourceLanguage}
+      />
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Mastery Levels</CardTitle>
@@ -224,7 +243,8 @@ export default async function VocabularyPage({
             <Zap className="mb-4 h-12 w-12 text-muted-foreground/50" />
             <h3 className="text-lg font-medium">No vocabulary tracked yet</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Complete quizzes to start building your word mastery profile.
+              Import vocabulary or complete quizzes to start building your word
+              mastery profile.
             </p>
           </CardContent>
         </Card>
