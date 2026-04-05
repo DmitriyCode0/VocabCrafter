@@ -14,6 +14,10 @@ import {
   getGrammarTopicDisplayName,
   getPrimaryGrammarTopic,
 } from "@/lib/utils";
+import {
+  summarizePassiveVocabularyEvidence,
+  type PassiveVocabularyEvidenceRow,
+} from "@/lib/mastery/passive-vocabulary";
 import type { CEFRLevel } from "@/types/quiz";
 
 const CEFR_LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
@@ -138,6 +142,23 @@ export interface StudentProgressSnapshot {
     coveredTopics: StudentProgressTopicStat[];
     remainingTopics: Array<{ topicKey: string; label: string; level: string }>;
   };
+  passiveSignals: {
+    uniqueItems: number;
+    wordCount: number;
+    phraseCount: number;
+    equivalentWordCount: number;
+    avgConfidence: number;
+    sampleItems: Array<{
+      term: string;
+      definition: string | null;
+      itemType: "word" | "phrase";
+      sourceType: "full_text" | "manual_list" | "curated_list";
+      sourceLabel: string | null;
+      confidence: number;
+      importCount: number;
+      lastImportedAt: string;
+    }>;
+  };
   words: StudentProgressWord[];
 }
 
@@ -166,8 +187,13 @@ export async function getStudentProgressSnapshot(
 ): Promise<StudentProgressSnapshot> {
   const supabaseAdmin = createAdminClient();
 
-  const [profileResult, attemptsResult, masteryResult, quizCountResult] =
-    await Promise.all([
+  const [
+    profileResult,
+    attemptsResult,
+    masteryResult,
+    quizCountResult,
+    passiveEvidenceResult,
+  ] = await Promise.all([
       supabaseAdmin
         .from("profiles")
         .select("full_name, cefr_level, preferred_language, source_language")
@@ -190,6 +216,13 @@ export async function getStudentProgressSnapshot(
         .from("quizzes")
         .select("id", { count: "exact", head: true })
         .eq("creator_id", userId),
+      supabaseAdmin
+        .from("passive_vocabulary_evidence")
+        .select(
+          "term, definition, item_type, source_type, source_label, confidence, import_count, last_imported_at",
+        )
+        .eq("student_id", userId)
+        .order("last_imported_at", { ascending: false }),
     ]);
 
   if (profileResult.error || !profileResult.data) {
@@ -218,6 +251,9 @@ export async function getStudentProgressSnapshot(
         right.correctCount - left.correctCount ||
         left.term.localeCompare(right.term),
     );
+  const passiveSignals = summarizePassiveVocabularyEvidence(
+    (passiveEvidenceResult.data ?? []) as PassiveVocabularyEvidenceRow[],
+  );
 
   const scoredAttempts = attempts.filter(
     (attempt) => getScorePercent(attempt) !== null,
@@ -407,7 +443,7 @@ export async function getStudentProgressSnapshot(
     {
       key: "determination",
       label: "Determination",
-      shortLabel: "Grit",
+      shortLabel: "Determination",
       score: determinationScore,
       value: `${streakDays} day streak`,
       helper: `21 days is treated as a full habit-forming streak`,
@@ -470,6 +506,7 @@ export async function getStudentProgressSnapshot(
       coveredTopics,
       remainingTopics,
     },
+    passiveSignals,
     words,
   };
 }

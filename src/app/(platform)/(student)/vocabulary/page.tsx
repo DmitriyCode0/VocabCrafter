@@ -12,7 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
+import { DeletePassiveEvidenceButton } from "@/components/mastery/delete-passive-evidence-button";
+import { EditPassiveEvidenceDialog } from "@/components/mastery/edit-passive-evidence-dialog";
 import { ImportVocabularyCard } from "@/components/mastery/import-vocabulary-card";
+import { ImportPassiveVocabularyCard } from "@/components/mastery/import-passive-vocabulary-card";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { BookOpen, Clock, Star, TrendingUp, Zap } from "lucide-react";
 import { formatAppDate } from "@/lib/dates";
@@ -20,10 +23,12 @@ import {
   normalizeLearningLanguage,
   normalizeSourceLanguage,
 } from "@/lib/languages";
+import { summarizePassiveVocabularyEvidence } from "@/lib/mastery/passive-vocabulary";
 
 export const dynamic = "force-dynamic";
 
 const VOCABULARY_PAGE_SIZE = 24;
+const PASSIVE_EVIDENCE_PAGE_SIZE = 18;
 
 const LEVEL_LABELS = [
   "New",
@@ -55,15 +60,32 @@ interface WordMasteryRow {
   next_review: string | null;
 }
 
+interface PassiveEvidenceRow {
+  id: string;
+  term: string;
+  definition: string | null;
+  item_type: "word" | "phrase";
+  source_type: "full_text" | "manual_list" | "curated_list";
+  source_label: string | null;
+  confidence: number;
+  import_count: number;
+  last_imported_at: string;
+}
+
 export default async function VocabularyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; passivePage?: string }>;
 }) {
   const supabase = await createClient();
   const resolvedSearchParams = await searchParams;
   const currentPage = getCurrentPage(resolvedSearchParams.page);
+  const passivePage = getCurrentPage(resolvedSearchParams.passivePage);
   const { from, to } = getPaginationRange(currentPage, VOCABULARY_PAGE_SIZE);
+  const passiveRange = getPaginationRange(
+    passivePage,
+    PASSIVE_EVIDENCE_PAGE_SIZE,
+  );
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -88,6 +110,9 @@ export default async function VocabularyPage({
     dueForReviewResult,
     levelRowsResult,
     wordsResult,
+    passiveEvidenceCountResult,
+    passiveEvidenceSummaryRowsResult,
+    passiveEvidenceRowsResult,
   ] = await Promise.all([
     supabaseAdmin
       .from("word_mastery")
@@ -115,6 +140,24 @@ export default async function VocabularyPage({
       .order("mastery_level", { ascending: true })
       .order("last_practiced", { ascending: false })
       .range(from, to),
+    supabaseAdmin
+      .from("passive_vocabulary_evidence")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", user.id),
+    supabaseAdmin
+      .from("passive_vocabulary_evidence")
+      .select(
+        "term, definition, item_type, source_type, source_label, confidence, import_count, last_imported_at",
+      )
+      .eq("student_id", user.id),
+    supabaseAdmin
+      .from("passive_vocabulary_evidence")
+      .select(
+        "id, term, definition, item_type, source_type, source_label, confidence, import_count, last_imported_at",
+      )
+      .eq("student_id", user.id)
+      .order("last_imported_at", { ascending: false })
+      .range(passiveRange.from, passiveRange.to),
   ]);
 
   const totalWords = totalWordsResult.count ?? 0;
@@ -122,6 +165,21 @@ export default async function VocabularyPage({
   const dueForReview = dueForReviewResult.count ?? 0;
   const levelRows = levelRowsResult.data ?? [];
   const visibleWords = (wordsResult.data ?? []) as WordMasteryRow[];
+  const passiveEvidenceItems =
+    (passiveEvidenceRowsResult.data ?? []) as PassiveEvidenceRow[];
+  const passiveEvidenceTotal = passiveEvidenceCountResult.count ?? 0;
+  const passiveEvidenceSummary = summarizePassiveVocabularyEvidence(
+    ((passiveEvidenceSummaryRowsResult.data ?? []) as PassiveEvidenceRow[]).map((item) => ({
+      term: item.term,
+      definition: item.definition,
+      item_type: item.item_type,
+      source_type: item.source_type,
+      source_label: item.source_label,
+      confidence: item.confidence,
+      import_count: item.import_count,
+      last_imported_at: item.last_imported_at,
+    })),
+  );
 
   const avgLevel =
     levelRows.length > 0
@@ -215,6 +273,46 @@ export default async function VocabularyPage({
         sourceLanguage={sourceLanguage}
       />
 
+      <ImportPassiveVocabularyCard
+        targetLanguage={targetLanguage}
+        sourceLanguage={sourceLanguage}
+      />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Passive Evidence</CardTitle>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{passiveEvidenceTotal}</div>
+            <p className="text-xs text-muted-foreground">words and phrases tracked as recognition only</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Equivalent Words</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{passiveEvidenceSummary.equivalentWordCount}</div>
+            <p className="text-xs text-muted-foreground">weighted contribution to passive-recognition estimates</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Avg Confidence</CardTitle>
+            <Star className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{passiveEvidenceSummary.avgConfidence.toFixed(1)}</div>
+            <p className="text-xs text-muted-foreground">out of 5 confidence across all passive evidence</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Mastery Levels</CardTitle>
@@ -234,6 +332,67 @@ export default async function VocabularyPage({
               </Badge>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Passive Recognition Evidence</CardTitle>
+          <CardDescription>
+            Imported words and phrases from texts or curated lists. These stay
+            out of review and can be edited or removed later.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {passiveEvidenceItems.length === 0 ? (
+            <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+              No passive evidence imported yet.
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {passiveEvidenceItems.map((item) => (
+                  <div key={item.id} className="flex flex-col gap-3 rounded-lg border p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{item.term}</p>
+                        {item.definition && (
+                          <p className="truncate text-xs text-muted-foreground">
+                            {item.definition}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <EditPassiveEvidenceDialog evidence={item} />
+                        <DeletePassiveEvidenceButton evidenceId={item.id} term={item.term} />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge variant="outline">{item.item_type === "phrase" ? "Phrase" : "Word"}</Badge>
+                      <Badge variant="secondary">Confidence {item.confidence}/5</Badge>
+                      <Badge variant="outline">{item.source_type.replace("_", " ")}</Badge>
+                    </div>
+
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      {item.source_label && <p>Source: {item.source_label}</p>}
+                      <p>Imported {item.import_count} time{item.import_count !== 1 ? "s" : ""}</p>
+                      <p>Last updated {formatAppDate(item.last_imported_at)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <PagePagination
+                pathname="/vocabulary"
+                currentPage={passivePage}
+                pageSize={PASSIVE_EVIDENCE_PAGE_SIZE}
+                totalItems={passiveEvidenceTotal}
+                searchParams={resolvedSearchParams}
+                pageParam="passivePage"
+              />
+            </>
+          )}
         </CardContent>
       </Card>
 

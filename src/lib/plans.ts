@@ -4,6 +4,7 @@ import {
   Cpu,
   CreditCard,
   Database,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,6 +19,7 @@ export interface PlanDefinition {
   price: number; // monthly USD, 0 = free
   badge: "default" | "secondary" | "outline";
   aiCallsPerMonth: number;
+  reportsPerMonth: number;
   quizzesPerMonth: number; // Infinity = unlimited
   attemptsPerMonth: number;
   wordBanks: number; // max saved word banks
@@ -32,6 +34,7 @@ export const DEFAULT_PLANS: Record<PlanKey, PlanDefinition> = {
     price: 0,
     badge: "outline",
     aiCallsPerMonth: 500,
+    reportsPerMonth: 0,
     quizzesPerMonth: 30,
     attemptsPerMonth: 100,
     wordBanks: 5,
@@ -43,6 +46,7 @@ export const DEFAULT_PLANS: Record<PlanKey, PlanDefinition> = {
     price: 9,
     badge: "default",
     aiCallsPerMonth: 3000,
+    reportsPerMonth: 20,
     quizzesPerMonth: 200,
     attemptsPerMonth: 1000,
     wordBanks: 50,
@@ -55,6 +59,7 @@ export const DEFAULT_PLANS: Record<PlanKey, PlanDefinition> = {
     price: 24,
     badge: "secondary",
     aiCallsPerMonth: 15000,
+    reportsPerMonth: 80,
     quizzesPerMonth: Infinity,
     attemptsPerMonth: Infinity,
     wordBanks: Infinity,
@@ -74,6 +79,7 @@ const PLAN_EXTRA_FEATURES: Record<PlanKey, string[]> = {
 export type PlanLimitDetailKey =
   | "price"
   | "aiCalls"
+  | "reports"
   | "quizzes"
   | "attempts"
   | "wordBanks";
@@ -81,6 +87,7 @@ export type PlanLimitDetailKey =
 export const PLAN_LIMIT_DETAIL_ORDER: PlanLimitDetailKey[] = [
   "price",
   "aiCalls",
+  "reports",
   "quizzes",
   "attempts",
   "wordBanks",
@@ -110,6 +117,14 @@ export const PLAN_LIMIT_DETAILS: Record<
       "This includes generating quizzes, parsing pasted vocabulary, evaluating translation answers, building Review Activity quizzes, and server-side text-to-speech generation. Replaying already cached audio in the browser does not consume a new AI call.",
     icon: Cpu,
   },
+  reports: {
+    title: "AI Reports",
+    description:
+      "How many long-form student progress reports can be generated in one calendar month.",
+    extra:
+      "These reports are intended to use a stronger model with larger prompts and better reasoning, so the limit is kept separate from regular AI calls.",
+    icon: Sparkles,
+  },
   quizzes: {
     title: "Quizzes Created",
     description: "How many quizzes a user can create in one calendar month.",
@@ -137,6 +152,12 @@ export const PLAN_LIMIT_DETAILS: Record<
 
 export function buildPlanFeatures(plan: PlanDefinition): string[] {
   const features = [`${fmtLimit(plan.aiCallsPerMonth)} AI calls / month`];
+
+  features.push(
+    plan.reportsPerMonth > 0
+      ? `${fmtLimit(plan.reportsPerMonth)} AI reports / month`
+      : "No AI report generation",
+  );
 
   if (
     !Number.isFinite(plan.quizzesPerMonth) &&

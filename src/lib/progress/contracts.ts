@@ -74,6 +74,13 @@ export const EMPTY_TUTOR_PROGRESS_OVERRIDE: TutorProgressOverride = {
   insightsOverride: null,
 };
 
+export function parseProgressInsightsValue(
+  input: unknown,
+): ProgressInsights | null {
+  const parsed = progressInsightsSchema.nullable().safeParse(input ?? null);
+  return parsed.success ? parsed.data : null;
+}
+
 export function parseTutorProgressOverride(
   input:
     | {
@@ -91,13 +98,10 @@ export function parseTutorProgressOverride(
     .array(tutorProgressAxisOverrideSchema)
     .max(5)
     .safeParse(input.axis_overrides);
-  const insightsOverride = progressInsightsSchema
-    .nullable()
-    .safeParse(input.insights_override ?? null);
 
   return {
     axisOverrides: axisOverrides.success ? axisOverrides.data : [],
-    insightsOverride: insightsOverride.success ? insightsOverride.data : null,
+    insightsOverride: parseProgressInsightsValue(input.insights_override),
   };
 }
 

@@ -8,6 +8,7 @@ interface PagePaginationProps {
   pageSize: number;
   totalItems: number;
   searchParams?: Record<string, string | string[] | undefined>;
+  pageParam?: string;
 }
 
 export function PagePagination({
@@ -16,6 +17,7 @@ export function PagePagination({
   pageSize,
   totalItems,
   searchParams,
+  pageParam = "page",
 }: PagePaginationProps) {
   const totalPages = getTotalPages(totalItems, pageSize);
 
@@ -30,7 +32,7 @@ export function PagePagination({
     const params = new URLSearchParams();
 
     Object.entries(searchParams ?? {}).forEach(([key, value]) => {
-      if (key === "page" || value == null) {
+      if (key === pageParam || value == null) {
         return;
       }
 
@@ -43,7 +45,7 @@ export function PagePagination({
     });
 
     if (page > 1) {
-      params.set("page", String(page));
+      params.set(pageParam, String(page));
     }
 
     const query = params.toString();

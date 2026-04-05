@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Loader2, Sparkles } from "lucide-react";
+import type { ProgressInsights } from "@/lib/progress/contracts";
 
 interface VocabularyEstimate {
   low: number;
@@ -19,32 +20,25 @@ interface VocabularyEstimate {
   rationale: string;
 }
 
-interface ProgressInsightsResponse {
-  estimatedBand: "A0" | "A1" | "A2" | "B1" | "B2" | "C1";
-  summary: string;
-  passiveVocabulary: VocabularyEstimate;
-  activeVocabulary: VocabularyEstimate;
-  strengths: string[];
-  focusAreas: string[];
-  grammarPlan: Array<{
-    topic: string;
-    reason: string;
-  }>;
-  vocabularyThemes: Array<{
-    theme: string;
-    reason: string;
-    exampleWords: string[];
-  }>;
-  nextActions: string[];
-}
+type ProgressInsightsResponse = ProgressInsights;
 
 function formatEstimateRange(estimate: VocabularyEstimate) {
   return `${estimate.low.toLocaleString()}-${estimate.high.toLocaleString()}`;
 }
 
-export function StudentProgressInsights({ hasData }: { hasData: boolean }) {
+export function StudentProgressInsights({
+  hasData,
+  initialInsights = null,
+  sourceLabel,
+  isTutorVersion = false,
+}: {
+  hasData: boolean;
+  initialInsights?: ProgressInsightsResponse | null;
+  sourceLabel?: string | null;
+  isTutorVersion?: boolean;
+}) {
   const [insights, setInsights] = useState<ProgressInsightsResponse | null>(
-    null,
+    initialInsights,
   );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -102,7 +96,7 @@ export function StudentProgressInsights({ hasData }: { hasData: boolean }) {
           <Button
             type="button"
             onClick={handleGenerate}
-            disabled={!hasData || isPending}
+            disabled={!hasData || isPending || isTutorVersion}
             className="w-full sm:w-auto"
           >
             {isPending ? (
@@ -118,6 +112,13 @@ export function StudentProgressInsights({ hasData }: { hasData: boolean }) {
             )}
           </Button>
         </div>
+
+        {isTutorVersion && sourceLabel && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant="secondary">Tutor Version</Badge>
+            <span>Shown from {sourceLabel}. Student-side regeneration is disabled while a tutor version is active.</span>
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4">

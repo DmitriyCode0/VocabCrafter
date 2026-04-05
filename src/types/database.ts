@@ -69,6 +69,7 @@ export interface Database {
           key: string;
           price: number;
           ai_calls_per_month: number;
+          reports_per_month: number | null;
           quizzes_per_month: number | null;
           attempts_per_month: number | null;
           word_banks: number | null;
@@ -78,6 +79,7 @@ export interface Database {
           key: string;
           price: number;
           ai_calls_per_month: number;
+          reports_per_month?: number | null;
           quizzes_per_month?: number | null;
           attempts_per_month?: number | null;
           word_banks?: number | null;
@@ -87,12 +89,111 @@ export interface Database {
           key?: string;
           price?: number;
           ai_calls_per_month?: number;
+          reports_per_month?: number | null;
           quizzes_per_month?: number | null;
           attempts_per_month?: number | null;
           word_banks?: number | null;
           updated_at?: string;
         };
         Relationships: [];
+      };
+      student_progress_insights: {
+        Row: {
+          id: string;
+          user_id: string;
+          insights: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          insights?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          insights?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "student_progress_insights_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      passive_vocabulary_evidence: {
+        Row: {
+          id: string;
+          student_id: string;
+          imported_by: string | null;
+          term: string;
+          normalized_term: string;
+          definition: string | null;
+          item_type: "word" | "phrase";
+          source_type: "full_text" | "manual_list" | "curated_list";
+          source_label: string | null;
+          confidence: number;
+          import_count: number;
+          last_imported_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          imported_by?: string | null;
+          term: string;
+          normalized_term: string;
+          definition?: string | null;
+          item_type?: "word" | "phrase";
+          source_type?: "full_text" | "manual_list" | "curated_list";
+          source_label?: string | null;
+          confidence?: number;
+          import_count?: number;
+          last_imported_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          imported_by?: string | null;
+          term?: string;
+          normalized_term?: string;
+          definition?: string | null;
+          item_type?: "word" | "phrase";
+          source_type?: "full_text" | "manual_list" | "curated_list";
+          source_label?: string | null;
+          confidence?: number;
+          import_count?: number;
+          last_imported_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "passive_vocabulary_evidence_imported_by_fkey";
+            columns: ["imported_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "passive_vocabulary_evidence_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       classes: {
         Row: {
@@ -661,4 +762,6 @@ export type TutorStudent =
   Database["public"]["Tables"]["tutor_students"]["Row"];
 export type TutorStudentProgressOverride =
   Database["public"]["Tables"]["tutor_student_progress_overrides"]["Row"];
+export type PassiveVocabularyEvidence =
+  Database["public"]["Tables"]["passive_vocabulary_evidence"]["Row"];
 export type WordMastery = Database["public"]["Tables"]["word_mastery"]["Row"];

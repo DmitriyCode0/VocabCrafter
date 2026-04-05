@@ -55,6 +55,7 @@ export async function savePlanLimits(input: {
   key: PlanKey;
   price: number;
   aiCallsPerMonth: number;
+  reportsPerMonth: number | null;
   quizzesPerMonth: number | null;
   attemptsPerMonth: number | null;
   wordBanks: number | null;
@@ -70,6 +71,10 @@ export async function savePlanLimits(input: {
     ai_calls_per_month: parseWholeNumber(
       input.aiCallsPerMonth,
       "AI calls per month",
+    ),
+    reports_per_month: parseOptionalWholeNumber(
+      input.reportsPerMonth,
+      "Reports per month",
     ),
     quizzes_per_month: parseOptionalWholeNumber(
       input.quizzesPerMonth,

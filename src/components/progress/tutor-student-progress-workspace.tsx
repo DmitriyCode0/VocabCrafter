@@ -458,7 +458,31 @@ export function TutorStudentProgressWorkspace({
       const nextInsights = progressInsightsSchema.parse(data);
       setDraft(createDraftFromInsights(nextInsights));
       setLastValidInsights(nextInsights);
+      const saveResponse = await fetch(`/api/tutor/students/${studentId}/progress`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          axisOverrides: axes.map((axis) => ({
+            key: axis.key,
+            score: axis.score,
+            value: axis.value,
+            helper: axis.helper,
+          })),
+          insightsOverride: nextInsights,
+        }),
+      });
+
+      if (!saveResponse.ok) {
+        const saveData = (await saveResponse.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(
+          saveData?.error || "Failed to save generated student suggestions",
+        );
+      }
+
       toast.success(`Generated fresh coaching suggestions for ${studentName}.`);
+      router.refresh();
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -664,8 +688,7 @@ export function TutorStudentProgressWorkspace({
             <CardTitle className="text-base">Edit Radar Metrics</CardTitle>
             <CardDescription>
               Adjust the five radar axes for your tutor-facing interpretation.
-              The raw overview cards below remain based on recorded student
-              data.
+              These saved tutor edits sit on top of the computed student data.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

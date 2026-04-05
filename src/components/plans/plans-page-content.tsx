@@ -38,6 +38,7 @@ interface PlansPageContentProps {
 interface PlanEditorState {
   price: string;
   aiCallsPerMonth: string;
+  reportsPerMonth: string;
   quizzesPerMonth: string;
   attemptsPerMonth: string;
   wordBanks: string;
@@ -47,6 +48,7 @@ function toPlanEditorState(plan: PlanDefinition): PlanEditorState {
   return {
     price: String(plan.price),
     aiCallsPerMonth: String(plan.aiCallsPerMonth),
+    reportsPerMonth: String(plan.reportsPerMonth),
     quizzesPerMonth: Number.isFinite(plan.quizzesPerMonth)
       ? String(plan.quizzesPerMonth)
       : "",
@@ -158,6 +160,10 @@ export function PlansPageContent({
             draft.aiCallsPerMonth,
             "AI calls per month",
           ),
+          reportsPerMonth: parseOptionalNumber(
+            draft.reportsPerMonth,
+            "Reports per month",
+          ),
           quizzesPerMonth: parseOptionalNumber(
             draft.quizzesPerMonth,
             "Quizzes per month",
@@ -255,7 +261,7 @@ export function PlansPageContent({
               </CardHeader>
 
               <CardContent className="space-y-5 pt-0 text-sm">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                   <div>
                     <p className="font-medium">
                       {fmtLimit(plan.aiCallsPerMonth)}
@@ -264,6 +270,17 @@ export function PlansPageContent({
                       <InfoLabel
                         label="AI calls"
                         description={PLAN_LIMIT_DETAILS.aiCalls.description}
+                      />
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-medium">
+                      {fmtLimit(plan.reportsPerMonth)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      <InfoLabel
+                        label="Reports"
+                        description={PLAN_LIMIT_DETAILS.reports.description}
                       />
                     </p>
                   </div>
@@ -325,7 +342,7 @@ export function PlansPageContent({
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           {PLAN_LIMIT_DETAIL_ORDER.map((detailKey) => {
             const detail = PLAN_LIMIT_DETAILS[detailKey];
 
@@ -425,6 +442,34 @@ export function PlansPageContent({
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
+                        <Label htmlFor={`${plan.key}-reports`}>
+                          Reports / month
+                        </Label>
+                        <InfoLabel
+                          label=""
+                          className="[&>span:first-child]:sr-only"
+                          description={PLAN_LIMIT_DETAILS.reports.description}
+                        />
+                      </div>
+                      <Input
+                        id={`${plan.key}-reports`}
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="0 disables reports"
+                        value={draft.reportsPerMonth}
+                        onChange={(event) =>
+                          updateField(
+                            plan.key,
+                            "reportsPerMonth",
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
                         <Label htmlFor={`${plan.key}-quizzes`}>
                           Quizzes / month
                         </Label>
@@ -505,7 +550,8 @@ export function PlansPageContent({
 
                     <p className="text-xs text-muted-foreground">
                       Leave quizzes, attempts, or word banks blank to keep them
-                      unlimited for this plan.
+                      unlimited for this plan. Set reports to 0 to disable
+                      report generation.
                     </p>
 
                     <Button

@@ -22,9 +22,13 @@ import {
   PlusCircle,
   Trophy,
 } from "lucide-react";
-import { formatAppDate } from "@/lib/dates";
-import { ACTIVITY_LABELS } from "@/lib/constants";
 import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
+import {
+  applyTutorAxisOverrides,
+  buildChartDataFromAxes,
+  parseProgressInsightsValue,
+} from "@/lib/progress/contracts";
+import { getPublishedTutorProgressOverride } from "@/lib/progress/published-tutor-override";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +41,30 @@ export default async function ProgressPage() {
 
   if (!user) redirect("/login");
 
-  const snapshot = await getStudentProgressSnapshot(user.id);
+  const [snapshot, savedInsightsResult, publishedTutorOverride] = await Promise.all([
+    getStudentProgressSnapshot(user.id),
+    supabase
+      .from("student_progress_insights")
+      .select("insights")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    getPublishedTutorProgressOverride(user.id),
+  ]);
+  const savedInsights = parseProgressInsightsValue(savedInsightsResult.data?.insights);
+  const effectiveAxes = publishedTutorOverride
+    ? applyTutorAxisOverrides(
+        snapshot.axes,
+        publishedTutorOverride.override.axisOverrides,
+      )
+    : snapshot.axes;
+  const effectiveChartData = buildChartDataFromAxes(effectiveAxes);
+  const displayedInsights =
+    publishedTutorOverride?.override.insightsOverride ?? savedInsights;
   const hasAnyData =
-    snapshot.overview.totalAttempts > 0 || snapshot.overview.totalWords > 0;
+    snapshot.overview.totalAttempts > 0 ||
+    snapshot.overview.totalWords > 0 ||
+    snapshot.passiveSignals.uniqueItems > 0 ||
+    Boolean(publishedTutorOverride);
 
   if (!hasAnyData) {
     return (
@@ -91,12 +116,17 @@ export default async function ProgressPage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <StudentSkillRadar
-          axes={snapshot.axes}
-          chartData={snapshot.chartData}
+          axes={effectiveAxes}
+          chartData={effectiveChartData}
           cefrLevel={snapshot.profile.cefrLevel}
           grammarNotice={snapshot.grammar.betaNotice}
         />
-        <StudentProgressInsights hasData={hasAnyData} />
+        <StudentProgressInsights
+          hasData={hasAnyData}
+          initialInsights={displayedInsights}
+          isTutorVersion={Boolean(publishedTutorOverride?.override.insightsOverride)}
+          sourceLabel={publishedTutorOverride?.tutorName}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -186,87 +216,6 @@ export default async function ProgressPage() {
           </CardContent>
         </Card>
       </div>
-
-      {snapshot.activityStats.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Performance by Activity</CardTitle>
-            <CardDescription>
-              Your average scores broken down by activity type
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {snapshot.activityStats.map((activity) => {
-              return (
-                <div key={activity.type} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{activity.label}</span>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {activity.count} attempt
-                        {activity.count !== 1 ? "s" : ""}
-                      </Badge>
-                      <span
-                        className={
-                          activity.averageScore >= 80
-                            ? "text-green-600"
-                            : activity.averageScore >= 50
-                              ? "text-orange-600"
-                              : "text-red-600"
-                        }
-                      >
-                        {activity.averageScore}%
-                      </span>
-                    </div>
-                  </div>
-                  <Progress value={activity.averageScore} className="h-2" />
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
-
-      {snapshot.recentAttempts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Recent Attempts</CardTitle>
-            <CardDescription>
-              Your last {snapshot.recentAttempts.length} quiz attempts
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {snapshot.recentAttempts.map((attempt) => (
-              <div
-                key={`${attempt.title}-${attempt.completedAt}`}
-                className="flex items-center justify-between rounded-md bg-muted p-3"
-              >
-                <div>
-                  <p className="text-sm font-medium">{attempt.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {ACTIVITY_LABELS[attempt.type] || attempt.type} &middot;{" "}
-                    {formatAppDate(attempt.completedAt)}
-                  </p>
-                </div>
-                {attempt.scorePercent !== null && (
-                  <Badge
-                    variant="outline"
-                    className={
-                      attempt.scorePercent >= 80
-                        ? "text-green-600"
-                        : attempt.scorePercent >= 50
-                          ? "text-orange-600"
-                          : "text-red-600"
-                    }
-                  >
-                    {attempt.scorePercent}%
-                  </Badge>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

@@ -368,6 +368,7 @@ function buildFallbackVocabularyEstimates(
   snapshot: ProgressSnapshot,
   estimatedBand: EstimatedBand,
 ) {
+  const passiveEvidenceBoost = snapshot.passiveSignals.equivalentWordCount;
   const passiveAnchor = Math.round(
     VOCABULARY_BASE_BY_BAND[estimatedBand] * 0.25,
   );
@@ -376,24 +377,28 @@ function buildFallbackVocabularyEstimates(
       (1.5 + snapshot.overview.avgMasteryLevel * 0.22) +
       snapshot.overview.avgScore * 1.5 +
       snapshot.overview.masteredWords * 6 +
-      snapshot.overview.grammarCoveredCount * 4,
+      snapshot.overview.grammarCoveredCount * 4 +
+      passiveEvidenceBoost * 1.25,
   );
   const passiveLow = Math.max(
-    snapshot.overview.totalWords,
+    snapshot.overview.totalWords + passiveEvidenceBoost,
     passiveAnchor,
     passiveCalculated,
   );
   const passiveHigh = Math.max(passiveLow + 25, Math.round(passiveLow * 1.2));
   const activeLow = Math.max(
     snapshot.overview.masteredWords,
-    Math.round(passiveLow * (0.34 + snapshot.overview.avgMasteryLevel * 0.045)),
+    Math.round(
+      snapshot.overview.totalWords *
+        (0.34 + snapshot.overview.avgMasteryLevel * 0.045),
+    ),
   );
   const activeHigh = Math.min(
     passiveHigh,
     Math.max(activeLow + 15, Math.round(activeLow * 1.18)),
   );
-  const passiveEvidence = `Based on ${snapshot.overview.totalWords} tracked words, average mastery ${snapshot.overview.avgMasteryLevel.toFixed(1)}/5, ${snapshot.overview.avgScore}% average scores, and the current ${estimatedBand} study profile.`;
-  const activeEvidence = `Active range is kept below passive recognition and weighted more heavily toward mastery, translation accuracy, and repeated recall.`;
+  const passiveEvidence = `Based on ${snapshot.overview.totalWords} tracked mastery words, average mastery ${snapshot.overview.avgMasteryLevel.toFixed(1)}/5, ${snapshot.overview.avgScore}% average scores, the current ${estimatedBand} study profile, and ${snapshot.passiveSignals.uniqueItems} passive-recognition imports contributing about ${passiveEvidenceBoost} recognition-equivalent words.`;
+  const activeEvidence = `Active range is kept below passive recognition and weighted more heavily toward mastery, translation accuracy, and repeated recall. Passive-text imports do not raise the active range until the student shows recall or production evidence.`;
 
   return {
     passiveVocabulary: {
@@ -980,6 +985,15 @@ function buildProgressInsightsPrompt(
           )
           .join("\n")
       : "- No tracked words yet";
+  const passiveSignalsText =
+    snapshot.passiveSignals.sampleItems.length > 0
+      ? snapshot.passiveSignals.sampleItems
+          .map(
+            (item) =>
+              `- ${item.term}${item.definition ? ` | ${item.definition}` : ""} | ${item.itemType} | confidence ${item.confidence}/5${item.sourceLabel ? ` | source ${item.sourceLabel}` : ""}`,
+          )
+          .join("\n")
+      : "- None yet";
 
   return `You are an expert language coach building a student-facing progress interpretation.
 
@@ -1001,6 +1015,8 @@ Overview:
 - Mastered words: ${snapshot.overview.masteredWords}
 - Average mastery level: ${snapshot.overview.avgMasteryLevel}/5
 - Grammar topics covered: ${snapshot.overview.grammarCoveredCount}/${snapshot.overview.grammarAvailableCount}
+- Passive-recognition imports: ${snapshot.passiveSignals.uniqueItems} items (${snapshot.passiveSignals.wordCount} words, ${snapshot.passiveSignals.phraseCount} phrases)
+- Passive-recognition equivalent words: ${snapshot.passiveSignals.equivalentWordCount}
 
 Activity performance:
 ${activityText}
@@ -1014,12 +1030,16 @@ ${remainingTopicsText}
 Tracked vocabulary words:
 ${wordsText}
 
+Passive recognition evidence from understood text or curated imports:
+${passiveSignalsText}
+
 Instructions:
 - Estimate the learner's overall study band from A0 to C1. This is an approximate learning profile, not an official CEFR certification.
 - Estimate passive vocabulary as the number of words the student likely recognizes.
 - Estimate active vocabulary as the number of words the student can likely use accurately.
 - Passive vocabulary must be greater than or equal to active vocabulary.
 - Use the full tracked word list, the mastery data, the student's CEFR setting, and quiz performance to make the estimate.
+- Treat passive-recognition imports as evidence for recognition only. They can raise passive vocabulary estimates, but they must not be treated as proof of active mastery, recall, or review readiness.
 - Grammar plan topics must come from the remaining grammar topics list whenever that list is non-empty.
 - Vocabulary themes should reflect what the student already knows plus the next useful adjacent topics.
 - Keep recommendations encouraging, concrete, and study-oriented.
@@ -1130,7 +1150,8 @@ export async function POST(request: Request) {
 
     if (
       snapshot.overview.totalAttempts === 0 &&
-      snapshot.overview.totalWords === 0
+      snapshot.overview.totalWords === 0 &&
+      snapshot.passiveSignals.uniqueItems === 0
     ) {
       return NextResponse.json(
         { error: "Not enough progress data yet" },
@@ -1167,6 +1188,23 @@ export async function POST(request: Request) {
         result = buildFallbackProgressInsights(snapshot);
       } else {
         throw error;
+      }
+    }
+
+    if (targetUserId === user.id) {
+      const { error: saveError } = await supabaseAdmin
+        .from("student_progress_insights")
+        .upsert(
+          {
+            user_id: user.id,
+            insights: result,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" },
+        );
+
+      if (saveError) {
+        console.error("Save student progress insights error:", saveError);
       }
     }
 

@@ -42,6 +42,10 @@ function mergePlanLimitRow(
       row?.ai_calls_per_month,
       fallback.aiCallsPerMonth,
     ),
+    reportsPerMonth:
+      row?.reports_per_month == null
+        ? fallback.reportsPerMonth
+        : row.reports_per_month,
     quizzesPerMonth:
       row?.quizzes_per_month == null
         ? fallback.quizzesPerMonth
