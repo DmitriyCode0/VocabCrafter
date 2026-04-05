@@ -32,9 +32,12 @@ export function DeletePassiveEvidenceButton({
     setIsDeleting(true);
 
     try {
-      const response = await fetch(`/api/mastery/passive-evidence/${evidenceId}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `/api/mastery/passive-evidence/${evidenceId}`,
+        {
+          method: "DELETE",
+        },
+      );
 
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as {

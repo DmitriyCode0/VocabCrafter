@@ -458,19 +458,22 @@ export function TutorStudentProgressWorkspace({
       const nextInsights = progressInsightsSchema.parse(data);
       setDraft(createDraftFromInsights(nextInsights));
       setLastValidInsights(nextInsights);
-      const saveResponse = await fetch(`/api/tutor/students/${studentId}/progress`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          axisOverrides: axes.map((axis) => ({
-            key: axis.key,
-            score: axis.score,
-            value: axis.value,
-            helper: axis.helper,
-          })),
-          insightsOverride: nextInsights,
-        }),
-      });
+      const saveResponse = await fetch(
+        `/api/tutor/students/${studentId}/progress`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            axisOverrides: axes.map((axis) => ({
+              key: axis.key,
+              score: axis.score,
+              value: axis.value,
+              helper: axis.helper,
+            })),
+            insightsOverride: nextInsights,
+          }),
+        },
+      );
 
       if (!saveResponse.ok) {
         const saveData = (await saveResponse.json().catch(() => null)) as {

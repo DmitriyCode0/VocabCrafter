@@ -87,27 +87,28 @@ export default async function TutorStudentProgressPage({
     }
   }
 
-  const [studentProfileResult, overrideResult, passiveEvidenceResult] = await Promise.all([
-    supabaseAdmin
-      .from("profiles")
-      .select("full_name, email")
-      .eq("id", studentId)
-      .single(),
-    supabaseAdmin
-      .from("tutor_student_progress_overrides")
-      .select("axis_overrides, insights_override")
-      .eq("tutor_id", user.id)
-      .eq("student_id", studentId)
-      .maybeSingle(),
-    supabaseAdmin
-      .from("passive_vocabulary_evidence")
-      .select(
-        "id, term, definition, item_type, source_type, source_label, confidence, import_count, last_imported_at",
-      )
-      .eq("student_id", studentId)
-      .order("last_imported_at", { ascending: false })
-      .range(0, 11),
-  ]);
+  const [studentProfileResult, overrideResult, passiveEvidenceResult] =
+    await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", studentId)
+        .single(),
+      supabaseAdmin
+        .from("tutor_student_progress_overrides")
+        .select("axis_overrides, insights_override")
+        .eq("tutor_id", user.id)
+        .eq("student_id", studentId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("passive_vocabulary_evidence")
+        .select(
+          "id, term, definition, item_type, source_type, source_label, confidence, import_count, last_imported_at",
+        )
+        .eq("student_id", studentId)
+        .order("last_imported_at", { ascending: false })
+        .range(0, 11),
+    ]);
 
   if (studentProfileResult.error || !studentProfileResult.data) {
     redirect("/students");
@@ -119,8 +120,8 @@ export default async function TutorStudentProgressPage({
     snapshot.overview.totalWords > 0 ||
     snapshot.passiveSignals.uniqueItems > 0;
   const initialOverride = parseTutorProgressOverride(overrideResult.data);
-  const passiveEvidenceItems =
-    (passiveEvidenceResult.data ?? []) as PassiveEvidenceRow[];
+  const passiveEvidenceItems = (passiveEvidenceResult.data ??
+    []) as PassiveEvidenceRow[];
   const studentName =
     studentProfileResult.data.full_name ||
     studentProfileResult.data.email ||
@@ -181,7 +182,9 @@ export default async function TutorStudentProgressPage({
       {!hasAnyRawData ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">No raw progress data yet</CardTitle>
+            <CardTitle className="text-base">
+              No raw progress data yet
+            </CardTitle>
             <CardDescription>
               This student has not built enough quiz or vocabulary history to
               populate the raw overview cards yet.
@@ -196,8 +199,13 @@ export default async function TutorStudentProgressPage({
               <Trophy className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{snapshot.overview.avgScore}%</div>
-              <Progress value={snapshot.overview.avgScore} className="mt-2 h-2" />
+              <div className="text-2xl font-bold">
+                {snapshot.overview.avgScore}%
+              </div>
+              <Progress
+                value={snapshot.overview.avgScore}
+                className="mt-2 h-2"
+              />
             </CardContent>
           </Card>
 
@@ -210,7 +218,9 @@ export default async function TutorStudentProgressPage({
               <div className="text-2xl font-bold">
                 {snapshot.overview.avgMasteryLevel.toFixed(1)}
               </div>
-              <p className="text-xs text-muted-foreground">out of 5 mastery levels</p>
+              <p className="text-xs text-muted-foreground">
+                out of 5 mastery levels
+              </p>
             </CardContent>
           </Card>
 
@@ -220,7 +230,9 @@ export default async function TutorStudentProgressPage({
               <Flame className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{snapshot.overview.streakDays}</div>
+              <div className="text-2xl font-bold">
+                {snapshot.overview.streakDays}
+              </div>
               <p className="text-xs text-muted-foreground">
                 consecutive day{snapshot.overview.streakDays !== 1 ? "s" : ""}
               </p>
@@ -229,11 +241,15 @@ export default async function TutorStudentProgressPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Unique Words</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Unique Words
+              </CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{snapshot.overview.totalWords}</div>
+              <div className="text-2xl font-bold">
+                {snapshot.overview.totalWords}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {snapshot.overview.masteredWords} mastered words
               </p>
@@ -242,7 +258,9 @@ export default async function TutorStudentProgressPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Grammar Topics</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Grammar Topics
+              </CardTitle>
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -271,7 +289,9 @@ export default async function TutorStudentProgressPage({
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Passive Evidence</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Passive Evidence
+            </CardTitle>
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -286,7 +306,9 @@ export default async function TutorStudentProgressPage({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Equivalent Words</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Equivalent Words
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -301,7 +323,9 @@ export default async function TutorStudentProgressPage({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Avg Confidence</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Avg Confidence
+            </CardTitle>
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -325,7 +349,8 @@ export default async function TutorStudentProgressPage({
         <CardHeader>
           <CardTitle className="text-base">Recent Passive Evidence</CardTitle>
           <CardDescription>
-            Review the latest passive-recognition imports for {studentName}. These items stay out of review and can be edited or removed here.
+            Review the latest passive-recognition imports for {studentName}.
+            These items stay out of review and can be edited or removed here.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -342,7 +367,9 @@ export default async function TutorStudentProgressPage({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{item.term}</p>
+                      <p className="truncate text-sm font-medium">
+                        {item.term}
+                      </p>
                       {item.definition && (
                         <p className="truncate text-xs text-muted-foreground">
                           {item.definition}

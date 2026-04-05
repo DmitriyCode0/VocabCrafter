@@ -41,16 +41,19 @@ export default async function ProgressPage() {
 
   if (!user) redirect("/login");
 
-  const [snapshot, savedInsightsResult, publishedTutorOverride] = await Promise.all([
-    getStudentProgressSnapshot(user.id),
-    supabase
-      .from("student_progress_insights")
-      .select("insights")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    getPublishedTutorProgressOverride(user.id),
-  ]);
-  const savedInsights = parseProgressInsightsValue(savedInsightsResult.data?.insights);
+  const [snapshot, savedInsightsResult, publishedTutorOverride] =
+    await Promise.all([
+      getStudentProgressSnapshot(user.id),
+      supabase
+        .from("student_progress_insights")
+        .select("insights")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      getPublishedTutorProgressOverride(user.id),
+    ]);
+  const savedInsights = parseProgressInsightsValue(
+    savedInsightsResult.data?.insights,
+  );
   const effectiveAxes = publishedTutorOverride
     ? applyTutorAxisOverrides(
         snapshot.axes,
@@ -124,7 +127,9 @@ export default async function ProgressPage() {
         <StudentProgressInsights
           hasData={hasAnyData}
           initialInsights={displayedInsights}
-          isTutorVersion={Boolean(publishedTutorOverride?.override.insightsOverride)}
+          isTutorVersion={Boolean(
+            publishedTutorOverride?.override.insightsOverride,
+          )}
           sourceLabel={publishedTutorOverride?.tutorName}
         />
       </div>

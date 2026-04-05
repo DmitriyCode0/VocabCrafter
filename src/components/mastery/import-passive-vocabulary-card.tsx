@@ -48,7 +48,9 @@ export function ImportPassiveVocabularyCard({
 }: ImportPassiveVocabularyCardProps) {
   const router = useRouter();
   const [items, setItems] = useState<PassiveVocabularyDraftItem[]>([]);
-  const [sourceType, setSourceType] = useState<"full_text" | "manual_list" | "curated_list">("full_text");
+  const [sourceType, setSourceType] = useState<
+    "full_text" | "manual_list" | "curated_list"
+  >("full_text");
   const [sourceLabel, setSourceLabel] = useState("");
   const [confidence, setConfidence] = useState("4");
   const [isParseLoading, setIsParseLoading] = useState(false);
@@ -83,7 +85,9 @@ export function ImportPassiveVocabularyCard({
       } | null;
 
       if (!response.ok) {
-        throw new Error(data?.error || "Failed to import passive vocabulary evidence");
+        throw new Error(
+          data?.error || "Failed to import passive vocabulary evidence",
+        );
       }
 
       toast.success(
@@ -128,11 +132,22 @@ export function ImportPassiveVocabularyCard({
 
           <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-[520px]">
             <div className="space-y-2">
-              <Label htmlFor="passive-source-type" className="text-xs text-muted-foreground">
+              <Label
+                htmlFor="passive-source-type"
+                className="text-xs text-muted-foreground"
+              >
                 Evidence source
               </Label>
-              <Select value={sourceType} onValueChange={(value) => setSourceType(value as typeof sourceType)}>
-                <SelectTrigger id="passive-source-type" className="w-full bg-background">
+              <Select
+                value={sourceType}
+                onValueChange={(value) =>
+                  setSourceType(value as typeof sourceType)
+                }
+              >
+                <SelectTrigger
+                  id="passive-source-type"
+                  className="w-full bg-background"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -144,11 +159,17 @@ export function ImportPassiveVocabularyCard({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="passive-confidence" className="text-xs text-muted-foreground">
+              <Label
+                htmlFor="passive-confidence"
+                className="text-xs text-muted-foreground"
+              >
                 Confidence
               </Label>
               <Select value={confidence} onValueChange={setConfidence}>
-                <SelectTrigger id="passive-confidence" className="w-full bg-background">
+                <SelectTrigger
+                  id="passive-confidence"
+                  className="w-full bg-background"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -162,7 +183,10 @@ export function ImportPassiveVocabularyCard({
             </div>
 
             <div className="space-y-2 sm:col-span-3 lg:col-span-1">
-              <Label htmlFor="passive-source-label" className="text-xs text-muted-foreground">
+              <Label
+                htmlFor="passive-source-label"
+                className="text-xs text-muted-foreground"
+              >
                 Text or lesson label
               </Label>
               <Input

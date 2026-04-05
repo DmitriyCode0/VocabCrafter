@@ -165,20 +165,22 @@ export default async function VocabularyPage({
   const dueForReview = dueForReviewResult.count ?? 0;
   const levelRows = levelRowsResult.data ?? [];
   const visibleWords = (wordsResult.data ?? []) as WordMasteryRow[];
-  const passiveEvidenceItems =
-    (passiveEvidenceRowsResult.data ?? []) as PassiveEvidenceRow[];
+  const passiveEvidenceItems = (passiveEvidenceRowsResult.data ??
+    []) as PassiveEvidenceRow[];
   const passiveEvidenceTotal = passiveEvidenceCountResult.count ?? 0;
   const passiveEvidenceSummary = summarizePassiveVocabularyEvidence(
-    ((passiveEvidenceSummaryRowsResult.data ?? []) as PassiveEvidenceRow[]).map((item) => ({
-      term: item.term,
-      definition: item.definition,
-      item_type: item.item_type,
-      source_type: item.source_type,
-      source_label: item.source_label,
-      confidence: item.confidence,
-      import_count: item.import_count,
-      last_imported_at: item.last_imported_at,
-    })),
+    ((passiveEvidenceSummaryRowsResult.data ?? []) as PassiveEvidenceRow[]).map(
+      (item) => ({
+        term: item.term,
+        definition: item.definition,
+        item_type: item.item_type,
+        source_type: item.source_type,
+        source_label: item.source_label,
+        confidence: item.confidence,
+        import_count: item.import_count,
+        last_imported_at: item.last_imported_at,
+      }),
+    ),
   );
 
   const avgLevel =
@@ -281,34 +283,50 @@ export default async function VocabularyPage({
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Passive Evidence</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Passive Evidence
+            </CardTitle>
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{passiveEvidenceTotal}</div>
-            <p className="text-xs text-muted-foreground">words and phrases tracked as recognition only</p>
+            <p className="text-xs text-muted-foreground">
+              words and phrases tracked as recognition only
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Equivalent Words</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Equivalent Words
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{passiveEvidenceSummary.equivalentWordCount}</div>
-            <p className="text-xs text-muted-foreground">weighted contribution to passive-recognition estimates</p>
+            <div className="text-2xl font-bold">
+              {passiveEvidenceSummary.equivalentWordCount}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              weighted contribution to passive-recognition estimates
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Avg Confidence</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Avg Confidence
+            </CardTitle>
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{passiveEvidenceSummary.avgConfidence.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground">out of 5 confidence across all passive evidence</p>
+            <div className="text-2xl font-bold">
+              {passiveEvidenceSummary.avgConfidence.toFixed(1)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              out of 5 confidence across all passive evidence
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -337,7 +355,9 @@ export default async function VocabularyPage({
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Passive Recognition Evidence</CardTitle>
+          <CardTitle className="text-base">
+            Passive Recognition Evidence
+          </CardTitle>
           <CardDescription>
             Imported words and phrases from texts or curated lists. These stay
             out of review and can be edited or removed later.
@@ -352,10 +372,15 @@ export default async function VocabularyPage({
             <>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {passiveEvidenceItems.map((item) => (
-                  <div key={item.id} className="flex flex-col gap-3 rounded-lg border p-3">
+                  <div
+                    key={item.id}
+                    className="flex flex-col gap-3 rounded-lg border p-3"
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{item.term}</p>
+                        <p className="truncate text-sm font-medium">
+                          {item.term}
+                        </p>
                         {item.definition && (
                           <p className="truncate text-xs text-muted-foreground">
                             {item.definition}
@@ -364,19 +389,31 @@ export default async function VocabularyPage({
                       </div>
                       <div className="flex items-center gap-1">
                         <EditPassiveEvidenceDialog evidence={item} />
-                        <DeletePassiveEvidenceButton evidenceId={item.id} term={item.term} />
+                        <DeletePassiveEvidenceButton
+                          evidenceId={item.id}
+                          term={item.term}
+                        />
                       </div>
                     </div>
 
                     <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="outline">{item.item_type === "phrase" ? "Phrase" : "Word"}</Badge>
-                      <Badge variant="secondary">Confidence {item.confidence}/5</Badge>
-                      <Badge variant="outline">{item.source_type.replace("_", " ")}</Badge>
+                      <Badge variant="outline">
+                        {item.item_type === "phrase" ? "Phrase" : "Word"}
+                      </Badge>
+                      <Badge variant="secondary">
+                        Confidence {item.confidence}/5
+                      </Badge>
+                      <Badge variant="outline">
+                        {item.source_type.replace("_", " ")}
+                      </Badge>
                     </div>
 
                     <div className="space-y-1 text-xs text-muted-foreground">
                       {item.source_label && <p>Source: {item.source_label}</p>}
-                      <p>Imported {item.import_count} time{item.import_count !== 1 ? "s" : ""}</p>
+                      <p>
+                        Imported {item.import_count} time
+                        {item.import_count !== 1 ? "s" : ""}
+                      </p>
                       <p>Last updated {formatAppDate(item.last_imported_at)}</p>
                     </div>
                   </div>

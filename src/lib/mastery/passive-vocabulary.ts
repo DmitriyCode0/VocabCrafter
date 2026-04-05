@@ -100,7 +100,8 @@ export function summarizePassiveVocabularyEvidence(
   const equivalentWordCount = Math.round(
     rows.reduce(
       (sum, row) =>
-        sum + getPassiveVocabularyEquivalentWeight(row.item_type, row.confidence),
+        sum +
+        getPassiveVocabularyEquivalentWeight(row.item_type, row.confidence),
       0,
     ),
   );

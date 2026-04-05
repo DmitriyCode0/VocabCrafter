@@ -194,36 +194,36 @@ export async function getStudentProgressSnapshot(
     quizCountResult,
     passiveEvidenceResult,
   ] = await Promise.all([
-      supabaseAdmin
-        .from("profiles")
-        .select("full_name, cefr_level, preferred_language, source_language")
-        .eq("id", userId)
-        .single(),
-      supabaseAdmin
-        .from("quiz_attempts")
-        .select(
-          "score, max_score, completed_at, quizzes(title, type, cefr_level, vocabulary_terms, config)",
-        )
-        .eq("student_id", userId)
-        .order("completed_at", { ascending: false }),
-      supabaseAdmin
-        .from("word_mastery")
-        .select(
-          "term, definition, mastery_level, correct_count, incorrect_count, translation_correct_count, streak, last_practiced, next_review",
-        )
-        .eq("student_id", userId),
-      supabaseAdmin
-        .from("quizzes")
-        .select("id", { count: "exact", head: true })
-        .eq("creator_id", userId),
-      supabaseAdmin
-        .from("passive_vocabulary_evidence")
-        .select(
-          "term, definition, item_type, source_type, source_label, confidence, import_count, last_imported_at",
-        )
-        .eq("student_id", userId)
-        .order("last_imported_at", { ascending: false }),
-    ]);
+    supabaseAdmin
+      .from("profiles")
+      .select("full_name, cefr_level, preferred_language, source_language")
+      .eq("id", userId)
+      .single(),
+    supabaseAdmin
+      .from("quiz_attempts")
+      .select(
+        "score, max_score, completed_at, quizzes(title, type, cefr_level, vocabulary_terms, config)",
+      )
+      .eq("student_id", userId)
+      .order("completed_at", { ascending: false }),
+    supabaseAdmin
+      .from("word_mastery")
+      .select(
+        "term, definition, mastery_level, correct_count, incorrect_count, translation_correct_count, streak, last_practiced, next_review",
+      )
+      .eq("student_id", userId),
+    supabaseAdmin
+      .from("quizzes")
+      .select("id", { count: "exact", head: true })
+      .eq("creator_id", userId),
+    supabaseAdmin
+      .from("passive_vocabulary_evidence")
+      .select(
+        "term, definition, item_type, source_type, source_label, confidence, import_count, last_imported_at",
+      )
+      .eq("student_id", userId)
+      .order("last_imported_at", { ascending: false }),
+  ]);
 
   if (profileResult.error || !profileResult.data) {
     throw new Error("Failed to load student progress profile");

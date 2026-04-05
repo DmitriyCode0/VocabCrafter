@@ -51,7 +51,10 @@ export function ParsedPassiveVocabularyList({
     value: string,
   ) {
     const updated = [...items];
-    updated[index] = { ...updated[index], [field]: value } as PassiveVocabularyDraftItem;
+    updated[index] = {
+      ...updated[index],
+      [field]: value,
+    } as PassiveVocabularyDraftItem;
     onItemsChange(updated);
   }
 
@@ -102,14 +105,18 @@ export function ParsedPassiveVocabularyList({
                 <TableCell>
                   <Input
                     value={item.term}
-                    onChange={(event) => updateItem(index, "term", event.target.value)}
+                    onChange={(event) =>
+                      updateItem(index, "term", event.target.value)
+                    }
                     className="h-8"
                   />
                 </TableCell>
                 <TableCell>
                   <Input
                     value={item.definition}
-                    onChange={(event) => updateItem(index, "definition", event.target.value)}
+                    onChange={(event) =>
+                      updateItem(index, "definition", event.target.value)
+                    }
                     placeholder="Optional meaning"
                     className="h-8"
                   />
@@ -117,7 +124,9 @@ export function ParsedPassiveVocabularyList({
                 <TableCell>
                   <Select
                     value={item.itemType}
-                    onValueChange={(value) => updateItem(index, "itemType", value)}
+                    onValueChange={(value) =>
+                      updateItem(index, "itemType", value)
+                    }
                   >
                     <SelectTrigger className="h-8 w-full">
                       <SelectValue />
@@ -162,7 +171,12 @@ export function ParsedPassiveVocabularyList({
                 />
               </TableCell>
               <TableCell>
-                <Select value={newItemType} onValueChange={(value) => setNewItemType(value as typeof newItemType)}>
+                <Select
+                  value={newItemType}
+                  onValueChange={(value) =>
+                    setNewItemType(value as typeof newItemType)
+                  }
+                >
                   <SelectTrigger className="h-8 w-full">
                     <SelectValue />
                   </SelectTrigger>

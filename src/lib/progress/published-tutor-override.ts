@@ -16,18 +16,20 @@ export async function getPublishedTutorProgressOverride(
 ): Promise<PublishedTutorProgressOverride | null> {
   const supabaseAdmin = createAdminClient();
 
-  const [{ data: directConnections, error: directError }, { data: memberships, error: membershipError }] =
-    await Promise.all([
-      supabaseAdmin
-        .from("tutor_students")
-        .select("tutor_id")
-        .eq("student_id", studentId)
-        .eq("status", "active"),
-      supabaseAdmin
-        .from("class_members")
-        .select("class_id")
-        .eq("student_id", studentId),
-    ]);
+  const [
+    { data: directConnections, error: directError },
+    { data: memberships, error: membershipError },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("tutor_students")
+      .select("tutor_id")
+      .eq("student_id", studentId)
+      .eq("status", "active"),
+    supabaseAdmin
+      .from("class_members")
+      .select("class_id")
+      .eq("student_id", studentId),
+  ]);
 
   if (directError) {
     throw directError;
@@ -54,7 +56,12 @@ export async function getPublishedTutorProgressOverride(
     classTutorIds = (classes ?? []).map((item) => item.tutor_id);
   }
 
-  const tutorIds = [...new Set([...(directConnections ?? []).map((item) => item.tutor_id), ...classTutorIds])];
+  const tutorIds = [
+    ...new Set([
+      ...(directConnections ?? []).map((item) => item.tutor_id),
+      ...classTutorIds,
+    ]),
+  ];
   if (tutorIds.length === 0) {
     return null;
   }
@@ -79,7 +86,8 @@ export async function getPublishedTutorProgressOverride(
   const parsedOverride = parseTutorProgressOverride(overrideRow);
   const hasContent =
     parsedOverride.axisOverrides.length > 0 ||
-    parsedOverride.insightsOverride !== EMPTY_TUTOR_PROGRESS_OVERRIDE.insightsOverride;
+    parsedOverride.insightsOverride !==
+      EMPTY_TUTOR_PROGRESS_OVERRIDE.insightsOverride;
 
   if (!hasContent) {
     return null;

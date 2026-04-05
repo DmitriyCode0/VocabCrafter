@@ -116,7 +116,10 @@ export function StudentProgressInsights({
         {isTutorVersion && sourceLabel && (
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="secondary">Tutor Version</Badge>
-            <span>Shown from {sourceLabel}. Student-side regeneration is disabled while a tutor version is active.</span>
+            <span>
+              Shown from {sourceLabel}. Student-side regeneration is disabled
+              while a tutor version is active.
+            </span>
           </div>
         )}
       </CardHeader>

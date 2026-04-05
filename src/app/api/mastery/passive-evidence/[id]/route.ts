@@ -22,7 +22,10 @@ async function requirePassiveEvidenceAccess(evidenceId: string) {
 
   if (!user) {
     return {
-      errorResponse: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      errorResponse: NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      ),
     };
   }
 
@@ -44,7 +47,10 @@ async function requirePassiveEvidenceAccess(evidenceId: string) {
 
   if (!evidenceRow) {
     return {
-      errorResponse: NextResponse.json({ error: "Passive evidence not found" }, { status: 404 }),
+      errorResponse: NextResponse.json(
+        { error: "Passive evidence not found" },
+        { status: 404 },
+      ),
     };
   }
 
@@ -56,7 +62,10 @@ async function requirePassiveEvidenceAccess(evidenceId: string) {
 
   if (profileError || !profile) {
     return {
-      errorResponse: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      errorResponse: NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      ),
     };
   }
 
@@ -76,7 +85,11 @@ async function requirePassiveEvidenceAccess(evidenceId: string) {
   if (
     !isOwner &&
     isTutor &&
-    !(await tutorHasStudentAccess(supabaseAdmin, user.id, evidenceRow.student_id))
+    !(await tutorHasStudentAccess(
+      supabaseAdmin,
+      user.id,
+      evidenceRow.student_id,
+    ))
   ) {
     return {
       errorResponse: NextResponse.json(
@@ -130,7 +143,12 @@ export async function PATCH(
   if (error) {
     console.error("Update passive evidence error:", error);
     return NextResponse.json(
-      { error: error.code === "23505" ? "A matching passive evidence item already exists" : "Failed to update passive evidence" },
+      {
+        error:
+          error.code === "23505"
+            ? "A matching passive evidence item already exists"
+            : "Failed to update passive evidence",
+      },
       { status: 500 },
     );
   }

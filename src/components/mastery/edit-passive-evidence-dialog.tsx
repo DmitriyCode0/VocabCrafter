@@ -36,14 +36,20 @@ interface EditPassiveEvidenceDialogProps {
   };
 }
 
-export function EditPassiveEvidenceDialog({ evidence }: EditPassiveEvidenceDialogProps) {
+export function EditPassiveEvidenceDialog({
+  evidence,
+}: EditPassiveEvidenceDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [term, setTerm] = useState(evidence.term);
   const [definition, setDefinition] = useState(evidence.definition ?? "");
-  const [itemType, setItemType] = useState<"word" | "phrase">(evidence.item_type);
-  const [sourceType, setSourceType] = useState<"full_text" | "manual_list" | "curated_list">(evidence.source_type);
+  const [itemType, setItemType] = useState<"word" | "phrase">(
+    evidence.item_type,
+  );
+  const [sourceType, setSourceType] = useState<
+    "full_text" | "manual_list" | "curated_list"
+  >(evidence.source_type);
   const [sourceLabel, setSourceLabel] = useState(evidence.source_label ?? "");
   const [confidence, setConfidence] = useState(String(evidence.confidence));
 
@@ -51,18 +57,21 @@ export function EditPassiveEvidenceDialog({ evidence }: EditPassiveEvidenceDialo
     setIsSaving(true);
 
     try {
-      const response = await fetch(`/api/mastery/passive-evidence/${evidence.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          term,
-          definition: definition.trim() || null,
-          itemType,
-          sourceType,
-          sourceLabel: sourceLabel.trim() || null,
-          confidence: Number(confidence),
-        }),
-      });
+      const response = await fetch(
+        `/api/mastery/passive-evidence/${evidence.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            term,
+            definition: definition.trim() || null,
+            itemType,
+            sourceType,
+            sourceLabel: sourceLabel.trim() || null,
+            confidence: Number(confidence),
+          }),
+        },
+      );
 
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as {
@@ -103,7 +112,9 @@ export function EditPassiveEvidenceDialog({ evidence }: EditPassiveEvidenceDialo
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor={`passive-term-${evidence.id}`}>Term or phrase</Label>
+            <Label htmlFor={`passive-term-${evidence.id}`}>
+              Term or phrase
+            </Label>
             <Input
               id={`passive-term-${evidence.id}`}
               value={term}
@@ -123,7 +134,10 @@ export function EditPassiveEvidenceDialog({ evidence }: EditPassiveEvidenceDialo
 
           <div className="space-y-2">
             <Label>Type</Label>
-            <Select value={itemType} onValueChange={(value) => setItemType(value as typeof itemType)}>
+            <Select
+              value={itemType}
+              onValueChange={(value) => setItemType(value as typeof itemType)}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -152,7 +166,12 @@ export function EditPassiveEvidenceDialog({ evidence }: EditPassiveEvidenceDialo
 
           <div className="space-y-2">
             <Label>Source type</Label>
-            <Select value={sourceType} onValueChange={(value) => setSourceType(value as typeof sourceType)}>
+            <Select
+              value={sourceType}
+              onValueChange={(value) =>
+                setSourceType(value as typeof sourceType)
+              }
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -165,7 +184,9 @@ export function EditPassiveEvidenceDialog({ evidence }: EditPassiveEvidenceDialo
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor={`passive-source-label-${evidence.id}`}>Source label</Label>
+            <Label htmlFor={`passive-source-label-${evidence.id}`}>
+              Source label
+            </Label>
             <Input
               id={`passive-source-label-${evidence.id}`}
               value={sourceLabel}
