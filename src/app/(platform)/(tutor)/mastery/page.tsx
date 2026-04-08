@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { StudentMasteryCards } from "@/components/mastery/student-mastery-cards";
+import { PASSIVE_EQUIVALENT_WORDS_EXPLANATION } from "@/lib/mastery/passive-vocabulary";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { Users } from "lucide-react";
 
@@ -20,6 +21,10 @@ const MASTERY_PAGE_SIZE = 10;
 interface MasteryLevelRow {
   student_id: string;
   mastery_level: number;
+}
+
+interface PassiveEvidenceSummaryRow {
+  student_id: string;
 }
 
 interface StudentProfile {
@@ -126,7 +131,14 @@ export default async function TutorMasteryPage({
     .select("student_id, mastery_level")
     .in("student_id", studentIds);
 
+  const { data: passiveEvidenceRows } = await supabaseAdmin
+    .from("passive_vocabulary_evidence")
+    .select("student_id")
+    .in("student_id", studentIds);
+
   const visibleMastery = (allMasteryRows ?? []) as MasteryLevelRow[];
+  const visiblePassiveEvidence =
+    (passiveEvidenceRows ?? []) as PassiveEvidenceSummaryRow[];
 
   // Group by student for lightweight summary statistics.
   const studentMastery = new Map<string, number[]>();
@@ -140,6 +152,19 @@ export default async function TutorMasteryPage({
       studentMastery.set(studentId, []);
     }
     studentMastery.get(studentId)!.push(row.mastery_level);
+  }
+
+  const passiveEvidenceCounts = new Map<string, number>();
+  for (const row of visiblePassiveEvidence) {
+    const studentId = row.student_id;
+    if (!studentId) {
+      continue;
+    }
+
+    passiveEvidenceCounts.set(
+      studentId,
+      (passiveEvidenceCounts.get(studentId) ?? 0) + 1,
+    );
   }
 
   const summarizeStudent = (sid: string) => {
@@ -163,6 +188,8 @@ export default async function TutorMasteryPage({
       mastered,
       avgLevel: Math.round(avgLevel * 10) / 10,
       levelCounts,
+      passiveEvidenceCount: passiveEvidenceCounts.get(sid) ?? 0,
+      equivalentWords: passiveEvidenceCounts.get(sid) ?? 0,
     };
   };
 
@@ -200,7 +227,8 @@ export default async function TutorMasteryPage({
           Student Vocab Mastery
         </h1>
         <p className="text-muted-foreground">
-          See how well your students know their vocabulary across all classes.
+          See how well your students know their vocabulary across all classes,
+          including passive evidence imported from text they already understand.
         </p>
       </div>
 
@@ -209,9 +237,14 @@ export default async function TutorMasteryPage({
           <CardTitle className="text-base">Student Overview</CardTitle>
           <CardDescription>
             Student summaries load first. Expand a student to load their words.
+            Equivalent words is the single-word total from passive evidence used
+            in passive-vocabulary estimates.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {PASSIVE_EQUIVALENT_WORDS_EXPLANATION}
+          </p>
           <StudentMasteryCards students={studentSummaries} />
         </CardContent>
       </Card>

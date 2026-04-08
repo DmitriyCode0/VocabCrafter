@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import {
   LayoutDashboard,
   BookOpen,
+  CalendarDays,
   GraduationCap,
   Users,
   ClipboardList,
@@ -51,6 +52,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/classes",
     icon: GraduationCap,
     roles: ["student"],
+  },
+  {
+    label: "Lessons",
+    href: "/lessons",
+    icon: CalendarDays,
+    roles: ["student", "tutor"],
   },
   {
     label: "Assignments",

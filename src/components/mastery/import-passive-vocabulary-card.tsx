@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { BookMarked, RotateCcw } from "lucide-react";
-import type { LearningLanguage, SourceLanguage } from "@/lib/languages";
-import { WordInput } from "@/components/quiz/word-input";
+import { BookMarked, FileText, RotateCcw, Upload } from "lucide-react";
+import type { LearningLanguage } from "@/lib/languages";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,46 +15,68 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { ParsedPassiveVocabularyList } from "@/components/mastery/parsed-passive-vocabulary-list";
+import { extractPassiveVocabularyTermsFromText } from "@/lib/mastery/passive-vocabulary";
 
 export interface PassiveVocabularyDraftItem {
   term: string;
-  definition: string;
-  itemType: "word" | "phrase";
 }
 
 interface ImportPassiveVocabularyCardProps {
   targetLanguage: LearningLanguage;
-  sourceLanguage: SourceLanguage;
   studentId?: string;
+  cardId?: string;
 }
 
-function inferItemType(term: string): "word" | "phrase" {
-  return /\s/.test(term.trim()) ? "phrase" : "word";
-}
+const ACCEPTED_TEXT_FILE_TYPES = ".txt,.md,.markdown,.text";
 
 export function ImportPassiveVocabularyCard({
   targetLanguage,
-  sourceLanguage,
   studentId,
+  cardId,
 }: ImportPassiveVocabularyCardProps) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [items, setItems] = useState<PassiveVocabularyDraftItem[]>([]);
-  const [sourceType, setSourceType] = useState<
-    "full_text" | "manual_list" | "curated_list"
-  >("full_text");
+  const [rawText, setRawText] = useState("");
   const [sourceLabel, setSourceLabel] = useState("");
-  const [confidence, setConfidence] = useState("4");
-  const [isParseLoading, setIsParseLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [inputResetKey, setInputResetKey] = useState(0);
+
+  async function handleTextFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const fileText = await file.text();
+      setRawText((current) =>
+        current.trim().length > 0
+          ? `${current.trim()}\n\n${fileText.trim()}`
+          : fileText.trim(),
+      );
+
+      if (!sourceLabel.trim()) {
+        setSourceLabel(file.name.replace(/\.[^.]+$/, ""));
+      }
+    } catch {
+      toast.error("Failed to read text file");
+    }
+  }
+
+  function handleExtractWords() {
+    const extractedTerms = extractPassiveVocabularyTermsFromText(rawText);
+
+    if (extractedTerms.length === 0) {
+      toast.error("No words found in the provided text");
+      return;
+    }
+
+    setItems(extractedTerms.map((term) => ({ term })));
+  }
 
   async function handleImport() {
     if (items.length === 0) {
@@ -70,9 +91,8 @@ export function ImportPassiveVocabularyCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           studentId,
-          sourceType,
+          sourceType: "full_text",
           sourceLabel: sourceLabel.trim() || undefined,
-          confidence: Number(confidence),
           items,
         }),
       });
@@ -94,8 +114,8 @@ export function ImportPassiveVocabularyCard({
         `Imported ${data?.importedCount ?? items.length} passive-recognition items. Added ${data?.createdCount ?? 0} new and updated ${data?.updatedCount ?? 0} existing entries.`,
       );
       setItems([]);
+      setRawText("");
       setSourceLabel("");
-      setInputResetKey((current) => current + 1);
       router.refresh();
     } catch (error) {
       toast.error(
@@ -110,12 +130,12 @@ export function ImportPassiveVocabularyCard({
 
   function handleStartOver() {
     setItems([]);
+    setRawText("");
     setSourceLabel("");
-    setInputResetKey((current) => current + 1);
   }
 
   return (
-    <Card>
+    <Card id={cardId}>
       <CardHeader>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
@@ -124,65 +144,14 @@ export function ImportPassiveVocabularyCard({
               Import Passive Recognition
             </CardTitle>
             <CardDescription>
-              Parse words or phrases from a full text and save them as
-              recognition evidence only. These items improve passive vocabulary
-              estimation but do not create review tasks or active mastery.
+              Paste or upload a text the student understands. It will be split
+              into unique individual words and saved as passive-recognition
+              evidence only.
             </CardDescription>
           </div>
 
-          <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-[520px]">
+          <div className="w-full space-y-2 lg:w-[320px]">
             <div className="space-y-2">
-              <Label
-                htmlFor="passive-source-type"
-                className="text-xs text-muted-foreground"
-              >
-                Evidence source
-              </Label>
-              <Select
-                value={sourceType}
-                onValueChange={(value) =>
-                  setSourceType(value as typeof sourceType)
-                }
-              >
-                <SelectTrigger
-                  id="passive-source-type"
-                  className="w-full bg-background"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="full_text">Full Text</SelectItem>
-                  <SelectItem value="manual_list">Manual List</SelectItem>
-                  <SelectItem value="curated_list">Curated List</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="passive-confidence"
-                className="text-xs text-muted-foreground"
-              >
-                Confidence
-              </Label>
-              <Select value={confidence} onValueChange={setConfidence}>
-                <SelectTrigger
-                  id="passive-confidence"
-                  className="w-full bg-background"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 - weak signal</SelectItem>
-                  <SelectItem value="2">2 - tentative</SelectItem>
-                  <SelectItem value="3">3 - moderate</SelectItem>
-                  <SelectItem value="4">4 - strong</SelectItem>
-                  <SelectItem value="5">5 - confirmed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2 sm:col-span-3 lg:col-span-1">
               <Label
                 htmlFor="passive-source-label"
                 className="text-xs text-muted-foreground"
@@ -196,40 +165,81 @@ export function ImportPassiveVocabularyCard({
                 placeholder="Short story, article, lesson 12..."
               />
             </div>
+
+            <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-xs text-muted-foreground">
+              Imported words are stored as lowercase unique words in {targetLanguage} and used only for passive-recognition estimates.
+            </div>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {items.length === 0 ? (
-          <WordInput
-            key={inputResetKey}
-            onParsed={(terms) =>
-              setItems(
-                terms.map((term) => ({
-                  term: term.term,
-                  definition: term.definition,
-                  itemType: inferItemType(term.term),
-                })),
-              )
-            }
-            isLoading={isParseLoading}
-            setIsLoading={setIsParseLoading}
-            targetLanguage={targetLanguage}
-            sourceLanguage={sourceLanguage}
-          />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="passive-raw-text">Known text</Label>
+              <Textarea
+                id="passive-raw-text"
+                value={rawText}
+                onChange={(event) => setRawText(event.target.value)}
+                rows={10}
+                className="font-mono text-sm"
+                placeholder="Paste a text the student understands. The import will split it into unique individual words and save those words as known passive vocabulary."
+              />
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-lg border border-dashed bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">Optional text upload</p>
+                <p>Upload a plain text or markdown file and it will be appended to the text box.</p>
+              </div>
+
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ACCEPTED_TEXT_FILE_TYPES}
+                  onChange={handleTextFileSelection}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full sm:w-auto"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Text File
+                </Button>
+              </>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                onClick={handleExtractWords}
+                disabled={!rawText.trim()}
+                className="w-full sm:w-auto"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Extract Unique Words
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                This does not use the AI parser. It simply splits the text into individual words and deduplicates them.
+              </p>
+            </div>
+          </div>
         ) : (
           <>
             <ParsedPassiveVocabularyList
               items={items}
               onItemsChange={setItems}
               targetLanguage={targetLanguage}
-              sourceLanguage={sourceLanguage}
             />
 
             <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <p>
-                These items increase passive-recognition estimates only. They do
-                not get due dates, review sessions, or active mastery levels.
+                These words increase passive-recognition estimates only. They do
+                not get due dates, review sessions, meanings, or active mastery levels.
               </p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button

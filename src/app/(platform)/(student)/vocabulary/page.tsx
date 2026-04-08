@@ -23,7 +23,10 @@ import {
   normalizeLearningLanguage,
   normalizeSourceLanguage,
 } from "@/lib/languages";
-import { summarizePassiveVocabularyEvidence } from "@/lib/mastery/passive-vocabulary";
+import {
+  PASSIVE_EQUIVALENT_WORDS_EXPLANATION,
+  summarizePassiveVocabularyEvidence,
+} from "@/lib/mastery/passive-vocabulary";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +70,6 @@ interface PassiveEvidenceRow {
   item_type: "word" | "phrase";
   source_type: "full_text" | "manual_list" | "curated_list";
   source_label: string | null;
-  confidence: number;
   import_count: number;
   last_imported_at: string;
 }
@@ -147,13 +149,13 @@ export default async function VocabularyPage({
     supabaseAdmin
       .from("passive_vocabulary_evidence")
       .select(
-        "term, definition, item_type, source_type, source_label, confidence, import_count, last_imported_at",
+        "term, definition, item_type, source_type, source_label, import_count, last_imported_at",
       )
       .eq("student_id", user.id),
     supabaseAdmin
       .from("passive_vocabulary_evidence")
       .select(
-        "id, term, definition, item_type, source_type, source_label, confidence, import_count, last_imported_at",
+        "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at",
       )
       .eq("student_id", user.id)
       .order("last_imported_at", { ascending: false })
@@ -176,7 +178,6 @@ export default async function VocabularyPage({
         item_type: item.item_type,
         source_type: item.source_type,
         source_label: item.source_label,
-        confidence: item.confidence,
         import_count: item.import_count,
         last_imported_at: item.last_imported_at,
       }),
@@ -277,7 +278,7 @@ export default async function VocabularyPage({
 
       <ImportPassiveVocabularyCard
         targetLanguage={targetLanguage}
-        sourceLanguage={sourceLanguage}
+        cardId="passive-recognition"
       />
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -308,24 +309,19 @@ export default async function VocabularyPage({
               {passiveEvidenceSummary.equivalentWordCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              weighted contribution to passive-recognition estimates
+              single-word total used in passive-vocabulary estimates
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Avg Confidence
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">What It Means</CardTitle>
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {passiveEvidenceSummary.avgConfidence.toFixed(1)}
-            </div>
             <p className="text-xs text-muted-foreground">
-              out of 5 confidence across all passive evidence
+              {PASSIVE_EQUIVALENT_WORDS_EXPLANATION}
             </p>
           </CardContent>
         </Card>
@@ -399,9 +395,6 @@ export default async function VocabularyPage({
                     <div className="flex flex-wrap gap-1.5">
                       <Badge variant="outline">
                         {item.item_type === "phrase" ? "Phrase" : "Word"}
-                      </Badge>
-                      <Badge variant="secondary">
-                        Confidence {item.confidence}/5
                       </Badge>
                       <Badge variant="outline">
                         {item.source_type.replace("_", " ")}

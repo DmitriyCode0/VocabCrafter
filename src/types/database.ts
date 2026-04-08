@@ -129,6 +129,106 @@ export interface Database {
           },
         ];
       };
+      student_progress_reviews: {
+        Row: {
+          id: string;
+          student_id: string;
+          tutor_id: string;
+          content: string;
+          rating: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          tutor_id: string;
+          content: string;
+          rating?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          student_id?: string;
+          tutor_id?: string;
+          content?: string;
+          rating?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "student_progress_reviews_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "student_progress_reviews_tutor_id_fkey";
+            columns: ["tutor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tutor_student_lessons: {
+        Row: {
+          id: string;
+          tutor_id: string;
+          student_id: string;
+          title: string;
+          lesson_date: string;
+          start_time: string | null;
+          end_time: string | null;
+          notes: string | null;
+          status: "planned" | "completed" | "cancelled";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tutor_id: string;
+          student_id: string;
+          title: string;
+          lesson_date: string;
+          start_time?: string | null;
+          end_time?: string | null;
+          notes?: string | null;
+          status?: "planned" | "completed" | "cancelled";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          tutor_id?: string;
+          student_id?: string;
+          title?: string;
+          lesson_date?: string;
+          start_time?: string | null;
+          end_time?: string | null;
+          notes?: string | null;
+          status?: "planned" | "completed" | "cancelled";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_lessons_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_lessons_tutor_id_fkey";
+            columns: ["tutor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       passive_vocabulary_evidence: {
         Row: {
           id: string;
@@ -760,6 +860,10 @@ export type GrammarTopicPromptOverride =
 export type WordBank = Database["public"]["Tables"]["word_banks"]["Row"];
 export type TutorStudent =
   Database["public"]["Tables"]["tutor_students"]["Row"];
+export type StudentProgressReview =
+  Database["public"]["Tables"]["student_progress_reviews"]["Row"];
+export type TutorStudentLesson =
+  Database["public"]["Tables"]["tutor_student_lessons"]["Row"];
 export type TutorStudentProgressOverride =
   Database["public"]["Tables"]["tutor_student_progress_overrides"]["Row"];
 export type PassiveVocabularyEvidence =

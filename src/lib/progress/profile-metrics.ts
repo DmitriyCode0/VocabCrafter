@@ -147,14 +147,12 @@ export interface StudentProgressSnapshot {
     wordCount: number;
     phraseCount: number;
     equivalentWordCount: number;
-    avgConfidence: number;
     sampleItems: Array<{
       term: string;
       definition: string | null;
       itemType: "word" | "phrase";
       sourceType: "full_text" | "manual_list" | "curated_list";
       sourceLabel: string | null;
-      confidence: number;
       importCount: number;
       lastImportedAt: string;
     }>;
@@ -219,7 +217,7 @@ export async function getStudentProgressSnapshot(
     supabaseAdmin
       .from("passive_vocabulary_evidence")
       .select(
-        "term, definition, item_type, source_type, source_label, confidence, import_count, last_imported_at",
+        "term, definition, item_type, source_type, source_label, import_count, last_imported_at",
       )
       .eq("student_id", userId)
       .order("last_imported_at", { ascending: false }),

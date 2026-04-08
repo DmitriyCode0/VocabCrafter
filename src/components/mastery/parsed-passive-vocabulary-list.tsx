@@ -2,21 +2,11 @@
 
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import type { LearningLanguage, SourceLanguage } from "@/lib/languages";
-import {
-  getLearningLanguageLabel,
-  getSourceLanguageLabel,
-} from "@/lib/languages";
+import type { LearningLanguage } from "@/lib/languages";
+import { getLearningLanguageLabel } from "@/lib/languages";
 import type { PassiveVocabularyDraftItem } from "@/components/mastery/import-passive-vocabulary-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -30,30 +20,21 @@ interface ParsedPassiveVocabularyListProps {
   items: PassiveVocabularyDraftItem[];
   onItemsChange: (items: PassiveVocabularyDraftItem[]) => void;
   targetLanguage: LearningLanguage;
-  sourceLanguage: SourceLanguage;
 }
 
 export function ParsedPassiveVocabularyList({
   items,
   onItemsChange,
   targetLanguage,
-  sourceLanguage,
 }: ParsedPassiveVocabularyListProps) {
   const [newTerm, setNewTerm] = useState("");
-  const [newDefinition, setNewDefinition] = useState("");
-  const [newItemType, setNewItemType] = useState<"word" | "phrase">("word");
   const targetLanguageLabel = getLearningLanguageLabel(targetLanguage);
-  const sourceLanguageLabel = getSourceLanguageLabel(sourceLanguage);
 
-  function updateItem(
-    index: number,
-    field: keyof PassiveVocabularyDraftItem,
-    value: string,
-  ) {
+  function updateItem(index: number, value: string) {
     const updated = [...items];
     updated[index] = {
       ...updated[index],
-      [field]: value,
+      term: value,
     } as PassiveVocabularyDraftItem;
     onItemsChange(updated);
   }
@@ -71,21 +52,17 @@ export function ParsedPassiveVocabularyList({
       ...items,
       {
         term: newTerm.trim(),
-        definition: newDefinition.trim(),
-        itemType: newItemType,
       },
     ]);
     setNewTerm("");
-    setNewDefinition("");
-    setNewItemType("word");
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {items.length} recognition item{items.length !== 1 ? "s" : ""}
-          parsed. Mark each one as a word or phrase before saving.
+          {items.length} unique word{items.length !== 1 ? "s" : ""}
+          extracted. Review the list before saving.
         </p>
       </div>
 
@@ -93,9 +70,7 @@ export function ParsedPassiveVocabularyList({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[34%]">{targetLanguageLabel}</TableHead>
-              <TableHead className="w-[34%]">{sourceLanguageLabel}</TableHead>
-              <TableHead className="w-[18%]">Type</TableHead>
+              <TableHead className="w-[86%]">{targetLanguageLabel}</TableHead>
               <TableHead className="w-[14%]" />
             </TableRow>
           </TableHeader>
@@ -105,37 +80,9 @@ export function ParsedPassiveVocabularyList({
                 <TableCell>
                   <Input
                     value={item.term}
-                    onChange={(event) =>
-                      updateItem(index, "term", event.target.value)
-                    }
+                    onChange={(event) => updateItem(index, event.target.value)}
                     className="h-8"
                   />
-                </TableCell>
-                <TableCell>
-                  <Input
-                    value={item.definition}
-                    onChange={(event) =>
-                      updateItem(index, "definition", event.target.value)
-                    }
-                    placeholder="Optional meaning"
-                    className="h-8"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Select
-                    value={item.itemType}
-                    onValueChange={(value) =>
-                      updateItem(index, "itemType", value)
-                    }
-                  >
-                    <SelectTrigger className="h-8 w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="word">Word</SelectItem>
-                      <SelectItem value="phrase">Phrase</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </TableCell>
                 <TableCell>
                   <Button
@@ -156,35 +103,10 @@ export function ParsedPassiveVocabularyList({
                 <Input
                   value={newTerm}
                   onChange={(event) => setNewTerm(event.target.value)}
-                  placeholder={`Add ${targetLanguageLabel.toLowerCase()} word or phrase...`}
+                  placeholder={`Add ${targetLanguageLabel.toLowerCase()} word...`}
                   className="h-8"
                   onKeyDown={(event) => event.key === "Enter" && addItem()}
                 />
-              </TableCell>
-              <TableCell>
-                <Input
-                  value={newDefinition}
-                  onChange={(event) => setNewDefinition(event.target.value)}
-                  placeholder={`Optional ${sourceLanguageLabel.toLowerCase()} meaning...`}
-                  className="h-8"
-                  onKeyDown={(event) => event.key === "Enter" && addItem()}
-                />
-              </TableCell>
-              <TableCell>
-                <Select
-                  value={newItemType}
-                  onValueChange={(value) =>
-                    setNewItemType(value as typeof newItemType)
-                  }
-                >
-                  <SelectTrigger className="h-8 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="word">Word</SelectItem>
-                    <SelectItem value="phrase">Phrase</SelectItem>
-                  </SelectContent>
-                </Select>
               </TableCell>
               <TableCell>
                 <Button

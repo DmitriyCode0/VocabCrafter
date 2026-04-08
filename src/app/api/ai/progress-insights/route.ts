@@ -990,7 +990,7 @@ function buildProgressInsightsPrompt(
       ? snapshot.passiveSignals.sampleItems
           .map(
             (item) =>
-              `- ${item.term}${item.definition ? ` | ${item.definition}` : ""} | ${item.itemType} | confidence ${item.confidence}/5${item.sourceLabel ? ` | source ${item.sourceLabel}` : ""}`,
+              `- ${item.term}${item.definition ? ` | ${item.definition}` : ""} | ${item.itemType}${item.sourceLabel ? ` | source ${item.sourceLabel}` : ""}`,
           )
           .join("\n")
       : "- None yet";
@@ -1016,7 +1016,7 @@ Overview:
 - Average mastery level: ${snapshot.overview.avgMasteryLevel}/5
 - Grammar topics covered: ${snapshot.overview.grammarCoveredCount}/${snapshot.overview.grammarAvailableCount}
 - Passive-recognition imports: ${snapshot.passiveSignals.uniqueItems} items (${snapshot.passiveSignals.wordCount} words, ${snapshot.passiveSignals.phraseCount} phrases)
-- Passive-recognition equivalent words: ${snapshot.passiveSignals.equivalentWordCount}
+- Passive-recognition equivalent words: ${snapshot.passiveSignals.equivalentWordCount} (the single-word total added to passive-vocabulary estimates)
 
 Activity performance:
 ${activityText}
@@ -1040,6 +1040,7 @@ Instructions:
 - Passive vocabulary must be greater than or equal to active vocabulary.
 - Use the full tracked word list, the mastery data, the student's CEFR setting, and quiz performance to make the estimate.
 - Treat passive-recognition imports as evidence for recognition only. They can raise passive vocabulary estimates, but they must not be treated as proof of active mastery, recall, or review readiness.
+- Equivalent words means the single-word total derived from passive evidence that is fed into passive-vocabulary estimation.
 - Grammar plan topics must come from the remaining grammar topics list whenever that list is non-empty.
 - Vocabulary themes should reflect what the student already knows plus the next useful adjacent topics.
 - Keep recommendations encouraging, concrete, and study-oriented.

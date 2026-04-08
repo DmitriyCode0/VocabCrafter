@@ -11,7 +11,6 @@ const updatePassiveEvidenceSchema = z.object({
   itemType: z.enum(["word", "phrase"]),
   sourceType: z.enum(["full_text", "manual_list", "curated_list"]),
   sourceLabel: z.string().trim().max(160).nullable().optional(),
-  confidence: z.number().int().min(1).max(5),
 });
 
 async function requirePassiveEvidenceAccess(evidenceId: string) {
@@ -133,7 +132,6 @@ export async function PATCH(
       item_type: parsed.data.itemType,
       source_type: parsed.data.sourceType,
       source_label: parsed.data.sourceLabel?.trim() || null,
-      confidence: parsed.data.confidence,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

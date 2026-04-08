@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DeletePassiveEvidenceButton } from "@/components/mastery/delete-passive-evidence-button";
 import { EditPassiveEvidenceDialog } from "@/components/mastery/edit-passive-evidence-dialog";
 import { ImportPassiveVocabularyCard } from "@/components/mastery/import-passive-vocabulary-card";
+import { TutorProgressReviewForm } from "@/components/progress/tutor-progress-review-form";
 import { TutorStudentProgressWorkspace } from "@/components/progress/tutor-student-progress-workspace";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { formatAppDate } from "@/lib/dates";
+import { PASSIVE_EQUIVALENT_WORDS_EXPLANATION } from "@/lib/mastery/passive-vocabulary";
 import { parseTutorProgressOverride } from "@/lib/progress/contracts";
 import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
@@ -39,9 +41,23 @@ interface PassiveEvidenceRow {
   item_type: "word" | "phrase";
   source_type: "full_text" | "manual_list" | "curated_list";
   source_label: string | null;
-  confidence: number;
   import_count: number;
   last_imported_at: string;
+}
+
+interface StudentProgressReviewRow {
+  id: string;
+  tutor_id: string;
+  content: string;
+  rating: number | null;
+  created_at: string;
+  updated_at: string;
+  profiles:
+    | {
+        full_name: string | null;
+        email: string;
+      }
+    | null;
 }
 
 export default async function TutorStudentProgressPage({
@@ -87,7 +103,12 @@ export default async function TutorStudentProgressPage({
     }
   }
 
-  const [studentProfileResult, overrideResult, passiveEvidenceResult] =
+  const [
+    studentProfileResult,
+    overrideResult,
+    passiveEvidenceResult,
+    progressReviewsResult,
+  ] =
     await Promise.all([
       supabaseAdmin
         .from("profiles")
@@ -103,11 +124,18 @@ export default async function TutorStudentProgressPage({
       supabaseAdmin
         .from("passive_vocabulary_evidence")
         .select(
-          "id, term, definition, item_type, source_type, source_label, confidence, import_count, last_imported_at",
+          "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at",
         )
         .eq("student_id", studentId)
         .order("last_imported_at", { ascending: false })
         .range(0, 11),
+      supabaseAdmin
+        .from("student_progress_reviews")
+        .select(
+          "id, tutor_id, content, rating, created_at, updated_at, profiles!student_progress_reviews_tutor_id_fkey(full_name, email)",
+        )
+        .eq("student_id", studentId)
+        .order("created_at", { ascending: false }),
     ]);
 
   if (studentProfileResult.error || !studentProfileResult.data) {
@@ -122,6 +150,8 @@ export default async function TutorStudentProgressPage({
   const initialOverride = parseTutorProgressOverride(overrideResult.data);
   const passiveEvidenceItems = (passiveEvidenceResult.data ??
     []) as PassiveEvidenceRow[];
+  const progressReviews = (progressReviewsResult.data ??
+    []) as StudentProgressReviewRow[];
   const studentName =
     studentProfileResult.data.full_name ||
     studentProfileResult.data.email ||
@@ -154,7 +184,8 @@ export default async function TutorStudentProgressPage({
             </div>
             <p className="text-muted-foreground">
               Review this student&apos;s computed learning profile, then curate
-              your own coaching version of the radar metrics and AI suggestions.
+              your own coaching version of the radar metrics, AI suggestions,
+              and progress comments.
             </p>
           </div>
         </div>
@@ -178,6 +209,62 @@ export default async function TutorStudentProgressPage({
         hasData={hasAnyRawData}
         initialOverride={initialOverride}
       />
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Progress Reviews & Comments
+            </CardTitle>
+            <CardDescription>
+              Tutors can leave progress reviews, coaching notes, and comments
+              about how {studentName} is developing over time.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {progressReviews.length === 0 ? (
+              <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                No progress reviews yet.
+              </div>
+            ) : (
+              progressReviews.map((review) => {
+                const authorName =
+                  review.profiles?.full_name || review.profiles?.email || "Tutor";
+
+                return (
+                  <div
+                    key={review.id}
+                    className="rounded-lg border p-3 space-y-2"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium">{authorName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatAppDate(review.created_at)}
+                        </p>
+                      </div>
+                      {review.rating ? (
+                        <Badge variant="outline">
+                          {"★".repeat(review.rating)}
+                          {"☆".repeat(5 - review.rating)}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {review.content}
+                    </p>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
+        <TutorProgressReviewForm
+          studentId={studentId}
+          studentName={studentName}
+        />
+      </div>
 
       {!hasAnyRawData ? (
         <Card>
@@ -316,24 +403,18 @@ export default async function TutorStudentProgressPage({
               {snapshot.passiveSignals.equivalentWordCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              weighted contribution to passive-recognition estimates
+              single-word total used in passive-vocabulary estimates
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Avg Confidence
-            </CardTitle>
-            <Star className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">What It Means</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {snapshot.passiveSignals.avgConfidence.toFixed(1)}
-            </div>
             <p className="text-xs text-muted-foreground">
-              out of 5 across all passive evidence
+              {PASSIVE_EQUIVALENT_WORDS_EXPLANATION}
             </p>
           </CardContent>
         </Card>
@@ -341,7 +422,6 @@ export default async function TutorStudentProgressPage({
 
       <ImportPassiveVocabularyCard
         targetLanguage={snapshot.profile.targetLanguage}
-        sourceLanguage={snapshot.profile.sourceLanguage}
         studentId={studentId}
       />
 
@@ -388,9 +468,6 @@ export default async function TutorStudentProgressPage({
                   <div className="flex flex-wrap gap-1.5">
                     <Badge variant="outline">
                       {item.item_type === "phrase" ? "Phrase" : "Word"}
-                    </Badge>
-                    <Badge variant="secondary">
-                      Confidence {item.confidence}/5
                     </Badge>
                     <Badge variant="outline">
                       {item.source_type.replace("_", " ")}

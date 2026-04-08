@@ -32,7 +32,6 @@ interface EditPassiveEvidenceDialogProps {
     item_type: "word" | "phrase";
     source_type: "full_text" | "manual_list" | "curated_list";
     source_label: string | null;
-    confidence: number;
   };
 }
 
@@ -51,7 +50,6 @@ export function EditPassiveEvidenceDialog({
     "full_text" | "manual_list" | "curated_list"
   >(evidence.source_type);
   const [sourceLabel, setSourceLabel] = useState(evidence.source_label ?? "");
-  const [confidence, setConfidence] = useState(String(evidence.confidence));
 
   async function handleSave() {
     setIsSaving(true);
@@ -68,7 +66,6 @@ export function EditPassiveEvidenceDialog({
             itemType,
             sourceType,
             sourceLabel: sourceLabel.trim() || null,
-            confidence: Number(confidence),
           }),
         },
       );
@@ -144,22 +141,6 @@ export function EditPassiveEvidenceDialog({
               <SelectContent>
                 <SelectItem value="word">Word</SelectItem>
                 <SelectItem value="phrase">Phrase</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Confidence</Label>
-            <Select value={confidence} onValueChange={setConfidence}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[1, 2, 3, 4, 5].map((value) => (
-                  <SelectItem key={value} value={String(value)}>
-                    {value}
-                  </SelectItem>
-                ))}
               </SelectContent>
             </Select>
           </div>

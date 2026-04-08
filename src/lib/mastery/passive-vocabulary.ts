@@ -22,7 +22,6 @@ export const passiveVocabularyImportSchema = z.object({
   studentId: z.string().uuid().optional(),
   sourceType: z.enum(PASSIVE_VOCABULARY_SOURCE_TYPES).default("full_text"),
   sourceLabel: z.string().trim().max(160).optional(),
-  confidence: z.coerce.number().int().min(1).max(5).default(4),
   items: z.array(passiveVocabularyImportItemSchema).min(1).max(500),
 });
 
@@ -32,7 +31,6 @@ export interface PassiveVocabularyEvidenceRow {
   item_type: PassiveVocabularyItemType;
   source_type: PassiveVocabularySourceType;
   source_label: string | null;
-  confidence: number;
   import_count: number;
   last_imported_at: string;
 }
@@ -43,7 +41,6 @@ export interface PassiveVocabularySampleItem {
   itemType: PassiveVocabularyItemType;
   sourceType: PassiveVocabularySourceType;
   sourceLabel: string | null;
-  confidence: number;
   importCount: number;
   lastImportedAt: string;
 }
@@ -53,12 +50,38 @@ export interface PassiveVocabularySignalSummary {
   wordCount: number;
   phraseCount: number;
   equivalentWordCount: number;
-  avgConfidence: number;
   sampleItems: PassiveVocabularySampleItem[];
 }
 
+export const PASSIVE_EQUIVALENT_WORDS_EXPLANATION =
+  "Equivalent words is the single-word total used by progress estimates when passive evidence is added. Because passive imports are now split into individual known words, it will usually match the passive evidence count.";
+
+const PASSIVE_VOCABULARY_WORD_PATTERN =
+  /[\p{L}\p{M}]+(?:[\u2019'’-][\p{L}\p{M}]+)*/gu;
+
 export function normalizePassiveVocabularyText(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+export function extractPassiveVocabularyTermsFromText(text: string) {
+  const matches = text.match(PASSIVE_VOCABULARY_WORD_PATTERN) ?? [];
+  const uniqueTerms = new Map<string, string>();
+
+  for (const match of matches) {
+    const normalizedTerm = normalizePassiveVocabularyText(match);
+
+    if (!normalizedTerm) {
+      continue;
+    }
+
+    if (!uniqueTerms.has(normalizedTerm)) {
+      uniqueTerms.set(normalizedTerm, normalizedTerm);
+    }
+  }
+
+  return Array.from(uniqueTerms.values()).sort((left, right) =>
+    left.localeCompare(right, undefined, { sensitivity: "base" }),
+  );
 }
 
 export function getPassiveVocabularyCompositeKey(
@@ -70,16 +93,12 @@ export function getPassiveVocabularyCompositeKey(
 
 export function getPassiveVocabularyEquivalentWeight(
   itemType: PassiveVocabularyItemType,
-  confidence: number,
 ) {
-  const normalizedConfidence = Math.max(1, Math.min(5, confidence));
-  const confidenceFactor = 0.6 + (normalizedConfidence - 1) * 0.1;
-
   if (itemType === "phrase") {
-    return 0.45 * confidenceFactor;
+    return 1;
   }
 
-  return 1 * confidenceFactor;
+  return 1;
 }
 
 export function summarizePassiveVocabularyEvidence(
@@ -88,20 +107,9 @@ export function summarizePassiveVocabularyEvidence(
 ): PassiveVocabularySignalSummary {
   const wordCount = rows.filter((row) => row.item_type === "word").length;
   const phraseCount = rows.length - wordCount;
-  const avgConfidence =
-    rows.length > 0
-      ? Number(
-          (
-            rows.reduce((sum, row) => sum + (row.confidence ?? 0), 0) /
-            rows.length
-          ).toFixed(1),
-        )
-      : 0;
   const equivalentWordCount = Math.round(
     rows.reduce(
-      (sum, row) =>
-        sum +
-        getPassiveVocabularyEquivalentWeight(row.item_type, row.confidence),
+      (sum, row) => sum + getPassiveVocabularyEquivalentWeight(row.item_type),
       0,
     ),
   );
@@ -111,14 +119,12 @@ export function summarizePassiveVocabularyEvidence(
     wordCount,
     phraseCount,
     equivalentWordCount,
-    avgConfidence,
     sampleItems: rows.slice(0, sampleLimit).map((row) => ({
       term: row.term,
       definition: row.definition,
       itemType: row.item_type,
       sourceType: row.source_type,
       sourceLabel: row.source_label,
-      confidence: row.confidence,
       importCount: row.import_count,
       lastImportedAt: row.last_imported_at,
     })),

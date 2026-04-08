@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
   BookOpen,
+  BookMarked,
   Flame,
   GraduationCap,
   Users,
@@ -139,7 +140,7 @@ async function StudentDashboard({
 
   return (
     <div className="space-y-6">
-      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <AnimatedCard>
           <Card data-tour-id="student-new-quiz">
             <CardHeader className="flex flex-row items-center gap-2">
@@ -173,6 +174,29 @@ async function StudentDashboard({
             <CardFooter className="mt-auto justify-center">
               <Button asChild variant="outline" className="w-full">
                 <Link href="/quizzes/review">Start Review</Link>
+              </Button>
+            </CardFooter>
+          </Card>
+        </AnimatedCard>
+
+        <AnimatedCard>
+          <Card data-tour-id="student-passive-recognition">
+            <CardHeader className="flex flex-row items-center gap-2">
+              <BookMarked className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-base">
+                  Add Passive Recognition
+                </CardTitle>
+                <CardDescription>
+                  Import words from text you already understand
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardFooter className="mt-auto justify-center">
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/vocabulary#passive-recognition">
+                  Add Passive Recognition
+                </Link>
               </Button>
             </CardFooter>
           </Card>

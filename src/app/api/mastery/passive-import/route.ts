@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     }
 
     const { studentId, supabaseAdmin } = authorizedTarget;
-    const { confidence, sourceLabel, sourceType } = parsed.data;
+    const { sourceLabel, sourceType } = parsed.data;
     const dedupedItems = new Map<
       string,
       {
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
     const { data: existingRows, error: existingError } = await supabaseAdmin
       .from("passive_vocabulary_evidence")
       .select(
-        "student_id, normalized_term, item_type, definition, source_label, confidence, import_count",
+        "student_id, normalized_term, item_type, definition, source_label, import_count",
       )
       .eq("student_id", studentId)
       .in(
@@ -167,7 +167,6 @@ export async function POST(request: Request) {
         item_type: item.itemType,
         source_type: sourceType,
         source_label: sourceLabel ?? existing?.source_label ?? null,
-        confidence: Math.max(existing?.confidence ?? 0, confidence),
         import_count: (existing?.import_count ?? 0) + 1,
         last_imported_at: nowIso,
         updated_at: nowIso,
@@ -201,7 +200,6 @@ export async function POST(request: Request) {
       updatedCount: items.length - createdCount,
       studentId,
       sourceType,
-      confidence,
     });
   } catch (error) {
     console.error("Passive vocabulary import error:", error);

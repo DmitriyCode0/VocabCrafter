@@ -33,6 +33,8 @@ interface StudentMasterySummary {
   mastered: number;
   avgLevel: number;
   levelCounts: number[];
+  passiveEvidenceCount: number;
+  equivalentWords: number;
 }
 
 interface StudentWord {
@@ -147,6 +149,10 @@ export function StudentMasteryCards({
                 <p className="text-sm text-muted-foreground">
                   {student.totalWords} words · avg level {student.avgLevel} ·{" "}
                   {student.mastered} mastered
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {student.passiveEvidenceCount} passive evidence ·{" "}
+                  {student.equivalentWords} equivalent words
                 </p>
               </div>
 

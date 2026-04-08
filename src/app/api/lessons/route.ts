@@ -1,0 +1,114 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import { LESSON_STATUSES } from "@/lib/lessons";
+
+const timeSchema = z
+  .string()
+  .regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/)
+  .nullable()
+  .optional();
+
+const createLessonSchema = z
+  .object({
+    studentId: z.string().uuid(),
+    title: z.string().trim().min(1).max(200),
+    lessonDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    startTime: timeSchema,
+    endTime: timeSchema,
+    notes: z.string().trim().max(2000).nullable().optional(),
+    status: z.enum(LESSON_STATUSES).default("planned"),
+  })
+  .refine(
+    (value) => !value.startTime || !value.endTime || value.endTime > value.startTime,
+    {
+      message: "End time must be after start time",
+      path: ["endTime"],
+    },
+  );
+
+export async function POST(request: NextRequest) {
+  const supabase = await createClient();
+  const supabaseAdmin = createAdminClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile || profile.role !== "tutor") {
+    return NextResponse.json(
+      { error: "Only tutors can create lessons" },
+      { status: 403 },
+    );
+  }
+
+  const body = await request.json().catch(() => null);
+  const parsed = createLessonSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request", details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  const { data: connection, error: connectionError } = await supabaseAdmin
+    .from("tutor_students")
+    .select("id")
+    .eq("tutor_id", user.id)
+    .eq("student_id", parsed.data.studentId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (connectionError) {
+    console.error("Lesson connection check error:", connectionError);
+    return NextResponse.json(
+      { error: "Failed to validate tutor/student connection" },
+      { status: 500 },
+    );
+  }
+
+  if (!connection) {
+    return NextResponse.json(
+      { error: "You can only add lessons for connected students" },
+      { status: 403 },
+    );
+  }
+
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabaseAdmin
+    .from("tutor_student_lessons")
+    .insert({
+      tutor_id: user.id,
+      student_id: parsed.data.studentId,
+      title: parsed.data.title,
+      lesson_date: parsed.data.lessonDate,
+      start_time: parsed.data.startTime ?? null,
+      end_time: parsed.data.endTime ?? null,
+      notes: parsed.data.notes ?? null,
+      status: parsed.data.status,
+      updated_at: nowIso,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Create lesson error:", error);
+    return NextResponse.json(
+      { error: "Failed to create lesson" },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json(data, { status: 201 });
+}
