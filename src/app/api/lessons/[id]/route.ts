@@ -4,6 +4,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { LESSON_STATUSES } from "@/lib/lessons";
 
+const lessonTitleSchema = z
+  .union([z.string().trim().max(200), z.null(), z.undefined()])
+  .transform((value) => {
+    if (typeof value !== "string") {
+      return null;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  });
+
 const timeSchema = z
   .string()
   .regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/)
@@ -13,12 +24,13 @@ const timeSchema = z
 const updateLessonSchema = z
   .object({
     studentId: z.string().uuid(),
-    title: z.string().trim().min(1).max(200),
+    title: lessonTitleSchema,
     lessonDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     startTime: timeSchema,
     endTime: timeSchema,
     notes: z.string().trim().max(2000).nullable().optional(),
     status: z.enum(LESSON_STATUSES),
+    priceCents: z.number().int().nonnegative().optional(),
   })
   .refine(
     (value) =>
@@ -103,7 +115,7 @@ async function validateConnectedStudent(
 ) {
   const { data: connection, error } = await supabaseAdmin
     .from("tutor_students")
-    .select("id")
+    .select("id, lesson_price_cents")
     .eq("tutor_id", tutorId)
     .eq("student_id", studentId)
     .eq("status", "active")
@@ -113,7 +125,7 @@ async function validateConnectedStudent(
     throw error;
   }
 
-  return Boolean(connection);
+  return connection;
 }
 
 export async function PATCH(
@@ -138,13 +150,13 @@ export async function PATCH(
   }
 
   try {
-    const hasConnection = await validateConnectedStudent(
+    const connection = await validateConnectedStudent(
       access.user.id,
       parsed.data.studentId,
       access.supabaseAdmin,
     );
 
-    if (!hasConnection) {
+    if (!connection) {
       return NextResponse.json(
         { error: "You can only assign lessons to connected students" },
         { status: 403 },
@@ -161,6 +173,7 @@ export async function PATCH(
         end_time: parsed.data.endTime ?? null,
         notes: parsed.data.notes ?? null,
         status: parsed.data.status,
+        price_cents: parsed.data.priceCents ?? connection.lesson_price_cents,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)

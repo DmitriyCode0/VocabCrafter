@@ -4,6 +4,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { LESSON_STATUSES } from "@/lib/lessons";
 
+const lessonTitleSchema = z
+  .union([z.string().trim().max(200), z.null(), z.undefined()])
+  .transform((value) => {
+    if (typeof value !== "string") {
+      return null;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  });
+
 const timeSchema = z
   .string()
   .regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/)
@@ -13,12 +24,13 @@ const timeSchema = z
 const createLessonSchema = z
   .object({
     studentId: z.string().uuid(),
-    title: z.string().trim().min(1).max(200),
+    title: lessonTitleSchema,
     lessonDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     startTime: timeSchema,
     endTime: timeSchema,
     notes: z.string().trim().max(2000).nullable().optional(),
     status: z.enum(LESSON_STATUSES).default("planned"),
+    priceCents: z.number().int().nonnegative().optional(),
   })
   .refine(
     (value) =>
@@ -65,7 +77,7 @@ export async function POST(request: NextRequest) {
 
   const { data: connection, error: connectionError } = await supabaseAdmin
     .from("tutor_students")
-    .select("id")
+    .select("id, lesson_price_cents")
     .eq("tutor_id", user.id)
     .eq("student_id", parsed.data.studentId)
     .eq("status", "active")
@@ -98,6 +110,7 @@ export async function POST(request: NextRequest) {
       end_time: parsed.data.endTime ?? null,
       notes: parsed.data.notes ?? null,
       status: parsed.data.status,
+      price_cents: parsed.data.priceCents ?? connection.lesson_price_cents,
       updated_at: nowIso,
     })
     .select()

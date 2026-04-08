@@ -178,12 +178,13 @@ export interface Database {
           id: string;
           tutor_id: string;
           student_id: string;
-          title: string;
+          title: string | null;
           lesson_date: string;
           start_time: string | null;
           end_time: string | null;
           notes: string | null;
           status: "planned" | "completed" | "cancelled";
+          price_cents: number;
           created_at: string;
           updated_at: string;
         };
@@ -191,24 +192,26 @@ export interface Database {
           id?: string;
           tutor_id: string;
           student_id: string;
-          title: string;
+          title?: string | null;
           lesson_date: string;
           start_time?: string | null;
           end_time?: string | null;
           notes?: string | null;
           status?: "planned" | "completed" | "cancelled";
+          price_cents?: number;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           tutor_id?: string;
           student_id?: string;
-          title?: string;
+          title?: string | null;
           lesson_date?: string;
           start_time?: string | null;
           end_time?: string | null;
           notes?: string | null;
           status?: "planned" | "completed" | "cancelled";
+          price_cents?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -222,6 +225,57 @@ export interface Database {
           },
           {
             foreignKeyName: "tutor_student_lessons_tutor_id_fkey";
+            columns: ["tutor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tutor_student_balance_transactions: {
+        Row: {
+          id: string;
+          tutor_id: string;
+          student_id: string;
+          created_by: string;
+          amount_cents: number;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tutor_id: string;
+          student_id: string;
+          created_by: string;
+          amount_cents: number;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          tutor_id?: string;
+          student_id?: string;
+          created_by?: string;
+          amount_cents?: number;
+          note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_balance_transactions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_balance_transactions_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_balance_transactions_tutor_id_fkey";
             columns: ["tutor_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
@@ -688,6 +742,7 @@ export interface Database {
           student_id: string;
           connect_code: string | null;
           status: string;
+          lesson_price_cents: number;
           created_at: string;
           connected_at: string | null;
         };
@@ -697,6 +752,7 @@ export interface Database {
           student_id?: string;
           connect_code?: string | null;
           status?: string;
+          lesson_price_cents?: number;
           created_at?: string;
           connected_at?: string | null;
         };
@@ -705,6 +761,7 @@ export interface Database {
           student_id?: string;
           connected_at?: string | null;
           connect_code?: string | null;
+          lesson_price_cents?: number;
         };
         Relationships: [
           {
@@ -864,6 +921,8 @@ export type StudentProgressReview =
   Database["public"]["Tables"]["student_progress_reviews"]["Row"];
 export type TutorStudentLesson =
   Database["public"]["Tables"]["tutor_student_lessons"]["Row"];
+export type TutorStudentBalanceTransaction =
+  Database["public"]["Tables"]["tutor_student_balance_transactions"]["Row"];
 export type TutorStudentProgressOverride =
   Database["public"]["Tables"]["tutor_student_progress_overrides"]["Row"];
 export type PassiveVocabularyEvidence =

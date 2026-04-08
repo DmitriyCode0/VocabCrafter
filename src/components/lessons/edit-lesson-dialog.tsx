@@ -26,7 +26,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   LESSON_STATUSES,
+  formatLessonCurrencyInput,
+  getLessonDisplayTitle,
   getLessonStatusLabel,
+  getSuggestedLessonEndTime,
+  parseLessonCurrencyInput,
   type LessonStatus,
   type LessonStudentOption,
 } from "@/lib/lessons";
@@ -35,27 +39,36 @@ interface EditLessonDialogProps {
   lesson: {
     id: string;
     studentId: string;
-    title: string;
+    title: string | null;
     lessonDate: string;
     startTime: string | null;
     endTime: string | null;
     notes: string | null;
     status: LessonStatus;
+    priceCents: number;
   };
   students: LessonStudentOption[];
 }
 
 export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
+  const initialSuggestedEndTime = getSuggestedLessonEndTime(lesson.startTime);
+  const displayTitle = getLessonDisplayTitle(lesson.title);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [studentId, setStudentId] = useState(lesson.studentId);
-  const [title, setTitle] = useState(lesson.title);
+  const [title, setTitle] = useState(lesson.title ?? "");
   const [lessonDate, setLessonDate] = useState(lesson.lessonDate);
   const [startTime, setStartTime] = useState(lesson.startTime ?? "");
   const [endTime, setEndTime] = useState(lesson.endTime ?? "");
   const [notes, setNotes] = useState(lesson.notes ?? "");
   const [status, setStatus] = useState<LessonStatus>(lesson.status);
+  const [priceInput, setPriceInput] = useState(
+    formatLessonCurrencyInput(lesson.priceCents),
+  );
+  const [autoAdjustEndTime, setAutoAdjustEndTime] = useState(
+    Boolean(initialSuggestedEndTime) && lesson.endTime === initialSuggestedEndTime,
+  );
 
   const selectedStudentName = useMemo(
     () => students.find((student) => student.id === studentId)?.name,
@@ -64,17 +77,46 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
 
   function resetForm() {
     setStudentId(lesson.studentId);
-    setTitle(lesson.title);
+    setTitle(lesson.title ?? "");
     setLessonDate(lesson.lessonDate);
     setStartTime(lesson.startTime ?? "");
     setEndTime(lesson.endTime ?? "");
     setNotes(lesson.notes ?? "");
     setStatus(lesson.status);
+    setPriceInput(formatLessonCurrencyInput(lesson.priceCents));
+    setAutoAdjustEndTime(
+      Boolean(initialSuggestedEndTime) && lesson.endTime === initialSuggestedEndTime,
+    );
+  }
+
+  function handleStartTimeChange(nextStartTime: string) {
+    const suggestedEndTime = getSuggestedLessonEndTime(nextStartTime);
+
+    setStartTime(nextStartTime);
+
+    if (autoAdjustEndTime || (endTime && nextStartTime && endTime <= nextStartTime)) {
+      setEndTime(suggestedEndTime);
+      setAutoAdjustEndTime(true);
+    }
+  }
+
+  function handleEndTimeChange(nextEndTime: string) {
+    setEndTime(nextEndTime);
+    setAutoAdjustEndTime(
+      nextEndTime === getSuggestedLessonEndTime(startTime),
+    );
   }
 
   async function handleSave() {
-    if (!studentId || !title.trim() || !lessonDate) {
-      toast.error("Please choose a student, title, and lesson date");
+    if (!studentId || !lessonDate) {
+      toast.error("Please choose a student and lesson date");
+      return;
+    }
+
+    const priceCents = parseLessonCurrencyInput(priceInput);
+
+    if (priceCents === null) {
+      toast.error("Please enter a valid lesson price");
       return;
     }
 
@@ -86,12 +128,13 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           studentId,
-          title: title.trim(),
+          title: title.trim() || null,
           lessonDate,
           startTime: startTime || null,
           endTime: endTime || null,
           notes: notes.trim() || null,
           status,
+          priceCents,
         }),
       });
 
@@ -130,7 +173,7 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
           <PencilLine className="h-4 w-4 text-muted-foreground" />
-          <span className="sr-only">Edit {lesson.title}</span>
+          <span className="sr-only">Edit {displayTitle}</span>
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -164,7 +207,11 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
               id={`lesson-title-${lesson.id}`}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
+              placeholder="Optional lesson title"
             />
+            <p className="text-xs text-muted-foreground">
+              Optional. Leave blank to save it as a general lesson.
+            </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -205,7 +252,7 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
                 id={`lesson-start-${lesson.id}`}
                 type="time"
                 value={startTime}
-                onChange={(event) => setStartTime(event.target.value)}
+                onChange={(event) => handleStartTimeChange(event.target.value)}
               />
             </div>
 
@@ -215,7 +262,7 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
                 id={`lesson-end-${lesson.id}`}
                 type="time"
                 value={endTime}
-                onChange={(event) => setEndTime(event.target.value)}
+                onChange={(event) => handleEndTimeChange(event.target.value)}
               />
             </div>
           </div>
@@ -227,6 +274,19 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               rows={4}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor={`lesson-price-${lesson.id}`}>Lesson price</Label>
+            <Input
+              id={`lesson-price-${lesson.id}`}
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.01"
+              value={priceInput}
+              onChange={(event) => setPriceInput(event.target.value)}
             />
           </div>
         </div>

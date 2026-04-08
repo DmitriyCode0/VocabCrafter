@@ -11,8 +11,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Sparkles } from "lucide-react";
-import type { ProgressInsights } from "@/lib/progress/contracts";
+import { Loader2, RefreshCw, Sparkles } from "lucide-react";
+import {
+  vocabularyEstimateSchema,
+  type ProgressInsights,
+} from "@/lib/progress/contracts";
 
 interface VocabularyEstimate {
   low: number;
@@ -41,6 +44,7 @@ export function StudentProgressInsights({
     initialInsights,
   );
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshingPassive, setIsRefreshingPassive] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   async function loadInsights() {
@@ -81,6 +85,64 @@ export function StudentProgressInsights({
     });
   }
 
+  async function handleRefreshPassiveVocabulary() {
+    if (!hasData || !insights || isTutorVersion) {
+      return;
+    }
+
+    setError(null);
+    setIsRefreshingPassive(true);
+
+    try {
+      const response = await fetch("/api/ai/progress-insights", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mode: "passive-vocabulary",
+          estimatedBand: insights.estimatedBand,
+          activeVocabulary: insights.activeVocabulary,
+          currentInsights: insights,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | { passiveVocabulary?: ProgressInsightsResponse["passiveVocabulary"] }
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(
+          data && "error" in data
+            ? data.error || "Failed to refresh passive vocabulary"
+            : "Failed to refresh passive vocabulary",
+        );
+      }
+
+      const nextPassiveVocabulary = vocabularyEstimateSchema.parse(
+        data && "passiveVocabulary" in data ? data.passiveVocabulary : data,
+      );
+
+      setInsights((currentInsights) =>
+        currentInsights
+          ? {
+              ...currentInsights,
+              passiveVocabulary: nextPassiveVocabulary,
+            }
+          : currentInsights,
+      );
+    } catch (refreshError) {
+      setError(
+        refreshError instanceof Error
+          ? refreshError.message
+          : "Failed to refresh passive vocabulary",
+      );
+    } finally {
+      setIsRefreshingPassive(false);
+    }
+  }
+
   return (
     <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-accent/20">
       <CardHeader className="gap-3">
@@ -93,24 +155,62 @@ export function StudentProgressInsights({
               next.
             </CardDescription>
           </div>
-          <Button
-            type="button"
-            onClick={handleGenerate}
-            disabled={!hasData || isPending || isTutorVersion}
-            className="w-full sm:w-auto"
-          >
-            {isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                {insights ? "Refresh Suggestions" : "Generate Suggestions"}
-              </>
-            )}
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <Button
+                type="button"
+                onClick={handleGenerate}
+                disabled={
+                  !hasData || isPending || isRefreshingPassive || isTutorVersion
+                }
+                className="w-full sm:w-auto"
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    {insights ? "Refresh Suggestions" : "Generate Suggestions"}
+                  </>
+                )}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleRefreshPassiveVocabulary}
+                disabled={
+                  !hasData ||
+                  !insights ||
+                  isPending ||
+                  isRefreshingPassive ||
+                  isTutorVersion
+                }
+                className="w-full sm:w-auto"
+              >
+                {isRefreshingPassive ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh Passive Vocabulary
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground sm:max-w-sm sm:text-right">
+              Passive-only refresh uses the latest passive evidence imports
+              only. It updates just the passive estimate and leaves the rest of
+              the current AI plan unchanged.
+            </p>
+          </div>
         </div>
 
         {isTutorVersion && sourceLabel && (

@@ -6,6 +6,7 @@ import { z } from "zod";
 const updateQuizSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   isPublic: z.boolean().optional(),
+  generatedContent: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function PATCH(
@@ -38,6 +39,8 @@ export async function PATCH(
     if (parsed.data.title !== undefined) updates.title = parsed.data.title;
     if (parsed.data.isPublic !== undefined)
       updates.is_public = parsed.data.isPublic;
+    if (parsed.data.generatedContent !== undefined)
+      updates.generated_content = parsed.data.generatedContent;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(

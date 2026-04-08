@@ -118,6 +118,8 @@ export interface DiscussionPrompt {
   id: number;
   prompt: string;
   type: "open-ended" | "agree-disagree";
+  sourceTerm?: string;
+  highlightText?: string;
 }
 
 // Feedback

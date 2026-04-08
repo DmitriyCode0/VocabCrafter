@@ -14,10 +14,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { getLessonDisplayTitle } from "@/lib/lessons";
 
 interface DeleteLessonButtonProps {
   lessonId: string;
-  title: string;
+  title?: string | null;
 }
 
 export function DeleteLessonButton({
@@ -27,6 +28,7 @@ export function DeleteLessonButton({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const displayTitle = getLessonDisplayTitle(title);
 
   async function handleDelete() {
     setIsDeleting(true);
@@ -44,7 +46,7 @@ export function DeleteLessonButton({
         throw new Error(data?.error || "Failed to delete lesson");
       }
 
-      toast.success(`Deleted lesson ${title}`);
+      toast.success(`Deleted ${displayTitle}`);
       setOpen(false);
       router.refresh();
     } catch (error) {
@@ -61,14 +63,14 @@ export function DeleteLessonButton({
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
           <Trash2 className="h-4 w-4 text-muted-foreground" />
-          <span className="sr-only">Delete {title}</span>
+          <span className="sr-only">Delete {displayTitle}</span>
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete lesson</DialogTitle>
           <DialogDescription>
-            {title} will be removed from both the tutor and student calendars.
+            {displayTitle} will be removed from both the tutor and student calendars.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

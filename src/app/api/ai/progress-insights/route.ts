@@ -105,8 +105,17 @@ const FALLBACK_THEMES_BY_BAND: Record<EstimatedBand, string[]> = {
   ],
 };
 
+const progressInsightsRequestModeSchema = z.enum([
+  "full",
+  "passive-vocabulary",
+]);
+
 const requestSchema = z.object({
   studentId: z.string().uuid().optional(),
+  mode: progressInsightsRequestModeSchema.optional(),
+  estimatedBand: estimatedBandSchema.optional(),
+  activeVocabulary: vocabularyEstimateSchema.optional(),
+  currentInsights: progressInsightsSchema.optional(),
 });
 
 async function parseOptionalRequestBody(request: Request) {
@@ -840,6 +849,27 @@ function buildFallbackProgressInsights(
   });
 }
 
+function buildPassiveVocabularyOnlyEstimate(
+  snapshot: ProgressSnapshot,
+  estimatedBand?: EstimatedBand,
+  activeVocabulary?: ProgressInsights["activeVocabulary"],
+) {
+  const resolvedBand = estimatedBand ?? deriveEstimatedBand(snapshot);
+  const vocabularyEstimates = buildFallbackVocabularyEstimates(
+    snapshot,
+    resolvedBand,
+  );
+
+  if (!activeVocabulary) {
+    return vocabularyEstimates.passiveVocabulary;
+  }
+
+  return reconcileVocabularyEstimates(
+    vocabularyEstimates.passiveVocabulary,
+    activeVocabulary,
+  ).passiveVocabulary;
+}
+
 function normalizeProgressInsights(
   raw: unknown,
   snapshot: ProgressSnapshot,
@@ -1097,6 +1127,7 @@ export async function POST(request: Request) {
     }
 
     const requestedStudentId = parsedRequest.data.studentId;
+  const requestMode = parsedRequest.data.mode ?? "full";
     const supabaseAdmin = createAdminClient();
     let targetUserId = user.id;
 
@@ -1136,17 +1167,6 @@ export async function POST(request: Request) {
       targetUserId = requestedStudentId;
     }
 
-    const quota = await checkAIQuota(user.id);
-    if (!quota.allowed) {
-      return NextResponse.json(
-        {
-          error: `AI call limit reached (${quota.limit}/month). Upgrade your plan for more.`,
-          code: "QUOTA_EXCEEDED",
-        },
-        { status: 429 },
-      );
-    }
-
     const snapshot = await getStudentProgressSnapshot(targetUserId);
 
     if (
@@ -1157,6 +1177,52 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Not enough progress data yet" },
         { status: 400 },
+      );
+    }
+
+    if (requestMode === "passive-vocabulary") {
+      const passiveVocabulary = buildPassiveVocabularyOnlyEstimate(
+        snapshot,
+        parsedRequest.data.estimatedBand,
+        parsedRequest.data.activeVocabulary,
+      );
+
+      if (targetUserId === user.id && parsedRequest.data.currentInsights) {
+        const mergedInsights = progressInsightsSchema.parse({
+          ...parsedRequest.data.currentInsights,
+          passiveVocabulary,
+        });
+
+        const { error: saveError } = await supabaseAdmin
+          .from("student_progress_insights")
+          .upsert(
+            {
+              user_id: user.id,
+              insights: mergedInsights,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id" },
+          );
+
+        if (saveError) {
+          console.error(
+            "Save passive-only student progress insights error:",
+            saveError,
+          );
+        }
+      }
+
+      return NextResponse.json({ passiveVocabulary });
+    }
+
+    const quota = await checkAIQuota(user.id);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: `AI call limit reached (${quota.limit}/month). Upgrade your plan for more.`,
+          code: "QUOTA_EXCEEDED",
+        },
+        { status: 429 },
       );
     }
 

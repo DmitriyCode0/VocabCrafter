@@ -572,6 +572,12 @@ CRITICAL REQUIREMENTS:
 - Keep each sentence concise and conversation-ready (one line).
 - Mix open-ended prompts and agree/disagree statements.
 - Keep topics practical and suitable for live speaking.
+- Return exactly ${terms.length} items in the "prompts" array.
+- Each item must include a numeric "id" starting at 1 and increasing by 1.
+- The "type" field must be exactly either "open-ended" or "agree-disagree".
+- Each item must include a "sourceTerm" field equal to the input vocabulary item exactly as written.
+- Each item must include a "highlightText" field equal to the exact vocabulary word or phrase as it appears in the prompt.
+- Do not add explanations, notes, markdown, or any keys other than "id", "prompt", "type", "sourceTerm", and "highlightText".
 
 Vocabulary terms:
 ${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
@@ -582,7 +588,9 @@ Respond with JSON in this exact format:
     {
       "id": 1,
       "prompt": "Discussion question or statement here",
-      "type": "open-ended"
+      "type": "open-ended",
+      "sourceTerm": "target vocabulary item",
+      "highlightText": "exact text from the prompt"
     }
   ]
 }`;

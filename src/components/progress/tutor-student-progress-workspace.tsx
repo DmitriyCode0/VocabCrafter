@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2, RotateCcw, Save, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw, RotateCcw, Save, Sparkles } from "lucide-react";
 import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import {
   buildChartDataFromAxes,
   EMPTY_TUTOR_PROGRESS_OVERRIDE,
   progressInsightsSchema,
+  vocabularyEstimateSchema,
   type ProgressInsights,
   type TutorProgressOverride,
 } from "@/lib/progress/contracts";
@@ -386,6 +387,7 @@ export function TutorStudentProgressWorkspace({
   const [lastValidInsights, setLastValidInsights] =
     useState<ProgressInsights | null>(initialOverride.insightsOverride);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRegeneratingPassive, setIsRegeneratingPassive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
@@ -425,6 +427,41 @@ export function TutorStudentProgressWorkspace({
     );
   }
 
+  function buildAxisOverridesPayload() {
+    return axes.map((axis) => ({
+      key: axis.key,
+      score: axis.score,
+      value: axis.value,
+      helper: axis.helper,
+    }));
+  }
+
+  async function persistTutorOverride(insightsOverride: ProgressInsights | null) {
+    const response = await fetch(`/api/tutor/students/${studentId}/progress`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        axisOverrides: buildAxisOverridesPayload(),
+        insightsOverride,
+      }),
+    });
+
+    const data = (await response.json().catch(() => null)) as
+      | TutorProgressOverride
+      | { error?: string }
+      | null;
+
+    if (!response.ok) {
+      throw new Error(
+        data && "error" in data
+          ? data.error || "Failed to save tutor progress overrides"
+          : "Failed to save tutor progress overrides",
+      );
+    }
+
+    return data as TutorProgressOverride;
+  }
+
   async function handleGenerateInsights() {
     if (!hasData) {
       toast.error(
@@ -458,31 +495,7 @@ export function TutorStudentProgressWorkspace({
       const nextInsights = progressInsightsSchema.parse(data);
       setDraft(createDraftFromInsights(nextInsights));
       setLastValidInsights(nextInsights);
-      const saveResponse = await fetch(
-        `/api/tutor/students/${studentId}/progress`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            axisOverrides: axes.map((axis) => ({
-              key: axis.key,
-              score: axis.score,
-              value: axis.value,
-              helper: axis.helper,
-            })),
-            insightsOverride: nextInsights,
-          }),
-        },
-      );
-
-      if (!saveResponse.ok) {
-        const saveData = (await saveResponse.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(
-          saveData?.error || "Failed to save generated student suggestions",
-        );
-      }
+      await persistTutorOverride(nextInsights);
 
       toast.success(`Generated fresh coaching suggestions for ${studentName}.`);
       router.refresh();
@@ -502,37 +515,7 @@ export function TutorStudentProgressWorkspace({
 
     try {
       const insightsOverride = buildInsightsFromDraft(draft);
-      const response = await fetch(
-        `/api/tutor/students/${studentId}/progress`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            axisOverrides: axes.map((axis) => ({
-              key: axis.key,
-              score: axis.score,
-              value: axis.value,
-              helper: axis.helper,
-            })),
-            insightsOverride,
-          }),
-        },
-      );
-
-      const data = (await response.json().catch(() => null)) as
-        | TutorProgressOverride
-        | { error?: string }
-        | null;
-
-      if (!response.ok) {
-        throw new Error(
-          data && "error" in data
-            ? data.error || "Failed to save tutor progress overrides"
-            : "Failed to save tutor progress overrides",
-        );
-      }
-
-      const savedOverride = data as TutorProgressOverride;
+      const savedOverride = await persistTutorOverride(insightsOverride);
       setAxes(applyTutorAxisOverrides(baseAxes, savedOverride.axisOverrides));
       setLastValidInsights(savedOverride.insightsOverride);
       setDraft(
@@ -546,6 +529,88 @@ export function TutorStudentProgressWorkspace({
       toast.error(getValidationMessage(error));
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleRegeneratePassiveVocabulary() {
+    if (!hasData) {
+      toast.error(
+        "This student needs some real progress data before passive vocabulary can be recalculated.",
+      );
+      return;
+    }
+
+    let currentInsights: ProgressInsights | null;
+
+    try {
+      currentInsights = buildInsightsFromDraft(draft);
+    } catch {
+      toast.error(
+        "Fix the current tutor coaching fields before recalculating passive vocabulary.",
+      );
+      return;
+    }
+
+    if (!currentInsights) {
+      toast.error(
+        "Generate student suggestions first, then passive vocabulary can be recalculated on top of them.",
+      );
+      return;
+    }
+
+    setIsRegeneratingPassive(true);
+
+    try {
+      const response = await fetch("/api/ai/progress-insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId,
+          mode: "passive-vocabulary",
+          estimatedBand: currentInsights.estimatedBand,
+          activeVocabulary: currentInsights.activeVocabulary,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | { passiveVocabulary?: ProgressInsights["passiveVocabulary"]; error?: never }
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(
+          data && "error" in data
+            ? data.error || "Failed to recalculate passive vocabulary"
+            : "Failed to recalculate passive vocabulary",
+        );
+      }
+
+      const nextPassiveVocabulary = vocabularyEstimateSchema.parse(
+        data && "passiveVocabulary" in data ? data.passiveVocabulary : data,
+      );
+      const nextInsights = progressInsightsSchema.parse({
+        ...currentInsights,
+        passiveVocabulary: nextPassiveVocabulary,
+      });
+
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        passiveLow: String(nextPassiveVocabulary.low),
+        passiveHigh: String(nextPassiveVocabulary.high),
+        passiveRationale: nextPassiveVocabulary.rationale,
+      }));
+      setLastValidInsights(nextInsights);
+      await persistTutorOverride(nextInsights);
+      toast.success(`Passive vocabulary refreshed for ${studentName}.`);
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to recalculate passive vocabulary",
+      );
+    } finally {
+      setIsRegeneratingPassive(false);
     }
   }
 
@@ -615,7 +680,13 @@ export function TutorStudentProgressWorkspace({
                 <Button
                   type="button"
                   onClick={handleGenerateInsights}
-                  disabled={isGenerating || !hasData}
+                  disabled={
+                    isGenerating ||
+                    isRegeneratingPassive ||
+                    isSaving ||
+                    isResetting ||
+                    !hasData
+                  }
                 >
                   {isGenerating ? (
                     <>
@@ -633,8 +704,38 @@ export function TutorStudentProgressWorkspace({
                 <Button
                   type="button"
                   variant="outline"
+                  onClick={handleRegeneratePassiveVocabulary}
+                  disabled={
+                    isGenerating ||
+                    isRegeneratingPassive ||
+                    isSaving ||
+                    isResetting ||
+                    !hasData
+                  }
+                >
+                  {isRegeneratingPassive ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Recalculating...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Regenerate Passive Vocabulary
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={handleSaveOverrides}
-                  disabled={isSaving}
+                  disabled={
+                    isGenerating ||
+                    isRegeneratingPassive ||
+                    isSaving ||
+                    isResetting
+                  }
                 >
                   {isSaving ? (
                     <>
@@ -653,7 +754,12 @@ export function TutorStudentProgressWorkspace({
                   type="button"
                   variant="ghost"
                   onClick={handleResetOverrides}
-                  disabled={isResetting}
+                  disabled={
+                    isGenerating ||
+                    isRegeneratingPassive ||
+                    isSaving ||
+                    isResetting
+                  }
                 >
                   {isResetting ? (
                     <>

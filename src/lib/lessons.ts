@@ -1,23 +1,46 @@
 export const LESSON_STATUSES = ["planned", "completed", "cancelled"] as const;
+export const LESSON_BALANCE_CURRENCY = "USD";
 
 export type LessonStatus = (typeof LESSON_STATUSES)[number];
 
 export interface LessonStudentOption {
   id: string;
   name: string;
+  lessonPriceCents?: number;
 }
 
 export interface MonthlyLessonItem {
   id: string;
-  title: string;
+  title: string | null;
   lessonDate: string;
   startTime: string | null;
   endTime: string | null;
   notes: string | null;
   status: LessonStatus;
+  priceCents: number;
   studentId?: string;
   participantName: string;
   participantLabel: string;
+}
+
+export interface LessonBalanceSummaryItem {
+  participantId: string;
+  participantName: string;
+  participantLabel: string;
+  lessonPriceCents: number;
+  totalAmountPaidCents: number;
+  balanceCents: number;
+  lessonsLeft: number | null;
+  historyEntries: LessonBalanceHistoryEntry[];
+}
+
+export interface LessonBalanceHistoryEntry {
+  id: string;
+  type: "payment" | "deduction" | "lesson";
+  label: string;
+  description: string | null;
+  amountCents: number;
+  occurredAt: string;
 }
 
 export interface LessonMonthCell {
@@ -128,6 +151,62 @@ export function formatLessonTimeRange(
   }
 
   return "Time not set";
+}
+
+export function getLessonDisplayTitle(title?: string | null) {
+  const normalized = title?.trim();
+  return normalized ? normalized : "Lesson";
+}
+
+export function getSuggestedLessonEndTime(startTime?: string | null) {
+  if (!startTime || !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(startTime)) {
+    return "";
+  }
+
+  const [hourText, minuteText] = startTime.split(":");
+  const hour = Number(hourText);
+
+  if (!Number.isFinite(hour) || hour >= 23) {
+    return "";
+  }
+
+  return `${String(hour + 1).padStart(2, "0")}:${minuteText}`;
+}
+
+export function formatLessonCurrency(amountCents: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: LESSON_BALANCE_CURRENCY,
+    minimumFractionDigits: amountCents % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amountCents / 100);
+}
+
+export function formatLessonCurrencyInput(amountCents: number) {
+  return (amountCents / 100).toFixed(2);
+}
+
+export function parseLessonCurrencyInput(value: string) {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+
+  return Math.round(parsed * 100);
+}
+
+export function getLessonsLeft(balanceCents: number, lessonPriceCents: number) {
+  if (lessonPriceCents <= 0) {
+    return null;
+  }
+
+  return Math.floor(balanceCents / lessonPriceCents);
 }
 
 export function getLessonStatusLabel(status: LessonStatus) {

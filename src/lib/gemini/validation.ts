@@ -76,6 +76,8 @@ const discussionPromptSchema = z.object({
   id: z.number(),
   prompt: z.string(),
   type: z.enum(["open-ended", "agree-disagree"]),
+  sourceTerm: z.string().optional(),
+  highlightText: z.string().optional(),
 });
 
 export const discussionResponseSchema = z.object({

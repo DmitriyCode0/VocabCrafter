@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlusCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -26,7 +26,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   LESSON_STATUSES,
+  formatLessonCurrencyInput,
   getLessonStatusLabel,
+  getSuggestedLessonEndTime,
+  parseLessonCurrencyInput,
   type LessonStatus,
   type LessonStudentOption,
 } from "@/lib/lessons";
@@ -53,6 +56,8 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
   const [endTime, setEndTime] = useState("");
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<LessonStatus>("planned");
+  const [priceInput, setPriceInput] = useState("0.00");
+  const [autoAdjustEndTime, setAutoAdjustEndTime] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const isDisabled = students.length === 0;
@@ -60,6 +65,18 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
     () => students.find((student) => student.id === studentId)?.name,
     [studentId, students],
   );
+  const selectedStudent = useMemo(
+    () => students.find((student) => student.id === studentId) ?? null,
+    [studentId, students],
+  );
+
+  useEffect(() => {
+    if (!selectedStudent) {
+      return;
+    }
+
+    setPriceInput(formatLessonCurrencyInput(selectedStudent.lessonPriceCents ?? 0));
+  }, [selectedStudent]);
 
   function resetForm() {
     setStudentId("");
@@ -69,13 +86,40 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
     setEndTime("");
     setNotes("");
     setStatus("planned");
+    setPriceInput("0.00");
+    setAutoAdjustEndTime(true);
+  }
+
+  function handleStartTimeChange(nextStartTime: string) {
+    const suggestedEndTime = getSuggestedLessonEndTime(nextStartTime);
+
+    setStartTime(nextStartTime);
+
+    if (autoAdjustEndTime || (endTime && nextStartTime && endTime <= nextStartTime)) {
+      setEndTime(suggestedEndTime);
+      setAutoAdjustEndTime(true);
+    }
+  }
+
+  function handleEndTimeChange(nextEndTime: string) {
+    setEndTime(nextEndTime);
+    setAutoAdjustEndTime(
+      nextEndTime === getSuggestedLessonEndTime(startTime),
+    );
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!studentId || !title.trim() || !lessonDate) {
-      toast.error("Please choose a student, title, and lesson date");
+    if (!studentId || !lessonDate) {
+      toast.error("Please choose a student and lesson date");
+      return;
+    }
+
+    const priceCents = parseLessonCurrencyInput(priceInput);
+
+    if (priceCents === null) {
+      toast.error("Please enter a valid lesson price");
       return;
     }
 
@@ -87,12 +131,13 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           studentId,
-          title: title.trim(),
+          title: title.trim() || null,
           lessonDate,
           startTime: startTime || null,
           endTime: endTime || null,
           notes: notes.trim() || null,
           status,
+          priceCents,
         }),
       });
 
@@ -167,8 +212,11 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
               id="lesson-title"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Speaking practice, grammar review, lesson 12..."
+              placeholder="Optional: speaking practice, grammar review, lesson 12..."
             />
+            <p className="text-xs text-muted-foreground">
+              Optional. Leave blank to save it as a general lesson.
+            </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -208,7 +256,7 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
                 id="lesson-start-time"
                 type="time"
                 value={startTime}
-                onChange={(event) => setStartTime(event.target.value)}
+                onChange={(event) => handleStartTimeChange(event.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -217,7 +265,7 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
                 id="lesson-end-time"
                 type="time"
                 value={endTime}
-                onChange={(event) => setEndTime(event.target.value)}
+                onChange={(event) => handleEndTimeChange(event.target.value)}
               />
             </div>
           </div>
@@ -230,6 +278,20 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
               onChange={(event) => setNotes(event.target.value)}
               rows={4}
               placeholder="Optional lesson notes, focus areas, or what was covered..."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="lesson-price">Lesson price</Label>
+            <Input
+              id="lesson-price"
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.01"
+              value={priceInput}
+              onChange={(event) => setPriceInput(event.target.value)}
+              placeholder="0.00"
             />
           </div>
 

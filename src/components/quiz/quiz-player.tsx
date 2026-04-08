@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { FlashcardPlayer, type FlashcardResult } from "./flashcard-player";
 import { GapFillPlayer, type GapFillResult } from "./gap-fill-player";
@@ -30,6 +30,7 @@ import type {
   DiscussionPrompt,
   FlashcardItem,
   GapFillQuestion,
+  QuizTerm,
   TextTranslationContent,
   TranslationQuestion,
 } from "@/types/quiz";
@@ -37,6 +38,23 @@ import type {
 interface QuizPlayerProps {
   quiz: Quiz;
   isOwner?: boolean;
+}
+
+function normalizeDiscussionPrompts(
+  rawPrompts: DiscussionPrompt[],
+  vocabularyTerms: QuizTerm[],
+) {
+  return rawPrompts.map((prompt, index) => {
+    const fallbackTerm = vocabularyTerms[index]?.term;
+    const sourceTerm = prompt.sourceTerm ?? fallbackTerm;
+    const highlightText = prompt.highlightText ?? sourceTerm;
+
+    return {
+      ...prompt,
+      sourceTerm,
+      highlightText,
+    } satisfies DiscussionPrompt;
+  });
 }
 
 export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
@@ -53,10 +71,33 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
   const [flashcardTotal, setFlashcardTotal] = useState(0);
 
   const content = quiz.generated_content as Record<string, unknown>;
+  const vocabularyTerms = (quiz.vocabulary_terms ?? []) as unknown as QuizTerm[];
   const quizConfig = quiz.config as
     | import("@/types/quiz").QuizConfig
     | null
     | undefined;
+  const [discussionPrompts, setDiscussionPrompts] = useState<DiscussionPrompt[]>(
+    () =>
+      quiz.type === "discussion"
+        ? normalizeDiscussionPrompts(
+            ((content.prompts || []) as DiscussionPrompt[]) ?? [],
+            vocabularyTerms,
+          )
+        : [],
+  );
+
+  useEffect(() => {
+    if (quiz.type !== "discussion") {
+      return;
+    }
+
+    setDiscussionPrompts(
+      normalizeDiscussionPrompts(
+        ((content.prompts || []) as DiscussionPrompt[]) ?? [],
+        vocabularyTerms,
+      ),
+    );
+  }, [content, quiz.type, vocabularyTerms]);
 
   function handleRestart() {
     setShowResults(false);
@@ -255,11 +296,14 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
       );
     }
 
-    const prompts = (content.prompts || []) as DiscussionPrompt[];
     return (
       <DiscussionPlayer
-        prompts={prompts}
+        quizId={quiz.id}
+        prompts={discussionPrompts}
+        vocabularyTerms={vocabularyTerms}
         quizConfig={quizConfig ?? undefined}
+        isOwner={isOwner}
+        onPromptsChange={setDiscussionPrompts}
         onComplete={(usedPrompts) => {
           saveAttempt(
             quiz.id,
