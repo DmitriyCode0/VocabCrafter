@@ -69,9 +69,9 @@ function UpdateLessonPriceDialog({
         },
       );
 
-      const data = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to update lesson price");
@@ -82,7 +82,9 @@ function UpdateLessonPriceDialog({
       router.refresh();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to update lesson price",
+        error instanceof Error
+          ? error.message
+          : "Failed to update lesson price",
       );
     } finally {
       setIsSaving(false);
@@ -95,7 +97,9 @@ function UpdateLessonPriceDialog({
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
         if (!nextOpen) {
-          setPriceInput(formatLessonCurrencyInput(participant.lessonPriceCents));
+          setPriceInput(
+            formatLessonCurrencyInput(participant.lessonPriceCents),
+          );
         }
       }}
     >
@@ -176,9 +180,9 @@ function TopUpBalanceDialog({
         },
       );
 
-      const data = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to save balance change");
@@ -214,13 +218,19 @@ function TopUpBalanceDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" size="sm" variant={isDebit ? "outline" : "default"}>
+        <Button
+          type="button"
+          size="sm"
+          variant={isDebit ? "outline" : "default"}
+        >
           {isDebit ? "Deduct Balance" : "Top Up Balance"}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isDebit ? "Deduct balance" : "Top up balance"}</DialogTitle>
+          <DialogTitle>
+            {isDebit ? "Deduct balance" : "Top up balance"}
+          </DialogTitle>
           <DialogDescription>
             {isDebit
               ? `Record a manual balance deduction for ${participant.participantName}.`
@@ -230,7 +240,9 @@ function TopUpBalanceDialog({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor={`top-up-${participant.participantId}`}>Amount</Label>
+            <Label htmlFor={`top-up-${participant.participantId}`}>
+              Amount
+            </Label>
             <Input
               id={`top-up-${participant.participantId}`}
               type="number"
@@ -268,8 +280,10 @@ function TopUpBalanceDialog({
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Saving...
               </>
+            ) : isDebit ? (
+              "Save Deduction"
             ) : (
-              isDebit ? "Save Deduction" : "Save Top-up"
+              "Save Top-up"
             )}
           </Button>
         </DialogFooter>
@@ -289,7 +303,9 @@ export function LessonBalanceManager({
           <CardHeader>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <CardTitle className="text-base">{summary.participantName}</CardTitle>
+                <CardTitle className="text-base">
+                  {summary.participantName}
+                </CardTitle>
                 <CardDescription>{summary.participantLabel}</CardDescription>
               </div>
               <Wallet className="h-5 w-5 text-muted-foreground" />

@@ -70,7 +70,8 @@ export function DeleteLessonButton({
         <DialogHeader>
           <DialogTitle>Delete lesson</DialogTitle>
           <DialogDescription>
-            {displayTitle} will be removed from both the tutor and student calendars.
+            {displayTitle} will be removed from both the tutor and student
+            calendars.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

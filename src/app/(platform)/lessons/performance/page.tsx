@@ -252,9 +252,10 @@ export default async function LessonsPerformancePage() {
   const today = stripTime(new Date());
   const yearStart = new Date(today.getFullYear(), 0, 1);
   const weeklyWindowStart = addDays(startOfWeek(today), -11 * 7);
-  const queryStart = weeklyWindowStart.getTime() < yearStart.getTime()
-    ? weeklyWindowStart
-    : yearStart;
+  const queryStart =
+    weeklyWindowStart.getTime() < yearStart.getTime()
+      ? weeklyWindowStart
+      : yearStart;
 
   const { data: completedLessonsResult } = await supabaseAdmin
     .from("tutor_student_lessons")
@@ -273,7 +274,8 @@ export default async function LessonsPerformancePage() {
   const weekStart = startOfWeek(today);
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const yearLessons = completedLessons.filter(
-    (lesson) => parseLessonDate(lesson.lessonDate).getTime() >= yearStart.getTime(),
+    (lesson) =>
+      parseLessonDate(lesson.lessonDate).getTime() >= yearStart.getTime(),
   );
   const weeklyTrend = buildWeeklyTrend(completedLessons, today);
   const monthlyTrend = buildMonthlyTrend(completedLessons, today);
@@ -308,23 +310,40 @@ export default async function LessonsPerformancePage() {
     )
     .slice(0, 5);
 
-  const busiestWeek =
-    weeklyTrend.reduce((best, item) =>
-      item.lessons > best.lessons ? item : best,
-    weeklyTrend[weeklyTrend.length - 1] ?? { label: "-", lessons: 0, description: "No activity" });
-  const busiestMonth =
-    monthlyTrend.reduce((best, item) =>
-      item.lessons > best.lessons ? item : best,
-    monthlyTrend[monthlyTrend.length - 1] ?? { label: "-", lessons: 0, description: "No activity" });
-  const activeStudentsCount = new Set(yearLessons.map((lesson) => lesson.studentId)).size;
+  const busiestWeek = weeklyTrend.reduce(
+    (best, item) => (item.lessons > best.lessons ? item : best),
+    weeklyTrend[weeklyTrend.length - 1] ?? {
+      label: "-",
+      lessons: 0,
+      description: "No activity",
+    },
+  );
+  const busiestMonth = monthlyTrend.reduce(
+    (best, item) => (item.lessons > best.lessons ? item : best),
+    monthlyTrend[monthlyTrend.length - 1] ?? {
+      label: "-",
+      lessons: 0,
+      description: "No activity",
+    },
+  );
+  const activeStudentsCount = new Set(
+    yearLessons.map((lesson) => lesson.studentId),
+  ).size;
   const weeklyAverage =
     weeklyTrend.length > 0
-      ? (weeklyTrend.reduce((total, item) => total + item.lessons, 0) / weeklyTrend.length).toFixed(1)
+      ? (
+          weeklyTrend.reduce((total, item) => total + item.lessons, 0) /
+          weeklyTrend.length
+        ).toFixed(1)
       : "0.0";
   const firstLessonDate = completedLessons[0]
     ? parseLessonDate(completedLessons[0].lessonDate)
     : today;
-  const totalHours = sumLessonHoursInRange(completedLessons, firstLessonDate, today);
+  const totalHours = sumLessonHoursInRange(
+    completedLessons,
+    firstLessonDate,
+    today,
+  );
   const activeTeachingDays = countDistinctLessonDaysInRange(
     completedLessons,
     firstLessonDate,
@@ -382,11 +401,17 @@ export default async function LessonsPerformancePage() {
         insights={[
           {
             label: "Best week",
-            value: busiestWeek.lessons > 0 ? `${busiestWeek.lessons} in ${busiestWeek.label}` : "No activity yet",
+            value:
+              busiestWeek.lessons > 0
+                ? `${busiestWeek.lessons} in ${busiestWeek.label}`
+                : "No activity yet",
           },
           {
             label: "Best month",
-            value: busiestMonth.lessons > 0 ? `${busiestMonth.lessons} in ${busiestMonth.label}` : "No activity yet",
+            value:
+              busiestMonth.lessons > 0
+                ? `${busiestMonth.lessons} in ${busiestMonth.label}`
+                : "No activity yet",
           },
           {
             label: "Avg / week",

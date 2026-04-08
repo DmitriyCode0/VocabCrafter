@@ -19,7 +19,9 @@ export function LessonsSectionTabs({
     <Tabs
       value={currentSection}
       onValueChange={(value) => {
-        router.push(value === "schedule" ? scheduleHref : "/lessons/performance");
+        router.push(
+          value === "schedule" ? scheduleHref : "/lessons/performance",
+        );
       }}
       className="w-full pb-3"
     >

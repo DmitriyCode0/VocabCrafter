@@ -436,7 +436,9 @@ export function TutorStudentProgressWorkspace({
     }));
   }
 
-  async function persistTutorOverride(insightsOverride: ProgressInsights | null) {
+  async function persistTutorOverride(
+    insightsOverride: ProgressInsights | null,
+  ) {
     const response = await fetch(`/api/tutor/students/${studentId}/progress`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -573,7 +575,10 @@ export function TutorStudentProgressWorkspace({
       });
 
       const data = (await response.json().catch(() => null)) as
-        | { passiveVocabulary?: ProgressInsights["passiveVocabulary"]; error?: never }
+        | {
+            passiveVocabulary?: ProgressInsights["passiveVocabulary"];
+            error?: never;
+          }
         | { error?: string }
         | null;
 

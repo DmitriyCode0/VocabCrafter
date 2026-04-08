@@ -51,7 +51,7 @@ export function MonthlyLessonsCalendar({
   const weekdayLabels = getLessonWeekdayLabels();
   const lessonsByDate = groupLessonsByDate(lessons);
   const selectedDateLessons = selectedDate
-    ? lessonsByDate.get(selectedDate) ?? []
+    ? (lessonsByDate.get(selectedDate) ?? [])
     : [];
 
   function renderLessonRow(
@@ -88,7 +88,9 @@ export function MonthlyLessonsCalendar({
             ) : null}
             {showParticipant ? (
               <p className="text-muted-foreground">
-                {compact ? lesson.participantName : `${lesson.participantLabel}: ${lesson.participantName}`}
+                {compact
+                  ? lesson.participantName
+                  : `${lesson.participantLabel}: ${lesson.participantName}`}
               </p>
             ) : null}
           </div>
@@ -128,10 +130,7 @@ export function MonthlyLessonsCalendar({
                   }}
                   students={studentOptions}
                 />
-                <DeleteLessonButton
-                  lessonId={lesson.id}
-                  title={lesson.title}
-                />
+                <DeleteLessonButton lessonId={lesson.id} title={lesson.title} />
               </div>
             ) : null}
           </div>
@@ -144,7 +143,13 @@ export function MonthlyLessonsCalendar({
           </>
         ) : null}
         {lesson.notes ? (
-          <p className={cn(compact ? "mt-1 truncate text-muted-foreground" : "mt-2 whitespace-pre-wrap text-muted-foreground")}>
+          <p
+            className={cn(
+              compact
+                ? "mt-1 truncate text-muted-foreground"
+                : "mt-2 whitespace-pre-wrap text-muted-foreground",
+            )}
+          >
             {lesson.notes}
           </p>
         ) : null}
@@ -212,12 +217,12 @@ export function MonthlyLessonsCalendar({
                       </div>
 
                       <div className="mt-2 space-y-1.5">
-                        {dayLessons.slice(0, 2).map((lesson) => (
+                        {dayLessons.slice(0, 2).map((lesson) =>
                           renderLessonRow(lesson, {
                             compact: true,
                             showManageActions: false,
-                          })
-                        ))}
+                          }),
+                        )}
 
                         {dayLessons.length > 2 ? (
                           <p className="text-[11px] text-muted-foreground">
@@ -239,7 +244,8 @@ export function MonthlyLessonsCalendar({
           <div className="space-y-1">
             <CardTitle className="text-base">Lessons This Month</CardTitle>
             <p className="text-sm text-muted-foreground">
-              {lessons.length} lesson{lessons.length === 1 ? "" : "s"} in this month view.
+              {lessons.length} lesson{lessons.length === 1 ? "" : "s"} in this
+              month view.
             </p>
           </div>
           <Button
@@ -273,7 +279,8 @@ export function MonthlyLessonsCalendar({
                           {formatLessonDayLabel(isoDate)}
                         </p>
                         <Badge variant="outline">
-                          {dayLessons.length} lesson{dayLessons.length === 1 ? "" : "s"}
+                          {dayLessons.length} lesson
+                          {dayLessons.length === 1 ? "" : "s"}
                         </Badge>
                       </div>
                       <div className="space-y-2">
@@ -288,15 +295,21 @@ export function MonthlyLessonsCalendar({
         ) : null}
       </Card>
 
-      <Sheet open={Boolean(selectedDate)} onOpenChange={(open) => !open && setSelectedDate(null)}>
+      <Sheet
+        open={Boolean(selectedDate)}
+        onOpenChange={(open) => !open && setSelectedDate(null)}
+      >
         <SheetContent side="right" className="w-full sm:max-w-xl">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5" />
-              {selectedDate ? formatLessonDayLabel(selectedDate) : "Day lessons"}
+              {selectedDate
+                ? formatLessonDayLabel(selectedDate)
+                : "Day lessons"}
             </SheetTitle>
             <SheetDescription>
-              {selectedDateLessons.length} lesson{selectedDateLessons.length === 1 ? "" : "s"} on this day.
+              {selectedDateLessons.length} lesson
+              {selectedDateLessons.length === 1 ? "" : "s"} on this day.
             </SheetDescription>
           </SheetHeader>
 

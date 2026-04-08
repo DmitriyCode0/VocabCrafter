@@ -67,7 +67,8 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
     formatLessonCurrencyInput(lesson.priceCents),
   );
   const [autoAdjustEndTime, setAutoAdjustEndTime] = useState(
-    Boolean(initialSuggestedEndTime) && lesson.endTime === initialSuggestedEndTime,
+    Boolean(initialSuggestedEndTime) &&
+      lesson.endTime === initialSuggestedEndTime,
   );
 
   const selectedStudentName = useMemo(
@@ -85,7 +86,8 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
     setStatus(lesson.status);
     setPriceInput(formatLessonCurrencyInput(lesson.priceCents));
     setAutoAdjustEndTime(
-      Boolean(initialSuggestedEndTime) && lesson.endTime === initialSuggestedEndTime,
+      Boolean(initialSuggestedEndTime) &&
+        lesson.endTime === initialSuggestedEndTime,
     );
   }
 
@@ -94,7 +96,10 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
 
     setStartTime(nextStartTime);
 
-    if (autoAdjustEndTime || (endTime && nextStartTime && endTime <= nextStartTime)) {
+    if (
+      autoAdjustEndTime ||
+      (endTime && nextStartTime && endTime <= nextStartTime)
+    ) {
       setEndTime(suggestedEndTime);
       setAutoAdjustEndTime(true);
     }
@@ -102,9 +107,7 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
 
   function handleEndTimeChange(nextEndTime: string) {
     setEndTime(nextEndTime);
-    setAutoAdjustEndTime(
-      nextEndTime === getSuggestedLessonEndTime(startTime),
-    );
+    setAutoAdjustEndTime(nextEndTime === getSuggestedLessonEndTime(startTime));
   }
 
   async function handleSave() {

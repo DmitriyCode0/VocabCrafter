@@ -122,13 +122,9 @@ function normalizeDiscussionPromptType(
     }
 
     if (
-      [
-        "open-ended",
-        "open ended",
-        "open_ended",
-        "open",
-        "question",
-      ].includes(normalized)
+      ["open-ended", "open ended", "open_ended", "open", "question"].includes(
+        normalized,
+      )
     ) {
       return "open-ended";
     }
@@ -171,7 +167,8 @@ function buildFallbackDiscussionPrompt(
 ): DiscussionPrompt {
   const promptType: DiscussionPrompt["type"] =
     index % 2 === 0 ? "open-ended" : "agree-disagree";
-  const isSpanish = normalizeLearningLanguage(config.targetLanguage) === "spanish";
+  const isSpanish =
+    normalizeLearningLanguage(config.targetLanguage) === "spanish";
 
   if (promptType === "agree-disagree") {
     return {
@@ -320,7 +317,9 @@ export async function POST(request: Request) {
 
     let generatedContent: unknown;
     let usageSnapshot:
-      | Awaited<ReturnType<typeof generateJsonFromGeminiWithUsage>>["usageSnapshot"]
+      | Awaited<
+          ReturnType<typeof generateJsonFromGeminiWithUsage>
+        >["usageSnapshot"]
       | null = null;
 
     if (type === "discussion") {
@@ -331,7 +330,11 @@ export async function POST(request: Request) {
           temperature: 0.4,
         });
 
-        generatedContent = normalizeDiscussionContent(result.data, terms, config);
+        generatedContent = normalizeDiscussionContent(
+          result.data,
+          terms,
+          config,
+        );
         usageSnapshot = result.usageSnapshot;
       } catch (error) {
         console.warn(

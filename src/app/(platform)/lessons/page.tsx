@@ -294,16 +294,18 @@ async function StudentLessonsView({
   const lessons = mapStudentLessons(
     (lessonsResult ?? []) as StudentLessonRow[],
   );
-  const tutorConnections = (connectionsResult ?? []) as StudentTutorConnectionRow[];
-  const balanceTransactions =
-    (topUpsResult ?? []) as LessonBalanceTransactionRow[];
-  const completedLessonCharges =
-    (completedLessonsResult ?? []) as CompletedLessonChargeRow[];
+  const tutorConnections = (connectionsResult ??
+    []) as StudentTutorConnectionRow[];
+  const balanceTransactions = (topUpsResult ??
+    []) as LessonBalanceTransactionRow[];
+  const completedLessonCharges = (completedLessonsResult ??
+    []) as CompletedLessonChargeRow[];
   const lessonBalanceSummaries = buildLessonBalanceSummaries(
     tutorConnections
       .map((row) => ({
         id: row.tutor_id,
-        name: row.tutor_profile?.full_name || row.tutor_profile?.email || "Tutor",
+        name:
+          row.tutor_profile?.full_name || row.tutor_profile?.email || "Tutor",
         label: "Tutor",
         lessonPriceCents: row.lesson_price_cents,
       }))
@@ -312,16 +314,8 @@ async function StudentLessonsView({
           sensitivity: "base",
         }),
       ),
-    buildTotalsByKey(
-      balanceTransactions,
-      "tutor_id",
-      "amount_cents",
-    ),
-    buildTotalsByKey(
-      completedLessonCharges,
-      "tutor_id",
-      "price_cents",
-    ),
+    buildTotalsByKey(balanceTransactions, "tutor_id", "amount_cents"),
+    buildTotalsByKey(completedLessonCharges, "tutor_id", "price_cents"),
     buildBalanceHistoryByKey(
       balanceTransactions,
       completedLessonCharges,
@@ -400,35 +394,34 @@ async function TutorLessonsView({
     { data: lessonsResult },
     { data: topUpsResult },
     { data: completedLessonsResult },
-  ] =
-    await Promise.all([
-      supabaseAdmin
-        .from("tutor_students")
-        .select(
-          "student_id, lesson_price_cents, student_profile:profiles!tutor_students_student_id_fkey(full_name, email)",
-        )
-        .eq("tutor_id", userId)
-        .eq("status", "active"),
-      supabaseAdmin
-        .from("tutor_student_lessons")
-        .select(
-          "id, student_id, title, lesson_date, start_time, end_time, notes, status, price_cents, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
-        )
-        .eq("tutor_id", userId)
-        .gte("lesson_date", startIsoDate)
-        .lte("lesson_date", endIsoDate)
-        .order("lesson_date", { ascending: true })
-        .order("start_time", { ascending: true }),
-      supabaseAdmin
-        .from("tutor_student_balance_transactions")
-        .select("id, tutor_id, student_id, amount_cents, note, created_at")
-        .eq("tutor_id", userId),
-      supabaseAdmin
-        .from("tutor_student_lessons")
-        .select("id, tutor_id, student_id, title, lesson_date, price_cents")
-        .eq("tutor_id", userId)
-        .eq("status", "completed"),
-    ]);
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("tutor_students")
+      .select(
+        "student_id, lesson_price_cents, student_profile:profiles!tutor_students_student_id_fkey(full_name, email)",
+      )
+      .eq("tutor_id", userId)
+      .eq("status", "active"),
+    supabaseAdmin
+      .from("tutor_student_lessons")
+      .select(
+        "id, student_id, title, lesson_date, start_time, end_time, notes, status, price_cents, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
+      )
+      .eq("tutor_id", userId)
+      .gte("lesson_date", startIsoDate)
+      .lte("lesson_date", endIsoDate)
+      .order("lesson_date", { ascending: true })
+      .order("start_time", { ascending: true }),
+    supabaseAdmin
+      .from("tutor_student_balance_transactions")
+      .select("id, tutor_id, student_id, amount_cents, note, created_at")
+      .eq("tutor_id", userId),
+    supabaseAdmin
+      .from("tutor_student_lessons")
+      .select("id, tutor_id, student_id, title, lesson_date, price_cents")
+      .eq("tutor_id", userId)
+      .eq("status", "completed"),
+  ]);
 
   const connectedStudents = (
     (connectionsResult ?? []) as StudentConnectionRow[]
@@ -446,10 +439,10 @@ async function TutorLessonsView({
     );
 
   const lessons = mapTutorLessons((lessonsResult ?? []) as TutorLessonRow[]);
-  const balanceTransactions =
-    (topUpsResult ?? []) as LessonBalanceTransactionRow[];
-  const completedLessonCharges =
-    (completedLessonsResult ?? []) as CompletedLessonChargeRow[];
+  const balanceTransactions = (topUpsResult ??
+    []) as LessonBalanceTransactionRow[];
+  const completedLessonCharges = (completedLessonsResult ??
+    []) as CompletedLessonChargeRow[];
   const lessonBalanceSummaries = buildLessonBalanceSummaries(
     connectedStudents.map((student) => ({
       id: student.id,
@@ -457,16 +450,8 @@ async function TutorLessonsView({
       label: "Student",
       lessonPriceCents: student.lessonPriceCents ?? 0,
     })),
-    buildTotalsByKey(
-      balanceTransactions,
-      "student_id",
-      "amount_cents",
-    ),
-    buildTotalsByKey(
-      completedLessonCharges,
-      "student_id",
-      "price_cents",
-    ),
+    buildTotalsByKey(balanceTransactions, "student_id", "amount_cents"),
+    buildTotalsByKey(completedLessonCharges, "student_id", "price_cents"),
     buildBalanceHistoryByKey(
       balanceTransactions,
       completedLessonCharges,
@@ -519,10 +504,7 @@ async function TutorLessonsView({
               each student balance currently covers.
             </p>
           </div>
-          <LessonBalanceManager
-            summaries={lessonBalanceSummaries}
-            canManage
-          />
+          <LessonBalanceManager summaries={lessonBalanceSummaries} canManage />
         </div>
       ) : null}
     </div>

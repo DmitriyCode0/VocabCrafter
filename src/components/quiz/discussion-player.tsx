@@ -56,15 +56,20 @@ export function DiscussionPlayer({
   onPromptsChange,
   onComplete,
 }: DiscussionPlayerProps) {
-  const [regeneratingPromptId, setRegeneratingPromptId] = useState<number | null>(
-    null,
-  );
+  const [regeneratingPromptId, setRegeneratingPromptId] = useState<
+    number | null
+  >(null);
 
   function getPromptTerm(prompt: DiscussionPrompt, index: number) {
-    return prompt.sourceTerm ?? prompt.highlightText ?? vocabularyTerms[index]?.term;
+    return (
+      prompt.sourceTerm ?? prompt.highlightText ?? vocabularyTerms[index]?.term
+    );
   }
 
-  async function handleRegeneratePrompt(prompt: DiscussionPrompt, index: number) {
+  async function handleRegeneratePrompt(
+    prompt: DiscussionPrompt,
+    index: number,
+  ) {
     const sourceTerm = getPromptTerm(prompt, index);
     const vocabularyTerm =
       vocabularyTerms.find((term) => term.term === sourceTerm) ??
@@ -76,7 +81,9 @@ export function DiscussionPlayer({
     }
 
     if (!quizConfig) {
-      toast.error("This quiz is missing its generation config, so the prompt cannot be regenerated.");
+      toast.error(
+        "This quiz is missing its generation config, so the prompt cannot be regenerated.",
+      );
       return;
     }
 
@@ -136,9 +143,9 @@ export function DiscussionPlayer({
         }),
       });
 
-      const saved = (await saveResponse.json().catch(() => null)) as
-        | { error?: string }
-        | null;
+      const saved = (await saveResponse.json().catch(() => null)) as {
+        error?: string;
+      } | null;
 
       if (!saveResponse.ok) {
         throw new Error(saved?.error || "Failed to save regenerated prompt");

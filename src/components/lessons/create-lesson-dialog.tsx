@@ -75,7 +75,9 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
       return;
     }
 
-    setPriceInput(formatLessonCurrencyInput(selectedStudent.lessonPriceCents ?? 0));
+    setPriceInput(
+      formatLessonCurrencyInput(selectedStudent.lessonPriceCents ?? 0),
+    );
   }, [selectedStudent]);
 
   function resetForm() {
@@ -95,7 +97,10 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
 
     setStartTime(nextStartTime);
 
-    if (autoAdjustEndTime || (endTime && nextStartTime && endTime <= nextStartTime)) {
+    if (
+      autoAdjustEndTime ||
+      (endTime && nextStartTime && endTime <= nextStartTime)
+    ) {
       setEndTime(suggestedEndTime);
       setAutoAdjustEndTime(true);
     }
@@ -103,9 +108,7 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
 
   function handleEndTimeChange(nextEndTime: string) {
     setEndTime(nextEndTime);
-    setAutoAdjustEndTime(
-      nextEndTime === getSuggestedLessonEndTime(startTime),
-    );
+    setAutoAdjustEndTime(nextEndTime === getSuggestedLessonEndTime(startTime));
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

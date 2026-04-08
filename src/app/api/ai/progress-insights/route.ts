@@ -1127,7 +1127,7 @@ export async function POST(request: Request) {
     }
 
     const requestedStudentId = parsedRequest.data.studentId;
-  const requestMode = parsedRequest.data.mode ?? "full";
+    const requestMode = parsedRequest.data.mode ?? "full";
     const supabaseAdmin = createAdminClient();
     let targetUserId = user.id;
 

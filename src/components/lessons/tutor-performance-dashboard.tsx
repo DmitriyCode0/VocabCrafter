@@ -94,7 +94,13 @@ interface TutorPerformanceDashboardProps {
   hasCompletedLessons: boolean;
 }
 
-function MetricCard({ metric, index }: { metric: PeriodMetric; index: number }) {
+function MetricCard({
+  metric,
+  index,
+}: {
+  metric: PeriodMetric;
+  index: number;
+}) {
   const Icon =
     metric.iconKey === "week"
       ? CalendarDays
@@ -213,7 +219,11 @@ export function TutorPerformanceDashboard({
                     tickMargin={10}
                     minTickGap={12}
                   />
-                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                  <YAxis
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                  />
                   <ChartTooltip
                     cursor={false}
                     content={
@@ -310,8 +320,8 @@ export function TutorPerformanceDashboard({
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed p-5 text-sm text-muted-foreground">
-                  Student breakdown will appear once your completed lessons start
-                  accumulating this year.
+                  Student breakdown will appear once your completed lessons
+                  start accumulating this year.
                 </div>
               )}
             </CardContent>
@@ -342,14 +352,37 @@ export function TutorPerformanceDashboard({
               >
                 <AreaChart data={monthlyTrend}>
                   <defs>
-                    <linearGradient id="lessons-performance-monthly" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--color-lessons)" stopOpacity={0.34} />
-                      <stop offset="100%" stopColor="var(--color-lessons)" stopOpacity={0.02} />
+                    <linearGradient
+                      id="lessons-performance-monthly"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="0%"
+                        stopColor="var(--color-lessons)"
+                        stopOpacity={0.34}
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor="var(--color-lessons)"
+                        stopOpacity={0.02}
+                      />
                     </linearGradient>
                   </defs>
                   <CartesianGrid vertical={false} />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} />
-                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                  <XAxis
+                    dataKey="label"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={10}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                  />
                   <ChartTooltip
                     cursor={false}
                     content={
@@ -415,7 +448,11 @@ export function TutorPerformanceDashboard({
                     tickMargin={10}
                     minTickGap={14}
                   />
-                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                  <YAxis
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                  />
                   <ChartTooltip
                     cursor={false}
                     content={

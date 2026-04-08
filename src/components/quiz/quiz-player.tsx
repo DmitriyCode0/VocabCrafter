@@ -71,19 +71,21 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
   const [flashcardTotal, setFlashcardTotal] = useState(0);
 
   const content = quiz.generated_content as Record<string, unknown>;
-  const vocabularyTerms = (quiz.vocabulary_terms ?? []) as unknown as QuizTerm[];
+  const vocabularyTerms = (quiz.vocabulary_terms ??
+    []) as unknown as QuizTerm[];
   const quizConfig = quiz.config as
     | import("@/types/quiz").QuizConfig
     | null
     | undefined;
-  const [discussionPrompts, setDiscussionPrompts] = useState<DiscussionPrompt[]>(
-    () =>
-      quiz.type === "discussion"
-        ? normalizeDiscussionPrompts(
-            ((content.prompts || []) as DiscussionPrompt[]) ?? [],
-            vocabularyTerms,
-          )
-        : [],
+  const [discussionPrompts, setDiscussionPrompts] = useState<
+    DiscussionPrompt[]
+  >(() =>
+    quiz.type === "discussion"
+      ? normalizeDiscussionPrompts(
+          ((content.prompts || []) as DiscussionPrompt[]) ?? [],
+          vocabularyTerms,
+        )
+      : [],
   );
 
   useEffect(() => {
