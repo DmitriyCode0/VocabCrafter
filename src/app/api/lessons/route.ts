@@ -21,7 +21,8 @@ const createLessonSchema = z
     status: z.enum(LESSON_STATUSES).default("planned"),
   })
   .refine(
-    (value) => !value.startTime || !value.endTime || value.endTime > value.startTime,
+    (value) =>
+      !value.startTime || !value.endTime || value.endTime > value.startTime,
     {
       message: "End time must be after start time",
       path: ["endTime"],

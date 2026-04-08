@@ -131,9 +131,7 @@ export async function POST(
       rating: parsed.data.rating ?? null,
       updated_at: nowIso,
     })
-    .select(
-      "id, student_id, tutor_id, content, rating, created_at, updated_at",
-    )
+    .select("id, student_id, tutor_id, content, rating, created_at, updated_at")
     .single();
 
   if (error) {

@@ -86,7 +86,11 @@ export function getLessonMonthRange(date: Date) {
 export function buildLessonMonthCells(date: Date): LessonMonthCell[] {
   const firstOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
   const startOffset = (firstOfMonth.getDay() + 6) % 7;
-  const gridStart = new Date(date.getFullYear(), date.getMonth(), 1 - startOffset);
+  const gridStart = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    1 - startOffset,
+  );
   const todayIso = toIsoDate(new Date());
 
   return Array.from({ length: 42 }, (_, index) => {

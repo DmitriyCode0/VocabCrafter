@@ -46,7 +46,10 @@ export function MonthlyLessonsCalendar({
             <div className="min-w-[760px]">
               <div className="grid grid-cols-7 border-y text-xs font-medium text-muted-foreground">
                 {weekdayLabels.map((label) => (
-                  <div key={label} className="border-r px-3 py-2 last:border-r-0">
+                  <div
+                    key={label}
+                    className="border-r px-3 py-2 last:border-r-0"
+                  >
                     {label}
                   </div>
                 ))}
@@ -61,14 +64,16 @@ export function MonthlyLessonsCalendar({
                       key={cell.isoDate}
                       className={cn(
                         "min-h-36 border-r border-b p-2 align-top",
-                        !cell.inCurrentMonth && "bg-muted/20 text-muted-foreground",
+                        !cell.inCurrentMonth &&
+                          "bg-muted/20 text-muted-foreground",
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span
                           className={cn(
                             "inline-flex size-7 items-center justify-center rounded-full text-sm font-medium",
-                            cell.isToday && "bg-primary text-primary-foreground",
+                            cell.isToday &&
+                              "bg-primary text-primary-foreground",
                           )}
                         >
                           {cell.dayNumber}
@@ -139,71 +144,78 @@ export function MonthlyLessonsCalendar({
             </div>
           ) : (
             <div className="space-y-4">
-              {Array.from(lessonsByDate.entries()).map(([isoDate, dayLessons]) => (
-                <div key={isoDate} className="space-y-2">
-                  <p className="text-sm font-medium">{formatLessonDayLabel(isoDate)}</p>
-                  <div className="space-y-2">
-                    {dayLessons.map((lesson) => (
-                      <div
-                        key={lesson.id}
-                        className={cn(
-                          "rounded-lg border px-3 py-3 text-sm",
-                          getLessonStatusSurfaceClassName(lesson.status),
-                        )}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <p className="font-medium">{lesson.title}</p>
-                            <p className="text-muted-foreground">
-                              {lesson.participantLabel}: {lesson.participantName}
+              {Array.from(lessonsByDate.entries()).map(
+                ([isoDate, dayLessons]) => (
+                  <div key={isoDate} className="space-y-2">
+                    <p className="text-sm font-medium">
+                      {formatLessonDayLabel(isoDate)}
+                    </p>
+                    <div className="space-y-2">
+                      {dayLessons.map((lesson) => (
+                        <div
+                          key={lesson.id}
+                          className={cn(
+                            "rounded-lg border px-3 py-3 text-sm",
+                            getLessonStatusSurfaceClassName(lesson.status),
+                          )}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="font-medium">{lesson.title}</p>
+                              <p className="text-muted-foreground">
+                                {lesson.participantLabel}:{" "}
+                                {lesson.participantName}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className={getLessonStatusBadgeClassName(
+                                  lesson.status,
+                                )}
+                              >
+                                {getLessonStatusLabel(lesson.status)}
+                              </Badge>
+                              <Badge variant="outline">
+                                {formatLessonTimeRange(
+                                  lesson.startTime,
+                                  lesson.endTime,
+                                )}
+                              </Badge>
+                              {canManageLessons && lesson.studentId ? (
+                                <div className="flex items-center gap-1">
+                                  <EditLessonDialog
+                                    lesson={{
+                                      id: lesson.id,
+                                      studentId: lesson.studentId,
+                                      title: lesson.title,
+                                      lessonDate: lesson.lessonDate,
+                                      startTime: lesson.startTime,
+                                      endTime: lesson.endTime,
+                                      notes: lesson.notes,
+                                      status: lesson.status,
+                                    }}
+                                    students={studentOptions}
+                                  />
+                                  <DeleteLessonButton
+                                    lessonId={lesson.id}
+                                    title={lesson.title}
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                          {lesson.notes ? (
+                            <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
+                              {lesson.notes}
                             </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant="outline"
-                              className={getLessonStatusBadgeClassName(lesson.status)}
-                            >
-                              {getLessonStatusLabel(lesson.status)}
-                            </Badge>
-                            <Badge variant="outline">
-                              {formatLessonTimeRange(
-                                lesson.startTime,
-                                lesson.endTime,
-                              )}
-                            </Badge>
-                            {canManageLessons && lesson.studentId ? (
-                              <div className="flex items-center gap-1">
-                                <EditLessonDialog
-                                  lesson={{
-                                    id: lesson.id,
-                                    studentId: lesson.studentId,
-                                    title: lesson.title,
-                                    lessonDate: lesson.lessonDate,
-                                    startTime: lesson.startTime,
-                                    endTime: lesson.endTime,
-                                    notes: lesson.notes,
-                                    status: lesson.status,
-                                  }}
-                                  students={studentOptions}
-                                />
-                                <DeleteLessonButton
-                                  lessonId={lesson.id}
-                                  title={lesson.title}
-                                />
-                              </div>
-                            ) : null}
-                          </div>
+                          ) : null}
                         </div>
-                        {lesson.notes ? (
-                          <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
-                            {lesson.notes}
-                          </p>
-                        ) : null}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ),
+              )}
             </div>
           )}
         </CardContent>

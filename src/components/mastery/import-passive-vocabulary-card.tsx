@@ -167,7 +167,8 @@ export function ImportPassiveVocabularyCard({
             </div>
 
             <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-xs text-muted-foreground">
-              Imported words are stored as lowercase unique words in {targetLanguage} and used only for passive-recognition estimates.
+              Imported words are stored as lowercase unique words in{" "}
+              {targetLanguage} and used only for passive-recognition estimates.
             </div>
           </div>
         </div>
@@ -189,8 +190,13 @@ export function ImportPassiveVocabularyCard({
 
             <div className="flex flex-col gap-3 rounded-lg border border-dashed bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1 text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">Optional text upload</p>
-                <p>Upload a plain text or markdown file and it will be appended to the text box.</p>
+                <p className="font-medium text-foreground">
+                  Optional text upload
+                </p>
+                <p>
+                  Upload a plain text or markdown file and it will be appended
+                  to the text box.
+                </p>
               </div>
 
               <>
@@ -224,7 +230,8 @@ export function ImportPassiveVocabularyCard({
                 Extract Unique Words
               </Button>
               <p className="text-sm text-muted-foreground">
-                This does not use the AI parser. It simply splits the text into individual words and deduplicates them.
+                This does not use the AI parser. It simply splits the text into
+                individual words and deduplicates them.
               </p>
             </div>
           </div>
@@ -239,7 +246,8 @@ export function ImportPassiveVocabularyCard({
             <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <p>
                 These words increase passive-recognition estimates only. They do
-                not get due dates, review sessions, meanings, or active mastery levels.
+                not get due dates, review sessions, meanings, or active mastery
+                levels.
               </p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button

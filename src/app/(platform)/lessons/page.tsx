@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronLeft, ChevronRight, CalendarDays, Users, UserCheck } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  Users,
+  UserCheck,
+} from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { MonthlyLessonsCalendar } from "@/components/lessons/monthly-lessons-calendar";
@@ -108,7 +114,8 @@ function LessonsHeader({ month }: { month: Date }) {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Lessons</h1>
         <p className="text-muted-foreground">
-          View lessons month by month and keep tutor/student sessions in one calendar.
+          View lessons month by month and keep tutor/student sessions in one
+          calendar.
         </p>
       </div>
 
@@ -161,30 +168,40 @@ async function StudentLessonsView({
       .eq("status", "active"),
   ]);
 
-  const lessons = mapStudentLessons((lessonsResult ?? []) as StudentLessonRow[]);
+  const lessons = mapStudentLessons(
+    (lessonsResult ?? []) as StudentLessonRow[],
+  );
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Lessons This Month</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Lessons This Month
+            </CardTitle>
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{lessons.length}</div>
-            <p className="text-xs text-muted-foreground">sessions visible in this month view</p>
+            <p className="text-xs text-muted-foreground">
+              sessions visible in this month view
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Connected Tutors</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Connected Tutors
+            </CardTitle>
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{tutorCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground">tutors who can schedule lessons for you</p>
+            <p className="text-xs text-muted-foreground">
+              tutors who can schedule lessons for you
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -208,33 +225,40 @@ async function TutorLessonsView({
   const supabaseAdmin = createAdminClient();
   const { startIsoDate, endIsoDate } = getLessonMonthRange(month);
 
-  const [{ data: connectionsResult }, { data: lessonsResult }] = await Promise.all([
-    supabaseAdmin
-      .from("tutor_students")
-      .select(
-        "student_id, student_profile:profiles!tutor_students_student_id_fkey(full_name, email)",
-      )
-      .eq("tutor_id", userId)
-      .eq("status", "active"),
-    supabaseAdmin
-      .from("tutor_student_lessons")
-      .select(
-        "id, student_id, title, lesson_date, start_time, end_time, notes, status, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
-      )
-      .eq("tutor_id", userId)
-      .gte("lesson_date", startIsoDate)
-      .lte("lesson_date", endIsoDate)
-      .order("lesson_date", { ascending: true })
-      .order("start_time", { ascending: true }),
-  ]);
+  const [{ data: connectionsResult }, { data: lessonsResult }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("tutor_students")
+        .select(
+          "student_id, student_profile:profiles!tutor_students_student_id_fkey(full_name, email)",
+        )
+        .eq("tutor_id", userId)
+        .eq("status", "active"),
+      supabaseAdmin
+        .from("tutor_student_lessons")
+        .select(
+          "id, student_id, title, lesson_date, start_time, end_time, notes, status, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
+        )
+        .eq("tutor_id", userId)
+        .gte("lesson_date", startIsoDate)
+        .lte("lesson_date", endIsoDate)
+        .order("lesson_date", { ascending: true })
+        .order("start_time", { ascending: true }),
+    ]);
 
-  const connectedStudents = ((connectionsResult ?? []) as StudentConnectionRow[])
+  const connectedStudents = (
+    (connectionsResult ?? []) as StudentConnectionRow[]
+  )
     .map((row) => ({
       id: row.student_id,
       name:
-        row.student_profile?.full_name || row.student_profile?.email || "Student",
+        row.student_profile?.full_name ||
+        row.student_profile?.email ||
+        "Student",
     }))
-    .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }));
+    .sort((left, right) =>
+      left.name.localeCompare(right.name, undefined, { sensitivity: "base" }),
+    );
 
   const lessons = mapTutorLessons((lessonsResult ?? []) as TutorLessonRow[]);
 
@@ -245,13 +269,17 @@ async function TutorLessonsView({
           <CardHeader>
             <CardTitle className="text-base">Tutor Lesson Planner</CardTitle>
             <CardDescription>
-              Add lessons for connected students so they appear on both calendars.
+              Add lessons for connected students so they appear on both
+              calendars.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <Users className="h-4 w-4" />
-              <span>{connectedStudents.length} connected student{connectedStudents.length !== 1 ? "s" : ""}</span>
+              <span>
+                {connectedStudents.length} connected student
+                {connectedStudents.length !== 1 ? "s" : ""}
+              </span>
             </div>
             <CreateLessonDialog students={connectedStudents} />
           </CardContent>

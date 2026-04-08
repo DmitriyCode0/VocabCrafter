@@ -137,8 +137,8 @@ export default async function TutorMasteryPage({
     .in("student_id", studentIds);
 
   const visibleMastery = (allMasteryRows ?? []) as MasteryLevelRow[];
-  const visiblePassiveEvidence =
-    (passiveEvidenceRows ?? []) as PassiveEvidenceSummaryRow[];
+  const visiblePassiveEvidence = (passiveEvidenceRows ??
+    []) as PassiveEvidenceSummaryRow[];
 
   // Group by student for lightweight summary statistics.
   const studentMastery = new Map<string, number[]>();

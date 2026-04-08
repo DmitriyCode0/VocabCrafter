@@ -52,12 +52,10 @@ interface StudentProgressReviewRow {
   rating: number | null;
   created_at: string;
   updated_at: string;
-  profiles:
-    | {
-        full_name: string | null;
-        email: string;
-      }
-    | null;
+  profiles: {
+    full_name: string | null;
+    email: string;
+  } | null;
 }
 
 export default async function TutorStudentProgressPage({
@@ -108,35 +106,34 @@ export default async function TutorStudentProgressPage({
     overrideResult,
     passiveEvidenceResult,
     progressReviewsResult,
-  ] =
-    await Promise.all([
-      supabaseAdmin
-        .from("profiles")
-        .select("full_name, email")
-        .eq("id", studentId)
-        .single(),
-      supabaseAdmin
-        .from("tutor_student_progress_overrides")
-        .select("axis_overrides, insights_override")
-        .eq("tutor_id", user.id)
-        .eq("student_id", studentId)
-        .maybeSingle(),
-      supabaseAdmin
-        .from("passive_vocabulary_evidence")
-        .select(
-          "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at",
-        )
-        .eq("student_id", studentId)
-        .order("last_imported_at", { ascending: false })
-        .range(0, 11),
-      supabaseAdmin
-        .from("student_progress_reviews")
-        .select(
-          "id, tutor_id, content, rating, created_at, updated_at, profiles!student_progress_reviews_tutor_id_fkey(full_name, email)",
-        )
-        .eq("student_id", studentId)
-        .order("created_at", { ascending: false }),
-    ]);
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", studentId)
+      .single(),
+    supabaseAdmin
+      .from("tutor_student_progress_overrides")
+      .select("axis_overrides, insights_override")
+      .eq("tutor_id", user.id)
+      .eq("student_id", studentId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("passive_vocabulary_evidence")
+      .select(
+        "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at",
+      )
+      .eq("student_id", studentId)
+      .order("last_imported_at", { ascending: false })
+      .range(0, 11),
+    supabaseAdmin
+      .from("student_progress_reviews")
+      .select(
+        "id, tutor_id, content, rating, created_at, updated_at, profiles!student_progress_reviews_tutor_id_fkey(full_name, email)",
+      )
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false }),
+  ]);
 
   if (studentProfileResult.error || !studentProfileResult.data) {
     redirect("/students");
@@ -229,7 +226,9 @@ export default async function TutorStudentProgressPage({
             ) : (
               progressReviews.map((review) => {
                 const authorName =
-                  review.profiles?.full_name || review.profiles?.email || "Tutor";
+                  review.profiles?.full_name ||
+                  review.profiles?.email ||
+                  "Tutor";
 
                 return (
                   <div
