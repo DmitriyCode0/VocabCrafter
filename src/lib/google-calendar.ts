@@ -10,13 +10,11 @@ import {
 } from "@/lib/lessons";
 import type { Database } from "@/types/database";
 
-const GOOGLE_CALENDAR_AUTH_URL =
-  "https://accounts.google.com/o/oauth2/v2/auth";
+const GOOGLE_CALENDAR_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_CALENDAR_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALENDAR_USERINFO_URL =
   "https://www.googleapis.com/oauth2/v2/userinfo";
-const GOOGLE_CALENDAR_API_BASE_URL =
-  "https://www.googleapis.com/calendar/v3";
+const GOOGLE_CALENDAR_API_BASE_URL = "https://www.googleapis.com/calendar/v3";
 
 export const GOOGLE_CALENDAR_SCOPE = [
   "https://www.googleapis.com/auth/calendar.events",
@@ -80,7 +78,7 @@ export interface CalendarSyncResult {
 export function isGoogleCalendarSyncConfigured() {
   return Boolean(
     process.env.GOOGLE_CALENDAR_CLIENT_ID &&
-      process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
+    process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
   );
 }
 
@@ -172,7 +170,9 @@ export async function getGoogleCalendarConnectionSummary(
 ) {
   const { data, error } = await supabaseAdmin
     .from("google_calendar_connections")
-    .select("google_email, calendar_id, connected_at, last_synced_at, last_sync_error")
+    .select(
+      "google_email, calendar_id, connected_at, last_synced_at, last_sync_error",
+    )
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -318,7 +318,10 @@ export async function syncLessonToGoogleCalendar({
   let mapping: GoogleCalendarEventRow | null = null;
 
   try {
-    const connection = await getGoogleCalendarConnection(tutorId, supabaseAdmin);
+    const connection = await getGoogleCalendarConnection(
+      tutorId,
+      supabaseAdmin,
+    );
 
     if (!connection) {
       return { status: "skipped" };
@@ -437,7 +440,10 @@ export async function removeLessonFromGoogleCalendar({
   let mapping: GoogleCalendarEventRow | null = null;
 
   try {
-    const connection = await getGoogleCalendarConnection(tutorId, supabaseAdmin);
+    const connection = await getGoogleCalendarConnection(
+      tutorId,
+      supabaseAdmin,
+    );
 
     if (!connection) {
       return { status: "skipped" };
@@ -513,9 +519,9 @@ async function fetchGoogleUserEmail(accessToken: string) {
     return null;
   }
 
-  const payload = (await response.json().catch(() => null)) as
-    | GoogleCalendarUserInfo
-    | null;
+  const payload = (await response
+    .json()
+    .catch(() => null)) as GoogleCalendarUserInfo | null;
 
   return typeof payload?.email === "string" ? payload.email : null;
 }
@@ -699,7 +705,8 @@ function buildGoogleCalendarEventPayload(lesson: LessonGoogleCalendarSyncRow) {
 
 function buildGoogleCalendarEventTiming(lesson: LessonGoogleCalendarSyncRow) {
   if (lesson.start_time) {
-    const endTime = lesson.end_time || getSuggestedLessonEndTime(lesson.start_time);
+    const endTime =
+      lesson.end_time || getSuggestedLessonEndTime(lesson.start_time);
 
     if (endTime) {
       return {
@@ -776,9 +783,9 @@ async function setGoogleCalendarSyncError(
 }
 
 async function readGoogleResponseError(response: Response) {
-  const payload = (await response.json().catch(() => null)) as
-    | { error?: { message?: string } | string }
-    | null;
+  const payload = (await response.json().catch(() => null)) as {
+    error?: { message?: string } | string;
+  } | null;
 
   if (typeof payload?.error === "string") {
     return payload.error;
@@ -794,5 +801,7 @@ async function readGoogleResponseError(response: Response) {
 }
 
 function toErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unexpected Google Calendar error.";
+  return error instanceof Error
+    ? error.message
+    : "Unexpected Google Calendar error.";
 }

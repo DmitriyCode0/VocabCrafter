@@ -61,9 +61,9 @@ export function GoogleCalendarSyncCard({
       const response = await fetch("/api/google-calendar/disconnect", {
         method: "POST",
       });
-      const data = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to disconnect Google Calendar");
@@ -120,7 +120,9 @@ export function GoogleCalendarSyncCard({
               </p>
               <p>Calendar: {connection.calendarId}</p>
               {connectedAtLabel ? <p>Connected: {connectedAtLabel}</p> : null}
-              {lastSyncedAtLabel ? <p>Last successful sync: {lastSyncedAtLabel}</p> : null}
+              {lastSyncedAtLabel ? (
+                <p>Last successful sync: {lastSyncedAtLabel}</p>
+              ) : null}
             </div>
 
             {connection.lastSyncError ? (

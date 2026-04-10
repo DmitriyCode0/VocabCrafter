@@ -149,9 +149,9 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
         }),
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | LessonMutationResponse
-        | null;
+      const data = (await response
+        .json()
+        .catch(() => null)) as LessonMutationResponse | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to update lesson");
@@ -160,7 +160,10 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
       toast.success(
         `Updated lesson${selectedStudentName ? ` for ${selectedStudentName}` : ""}`,
       );
-      if (data?.calendarSync?.status === "failed" && data.calendarSync.message) {
+      if (
+        data?.calendarSync?.status === "failed" &&
+        data.calendarSync.message
+      ) {
         toast.error(data.calendarSync.message);
       }
       setOpen(false);

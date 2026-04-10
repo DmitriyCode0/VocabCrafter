@@ -251,7 +251,9 @@ export function StudentsClient({
                       className="rounded-xl border bg-background/90 p-4 shadow-sm"
                     >
                       <div className="space-y-1">
-                        <p className="font-medium text-foreground">{studentName}</p>
+                        <p className="font-medium text-foreground">
+                          {studentName}
+                        </p>
                         {studentEmail ? (
                           <p className="text-sm text-muted-foreground">
                             {studentEmail}

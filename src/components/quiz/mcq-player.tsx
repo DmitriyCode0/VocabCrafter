@@ -160,8 +160,10 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
           <div className="space-y-2">
             {question.options.map((option) => {
               const isSelected = selectedAnswer === option;
-              const showCorrect = submitted && option === question.correctAnswer;
-              const showWrong = submitted && isSelected && option !== question.correctAnswer;
+              const showCorrect =
+                submitted && option === question.correctAnswer;
+              const showWrong =
+                submitted && isSelected && option !== question.correctAnswer;
 
               return (
                 <button
@@ -203,7 +205,9 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
             ) : (
               <Button
                 onClick={handleNext}
-                disabled={!allCompleted && currentIndex === questions.length - 1}
+                disabled={
+                  !allCompleted && currentIndex === questions.length - 1
+                }
               >
                 {currentIndex < questions.length - 1 ? (
                   <>
@@ -217,7 +221,9 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
             )}
           </div>
 
-          {currentIndex === questions.length - 1 && submitted && !allCompleted ? (
+          {currentIndex === questions.length - 1 &&
+          submitted &&
+          !allCompleted ? (
             <p className="text-xs text-muted-foreground">
               Use the arrows to review unanswered questions before finishing.
             </p>
@@ -243,14 +249,18 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
                   <>
                     <p className="font-medium">
                       Not quite. The correct answer is:{" "}
-                      <span className="font-bold">{question.correctAnswer}</span>
+                      <span className="font-bold">
+                        {question.correctAnswer}
+                      </span>
                     </p>
                     {selectedAnswer ? (
                       <p className="text-sm opacity-90">
                         You selected {selectedAnswer}.
                       </p>
                     ) : (
-                      <p className="text-sm opacity-90">You skipped this question.</p>
+                      <p className="text-sm opacity-90">
+                        You skipped this question.
+                      </p>
                     )}
                   </>
                 )}

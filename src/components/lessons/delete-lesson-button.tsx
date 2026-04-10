@@ -46,16 +46,19 @@ export function DeleteLessonButton({
         method: "DELETE",
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | DeleteLessonResponse
-        | null;
+      const data = (await response
+        .json()
+        .catch(() => null)) as DeleteLessonResponse | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to delete lesson");
       }
 
       toast.success(`Deleted ${displayTitle}`);
-      if (data?.calendarSync?.status === "failed" && data.calendarSync.message) {
+      if (
+        data?.calendarSync?.status === "failed" &&
+        data.calendarSync.message
+      ) {
         toast.error(data.calendarSync.message);
       }
       setOpen(false);

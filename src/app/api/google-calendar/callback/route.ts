@@ -29,7 +29,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}${nextPath}`);
   }
 
-  if (!code || !returnedState || !expectedState || returnedState !== expectedState) {
+  if (
+    !code ||
+    !returnedState ||
+    !expectedState ||
+    returnedState !== expectedState
+  ) {
     return NextResponse.redirect(`${origin}${nextPath}`);
   }
 

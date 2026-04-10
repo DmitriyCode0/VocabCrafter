@@ -474,8 +474,8 @@ async function TutorLessonsView({
       "student_id",
     ),
   );
-  const googleCalendarConnection =
-    (googleCalendarConnectionResult ?? null) as GoogleCalendarConnectionStatusRow | null;
+  const googleCalendarConnection = (googleCalendarConnectionResult ??
+    null) as GoogleCalendarConnectionStatusRow | null;
   const isGoogleCalendarAvailable = isGoogleCalendarSyncConfigured();
   const connectHref = `/api/google-calendar/connect?next=${encodeURIComponent(buildMonthHref(month))}`;
 

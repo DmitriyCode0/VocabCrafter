@@ -283,20 +283,23 @@ async function TutorDashboard({
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  const [{ data: classes }, { count: monthlyQuizCount }, { data: connections }] =
-    await Promise.all([
-      supabase.from("classes").select("id").eq("tutor_id", userId),
-      supabase
-        .from("quizzes")
-        .select("*", { count: "exact", head: true })
-        .eq("creator_id", userId)
-        .gte("created_at", monthStart.toISOString()),
-      supabaseAdmin
-        .from("tutor_students")
-        .select("student_id")
-        .eq("tutor_id", userId)
-        .eq("status", "active"),
-    ]);
+  const [
+    { data: classes },
+    { count: monthlyQuizCount },
+    { data: connections },
+  ] = await Promise.all([
+    supabase.from("classes").select("id").eq("tutor_id", userId),
+    supabase
+      .from("quizzes")
+      .select("*", { count: "exact", head: true })
+      .eq("creator_id", userId)
+      .gte("created_at", monthStart.toISOString()),
+    supabaseAdmin
+      .from("tutor_students")
+      .select("student_id")
+      .eq("tutor_id", userId)
+      .eq("status", "active"),
+  ]);
 
   const classIds = classes?.map((classItem) => classItem.id) ?? [];
   const connectedStudentIds = Array.from(
@@ -392,7 +395,9 @@ async function TutorDashboard({
             <CardFooter className="mt-auto justify-center">
               {connectedStudentIds.length > 0 ? (
                 <Button asChild variant="outline" className="w-full">
-                  <Link href={passiveImportHref}>{passiveImportButtonLabel}</Link>
+                  <Link href={passiveImportHref}>
+                    {passiveImportButtonLabel}
+                  </Link>
                 </Button>
               ) : (
                 <Button variant="outline" className="w-full" disabled>

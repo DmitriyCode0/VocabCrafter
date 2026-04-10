@@ -172,10 +172,7 @@ function sumLessonEarningsInRange(
   }, 0);
 }
 
-function countDaysInRange(
-  startDate: Date,
-  endDate: Date,
-) {
+function countDaysInRange(startDate: Date, endDate: Date) {
   const cursor = stripTime(startDate);
   const endTime = stripTime(endDate).getTime();
   let total = 0;
@@ -389,7 +386,11 @@ export default async function LessonsPerformancePage() {
           weeklyTrend.length
         ).toFixed(1)
       : "0.0";
-  const monthTotalHours = sumLessonHoursInRange(monthLessons, monthStart, today);
+  const monthTotalHours = sumLessonHoursInRange(
+    monthLessons,
+    monthStart,
+    today,
+  );
   const yearTotalHours = sumLessonHoursInRange(yearLessons, yearStart, today);
   const daysSinceMonthStart = countDaysInRange(monthStart, today);
   const daysSinceYearStart = countDaysInRange(yearStart, today);
