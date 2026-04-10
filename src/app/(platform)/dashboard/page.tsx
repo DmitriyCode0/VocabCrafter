@@ -283,16 +283,29 @@ async function TutorDashboard({
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  const [{ data: classes }, { count: monthlyQuizCount }] = await Promise.all([
-    supabase.from("classes").select("id").eq("tutor_id", userId),
-    supabase
-      .from("quizzes")
-      .select("*", { count: "exact", head: true })
-      .eq("creator_id", userId)
-      .gte("created_at", monthStart.toISOString()),
-  ]);
+  const [{ data: classes }, { count: monthlyQuizCount }, { data: connections }] =
+    await Promise.all([
+      supabase.from("classes").select("id").eq("tutor_id", userId),
+      supabase
+        .from("quizzes")
+        .select("*", { count: "exact", head: true })
+        .eq("creator_id", userId)
+        .gte("created_at", monthStart.toISOString()),
+      supabaseAdmin
+        .from("tutor_students")
+        .select("student_id")
+        .eq("tutor_id", userId)
+        .eq("status", "active"),
+    ]);
 
   const classIds = classes?.map((classItem) => classItem.id) ?? [];
+  const connectedStudentIds = Array.from(
+    new Set(
+      (connections ?? [])
+        .map((connection) => connection.student_id)
+        .filter((studentId) => studentId !== userId),
+    ),
+  );
   let totalStudents = 0;
 
   if (classIds.length > 0) {
@@ -309,10 +322,26 @@ async function TutorDashboard({
   const quizPercentage = pct(monthlyQuizCount ?? 0, quizLimit);
   const isQuizWarning = quizPercentage >= 80;
   const isQuizOver = quizPercentage >= 100;
+  const passiveImportHref =
+    connectedStudentIds.length === 1
+      ? `/students/${connectedStudentIds[0]}/progress#passive-recognition`
+      : "/students?intent=passive-recognition";
+  const passiveImportDescription =
+    connectedStudentIds.length === 0
+      ? "Connect a student first, then import text they already understand."
+      : connectedStudentIds.length === 1
+        ? "Jump straight into passive-recognition import for your connected student."
+        : "Choose a connected student, then import text they already understand.";
+  const passiveImportButtonLabel =
+    connectedStudentIds.length === 0
+      ? "Connect Student First"
+      : connectedStudentIds.length === 1
+        ? "Import Passive Vocabulary"
+        : "Choose Student";
 
   return (
     <div className="space-y-6">
-      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <AnimatedCard>
           <Card data-tour-id="tutor-new-quiz">
             <CardHeader className="flex flex-row items-center gap-2">
@@ -345,6 +374,31 @@ async function TutorDashboard({
               <Button asChild variant="outline" className="w-full">
                 <Link href="/review">Review Work</Link>
               </Button>
+            </CardFooter>
+          </Card>
+        </AnimatedCard>
+
+        <AnimatedCard>
+          <Card data-tour-id="tutor-passive-recognition">
+            <CardHeader className="flex flex-row items-center gap-2">
+              <BookMarked className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-base">
+                  Import Passive Vocabulary
+                </CardTitle>
+                <CardDescription>{passiveImportDescription}</CardDescription>
+              </div>
+            </CardHeader>
+            <CardFooter className="mt-auto justify-center">
+              {connectedStudentIds.length > 0 ? (
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={passiveImportHref}>{passiveImportButtonLabel}</Link>
+                </Button>
+              ) : (
+                <Button variant="outline" className="w-full" disabled>
+                  {passiveImportButtonLabel}
+                </Button>
+              )}
             </CardFooter>
           </Card>
         </AnimatedCard>

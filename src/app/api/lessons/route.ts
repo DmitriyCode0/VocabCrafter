@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { syncLessonToGoogleCalendar } from "@/lib/google-calendar";
 import { LESSON_STATUSES } from "@/lib/lessons";
 
 const lessonTitleSchema = z
@@ -29,7 +30,7 @@ const createLessonSchema = z
     startTime: timeSchema,
     endTime: timeSchema,
     notes: z.string().trim().max(2000).nullable().optional(),
-    status: z.enum(LESSON_STATUSES).default("planned"),
+    status: z.enum(LESSON_STATUSES).default("completed"),
     priceCents: z.number().int().nonnegative().optional(),
   })
   .refine(
@@ -124,5 +125,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json(data, { status: 201 });
+  const calendarSync = await syncLessonToGoogleCalendar({
+    lessonId: data.id,
+    tutorId: user.id,
+    supabaseAdmin,
+  });
+
+  return NextResponse.json({ ...data, calendarSync }, { status: 201 });
 }

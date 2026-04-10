@@ -23,6 +23,7 @@ interface GapFillResult {
 interface MCQResult {
   question?: string;
   selected?: string;
+  selectedAnswer?: string;
   correctAnswer?: string;
   isCorrect?: boolean;
 }
@@ -189,7 +190,7 @@ function MCQDetail({ results }: { results: MCQResult[] }) {
               <p className="text-xs text-muted-foreground mb-1">{r.question}</p>
             )}
             <p>
-              Selected: <strong>{r.selected ?? "—"}</strong>
+              Selected: <strong>{r.selectedAnswer ?? r.selected ?? "—"}</strong>
               {!r.isCorrect && r.correctAnswer && (
                 <span className="text-muted-foreground ml-2">
                   (Correct: <strong>{r.correctAnswer}</strong>)

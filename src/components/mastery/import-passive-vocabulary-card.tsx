@@ -141,35 +141,12 @@ export function ImportPassiveVocabularyCard({
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-base">
               <BookMarked className="h-5 w-5 text-primary" />
-              Import Passive Recognition
+              Import Passive Vocabulary
             </CardTitle>
             <CardDescription>
-              Paste or upload a text the student understands. It will be split
-              into unique individual words and saved as passive-recognition
-              evidence only.
+              Paste a text. It will be split into unique individual words and
+              saved as passive vocabulary.
             </CardDescription>
-          </div>
-
-          <div className="w-full space-y-2 lg:w-[320px]">
-            <div className="space-y-2">
-              <Label
-                htmlFor="passive-source-label"
-                className="text-xs text-muted-foreground"
-              >
-                Text or lesson label
-              </Label>
-              <Input
-                id="passive-source-label"
-                value={sourceLabel}
-                onChange={(event) => setSourceLabel(event.target.value)}
-                placeholder="Short story, article, lesson 12..."
-              />
-            </div>
-
-            <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-xs text-muted-foreground">
-              Imported words are stored as lowercase unique words in{" "}
-              {targetLanguage} and used only for passive-recognition estimates.
-            </div>
           </div>
         </div>
       </CardHeader>
@@ -184,39 +161,8 @@ export function ImportPassiveVocabularyCard({
                 onChange={(event) => setRawText(event.target.value)}
                 rows={10}
                 className="font-mono text-sm"
-                placeholder="Paste a text the student understands. The import will split it into unique individual words and save those words as known passive vocabulary."
+                placeholder="Paste the text here..."
               />
-            </div>
-
-            <div className="flex flex-col gap-3 rounded-lg border border-dashed bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1 text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">
-                  Optional text upload
-                </p>
-                <p>
-                  Upload a plain text or markdown file and it will be appended
-                  to the text box.
-                </p>
-              </div>
-
-              <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={ACCEPTED_TEXT_FILE_TYPES}
-                  onChange={handleTextFileSelection}
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full sm:w-auto"
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Text File
-                </Button>
-              </>
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row">

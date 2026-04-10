@@ -38,6 +38,14 @@ interface CreateLessonDialogProps {
   students: LessonStudentOption[];
 }
 
+interface LessonMutationResponse {
+  error?: string;
+  calendarSync?: {
+    status: "synced" | "skipped" | "failed";
+    message?: string;
+  };
+}
+
 function getTodayIsoDate() {
   const now = new Date();
   const year = now.getFullYear();
@@ -55,7 +63,7 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [notes, setNotes] = useState("");
-  const [status, setStatus] = useState<LessonStatus>("planned");
+  const [status, setStatus] = useState<LessonStatus>("completed");
   const [priceInput, setPriceInput] = useState("0.00");
   const [autoAdjustEndTime, setAutoAdjustEndTime] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -87,7 +95,7 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
     setStartTime("");
     setEndTime("");
     setNotes("");
-    setStatus("planned");
+    setStatus("completed");
     setPriceInput("0.00");
     setAutoAdjustEndTime(true);
   }
@@ -144,9 +152,9 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
         }),
       });
 
-      const data = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
+      const data = (await response.json().catch(() => null)) as
+        | LessonMutationResponse
+        | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to create lesson");
@@ -155,6 +163,9 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
       toast.success(
         `Added lesson${selectedStudentName ? ` for ${selectedStudentName}` : ""}`,
       );
+      if (data?.calendarSync?.status === "failed" && data.calendarSync.message) {
+        toast.error(data.calendarSync.message);
+      }
       setOpen(false);
       resetForm();
       router.refresh();

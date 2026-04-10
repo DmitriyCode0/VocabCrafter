@@ -50,6 +50,14 @@ interface EditLessonDialogProps {
   students: LessonStudentOption[];
 }
 
+interface LessonMutationResponse {
+  error?: string;
+  calendarSync?: {
+    status: "synced" | "skipped" | "failed";
+    message?: string;
+  };
+}
+
 export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
   const initialSuggestedEndTime = getSuggestedLessonEndTime(lesson.startTime);
   const displayTitle = getLessonDisplayTitle(lesson.title);
@@ -141,9 +149,9 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
         }),
       });
 
-      const data = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
+      const data = (await response.json().catch(() => null)) as
+        | LessonMutationResponse
+        | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to update lesson");
@@ -152,6 +160,9 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
       toast.success(
         `Updated lesson${selectedStudentName ? ` for ${selectedStudentName}` : ""}`,
       );
+      if (data?.calendarSync?.status === "failed" && data.calendarSync.message) {
+        toast.error(data.calendarSync.message);
+      }
       setOpen(false);
       router.refresh();
     } catch (error) {

@@ -17,7 +17,6 @@ import {
   CalendarDays,
   ChartColumnBig,
   Clock3,
-  Sparkles,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -35,6 +34,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { formatLessonCurrency } from "@/lib/lessons";
 import { cn } from "@/lib/utils";
 
 const weeklyChartConfig = {
@@ -61,7 +61,12 @@ const dailyChartConfig = {
 interface PeriodMetric {
   label: string;
   value: number;
+  earningsCents: number;
   helper: string;
+  stats?: Array<{
+    label: string;
+    value: string;
+  }>;
   iconKey: "week" | "month" | "year";
   accentClassName: string;
 }
@@ -84,6 +89,16 @@ interface PerformanceInsight {
   value: string;
 }
 
+interface FormulaMetrics {
+  yearLabel: number;
+  rangeLabel: string;
+  totalHoursLabel: string;
+  calendarDays: number;
+  weekdayDays: number;
+  averageHoursPerDayLabel: string;
+  averageHoursPerWorkdayLabel: string;
+}
+
 interface TutorPerformanceDashboardProps {
   periodMetrics: PeriodMetric[];
   weeklyTrend: TrendPoint[];
@@ -91,6 +106,7 @@ interface TutorPerformanceDashboardProps {
   dailyTrend: TrendPoint[];
   topStudents: StudentPerformanceItem[];
   insights: PerformanceInsight[];
+  formulaMetrics: FormulaMetrics;
   hasCompletedLessons: boolean;
 }
 
@@ -114,7 +130,7 @@ function MetricCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.06, ease: "easeOut" }}
     >
-      <Card className="overflow-hidden border-border/60 bg-gradient-to-br from-card via-card to-muted/30">
+      <Card className="h-full overflow-hidden border-border/60 bg-gradient-to-br from-card via-card to-muted/30">
         <CardHeader className="relative pb-3">
           <div
             className={cn(
@@ -130,17 +146,86 @@ function MetricCard({
               <div className="mt-2 text-4xl font-semibold tracking-tight">
                 {metric.value}
               </div>
+              <p className="mt-2 text-sm font-medium text-foreground/75">
+                Earned {formatLessonCurrency(metric.earningsCents)}
+              </p>
             </div>
             <div className="rounded-2xl border border-border/60 bg-background/80 p-3 shadow-sm backdrop-blur-sm">
               <Icon className="h-5 w-5 text-foreground" />
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">{metric.helper}</p>
+          {metric.stats?.length ? (
+            <div className="space-y-2 border-t border-border/60 pt-4">
+              {metric.stats.map((stat) => (
+                <div
+                  key={stat.label}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
+                  <span className="text-muted-foreground">{stat.label}</span>
+                  <span className="font-semibold tracking-tight text-foreground">
+                    {stat.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </motion.div>
+  );
+}
+
+function FormulaCard({
+  title,
+  description,
+  formula,
+  accentClassName,
+}: {
+  title: string;
+  description: string;
+  formula: Array<{ label: string; value: string }>;
+  accentClassName: string;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-background/85 p-5 shadow-sm backdrop-blur-sm">
+      <div
+        className={cn(
+          "absolute right-0 top-0 h-24 w-24 rounded-full blur-3xl",
+          accentClassName,
+        )}
+      />
+      <div className="relative space-y-4">
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+            {title}
+          </p>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+          {formula.map((part, index) => (
+            <div key={part.label} className="flex items-center gap-2">
+              <div className="rounded-2xl border border-border/60 bg-muted/40 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  {part.label}
+                </p>
+                <p className="mt-1 text-base font-semibold tracking-tight">
+                  {part.value}
+                </p>
+              </div>
+              {index < formula.length - 1 ? (
+                <span className="text-lg font-semibold text-muted-foreground">
+                  {index === formula.length - 2 ? "=" : "/"}
+                </span>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -151,6 +236,7 @@ export function TutorPerformanceDashboard({
   dailyTrend,
   topStudents,
   insights,
+  formulaMetrics,
   hasCompletedLessons,
 }: TutorPerformanceDashboardProps) {
   return (
@@ -533,20 +619,52 @@ export function TutorPerformanceDashboard({
         transition={{ duration: 0.35, ease: "easeOut", delay: 0.3 }}
       >
         <Card className="border-border/60 bg-gradient-to-r from-muted/30 via-background to-muted/10">
-          <CardContent className="flex flex-col gap-3 py-6 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">
-                Completed lessons are the source of truth here.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                This view updates as lessons move to the completed state on your
-                schedule.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Built from the same lesson records students already see.
-            </div>
+          <CardHeader className="space-y-2">
+            <CardTitle>Average formulas</CardTitle>
+            <CardDescription>
+              Year-to-date lesson hours for {formulaMetrics.yearLabel} across{" "}
+              {formulaMetrics.rangeLabel}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-2">
+            <FormulaCard
+              title="7-day average"
+              description="Completed lesson hours this year divided by every calendar day since Jan 1."
+              formula={[
+                {
+                  label: "Hours this year",
+                  value: formulaMetrics.totalHoursLabel,
+                },
+                {
+                  label: "Calendar days",
+                  value: `${formulaMetrics.calendarDays}`,
+                },
+                {
+                  label: "Avg hrs / day",
+                  value: formulaMetrics.averageHoursPerDayLabel,
+                },
+              ]}
+              accentClassName="bg-[var(--color-chart-2)]/18"
+            />
+            <FormulaCard
+              title="5-day average"
+              description="The same year-to-date lesson hours divided by weekdays only, excluding Saturdays and Sundays."
+              formula={[
+                {
+                  label: "Hours this year",
+                  value: formulaMetrics.totalHoursLabel,
+                },
+                {
+                  label: "Weekdays",
+                  value: `${formulaMetrics.weekdayDays}`,
+                },
+                {
+                  label: "Avg hrs / day",
+                  value: formulaMetrics.averageHoursPerWorkdayLabel,
+                },
+              ]}
+              accentClassName="bg-[var(--color-chart-3)]/18"
+            />
           </CardContent>
         </Card>
       </motion.div>

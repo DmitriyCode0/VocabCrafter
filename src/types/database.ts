@@ -283,6 +283,107 @@ export interface Database {
           },
         ];
       };
+      google_calendar_connections: {
+        Row: {
+          user_id: string;
+          google_email: string | null;
+          calendar_id: string;
+          access_token: string;
+          refresh_token: string;
+          scope: string | null;
+          access_token_expires_at: string | null;
+          last_synced_at: string | null;
+          last_sync_error: string | null;
+          connected_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          google_email?: string | null;
+          calendar_id?: string;
+          access_token: string;
+          refresh_token: string;
+          scope?: string | null;
+          access_token_expires_at?: string | null;
+          last_synced_at?: string | null;
+          last_sync_error?: string | null;
+          connected_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          google_email?: string | null;
+          calendar_id?: string;
+          access_token?: string;
+          refresh_token?: string;
+          scope?: string | null;
+          access_token_expires_at?: string | null;
+          last_synced_at?: string | null;
+          last_sync_error?: string | null;
+          connected_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_connections_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lesson_google_calendar_events: {
+        Row: {
+          lesson_id: string;
+          user_id: string;
+          google_calendar_id: string;
+          google_event_id: string;
+          synced_at: string;
+          last_error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          lesson_id: string;
+          user_id: string;
+          google_calendar_id?: string;
+          google_event_id: string;
+          synced_at?: string;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          lesson_id?: string;
+          user_id?: string;
+          google_calendar_id?: string;
+          google_event_id?: string;
+          synced_at?: string;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lesson_google_calendar_events_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: true;
+            referencedRelation: "tutor_student_lessons";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lesson_google_calendar_events_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       passive_vocabulary_evidence: {
         Row: {
           id: string;

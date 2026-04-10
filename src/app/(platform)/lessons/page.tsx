@@ -7,6 +7,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { GoogleCalendarSyncCard } from "@/components/lessons/google-calendar-sync-card";
 import { MonthlyLessonsCalendar } from "@/components/lessons/monthly-lessons-calendar";
 import { LessonBalanceManager } from "@/components/lessons/lesson-balance-manager";
 import { CreateLessonDialog } from "@/components/lessons/create-lesson-dialog";
@@ -31,6 +32,11 @@ import {
   type LessonBalanceSummaryItem,
   type MonthlyLessonItem,
 } from "@/lib/lessons";
+import { autoCompleteOverduePlannedLessons } from "@/lib/lessons-server";
+import {
+  getGoogleCalendarConnectionSummary,
+  isGoogleCalendarSyncConfigured,
+} from "@/lib/google-calendar";
 import { getLessonsViewerAccess } from "@/lib/lessons-access";
 
 interface SearchParams {
@@ -102,6 +108,14 @@ interface StudentLessonRow {
     full_name: string | null;
     email: string;
   } | null;
+}
+
+interface GoogleCalendarConnectionStatusRow {
+  googleEmail: string | null;
+  calendarId: string;
+  connectedAt: string;
+  lastSyncedAt: string | null;
+  lastSyncError: string | null;
 }
 
 function buildMonthHref(monthDate: Date) {
@@ -394,6 +408,7 @@ async function TutorLessonsView({
     { data: lessonsResult },
     { data: topUpsResult },
     { data: completedLessonsResult },
+    googleCalendarConnectionResult,
   ] = await Promise.all([
     supabaseAdmin
       .from("tutor_students")
@@ -421,6 +436,7 @@ async function TutorLessonsView({
       .select("id, tutor_id, student_id, title, lesson_date, price_cents")
       .eq("tutor_id", userId)
       .eq("status", "completed"),
+    getGoogleCalendarConnectionSummary(userId, supabaseAdmin),
   ]);
 
   const connectedStudents = (
@@ -458,10 +474,14 @@ async function TutorLessonsView({
       "student_id",
     ),
   );
+  const googleCalendarConnection =
+    (googleCalendarConnectionResult ?? null) as GoogleCalendarConnectionStatusRow | null;
+  const isGoogleCalendarAvailable = isGoogleCalendarSyncConfigured();
+  const connectHref = `/api/google-calendar/connect?next=${encodeURIComponent(buildMonthHref(month))}`;
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] lg:items-start">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Tutor Lesson Planner</CardTitle>
@@ -481,6 +501,12 @@ async function TutorLessonsView({
             <CreateLessonDialog students={connectedStudents} />
           </CardContent>
         </Card>
+
+        <GoogleCalendarSyncCard
+          available={isGoogleCalendarAvailable}
+          connectHref={connectHref}
+          connection={googleCalendarConnection}
+        />
       </div>
 
       <MonthlyLessonsCalendar
@@ -519,6 +545,9 @@ export default async function LessonsPage({
   const resolvedSearchParams = await searchParams;
   const month = normalizeLessonMonthParam(resolvedSearchParams.month);
   const { userId, role } = await getLessonsViewerAccess();
+  await autoCompleteOverduePlannedLessons(
+    role === "student" ? { studentId: userId } : { tutorId: userId },
+  );
   const previousMonth = new Date(month.getFullYear(), month.getMonth() - 1, 1);
   const nextMonth = new Date(month.getFullYear(), month.getMonth() + 1, 1);
 

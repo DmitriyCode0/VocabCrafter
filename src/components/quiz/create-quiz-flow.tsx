@@ -48,6 +48,7 @@ import {
   ArrowRight,
   BookOpen,
   Loader2,
+  CircleDot,
   PenLine,
   Languages,
   FileText,
@@ -73,6 +74,7 @@ const GRAMMAR_TOPIC_STORAGE_KEY = "vocab-crafter:last-grammar-topic";
 
 type Step = "input" | "edit" | "activity";
 type ActivityType =
+  | "mcq"
   | "flashcards"
   | "gap_fill"
   | "translation"
@@ -101,6 +103,11 @@ const ACTIVITIES: {
   label: string;
   icon: React.ReactNode;
 }[] = [
+  {
+    type: "mcq",
+    label: "Multiple Choice",
+    icon: <CircleDot className="h-8 w-8" />,
+  },
   {
     type: "flashcards",
     label: "Flashcards",
@@ -240,6 +247,10 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
   }
 
   function getActivityDescription(type: ActivityType) {
+    if (type === "mcq") {
+      return `Answer ${targetLanguageLabel.toLowerCase()} multiple-choice questions with one correct option and three distractors.`;
+    }
+
     if (type === "text_translation") {
       return `Translate a short ${sourceLanguageLabel.toLowerCase()} passage into ${targetLanguageLabel.toLowerCase()} with one full-text score.`;
     }

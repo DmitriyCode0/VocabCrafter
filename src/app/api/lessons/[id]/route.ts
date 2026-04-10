@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import {
+  removeLessonFromGoogleCalendar,
+  syncLessonToGoogleCalendar,
+} from "@/lib/google-calendar";
 import { LESSON_STATUSES } from "@/lib/lessons";
 
 const lessonTitleSchema = z
@@ -188,7 +192,13 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json(data);
+    const calendarSync = await syncLessonToGoogleCalendar({
+      lessonId: data.id,
+      tutorId: access.user.id,
+      supabaseAdmin: access.supabaseAdmin,
+    });
+
+    return NextResponse.json({ ...data, calendarSync });
   } catch (error) {
     console.error("Validate lesson connection error:", error);
     return NextResponse.json(
@@ -209,6 +219,12 @@ export async function DELETE(
     return access.errorResponse;
   }
 
+  const calendarSync = await removeLessonFromGoogleCalendar({
+    lessonId: id,
+    tutorId: access.user.id,
+    supabaseAdmin: access.supabaseAdmin,
+  });
+
   const { error } = await access.supabaseAdmin
     .from("tutor_student_lessons")
     .delete()
@@ -222,5 +238,5 @@ export async function DELETE(
     );
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, calendarSync });
 }

@@ -21,6 +21,14 @@ interface DeleteLessonButtonProps {
   title?: string | null;
 }
 
+interface DeleteLessonResponse {
+  error?: string;
+  calendarSync?: {
+    status: "synced" | "skipped" | "failed";
+    message?: string;
+  };
+}
+
 export function DeleteLessonButton({
   lessonId,
   title,
@@ -38,15 +46,18 @@ export function DeleteLessonButton({
         method: "DELETE",
       });
 
-      const data = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
+      const data = (await response.json().catch(() => null)) as
+        | DeleteLessonResponse
+        | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to delete lesson");
       }
 
       toast.success(`Deleted ${displayTitle}`);
+      if (data?.calendarSync?.status === "failed" && data.calendarSync.message) {
+        toast.error(data.calendarSync.message);
+      }
       setOpen(false);
       router.refresh();
     } catch (error) {

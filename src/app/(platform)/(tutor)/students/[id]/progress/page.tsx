@@ -422,6 +422,7 @@ export default async function TutorStudentProgressPage({
       <ImportPassiveVocabularyCard
         targetLanguage={snapshot.profile.targetLanguage}
         studentId={studentId}
+        cardId="passive-recognition"
       />
 
       <Card>

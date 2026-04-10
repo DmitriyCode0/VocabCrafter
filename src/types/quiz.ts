@@ -47,9 +47,11 @@ export interface MCQQuestion {
 
 export interface MCQAnswer {
   questionId: number;
+  question?: string;
   selectedAnswer: string;
   correctAnswer: string;
   isCorrect: boolean;
+  originalTerm?: string;
 }
 
 // Gap-fill types

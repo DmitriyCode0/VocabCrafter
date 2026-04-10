@@ -31,6 +31,7 @@ import {
   Clock,
   Link2,
   TrendingUp,
+  BookMarked,
 } from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import Link from "next/link";
@@ -54,12 +55,14 @@ interface StudentsClientProps {
   connections: Record<string, unknown>[];
   recentAttempts: Record<string, unknown>[];
   tutorId: string;
+  intent?: string;
 }
 
 export function StudentsClient({
   connections,
   recentAttempts,
   tutorId,
+  intent,
 }: StudentsClientProps) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -72,6 +75,7 @@ export function StudentsClient({
     (c) => c.status === "active" && c.student_id !== tutorId,
   );
   const pendingConnections = connections.filter((c) => c.status === "pending");
+  const showPassiveImportChooser = intent === "passive-recognition";
 
   async function handleGenerate() {
     setGenerating(true);
@@ -209,6 +213,69 @@ export function StudentsClient({
           </DialogContent>
         </Dialog>
       </div>
+
+      {showPassiveImportChooser ? (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-start gap-3">
+              <BookMarked className="mt-0.5 h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-base">
+                  Choose a Student for Passive Vocabulary Import
+                </CardTitle>
+                <CardDescription>
+                  Jump straight to the passive-recognition import section for a
+                  connected student.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {activeConnections.length === 0 ? (
+              <div className="rounded-lg border border-dashed bg-background/80 px-4 py-5 text-sm text-muted-foreground">
+                No connected students yet. Connect a student first, then you can
+                import text they already understand.
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {activeConnections.map((conn) => {
+                  const student = conn.profiles as StudentProfile | null;
+                  const studentName =
+                    student?.full_name || student?.email || "Unknown student";
+                  const studentEmail = student?.email;
+                  const studentLevel = student?.cefr_level;
+
+                  return (
+                    <div
+                      key={`passive-import-${conn.id as string}`}
+                      className="rounded-xl border bg-background/90 p-4 shadow-sm"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-medium text-foreground">{studentName}</p>
+                        {studentEmail ? (
+                          <p className="text-sm text-muted-foreground">
+                            {studentEmail}
+                          </p>
+                        ) : null}
+                        {studentLevel ? (
+                          <Badge variant="secondary">{studentLevel}</Badge>
+                        ) : null}
+                      </div>
+                      <Button asChild className="mt-4 w-full">
+                        <Link
+                          href={`/students/${conn.student_id as string}/progress#passive-recognition`}
+                        >
+                          Import Passive Vocabulary
+                        </Link>
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Pending connections */}
       {pendingConnections.length > 0 && (

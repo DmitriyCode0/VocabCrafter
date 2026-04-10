@@ -15,6 +15,7 @@ import { CheckCircle2, XCircle, RotateCcw, Home } from "lucide-react";
 import { saveAttempt } from "@/lib/save-attempt";
 import { removeSuggestedAnswerLines, stripMarkdownEmphasis } from "@/lib/utils";
 import type { GapFillResult } from "./gap-fill-player";
+import type { MCQResult } from "./mcq-player";
 import type { TextTranslationResult } from "./text-translation-player";
 import type { TranslationResult } from "./translation-player";
 import type { QuizConfig } from "@/types/quiz";
@@ -27,8 +28,9 @@ import {
 } from "@/lib/languages";
 
 interface QuizResultsProps {
-  type: "gap_fill" | "translation" | "text_translation";
+  type: "mcq" | "gap_fill" | "translation" | "text_translation";
   quizId: string;
+  mcqResults?: MCQResult[];
   gapFillResults?: GapFillResult[];
   translationResults?: TranslationResult[];
   textTranslationResults?: TextTranslationResult[];
@@ -39,6 +41,7 @@ interface QuizResultsProps {
 export function QuizResults({
   type,
   quizId,
+  mcqResults,
   gapFillResults,
   translationResults,
   textTranslationResults,
@@ -57,7 +60,15 @@ export function QuizResults({
     if (savedRef.current) return;
     savedRef.current = true;
 
-    if (type === "gap_fill" && gapFillResults) {
+    if (type === "mcq" && mcqResults) {
+      const correct = mcqResults.filter((r) => r.isCorrect).length;
+      saveAttempt(
+        quizId,
+        { type: "mcq", results: mcqResults },
+        correct,
+        mcqResults.length,
+      );
+    } else if (type === "gap_fill" && gapFillResults) {
       const correct = gapFillResults.filter((r) => r.isCorrect).length;
       saveAttempt(
         quizId,
@@ -91,10 +102,72 @@ export function QuizResults({
   }, [
     type,
     quizId,
+    mcqResults,
     gapFillResults,
     textTranslationResults,
     translationResults,
   ]);
+  if (type === "mcq" && mcqResults) {
+    const correct = mcqResults.filter((r) => r.isCorrect).length;
+    const total = mcqResults.length;
+    const percentage = Math.round((correct / total) * 100);
+
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Quiz Complete!</CardTitle>
+            <CardDescription>
+              You scored {correct} out of {total} ({percentage}%)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {mcqResults.map((result, index) => (
+              <div
+                key={index}
+                className={`flex items-start gap-3 rounded-md p-3 ${
+                  result.isCorrect
+                    ? "bg-green-50 dark:bg-green-950/30"
+                    : "bg-red-50 dark:bg-red-950/30"
+                }`}
+              >
+                {result.isCorrect ? (
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+                ) : (
+                  <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                )}
+                <div className="text-sm">
+                  <p className="mb-1 font-medium">{result.question}</p>
+                  <p>
+                    Your answer: <strong>{result.selectedAnswer || "—"}</strong>
+                  </p>
+                  {!result.isCorrect ? (
+                    <p className="text-muted-foreground">
+                      Correct: <strong>{result.correctAnswer}</strong>
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+
+            <div className="flex gap-2 pt-4">
+              <Button variant="outline" onClick={onRestart}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+              <Button asChild className="flex-1">
+                <Link href="/quizzes">
+                  <Home className="mr-2 h-4 w-4" />
+                  My Quizzes
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (type === "gap_fill" && gapFillResults) {
     const correct = gapFillResults.filter((r) => r.isCorrect).length;
     const total = gapFillResults.length;

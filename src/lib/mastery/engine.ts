@@ -6,7 +6,7 @@ export interface WordResult {
   term: string;
   definition: string;
   correct: boolean;
-  practiceType: "gap_fill" | "translation" | "flashcards";
+  practiceType: "mcq" | "gap_fill" | "translation" | "flashcards";
 }
 
 function normalizeForWordMatch(text: string): string[] {
@@ -118,6 +118,10 @@ export function extractWordResults(
     return extractGapFillResults(answers, generatedContent, termMap);
   }
 
+  if (quizType === "mcq") {
+    return extractMCQResults(answers, generatedContent, termMap);
+  }
+
   if (quizType === "translation") {
     return extractTranslationResults(answers, generatedContent, termMap);
   }
@@ -170,6 +174,45 @@ function extractGapFillResults(
       };
     })
     .filter((r): r is WordResult => r !== null);
+}
+
+function extractMCQResults(
+  answers: Record<string, unknown>,
+  generatedContent: Record<string, unknown>,
+  termMap: Map<string, string>,
+): WordResult[] {
+  const results = (answers.results ?? []) as {
+    questionId?: number;
+    isCorrect?: boolean;
+  }[];
+
+  const questions = (generatedContent.questions ?? []) as {
+    id: number;
+    originalTerm?: string;
+  }[];
+
+  const questionTermMap = new Map<number, string>();
+  for (const question of questions) {
+    if (question.originalTerm) {
+      questionTermMap.set(question.id, question.originalTerm.toLowerCase());
+    }
+  }
+
+  return results
+    .map((result) => {
+      const term = questionTermMap.get(result.questionId ?? -1);
+      if (!term) {
+        return null;
+      }
+
+      return {
+        term,
+        definition: termMap.get(term) ?? "",
+        correct: result.isCorrect === true,
+        practiceType: "mcq",
+      };
+    })
+    .filter((result): result is WordResult => result !== null);
 }
 
 function extractTranslationResults(

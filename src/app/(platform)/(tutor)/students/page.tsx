@@ -5,7 +5,16 @@ import { StudentsClient } from "@/components/students/students-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudentsPage() {
+interface StudentsPageSearchParams {
+  intent?: string;
+}
+
+export default async function StudentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<StudentsPageSearchParams>;
+}) {
+  const resolvedSearchParams = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -59,6 +68,7 @@ export default async function StudentsPage() {
       connections={(connections ?? []) as Record<string, unknown>[]}
       recentAttempts={recentAttempts}
       tutorId={user.id}
+      intent={resolvedSearchParams.intent}
     />
   );
 }

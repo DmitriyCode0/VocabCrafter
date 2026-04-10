@@ -1,5 +1,6 @@
 export const LESSON_STATUSES = ["planned", "completed", "cancelled"] as const;
-export const LESSON_BALANCE_CURRENCY = "USD";
+export const LESSON_BALANCE_CURRENCY = "UAH";
+export const LESSON_BALANCE_LOCALE = "uk-UA";
 
 export type LessonStatus = (typeof LESSON_STATUSES)[number];
 
@@ -174,7 +175,7 @@ export function getSuggestedLessonEndTime(startTime?: string | null) {
 }
 
 export function formatLessonCurrency(amountCents: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat(LESSON_BALANCE_LOCALE, {
     style: "currency",
     currency: LESSON_BALANCE_CURRENCY,
     minimumFractionDigits: amountCents % 100 === 0 ? 0 : 2,

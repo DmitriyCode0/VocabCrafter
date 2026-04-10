@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { FlashcardPlayer, type FlashcardResult } from "./flashcard-player";
 import { GapFillPlayer, type GapFillResult } from "./gap-fill-player";
+import { MCQPlayer, type MCQResult } from "./mcq-player";
 import { DiscussionPlayer } from "./discussion-player";
 import {
   TranslationPlayer,
@@ -30,6 +31,7 @@ import type {
   DiscussionPrompt,
   FlashcardItem,
   GapFillQuestion,
+  MCQQuestion,
   QuizTerm,
   TextTranslationContent,
   TranslationQuestion,
@@ -59,6 +61,7 @@ function normalizeDiscussionPrompts(
 
 export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
   const [showResults, setShowResults] = useState(false);
+  const [mcqResults, setMcqResults] = useState<MCQResult[]>([]);
   const [gapFillResults, setGapFillResults] = useState<GapFillResult[]>([]);
   const [translationResults, setTranslationResults] = useState<
     TranslationResult[]
@@ -103,6 +106,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
 
   function handleRestart() {
     setShowResults(false);
+    setMcqResults([]);
     setGapFillResults([]);
     setTranslationResults([]);
     setTextTranslationResults([]);
@@ -130,6 +134,30 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
     },
     [quiz.id],
   );
+
+  if (quiz.type === "mcq") {
+    if (showResults) {
+      return (
+        <QuizResults
+          type="mcq"
+          quizId={quiz.id}
+          mcqResults={mcqResults}
+          onRestart={handleRestart}
+        />
+      );
+    }
+
+    const questions = (content.questions || []) as MCQQuestion[];
+    return (
+      <MCQPlayer
+        questions={questions}
+        onComplete={(results) => {
+          setMcqResults(results);
+          setShowResults(true);
+        }}
+      />
+    );
+  }
 
   if (quiz.type === "flashcards") {
     if (showResults) {
