@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, CalendarDays } from "lucide-react";
+import { BarChart3, CalendarDays, Loader2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface LessonsSectionTabsProps {
@@ -14,11 +15,14 @@ export function LessonsSectionTabs({
   scheduleHref = "/lessons",
 }: LessonsSectionTabsProps) {
   const router = useRouter();
+  const [loadingTab, setLoadingTab] = useState<string | null>(null);
 
   return (
     <Tabs
       value={currentSection}
       onValueChange={(value) => {
+        if (value === currentSection) return;
+        setLoadingTab(value);
         router.push(
           value === "schedule" ? scheduleHref : "/lessons/performance",
         );
@@ -33,14 +37,22 @@ export function LessonsSectionTabs({
           value="schedule"
           className="h-14 rounded-none px-4 pb-4 text-base font-semibold sm:text-lg after:bottom-[-1px]"
         >
-          <CalendarDays className="h-5 w-5" />
+          {loadingTab === "schedule" ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <CalendarDays className="h-5 w-5" />
+          )}
           Schedule
         </TabsTrigger>
         <TabsTrigger
           value="performance"
           className="h-14 rounded-none px-4 pb-4 text-base font-semibold sm:text-lg after:bottom-[-1px]"
         >
-          <BarChart3 className="h-5 w-5" />
+          {loadingTab === "performance" ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <BarChart3 className="h-5 w-5" />
+          )}
           Performance
         </TabsTrigger>
       </TabsList>

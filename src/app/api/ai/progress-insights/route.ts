@@ -72,39 +72,6 @@ const VOCABULARY_BASE_BY_BAND: Record<EstimatedBand, number> = {
   B2: 3000,
   C1: 5500,
 };
-const FALLBACK_THEMES_BY_BAND: Record<EstimatedBand, string[]> = {
-  A0: [
-    "Survival phrases and core verbs",
-    "People, numbers, and time",
-    "Daily needs and simple requests",
-  ],
-  A1: [
-    "Daily routines and essential verbs",
-    "Home, family, and descriptions",
-    "Food, shopping, and everyday places",
-  ],
-  A2: [
-    "Travel and directions",
-    "Health, body, and appointments",
-    "Work, study, and schedules",
-  ],
-  B1: [
-    "Opinions and discussion language",
-    "News, culture, and media",
-    "Problem solving and everyday situations",
-  ],
-  B2: [
-    "Abstract topics and nuance",
-    "Professional communication",
-    "Collocations for fluent explanations",
-  ],
-  C1: [
-    "Argumentation and persuasion",
-    "Academic and professional nuance",
-    "Idioms, register, and stylistic range",
-  ],
-};
-
 const progressInsightsRequestModeSchema = z.enum([
   "full",
   "passive-vocabulary",
@@ -284,8 +251,6 @@ function unwrapProgressInsights(value: unknown) {
       "strengths",
       "focusAreas",
       "grammarPlan",
-      "vocabularyThemes",
-      "nextActions",
     ].some((key) => key in record);
 
     if (looksLikeInsights) {
@@ -314,13 +279,13 @@ function unwrapProgressInsights(value: unknown) {
 function deriveEstimatedBand(snapshot: ProgressSnapshot): EstimatedBand {
   const weightedScore = snapshot.axes.reduce((total, axis) => {
     const weight =
-      axis.key === "vocabulary"
+      axis.key === "active_vocab"
         ? 0.28
         : axis.key === "accuracy"
           ? 0.24
-          : axis.key === "breadth"
+          : axis.key === "passive_vocab"
             ? 0.18
-            : axis.key === "grammar"
+            : axis.key === "grammar_variety"
               ? 0.16
               : 0.14;
 
@@ -386,7 +351,7 @@ function buildFallbackVocabularyEstimates(
       (1.5 + snapshot.overview.avgMasteryLevel * 0.22) +
       snapshot.overview.avgScore * 1.5 +
       snapshot.overview.masteredWords * 6 +
-      snapshot.overview.grammarCoveredCount * 4 +
+      snapshot.overview.grammarMasteredCount * 4 +
       passiveEvidenceBoost * 1.25,
   );
   const passiveLow = Math.max(
@@ -406,7 +371,7 @@ function buildFallbackVocabularyEstimates(
     passiveHigh,
     Math.max(activeLow + 15, Math.round(activeLow * 1.18)),
   );
-  const passiveEvidence = `Based on ${snapshot.overview.totalWords} tracked mastery words, average mastery ${snapshot.overview.avgMasteryLevel.toFixed(1)}/5, ${snapshot.overview.avgScore}% average scores, the current ${estimatedBand} study profile, and ${snapshot.passiveSignals.uniqueItems} passive-recognition imports contributing about ${passiveEvidenceBoost} recognition-equivalent words.`;
+  const passiveEvidence = `Based on ${snapshot.overview.totalWords} tracked mastery words, average mastery ${snapshot.overview.avgMasteryLevel.toFixed(1)}/5, ${snapshot.overview.avgScore}% average scores, the current ${estimatedBand} study profile, and ${snapshot.passiveSignals.uniqueItems} passive-recognition imports contributing about ${passiveEvidenceBoost} level-aware recognition-equivalent words.`;
   const activeEvidence = `Active range is kept below passive recognition and weighted more heavily toward mastery, translation accuracy, and repeated recall. Passive-text imports do not raise the active range until the student shows recall or production evidence.`;
 
   return {
@@ -553,16 +518,16 @@ function buildFallbackFocusAreas(snapshot: ProgressSnapshot) {
     .sort((left, right) => left.score - right.score)
     .slice(0, 2)
     .map((axis) => {
-      if (axis.key === "grammar") {
-        return `Grammar needs the clearest next push: target uncovered topics and pair each one with a translation-heavy activity.`;
+      if (axis.key === "grammar_variety") {
+        return `Grammar variety needs the clearest next push: target uncovered topics and pair each one with a translation-heavy activity.`;
       }
 
-      if (axis.key === "determination") {
-        return `Consistency needs attention: even one short session each day will make retention steadier and lift the streak signal.`;
+      if (axis.key === "engagement") {
+        return `Consistency needs attention: even one short session each day will make retention steadier and lift engagement.`;
       }
 
-      if (axis.key === "breadth") {
-        return `Breadth is still limited: add a fresh cluster of words around one practical theme instead of only recycling familiar items.`;
+      if (axis.key === "passive_vocab") {
+        return `Passive vocabulary is still limited: add a fresh cluster of words around one practical theme instead of only recycling familiar items.`;
       }
 
       if (axis.key === "accuracy") {
@@ -603,26 +568,6 @@ function buildFallbackGrammarPlan(snapshot: ProgressSnapshot) {
     0,
     6,
   );
-}
-
-function getExampleWordPool(snapshot: ProgressSnapshot) {
-  return uniqueStrings(snapshot.words.map((word) => word.term)).slice(0, 12);
-}
-
-function buildFallbackVocabularyThemes(
-  snapshot: ProgressSnapshot,
-  estimatedBand: EstimatedBand,
-) {
-  const examplePool = getExampleWordPool(snapshot);
-  const reason =
-    (snapshot.axes.find((axis) => axis.key === "breadth")?.score ?? 0) < 50
-      ? "This theme expands your range into practical, high-utility territory."
-      : "This theme extends what you already know into adjacent situations.";
-  return FALLBACK_THEMES_BY_BAND[estimatedBand].map((theme, index) => ({
-    theme,
-    reason,
-    exampleWords: examplePool.slice(index, index + 3),
-  }));
 }
 
 function normalizeStringArray(value: unknown, fallback: string[], max: number) {
@@ -700,110 +645,6 @@ function normalizeGrammarPlan(value: unknown, snapshot: ProgressSnapshot) {
   ).slice(0, 6);
 }
 
-function normalizeVocabularyThemes(
-  value: unknown,
-  snapshot: ProgressSnapshot,
-  estimatedBand: EstimatedBand,
-) {
-  const record = asRecord(value);
-  const nested = pickFirstUnknown(record, [
-    "items",
-    "list",
-    "themes",
-    "recommendations",
-  ]);
-  const source = Array.isArray(value)
-    ? value
-    : Array.isArray(nested)
-      ? nested
-      : typeof value === "string"
-        ? splitTextItems(value)
-        : typeof nested === "string"
-          ? splitTextItems(nested)
-          : [];
-  const examplePool = getExampleWordPool(snapshot);
-  const normalized = source.flatMap((item, index) => {
-    if (typeof item === "string") {
-      const theme = normalizeInlineText(item);
-      return theme
-        ? [
-            {
-              theme,
-              reason:
-                "This theme is a useful next step for widening usable vocabulary.",
-              exampleWords: examplePool.slice(index, index + 3),
-            },
-          ]
-        : [];
-    }
-
-    const itemRecord = asRecord(item);
-    if (!itemRecord) {
-      return [];
-    }
-
-    const theme = pickFirstString(itemRecord, [
-      "theme",
-      "label",
-      "title",
-      "name",
-    ]);
-    if (!theme) {
-      return [];
-    }
-
-    const exampleWords = uniqueStrings(
-      normalizeTextList(
-        pickFirstUnknown(itemRecord, ["exampleWords", "examples", "words"]),
-      ),
-    ).slice(0, 5);
-
-    return [
-      {
-        theme,
-        reason:
-          pickFirstString(itemRecord, [
-            "reason",
-            "why",
-            "description",
-            "focus",
-          ]) ??
-          "This theme is a useful next step for widening usable vocabulary.",
-        exampleWords:
-          exampleWords.length > 0
-            ? exampleWords
-            : examplePool.slice(index, index + 3),
-      },
-    ];
-  });
-
-  return uniqueBy(
-    [...normalized, ...buildFallbackVocabularyThemes(snapshot, estimatedBand)],
-    (item) => item.theme,
-  ).slice(0, 6);
-}
-
-function buildFallbackNextActions(
-  snapshot: ProgressSnapshot,
-  grammarPlan: ProgressInsights["grammarPlan"],
-  vocabularyThemes: ProgressInsights["vocabularyThemes"],
-) {
-  return [
-    snapshot.overview.streakDays > 0
-      ? `Keep the streak alive with one short practice session today.`
-      : `Complete one short practice session today to start a streak.`,
-    grammarPlan[0]
-      ? `Study ${grammarPlan[0].topic} next, then follow it with one translation-focused activity.`
-      : `Do one grammar-heavy translation activity and review every correction before moving on.`,
-    vocabularyThemes[0]
-      ? `Add 8-12 words around ${vocabularyThemes[0].theme.toLowerCase()} and review them until several reach mastery 3.`
-      : `Add 8-12 new words and review them until several reach mastery 3.`,
-    snapshot.overview.avgScore < 75
-      ? `Redo one recent low-scoring attempt and compare your corrections before starting new material.`
-      : `Keep accuracy high by reviewing mistakes before you start a harder activity.`,
-  ];
-}
-
 function buildFallbackSummary(
   snapshot: ProgressSnapshot,
   estimatedBand: EstimatedBand,
@@ -823,10 +664,6 @@ function buildFallbackProgressInsights(
 ): ProgressInsights {
   const estimatedBand = deriveEstimatedBand(snapshot);
   const grammarPlan = buildFallbackGrammarPlan(snapshot);
-  const vocabularyThemes = buildFallbackVocabularyThemes(
-    snapshot,
-    estimatedBand,
-  );
   const vocabularyEstimates = buildFallbackVocabularyEstimates(
     snapshot,
     estimatedBand,
@@ -840,12 +677,8 @@ function buildFallbackProgressInsights(
     strengths: buildFallbackStrengths(snapshot),
     focusAreas: buildFallbackFocusAreas(snapshot),
     grammarPlan,
-    vocabularyThemes,
-    nextActions: buildFallbackNextActions(
-      snapshot,
-      grammarPlan,
-      vocabularyThemes,
-    ),
+    vocabularyThemes: [],
+    nextActions: [],
   });
 }
 
@@ -921,16 +754,6 @@ function normalizeProgressInsights(
     ]),
     snapshot,
   );
-  const vocabularyThemes = normalizeVocabularyThemes(
-    pickFirstUnknown(candidate, [
-      "vocabularyThemes",
-      "themes",
-      "vocabThemes",
-      "vocabularySuggestions",
-    ]),
-    snapshot,
-    estimatedBand,
-  );
   const strengths = normalizeStringArray(
     pickFirstUnknown(candidate, ["strengths", "wins", "strongPoints"]),
     buildFallbackStrengths(snapshot),
@@ -940,16 +763,6 @@ function normalizeProgressInsights(
     pickFirstUnknown(candidate, ["focusAreas", "weaknesses", "growthAreas"]),
     buildFallbackFocusAreas(snapshot),
     5,
-  );
-  const nextActions = normalizeStringArray(
-    pickFirstUnknown(candidate, [
-      "nextActions",
-      "actions",
-      "nextSteps",
-      "actionPlan",
-    ]),
-    buildFallbackNextActions(snapshot, grammarPlan, vocabularyThemes),
-    6,
   );
   const summary =
     pickFirstString(candidate, [
@@ -967,8 +780,8 @@ function normalizeProgressInsights(
     strengths,
     focusAreas,
     grammarPlan,
-    vocabularyThemes,
-    nextActions,
+    vocabularyThemes: [],
+    nextActions: [],
   });
 }
 
@@ -1044,9 +857,9 @@ Overview:
 - Total unique words: ${snapshot.overview.totalWords}
 - Mastered words: ${snapshot.overview.masteredWords}
 - Average mastery level: ${snapshot.overview.avgMasteryLevel}/5
-- Grammar topics covered: ${snapshot.overview.grammarCoveredCount}/${snapshot.overview.grammarAvailableCount}
+- Grammar topics mastered: ${snapshot.overview.grammarMasteredCount}/${snapshot.overview.grammarAvailableCount}
 - Passive-recognition imports: ${snapshot.passiveSignals.uniqueItems} items (${snapshot.passiveSignals.wordCount} words, ${snapshot.passiveSignals.phraseCount} phrases)
-- Passive-recognition equivalent words: ${snapshot.passiveSignals.equivalentWordCount} (the single-word total added to passive-vocabulary estimates)
+- Passive-recognition equivalent words: ${snapshot.passiveSignals.equivalentWordCount} (the level-adjusted recognition-weighted total added to passive-vocabulary estimates)
 
 Activity performance:
 ${activityText}
@@ -1070,9 +883,8 @@ Instructions:
 - Passive vocabulary must be greater than or equal to active vocabulary.
 - Use the full tracked word list, the mastery data, the student's CEFR setting, and quiz performance to make the estimate.
 - Treat passive-recognition imports as evidence for recognition only. They can raise passive vocabulary estimates, but they must not be treated as proof of active mastery, recall, or review readiness.
-- Equivalent words means the single-word total derived from passive evidence that is fed into passive-vocabulary estimation.
+- Equivalent words means the recognition-weighted single-word total derived from passive evidence. Library-tagged words above the student's current CEFR level count partially rather than fully.
 - Grammar plan topics must come from the remaining grammar topics list whenever that list is non-empty.
-- Vocabulary themes should reflect what the student already knows plus the next useful adjacent topics.
 - Keep recommendations encouraging, concrete, and study-oriented.
 - Output JSON only.
 
@@ -1098,14 +910,8 @@ Respond with JSON in this exact structure:
       "reason": "why next"
     }
   ],
-  "vocabularyThemes": [
-    {
-      "theme": "theme name",
-      "reason": "why this theme fits",
-      "exampleWords": ["word one", "word two"]
-    }
-  ],
-  "nextActions": ["..."]
+  "vocabularyThemes": [],
+  "nextActions": []
 }`;
 }
 

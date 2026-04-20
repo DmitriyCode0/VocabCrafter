@@ -129,6 +129,48 @@ export interface Database {
           },
         ];
       };
+      student_grammar_topic_mastery: {
+        Row: {
+          id: string;
+          student_id: string;
+          topic_key: string;
+          source: string;
+          tutor_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          topic_key: string;
+          source: string;
+          tutor_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          topic_key?: string;
+          source?: string;
+          tutor_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "student_grammar_topic_mastery_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "student_grammar_topic_mastery_tutor_id_fkey";
+            columns: ["tutor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       student_progress_reviews: {
         Row: {
           id: string;
@@ -389,6 +431,7 @@ export interface Database {
           id: string;
           student_id: string;
           imported_by: string | null;
+          library_item_id: string | null;
           term: string;
           normalized_term: string;
           definition: string | null;
@@ -405,6 +448,7 @@ export interface Database {
           id?: string;
           student_id: string;
           imported_by?: string | null;
+          library_item_id?: string | null;
           term: string;
           normalized_term: string;
           definition?: string | null;
@@ -421,6 +465,7 @@ export interface Database {
           id?: string;
           student_id?: string;
           imported_by?: string | null;
+          library_item_id?: string | null;
           term?: string;
           normalized_term?: string;
           definition?: string | null;
@@ -442,10 +487,121 @@ export interface Database {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "passive_vocabulary_evidence_library_item_id_fkey";
+            columns: ["library_item_id"];
+            isOneToOne: false;
+            referencedRelation: "passive_vocabulary_library";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "passive_vocabulary_evidence_student_id_fkey";
             columns: ["student_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      passive_vocabulary_library: {
+        Row: {
+          id: string;
+          canonical_term: string;
+          normalized_term: string;
+          item_type: "word" | "phrase";
+          cefr_level: string | null;
+          part_of_speech: string | null;
+          attributes: Json;
+          enrichment_status: "pending" | "completed" | "failed";
+          enrichment_error: string | null;
+          created_by: string | null;
+          updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          canonical_term: string;
+          normalized_term: string;
+          item_type?: "word" | "phrase";
+          cefr_level?: string | null;
+          part_of_speech?: string | null;
+          attributes?: Json;
+          enrichment_status?: "pending" | "completed" | "failed";
+          enrichment_error?: string | null;
+          created_by?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          canonical_term?: string;
+          normalized_term?: string;
+          item_type?: "word" | "phrase";
+          cefr_level?: string | null;
+          part_of_speech?: string | null;
+          attributes?: Json;
+          enrichment_status?: "pending" | "completed" | "failed";
+          enrichment_error?: string | null;
+          created_by?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "passive_vocabulary_library_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "passive_vocabulary_library_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      passive_vocabulary_library_forms: {
+        Row: {
+          id: string;
+          library_item_id: string;
+          form_term: string;
+          normalized_form: string;
+          item_type: "word" | "phrase";
+          is_canonical: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          library_item_id: string;
+          form_term: string;
+          normalized_form: string;
+          item_type?: "word" | "phrase";
+          is_canonical?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          library_item_id?: string;
+          form_term?: string;
+          normalized_form?: string;
+          item_type?: "word" | "phrase";
+          is_canonical?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "passive_vocabulary_library_forms_library_item_id_fkey";
+            columns: ["library_item_id"];
+            isOneToOne: false;
+            referencedRelation: "passive_vocabulary_library";
             referencedColumns: ["id"];
           },
         ];

@@ -123,6 +123,7 @@ export default async function ProgressPage() {
           chartData={effectiveChartData}
           cefrLevel={snapshot.profile.cefrLevel}
           grammarNotice={snapshot.grammar.betaNotice}
+          grammarTopics={snapshot.grammarTopicMastery}
         />
         <StudentProgressInsights
           hasData={hasAnyData}
@@ -203,15 +204,14 @@ export default async function ProgressPage() {
           <CardContent>
             <div className="flex items-center gap-2">
               <div className="text-2xl font-bold">
-                {snapshot.overview.grammarCoveredCount}/
+                {snapshot.overview.grammarMasteredCount}/
                 {snapshot.overview.grammarAvailableCount}
               </div>
-              <Badge variant="secondary">Beta</Badge>
             </div>
             <Progress
               value={
                 snapshot.overview.grammarAvailableCount > 0
-                  ? (snapshot.overview.grammarCoveredCount /
+                  ? (snapshot.overview.grammarMasteredCount /
                       snapshot.overview.grammarAvailableCount) *
                     100
                   : 0

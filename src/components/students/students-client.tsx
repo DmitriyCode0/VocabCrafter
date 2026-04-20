@@ -224,7 +224,7 @@ export function StudentsClient({
                   Choose a Student for Passive Vocabulary Import
                 </CardTitle>
                 <CardDescription>
-                  Jump straight to the passive-recognition import section for a
+                  Jump straight to the dedicated passive-vocabulary page for a
                   connected student.
                 </CardDescription>
               </div>
@@ -265,7 +265,7 @@ export function StudentsClient({
                       </div>
                       <Button asChild className="mt-4 w-full">
                         <Link
-                          href={`/students/${conn.student_id as string}/progress#passive-recognition`}
+                          href={`/passive-vocabulary?student=${conn.student_id as string}`}
                         >
                           Import Passive Vocabulary
                         </Link>

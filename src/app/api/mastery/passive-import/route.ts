@@ -5,6 +5,8 @@ import {
   normalizePassiveVocabularyText,
   passiveVocabularyImportSchema,
 } from "@/lib/mastery/passive-vocabulary";
+import { resolvePassiveVocabularyLibraryItems } from "@/lib/mastery/passive-vocabulary-library";
+import { normalizeLearningLanguage } from "@/lib/languages";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
 import { createClient } from "@/lib/supabase/server";
 
@@ -126,15 +128,71 @@ export async function POST(request: Request) {
       );
     }
 
+    const { data: studentProfile, error: studentProfileError } = await supabaseAdmin
+      .from("profiles")
+      .select("preferred_language")
+      .eq("id", studentId)
+      .single();
+
+    if (studentProfileError || !studentProfile) {
+      return NextResponse.json(
+        { error: "Failed to load the student's language profile" },
+        { status: 500 },
+      );
+    }
+
+    const libraryItems = await resolvePassiveVocabularyLibraryItems({
+      items,
+      targetLanguage: normalizeLearningLanguage(
+        studentProfile.preferred_language,
+      ),
+      actorUserId: user.id,
+      adminClient: supabaseAdmin,
+    });
+    const canonicalItems = new Map<
+      string,
+      {
+        term: string;
+        definition: string | null;
+        normalizedTerm: string;
+        itemType: "word" | "phrase";
+        libraryItemId: string | null;
+      }
+    >();
+
+    for (const libraryItem of libraryItems) {
+      const key = getPassiveVocabularyCompositeKey(
+        libraryItem.canonicalNormalizedTerm,
+        libraryItem.itemType,
+      );
+      const existingCanonicalItem = canonicalItems.get(key);
+
+      canonicalItems.set(key, {
+        term: libraryItem.canonicalTerm,
+        definition: existingCanonicalItem?.definition ??
+          items.find(
+            (item) =>
+              item.normalizedTerm === libraryItem.requestedNormalizedTerm &&
+              item.itemType === libraryItem.itemType,
+          )?.definition ??
+          null,
+        normalizedTerm: libraryItem.canonicalNormalizedTerm,
+        itemType: libraryItem.itemType,
+        libraryItemId: libraryItem.libraryItemId,
+      });
+    }
+
+    const canonicalItemList = Array.from(canonicalItems.values());
+
     const { data: existingRows, error: existingError } = await supabaseAdmin
       .from("passive_vocabulary_evidence")
       .select(
-        "student_id, normalized_term, item_type, definition, source_label, import_count",
+        "student_id, normalized_term, item_type, definition, source_label, import_count, library_item_id",
       )
       .eq("student_id", studentId)
       .in(
         "normalized_term",
-        items.map((item) => item.normalizedTerm),
+        canonicalItemList.map((item) => item.normalizedTerm),
       );
 
     if (existingError) {
@@ -153,7 +211,7 @@ export async function POST(request: Request) {
     );
     const nowIso = new Date().toISOString();
 
-    const upsertRows = items.map((item) => {
+    const upsertRows = canonicalItemList.map((item) => {
       const existing = existingMap.get(
         getPassiveVocabularyCompositeKey(item.normalizedTerm, item.itemType),
       );
@@ -163,6 +221,7 @@ export async function POST(request: Request) {
         imported_by: user.id,
         term: item.term,
         normalized_term: item.normalizedTerm,
+        library_item_id: item.libraryItemId ?? existing?.library_item_id ?? null,
         definition: item.definition ?? existing?.definition ?? null,
         item_type: item.itemType,
         source_type: sourceType,
@@ -187,7 +246,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const createdCount = items.filter(
+    const createdCount = canonicalItemList.filter(
       (item) =>
         !existingMap.has(
           getPassiveVocabularyCompositeKey(item.normalizedTerm, item.itemType),
@@ -195,9 +254,9 @@ export async function POST(request: Request) {
     ).length;
 
     return NextResponse.json({
-      importedCount: items.length,
+      importedCount: canonicalItemList.length,
       createdCount,
-      updatedCount: items.length - createdCount,
+      updatedCount: canonicalItemList.length - createdCount,
       studentId,
       sourceType,
     });

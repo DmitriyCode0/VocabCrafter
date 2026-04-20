@@ -9,6 +9,7 @@ export type AIUsageFeature =
   | "parse_input"
   | "evaluate"
   | "progress_insights"
+  | "passive_vocabulary_enrichment"
   | "tts";
 
 export type AIUsageRequestType = "text" | "tts";

@@ -1,20 +1,24 @@
 "use server";
 
+import { ALL_CEFR_LEVELS, getAllowedCefrLevels } from "@/lib/languages";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { Role } from "@/types/roles";
+import type { CEFRLevel } from "@/types/quiz";
 
 const VALID_ROLES: Role[] = ["student", "tutor", "superadmin"];
 
-export async function changeUserRole(userId: string, newRole: Role) {
-  // Auth check — only superadmin can call this
+async function requireSuperadmin() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+
+  if (!user) {
+    redirect("/login");
+  }
 
   const { data: caller } = await supabase
     .from("profiles")
@@ -25,6 +29,10 @@ export async function changeUserRole(userId: string, newRole: Role) {
   if (caller?.role !== "superadmin") {
     throw new Error("Forbidden");
   }
+}
+
+export async function changeUserRole(userId: string, newRole: Role) {
+  await requireSuperadmin();
 
   if (!VALID_ROLES.includes(newRole)) {
     throw new Error("Invalid role");
@@ -38,6 +46,51 @@ export async function changeUserRole(userId: string, newRole: Role) {
     .eq("id", userId);
 
   if (error) throw new Error(error.message);
+
+  revalidatePath("/users");
+}
+
+export async function changeUserCefrLevel(
+  userId: string,
+  newCefrLevel: CEFRLevel,
+) {
+  await requireSuperadmin();
+
+  if (!ALL_CEFR_LEVELS.includes(newCefrLevel)) {
+    throw new Error("Invalid CEFR level");
+  }
+
+  const admin = createAdminClient();
+  const { data: targetProfile, error: targetProfileError } = await admin
+    .from("profiles")
+    .select("role, preferred_language")
+    .eq("id", userId)
+    .single();
+
+  if (targetProfileError || !targetProfile) {
+    throw new Error(targetProfileError?.message ?? "Student not found");
+  }
+
+  if (targetProfile.role !== "student") {
+    throw new Error("Only student CEFR levels can be changed");
+  }
+
+  const allowedCefrLevels = getAllowedCefrLevels(
+    targetProfile.preferred_language,
+  );
+
+  if (!allowedCefrLevels.includes(newCefrLevel)) {
+    throw new Error("Invalid CEFR level for the student's language");
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ cefr_level: newCefrLevel })
+    .eq("id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 
   revalidatePath("/users");
 }

@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import {
   LayoutDashboard,
   BookOpen,
+  BookMarked,
   CalendarDays,
   GraduationCap,
   Users,
@@ -132,6 +133,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/history",
     icon: History,
     roles: ["student", "tutor"],
+  },
+  {
+    label: "Passive Vocabulary",
+    href: "/passive-vocabulary",
+    icon: BookMarked,
+    roles: ["student", "tutor", "superadmin"],
   },
   // Admin items
   {

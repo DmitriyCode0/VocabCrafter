@@ -79,8 +79,8 @@ export function QuizWordPicker({ onSelect }: QuizWordPickerProps) {
       <div className="py-8 text-center">
         <FileText className="mx-auto h-8 w-8 text-muted-foreground/50" />
         <p className="mt-2 text-sm text-muted-foreground">
-          No quizzes created yet. Create your first quiz to reuse its
-          vocabulary.
+          No quizzes available yet. Create a quiz or complete an assigned quiz
+          to reuse its vocabulary.
         </p>
       </div>
     );
@@ -89,7 +89,8 @@ export function QuizWordPicker({ onSelect }: QuizWordPickerProps) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Select a quiz to reuse its vocabulary terms.
+        Select one of your quizzes or a passed assignment quiz to reuse its
+        vocabulary terms.
       </p>
       <div className="grid gap-3">
         {quizzes.map((quiz) => (

@@ -3,7 +3,9 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeLearningLanguage } from "@/lib/languages";
 import { normalizePassiveVocabularyText } from "@/lib/mastery/passive-vocabulary";
+import { resolvePassiveVocabularyLibraryItems } from "@/lib/mastery/passive-vocabulary-library";
 
 const updatePassiveEvidenceSchema = z.object({
   term: z.string().trim().min(1).max(200),
@@ -123,11 +125,38 @@ export async function PATCH(
   }
 
   const normalizedTerm = normalizePassiveVocabularyText(parsed.data.term);
+  const { data: studentProfile, error: studentProfileError } = await access.supabaseAdmin
+    .from("profiles")
+    .select("preferred_language")
+    .eq("id", access.evidenceRow.student_id)
+    .single();
+
+  if (studentProfileError || !studentProfile) {
+    return NextResponse.json(
+      { error: "Failed to load the student's language profile" },
+      { status: 500 },
+    );
+  }
+
+  const [libraryItem] = await resolvePassiveVocabularyLibraryItems({
+    items: [
+      {
+        term: parsed.data.term.trim().replace(/\s+/g, " "),
+        normalizedTerm,
+        itemType: parsed.data.itemType,
+      },
+    ],
+    targetLanguage: normalizeLearningLanguage(studentProfile.preferred_language),
+    actorUserId: access.user.id,
+    adminClient: access.supabaseAdmin,
+  });
+
   const { data: updatedRow, error } = await access.supabaseAdmin
     .from("passive_vocabulary_evidence")
     .update({
-      term: parsed.data.term.trim().replace(/\s+/g, " "),
-      normalized_term: normalizedTerm,
+      term: libraryItem.canonicalTerm,
+      normalized_term: libraryItem.canonicalNormalizedTerm,
+      library_item_id: libraryItem.libraryItemId,
       definition: parsed.data.definition?.trim() || null,
       item_type: parsed.data.itemType,
       source_type: parsed.data.sourceType,

@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, RotateCcw, Save, Sparkles } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Sparkles, X } from "lucide-react";
 import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,9 +32,18 @@ import {
   type ProgressInsights,
   type TutorProgressOverride,
 } from "@/lib/progress/contracts";
-import type { StudentProgressAxis } from "@/lib/progress/profile-metrics";
+import type {
+  GrammarTopicMasteryItem,
+  StudentProgressAxis,
+} from "@/lib/progress/profile-metrics";
+import { getTopicsForLevel } from "@/lib/grammar/topics";
 
 const ESTIMATED_BANDS = ["A0", "A1", "A2", "B1", "B2", "C1"] as const;
+
+interface GrammarPlanItem {
+  topic: string;
+  reason: string;
+}
 
 interface InsightDraft {
   estimatedBand: ProgressInsights["estimatedBand"];
@@ -48,9 +56,7 @@ interface InsightDraft {
   activeRationale: string;
   strengths: string;
   focusAreas: string;
-  grammarPlan: string;
-  vocabularyThemes: string;
-  nextActions: string;
+  grammarPlanItems: GrammarPlanItem[];
 }
 
 const EMPTY_INSIGHT_DRAFT: InsightDraft = {
@@ -64,14 +70,8 @@ const EMPTY_INSIGHT_DRAFT: InsightDraft = {
   activeRationale: "",
   strengths: "",
   focusAreas: "",
-  grammarPlan: "",
-  vocabularyThemes: "",
-  nextActions: "",
+  grammarPlanItems: [],
 };
-
-function formatEstimateRange(low: number, high: number) {
-  return `${low.toLocaleString()}-${high.toLocaleString()}`;
-}
 
 function formatStringList(values: string[]) {
   return values.join("\n");
@@ -83,62 +83,6 @@ function parseStringList(text: string, max: number) {
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, max);
-}
-
-function formatGrammarPlan(insights: ProgressInsights["grammarPlan"]) {
-  return insights.map((item) => `${item.topic} :: ${item.reason}`).join("\n");
-}
-
-function parseGrammarPlan(text: string) {
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [topic, ...reasonParts] = line.split("::");
-      return {
-        topic: topic?.trim() ?? "",
-        reason: reasonParts.join("::").trim(),
-      };
-    })
-    .filter((item) => item.topic && item.reason)
-    .slice(0, 6);
-}
-
-function formatVocabularyThemes(
-  insights: ProgressInsights["vocabularyThemes"],
-) {
-  return insights
-    .map(
-      (item) =>
-        `${item.theme} :: ${item.reason} :: ${item.exampleWords.join(", ")}`,
-    )
-    .join("\n");
-}
-
-function parseVocabularyThemes(text: string) {
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [theme, reason, examples] = line
-        .split("::")
-        .map((item) => item.trim());
-      return {
-        theme,
-        reason,
-        exampleWords: examples
-          ? examples
-              .split(",")
-              .map((word) => word.trim())
-              .filter(Boolean)
-              .slice(0, 5)
-          : [],
-      };
-    })
-    .filter((item) => item.theme && item.reason)
-    .slice(0, 6);
 }
 
 function createDraftFromInsights(insights: ProgressInsights): InsightDraft {
@@ -153,27 +97,28 @@ function createDraftFromInsights(insights: ProgressInsights): InsightDraft {
     activeRationale: insights.activeVocabulary.rationale,
     strengths: formatStringList(insights.strengths),
     focusAreas: formatStringList(insights.focusAreas),
-    grammarPlan: formatGrammarPlan(insights.grammarPlan),
-    vocabularyThemes: formatVocabularyThemes(insights.vocabularyThemes),
-    nextActions: formatStringList(insights.nextActions),
+    grammarPlanItems: insights.grammarPlan.map((item) => ({
+      topic: item.topic,
+      reason: item.reason,
+    })),
   };
 }
 
 function hasInsightDraftContent(draft: InsightDraft) {
-  return [
-    draft.summary,
-    draft.passiveLow,
-    draft.passiveHigh,
-    draft.passiveRationale,
-    draft.activeLow,
-    draft.activeHigh,
-    draft.activeRationale,
-    draft.strengths,
-    draft.focusAreas,
-    draft.grammarPlan,
-    draft.vocabularyThemes,
-    draft.nextActions,
-  ].some((value) => value.trim().length > 0);
+  return (
+    [
+      draft.summary,
+      draft.passiveLow,
+      draft.passiveHigh,
+      draft.passiveRationale,
+      draft.activeLow,
+      draft.activeHigh,
+      draft.activeRationale,
+      draft.strengths,
+      draft.focusAreas,
+    ].some((value) => value.trim().length > 0) ||
+    draft.grammarPlanItems.length > 0
+  );
 }
 
 function buildInsightsFromDraft(draft: InsightDraft): ProgressInsights | null {
@@ -196,9 +141,11 @@ function buildInsightsFromDraft(draft: InsightDraft): ProgressInsights | null {
     },
     strengths: parseStringList(draft.strengths, 5),
     focusAreas: parseStringList(draft.focusAreas, 5),
-    grammarPlan: parseGrammarPlan(draft.grammarPlan),
-    vocabularyThemes: parseVocabularyThemes(draft.vocabularyThemes),
-    nextActions: parseStringList(draft.nextActions, 6),
+    grammarPlan: draft.grammarPlanItems
+      .filter((item) => item.topic.trim() && item.reason.trim())
+      .slice(0, 6),
+    vocabularyThemes: [],
+    nextActions: [],
   });
 }
 
@@ -215,143 +162,80 @@ function getValidationMessage(error: unknown) {
     : "Please fix the tutor coaching fields before saving.";
 }
 
-function TutorInsightsPreview({
-  insights,
+function GrammarPlanTopicSelector({
+  value,
+  onChange,
+  availableTopics,
 }: {
-  insights: ProgressInsights | null;
+  value: string;
+  onChange: (topic: string) => void;
+  availableTopics: Array<{ level: string; topics: string[] }>;
 }) {
-  if (!insights) {
-    return (
-      <div className="rounded-2xl border border-dashed bg-muted/30 p-5 text-sm text-muted-foreground">
-        No tutor coaching override yet. Generate suggestions for this student,
-        edit them, and save the version you want to keep.
-      </div>
-    );
-  }
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const query = value.toLowerCase();
+    if (!query) return availableTopics;
+
+    return availableTopics
+      .map((group) => ({
+        level: group.level,
+        topics: group.topics.filter((t) => t.toLowerCase().includes(query)),
+      }))
+      .filter((group) => group.topics.length > 0);
+  }, [availableTopics, value]);
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border bg-background/80 p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Estimated Band
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <p className="text-3xl font-semibold">{insights.estimatedBand}</p>
-            <Badge variant="outline">Tutor View</Badge>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border bg-background/80 p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Passive Vocabulary
-          </p>
-          <p className="mt-2 text-3xl font-semibold">
-            {formatEstimateRange(
-              insights.passiveVocabulary.low,
-              insights.passiveVocabulary.high,
-            )}
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {insights.passiveVocabulary.rationale}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border bg-background/80 p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Active Vocabulary
-          </p>
-          <p className="mt-2 text-3xl font-semibold">
-            {formatEstimateRange(
-              insights.activeVocabulary.low,
-              insights.activeVocabulary.high,
-            )}
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {insights.activeVocabulary.rationale}
-          </p>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border bg-background/80 p-4 shadow-sm">
-        <p className="text-sm leading-relaxed text-foreground/90">
-          {insights.summary}
-        </p>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border bg-background/80 p-4 shadow-sm">
-          <p className="text-sm font-semibold">Strengths</p>
-          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            {insights.strengths.map((item) => (
-              <li key={item} className="rounded-lg bg-muted/50 px-3 py-2">
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="rounded-2xl border bg-background/80 p-4 shadow-sm">
-          <p className="text-sm font-semibold">Focus Areas</p>
-          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            {insights.focusAreas.map((item) => (
-              <li key={item} className="rounded-lg bg-muted/50 px-3 py-2">
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="rounded-2xl border bg-background/80 p-4 shadow-sm">
-          <p className="text-sm font-semibold">Grammar Plan</p>
-          <div className="mt-3 space-y-3">
-            {insights.grammarPlan.map((item) => (
-              <div key={item.topic} className="rounded-xl bg-muted/50 p-3">
-                <p className="text-sm font-medium">{item.topic}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {item.reason}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border bg-background/80 p-4 shadow-sm">
-          <p className="text-sm font-semibold">Vocabulary Themes</p>
-          <div className="mt-3 space-y-3">
-            {insights.vocabularyThemes.map((item) => (
-              <div key={item.theme} className="rounded-xl bg-muted/50 p-3">
-                <p className="text-sm font-medium">{item.theme}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {item.reason}
-                </p>
-                {item.exampleWords.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {item.exampleWords.map((word) => (
-                      <Badge key={word} variant="secondary">
-                        {word}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border bg-background/80 p-4 shadow-sm">
-        <p className="text-sm font-semibold">Next Actions</p>
-        <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-          {insights.nextActions.map((item) => (
-            <li key={item} className="rounded-lg bg-muted/50 px-3 py-2">
-              {item}
-            </li>
+    <div ref={containerRef} className="relative">
+      <Input
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          if (!isOpen) setIsOpen(true);
+        }}
+        onFocus={() => setIsOpen(true)}
+        placeholder="Search or type a grammar topic..."
+        className="h-8 text-sm"
+      />
+      {isOpen && filtered.length > 0 && (
+        <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-md border bg-popover p-1 shadow-md">
+          {filtered.map((group) => (
+            <div key={group.level}>
+              <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {group.level}
+              </p>
+              {group.topics.map((topic) => (
+                <button
+                  key={topic}
+                  type="button"
+                  className="w-full rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent"
+                  onClick={() => {
+                    onChange(topic);
+                    setIsOpen(false);
+                  }}
+                >
+                  {topic}
+                </button>
+              ))}
+            </div>
           ))}
-        </ul>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -364,6 +248,7 @@ interface TutorStudentProgressWorkspaceProps {
   grammarNotice: string;
   hasData: boolean;
   initialOverride?: TutorProgressOverride;
+  grammarTopicMastery: GrammarTopicMasteryItem[];
 }
 
 export function TutorStudentProgressWorkspace({
@@ -374,6 +259,7 @@ export function TutorStudentProgressWorkspace({
   grammarNotice,
   hasData,
   initialOverride = EMPTY_TUTOR_PROGRESS_OVERRIDE,
+  grammarTopicMastery: initialGrammarTopics,
 }: TutorStudentProgressWorkspaceProps) {
   const router = useRouter();
   const [axes, setAxes] = useState(() =>
@@ -384,21 +270,55 @@ export function TutorStudentProgressWorkspace({
       ? createDraftFromInsights(initialOverride.insightsOverride)
       : EMPTY_INSIGHT_DRAFT,
   );
-  const [lastValidInsights, setLastValidInsights] =
-    useState<ProgressInsights | null>(initialOverride.insightsOverride);
+  const [grammarTopics, setGrammarTopics] =
+    useState<GrammarTopicMasteryItem[]>(initialGrammarTopics);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRegeneratingPassive, setIsRegeneratingPassive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
+  const savedAxesRef = useRef(
+    JSON.stringify(
+      applyTutorAxisOverrides(baseAxes, initialOverride.axisOverrides).map(
+        (a) => ({
+          key: a.key,
+          score: a.score,
+          value: a.value,
+          helper: a.helper,
+        }),
+      ),
+    ),
+  );
+  const savedDraftRef = useRef(
+    JSON.stringify(
+      initialOverride.insightsOverride
+        ? createDraftFromInsights(initialOverride.insightsOverride)
+        : EMPTY_INSIGHT_DRAFT,
+    ),
+  );
+
   const chartData = useMemo(() => buildChartDataFromAxes(axes), [axes]);
-  const previewInsights = useMemo(() => {
-    try {
-      return buildInsightsFromDraft(draft);
-    } catch {
-      return lastValidInsights;
-    }
-  }, [draft, lastValidInsights]);
+  const availableGrammarTopics = useMemo(
+    () => getTopicsForLevel(cefrLevel),
+    [cefrLevel],
+  );
+
+  const isDirty = useMemo(() => {
+    const currentAxes = JSON.stringify(
+      axes.map((a) => ({
+        key: a.key,
+        score: a.score,
+        value: a.value,
+        helper: a.helper,
+      })),
+    );
+    const currentDraft = JSON.stringify(draft);
+
+    return (
+      currentAxes !== savedAxesRef.current ||
+      currentDraft !== savedDraftRef.current
+    );
+  }, [axes, draft]);
 
   function updateAxis(
     key: StudentProgressAxis["key"],
@@ -407,9 +327,7 @@ export function TutorStudentProgressWorkspace({
   ) {
     setAxes((currentAxes) =>
       currentAxes.map((axis) => {
-        if (axis.key !== key) {
-          return axis;
-        }
+        if (axis.key !== key) return axis;
 
         if (field === "score") {
           const nextScore = Math.max(
@@ -419,10 +337,7 @@ export function TutorStudentProgressWorkspace({
           return { ...axis, score: nextScore };
         }
 
-        return {
-          ...axis,
-          [field]: value,
-        };
+        return { ...axis, [field]: value };
       }),
     );
   }
@@ -496,7 +411,6 @@ export function TutorStudentProgressWorkspace({
 
       const nextInsights = progressInsightsSchema.parse(data);
       setDraft(createDraftFromInsights(nextInsights));
-      setLastValidInsights(nextInsights);
       await persistTutorOverride(nextInsights);
 
       toast.success(`Generated fresh coaching suggestions for ${studentName}.`);
@@ -518,13 +432,26 @@ export function TutorStudentProgressWorkspace({
     try {
       const insightsOverride = buildInsightsFromDraft(draft);
       const savedOverride = await persistTutorOverride(insightsOverride);
-      setAxes(applyTutorAxisOverrides(baseAxes, savedOverride.axisOverrides));
-      setLastValidInsights(savedOverride.insightsOverride);
-      setDraft(
-        savedOverride.insightsOverride
-          ? createDraftFromInsights(savedOverride.insightsOverride)
-          : EMPTY_INSIGHT_DRAFT,
+      const nextAxes = applyTutorAxisOverrides(
+        baseAxes,
+        savedOverride.axisOverrides,
       );
+      setAxes(nextAxes);
+      const nextDraft = savedOverride.insightsOverride
+        ? createDraftFromInsights(savedOverride.insightsOverride)
+        : EMPTY_INSIGHT_DRAFT;
+      setDraft(nextDraft);
+
+      savedAxesRef.current = JSON.stringify(
+        nextAxes.map((a) => ({
+          key: a.key,
+          score: a.score,
+          value: a.value,
+          helper: a.helper,
+        })),
+      );
+      savedDraftRef.current = JSON.stringify(nextDraft);
+
       toast.success("Tutor progress customizations saved.");
       router.refresh();
     } catch (error) {
@@ -593,10 +520,6 @@ export function TutorStudentProgressWorkspace({
       const nextPassiveVocabulary = vocabularyEstimateSchema.parse(
         data && "passiveVocabulary" in data ? data.passiveVocabulary : data,
       );
-      const nextInsights = progressInsightsSchema.parse({
-        ...currentInsights,
-        passiveVocabulary: nextPassiveVocabulary,
-      });
 
       setDraft((currentDraft) => ({
         ...currentDraft,
@@ -604,8 +527,13 @@ export function TutorStudentProgressWorkspace({
         passiveHigh: String(nextPassiveVocabulary.high),
         passiveRationale: nextPassiveVocabulary.rationale,
       }));
-      setLastValidInsights(nextInsights);
+
+      const nextInsights = progressInsightsSchema.parse({
+        ...currentInsights,
+        passiveVocabulary: nextPassiveVocabulary,
+      });
       await persistTutorOverride(nextInsights);
+
       toast.success(`Passive vocabulary refreshed for ${studentName}.`);
       router.refresh();
     } catch (error) {
@@ -619,513 +547,472 @@ export function TutorStudentProgressWorkspace({
     }
   }
 
-  async function handleResetOverrides() {
+  async function handleUpdateFromBase() {
     setIsResetting(true);
 
     try {
-      const response = await fetch(
-        `/api/tutor/students/${studentId}/progress`,
-        {
-          method: "DELETE",
-        },
-      );
-
-      const data = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error || "Failed to reset tutor progress overrides",
-        );
-      }
-
       setAxes(baseAxes);
-      setDraft(EMPTY_INSIGHT_DRAFT);
-      setLastValidInsights(null);
-      toast.success(
-        "Tutor overrides cleared. The page is back to computed values.",
+      setGrammarTopics(initialGrammarTopics);
+
+      savedAxesRef.current = JSON.stringify(
+        baseAxes.map((a) => ({
+          key: a.key,
+          score: a.score,
+          value: a.value,
+          helper: a.helper,
+        })),
       );
-      router.refresh();
+
+      toast.success(
+        "Radar metrics reset to system-computed values. Save to persist.",
+      );
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to reset tutor progress overrides",
+          : "Failed to reset to base values",
       );
     } finally {
       setIsResetting(false);
     }
   }
 
+  async function handleGrammarTopicToggle(
+    topicKey: string,
+    checked: boolean,
+  ) {
+    setGrammarTopics((current) =>
+      current.map((topic) => {
+        if (topic.topicKey !== topicKey) return topic;
+        if (topic.source === "system") return topic;
+
+        return {
+          ...topic,
+          mastered: checked,
+          source: checked ? ("tutor" as const) : null,
+        };
+      }),
+    );
+
+    try {
+      const response = await fetch(
+        `/api/tutor/students/${studentId}/grammar-topics`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topicKey, marked: checked }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to toggle grammar topic");
+      }
+
+      const updatedTopics = grammarTopics.map((topic) => {
+        if (topic.topicKey !== topicKey) return topic;
+        if (topic.source === "system") return topic;
+
+        return {
+          ...topic,
+          mastered: checked,
+          source: checked ? ("tutor" as const) : null,
+        };
+      });
+      const masteredCount = updatedTopics.filter((t) => t.mastered).length;
+      const grammarScore =
+        updatedTopics.length > 0
+          ? Math.max(
+              0,
+              Math.min(
+                100,
+                Math.round((masteredCount / updatedTopics.length) * 100),
+              ),
+            )
+          : 0;
+
+      setAxes((currentAxes) =>
+        currentAxes.map((axis) =>
+          axis.key === "grammar_variety"
+            ? {
+                ...axis,
+                score: grammarScore,
+                value: `${masteredCount}/${updatedTopics.length} topics mastered`,
+              }
+            : axis,
+        ),
+      );
+    } catch {
+      setGrammarTopics(initialGrammarTopics);
+      toast.error("Failed to toggle grammar topic.");
+    }
+  }
+
+  function updateGrammarPlanItem(
+    index: number,
+    field: "topic" | "reason",
+    value: string,
+  ) {
+    setDraft((current) => ({
+      ...current,
+      grammarPlanItems: current.grammarPlanItems.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item,
+      ),
+    }));
+  }
+
+  function addGrammarPlanItem() {
+    if (draft.grammarPlanItems.length >= 6) return;
+
+    setDraft((current) => ({
+      ...current,
+      grammarPlanItems: [
+        ...current.grammarPlanItems,
+        { topic: "", reason: "" },
+      ],
+    }));
+  }
+
+  function removeGrammarPlanItem(index: number) {
+    setDraft((current) => ({
+      ...current,
+      grammarPlanItems: current.grammarPlanItems.filter((_, i) => i !== index),
+    }));
+  }
+
+  const anyBusy =
+    isGenerating || isRegeneratingPassive || isSaving || isResetting;
+
   return (
-    <div className="space-y-6">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <StudentSkillRadar
-          axes={axes}
-          chartData={chartData}
-          cefrLevel={cefrLevel}
-          grammarNotice={grammarNotice}
-        />
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+      <StudentSkillRadar
+        axes={axes}
+        chartData={chartData}
+        cefrLevel={cefrLevel}
+        grammarNotice={grammarNotice}
+        editable
+        isDirty={isDirty}
+        isSaving={isSaving}
+        isResetting={isResetting}
+        onAxisChange={updateAxis}
+        onSave={handleSaveOverrides}
+        onUpdateFromBase={handleUpdateFromBase}
+        grammarTopics={grammarTopics}
+        onGrammarTopicToggle={handleGrammarTopicToggle}
+      />
 
-        <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-accent/20">
-          <CardHeader className="gap-3">
-            <div className="flex flex-col gap-3">
-              <div className="space-y-2">
-                <CardTitle className="text-xl">Tutor Coaching Layer</CardTitle>
-                <CardDescription>
-                  Generate and curate the coaching view for {studentName}. These
-                  edits sit on top of the raw computed profile and do not change
-                  the student&apos;s recorded attempts, streak, or vocabulary
-                  history.
-                </CardDescription>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  onClick={handleGenerateInsights}
-                  disabled={
-                    isGenerating ||
-                    isRegeneratingPassive ||
-                    isSaving ||
-                    isResetting ||
-                    !hasData
-                  }
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Generate Student Suggestions
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleRegeneratePassiveVocabulary}
-                  disabled={
-                    isGenerating ||
-                    isRegeneratingPassive ||
-                    isSaving ||
-                    isResetting ||
-                    !hasData
-                  }
-                >
-                  {isRegeneratingPassive ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Recalculating...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Regenerate Passive Vocabulary
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleSaveOverrides}
-                  disabled={
-                    isGenerating ||
-                    isRegeneratingPassive ||
-                    isSaving ||
-                    isResetting
-                  }
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Tutor Version
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleResetOverrides}
-                  disabled={
-                    isGenerating ||
-                    isRegeneratingPassive ||
-                    isSaving ||
-                    isResetting
-                  }
-                >
-                  {isResetting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Resetting...
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      Reset Overrides
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            {!hasData && !previewInsights && (
-              <div className="rounded-2xl border border-dashed bg-muted/30 p-5 text-sm text-muted-foreground">
-                This student does not have enough recorded progress yet. You can
-                still shape the radar metrics manually, but AI suggestions need
-                real quiz or vocabulary data first.
-              </div>
-            )}
-
-            <TutorInsightsPreview insights={previewInsights} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Edit Radar Metrics</CardTitle>
+      <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-accent/20">
+        <CardHeader className="gap-3">
+          <div className="space-y-2">
+            <CardTitle className="text-xl">Tutor Coaching Layer</CardTitle>
             <CardDescription>
-              Adjust the five radar axes for your tutor-facing interpretation.
-              These saved tutor edits sit on top of the computed student data.
+              Generate and curate the coaching view for {studentName}. These
+              edits sit on top of the raw computed profile.
             </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {axes.map((axis) => (
-              <div
-                key={axis.key}
-                className="rounded-2xl border bg-muted/20 p-4"
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGenerateInsights}
+              disabled={anyBusy || !hasData}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Generate Suggestions
+                </>
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleRegeneratePassiveVocabulary}
+              disabled={anyBusy || !hasData}
+            >
+              {isRegeneratingPassive ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Recalculating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Regen Passive Vocab
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-5">
+          {!hasData && !hasInsightDraftContent(draft) && (
+            <div className="rounded-2xl border border-dashed bg-muted/30 p-5 text-sm text-muted-foreground">
+              This student does not have enough recorded progress yet. You can
+              still shape the radar metrics manually, but AI suggestions need
+              real quiz or vocabulary data first.
+            </div>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">
+                Estimated band
+              </label>
+              <Select
+                value={draft.estimatedBand}
+                onValueChange={(value) =>
+                  setDraft((current) => ({
+                    ...current,
+                    estimatedBand: value as InsightDraft["estimatedBand"],
+                  }))
+                }
               >
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold">{axis.label}</p>
-                    {axis.beta && <Badge variant="secondary">Beta</Badge>}
-                  </div>
-                  <Badge variant="outline">{axis.score}/100</Badge>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)]">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Score
-                    </label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={axis.score}
-                      onChange={(event) =>
-                        updateAxis(axis.key, "score", event.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Value line
-                    </label>
-                    <Input
-                      value={axis.value}
-                      onChange={(event) =>
-                        updateAxis(axis.key, "value", event.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3 space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Helper text
-                  </label>
-                  <Textarea
-                    value={axis.helper}
-                    onChange={(event) =>
-                      updateAxis(axis.key, "helper", event.target.value)
-                    }
-                    className="min-h-20"
-                  />
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Edit AI Coaching</CardTitle>
-            <CardDescription>
-              Generate a draft, then rewrite it into the coaching version you
-              want to keep for this student.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Estimated band
-                </label>
-                <Select
-                  value={draft.estimatedBand}
-                  onValueChange={(value) =>
-                    setDraft((current) => ({
-                      ...current,
-                      estimatedBand: value as InsightDraft["estimatedBand"],
-                    }))
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ESTIMATED_BANDS.map((band) => (
-                      <SelectItem key={band} value={band}>
-                        {band}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Summary
-                </label>
-                <Textarea
-                  value={draft.summary}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      summary: event.target.value,
-                    }))
-                  }
-                  className="min-h-24"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border bg-muted/20 p-4">
-                <p className="text-sm font-semibold">Passive Vocabulary</p>
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Low
-                    </label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={draft.passiveLow}
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          passiveLow: event.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      High
-                    </label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={draft.passiveHigh}
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          passiveHigh: event.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="mt-3 space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Rationale
-                  </label>
-                  <Textarea
-                    value={draft.passiveRationale}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        passiveRationale: event.target.value,
-                      }))
-                    }
-                    className="min-h-20"
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl border bg-muted/20 p-4">
-                <p className="text-sm font-semibold">Active Vocabulary</p>
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Low
-                    </label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={draft.activeLow}
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          activeLow: event.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      High
-                    </label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={draft.activeHigh}
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          activeHigh: event.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="mt-3 space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Rationale
-                  </label>
-                  <Textarea
-                    value={draft.activeRationale}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        activeRationale: event.target.value,
-                      }))
-                    }
-                    className="min-h-20"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Strengths
-                </label>
-                <Textarea
-                  value={draft.strengths}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      strengths: event.target.value,
-                    }))
-                  }
-                  className="min-h-28"
-                />
-                <p className="text-xs text-muted-foreground">
-                  One item per line, up to 5.
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Focus Areas
-                </label>
-                <Textarea
-                  value={draft.focusAreas}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      focusAreas: event.target.value,
-                    }))
-                  }
-                  className="min-h-28"
-                />
-                <p className="text-xs text-muted-foreground">
-                  One item per line, up to 5.
-                </p>
-              </div>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ESTIMATED_BANDS.map((band) => (
+                    <SelectItem key={band} value={band}>
+                      {band}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">
-                Grammar Plan
+                Summary
               </label>
               <Textarea
-                value={draft.grammarPlan}
+                value={draft.summary}
                 onChange={(event) =>
                   setDraft((current) => ({
                     ...current,
-                    grammarPlan: event.target.value,
-                  }))
-                }
-                className="min-h-28"
-              />
-              <p className="text-xs text-muted-foreground">
-                Use one line per item in the format topic :: reason.
-              </p>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">
-                Vocabulary Themes
-              </label>
-              <Textarea
-                value={draft.vocabularyThemes}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    vocabularyThemes: event.target.value,
-                  }))
-                }
-                className="min-h-28"
-              />
-              <p className="text-xs text-muted-foreground">
-                Use one line per item in the format theme :: reason :: word 1,
-                word 2.
-              </p>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">
-                Next Actions
-              </label>
-              <Textarea
-                value={draft.nextActions}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    nextActions: event.target.value,
+                    summary: event.target.value,
                   }))
                 }
                 className="min-h-24"
               />
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <p className="text-sm font-semibold">Passive Vocabulary</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Low
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={draft.passiveLow}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        passiveLow: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    High
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={draft.passiveHigh}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        passiveHigh: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="mt-3 space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Rationale
+                </label>
+                <Textarea
+                  value={draft.passiveRationale}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      passiveRationale: event.target.value,
+                    }))
+                  }
+                  className="min-h-20"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <p className="text-sm font-semibold">Active Vocabulary</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Low
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={draft.activeLow}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        activeLow: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    High
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={draft.activeHigh}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        activeHigh: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="mt-3 space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Rationale
+                </label>
+                <Textarea
+                  value={draft.activeRationale}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      activeRationale: event.target.value,
+                    }))
+                  }
+                  className="min-h-20"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">
+                Strengths
+              </label>
+              <Textarea
+                value={draft.strengths}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    strengths: event.target.value,
+                  }))
+                }
+                className="min-h-28"
+              />
               <p className="text-xs text-muted-foreground">
-                One item per line, up to 6.
+                One item per line, up to 5.
               </p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">
+                Focus Areas
+              </label>
+              <Textarea
+                value={draft.focusAreas}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    focusAreas: event.target.value,
+                  }))
+                }
+                className="min-h-28"
+              />
+              <p className="text-xs text-muted-foreground">
+                One item per line, up to 5.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground">
+                Grammar Plan
+              </label>
+              {draft.grammarPlanItems.length < 6 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={addGrammarPlanItem}
+                  className="h-7 text-xs"
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  Add topic
+                </Button>
+              )}
+            </div>
+
+            {draft.grammarPlanItems.length === 0 && (
+              <div className="rounded-xl border border-dashed bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground">
+                No grammar plan items yet. Add one or generate suggestions.
+              </div>
+            )}
+
+            {draft.grammarPlanItems.map((item, index) => (
+              <div
+                key={index}
+                className="flex gap-2 rounded-xl border bg-muted/20 p-3"
+              >
+                <div className="flex-1 space-y-2">
+                  <GrammarPlanTopicSelector
+                    value={item.topic}
+                    onChange={(topic) =>
+                      updateGrammarPlanItem(index, "topic", topic)
+                    }
+                    availableTopics={availableGrammarTopics}
+                  />
+                  <Input
+                    value={item.reason}
+                    onChange={(e) =>
+                      updateGrammarPlanItem(index, "reason", e.target.value)
+                    }
+                    placeholder="Reason for this topic..."
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeGrammarPlanItem(index)}
+                  className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

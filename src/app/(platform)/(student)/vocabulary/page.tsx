@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
@@ -9,16 +10,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
-import { DeletePassiveEvidenceButton } from "@/components/mastery/delete-passive-evidence-button";
-import { EditPassiveEvidenceDialog } from "@/components/mastery/edit-passive-evidence-dialog";
 import { ImportVocabularyCard } from "@/components/mastery/import-vocabulary-card";
-import { ImportPassiveVocabularyCard } from "@/components/mastery/import-passive-vocabulary-card";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
-import { BookOpen, Clock, Star, TrendingUp, Zap } from "lucide-react";
-import { formatAppDate } from "@/lib/dates";
+import { BookMarked, BookOpen, Clock, Star, TrendingUp, Zap } from "lucide-react";
 import {
   normalizeLearningLanguage,
   normalizeSourceLanguage,
@@ -31,7 +29,6 @@ import {
 export const dynamic = "force-dynamic";
 
 const VOCABULARY_PAGE_SIZE = 24;
-const PASSIVE_EVIDENCE_PAGE_SIZE = 18;
 
 const LEVEL_LABELS = [
   "New",
@@ -77,17 +74,12 @@ interface PassiveEvidenceRow {
 export default async function VocabularyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; passivePage?: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
   const supabase = await createClient();
   const resolvedSearchParams = await searchParams;
   const currentPage = getCurrentPage(resolvedSearchParams.page);
-  const passivePage = getCurrentPage(resolvedSearchParams.passivePage);
   const { from, to } = getPaginationRange(currentPage, VOCABULARY_PAGE_SIZE);
-  const passiveRange = getPaginationRange(
-    passivePage,
-    PASSIVE_EVIDENCE_PAGE_SIZE,
-  );
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -114,7 +106,6 @@ export default async function VocabularyPage({
     wordsResult,
     passiveEvidenceCountResult,
     passiveEvidenceSummaryRowsResult,
-    passiveEvidenceRowsResult,
   ] = await Promise.all([
     supabaseAdmin
       .from("word_mastery")
@@ -152,14 +143,6 @@ export default async function VocabularyPage({
         "term, definition, item_type, source_type, source_label, import_count, last_imported_at",
       )
       .eq("student_id", user.id),
-    supabaseAdmin
-      .from("passive_vocabulary_evidence")
-      .select(
-        "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at",
-      )
-      .eq("student_id", user.id)
-      .order("last_imported_at", { ascending: false })
-      .range(passiveRange.from, passiveRange.to),
   ]);
 
   const totalWords = totalWordsResult.count ?? 0;
@@ -167,8 +150,6 @@ export default async function VocabularyPage({
   const dueForReview = dueForReviewResult.count ?? 0;
   const levelRows = levelRowsResult.data ?? [];
   const visibleWords = (wordsResult.data ?? []) as WordMasteryRow[];
-  const passiveEvidenceItems = (passiveEvidenceRowsResult.data ??
-    []) as PassiveEvidenceRow[];
   const passiveEvidenceTotal = passiveEvidenceCountResult.count ?? 0;
   const passiveEvidenceSummary = summarizePassiveVocabularyEvidence(
     ((passiveEvidenceSummaryRowsResult.data ?? []) as PassiveEvidenceRow[]).map(
@@ -276,10 +257,23 @@ export default async function VocabularyPage({
         sourceLanguage={sourceLanguage}
       />
 
-      <ImportPassiveVocabularyCard
-        targetLanguage={targetLanguage}
-        cardId="passive-recognition"
-      />
+      <Card id="passive-recognition">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BookMarked className="h-5 w-5 text-primary" />
+            Passive Vocabulary
+          </CardTitle>
+          <CardDescription>
+            Import passive-recognition words and review recent passive evidence
+            on the dedicated passive-vocabulary page.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild variant="outline">
+            <Link href="/passive-vocabulary">Open Passive Vocabulary</Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -309,7 +303,7 @@ export default async function VocabularyPage({
               {passiveEvidenceSummary.equivalentWordCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              single-word total used in passive-vocabulary estimates
+              level-adjusted recognition-weighted total used in passive-vocabulary estimates
             </p>
           </CardContent>
         </Card>
@@ -346,83 +340,6 @@ export default async function VocabularyPage({
               </Badge>
             ))}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">
-            Passive Recognition Evidence
-          </CardTitle>
-          <CardDescription>
-            Imported words and phrases from texts or curated lists. These stay
-            out of review and can be edited or removed later.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {passiveEvidenceItems.length === 0 ? (
-            <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-              No passive evidence imported yet.
-            </div>
-          ) : (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {passiveEvidenceItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col gap-3 rounded-lg border p-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          {item.term}
-                        </p>
-                        {item.definition && (
-                          <p className="truncate text-xs text-muted-foreground">
-                            {item.definition}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <EditPassiveEvidenceDialog evidence={item} />
-                        <DeletePassiveEvidenceButton
-                          evidenceId={item.id}
-                          term={item.term}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="outline">
-                        {item.item_type === "phrase" ? "Phrase" : "Word"}
-                      </Badge>
-                      <Badge variant="outline">
-                        {item.source_type.replace("_", " ")}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-1 text-xs text-muted-foreground">
-                      {item.source_label && <p>Source: {item.source_label}</p>}
-                      <p>
-                        Imported {item.import_count} time
-                        {item.import_count !== 1 ? "s" : ""}
-                      </p>
-                      <p>Last updated {formatAppDate(item.last_imported_at)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <PagePagination
-                pathname="/vocabulary"
-                currentPage={passivePage}
-                pageSize={PASSIVE_EVIDENCE_PAGE_SIZE}
-                totalItems={passiveEvidenceTotal}
-                searchParams={resolvedSearchParams}
-                pageParam="passivePage"
-              />
-            </>
-          )}
         </CardContent>
       </Card>
 

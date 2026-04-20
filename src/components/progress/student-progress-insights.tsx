@@ -348,14 +348,14 @@ export function StudentProgressInsights({
               </div>
             </motion.div>
 
-            <motion.div
-              variants={{
-                hidden: { opacity: 0, y: 8 },
-                visible: { opacity: 1, y: 0 },
-              }}
-              className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
-            >
-              <div className="rounded-2xl border bg-background/80 p-4 shadow-sm">
+            {insights.grammarPlan.length > 0 && (
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, y: 8 },
+                  visible: { opacity: 1, y: 0 },
+                }}
+                className="rounded-2xl border bg-background/80 p-4 shadow-sm"
+              >
                 <p className="text-sm font-semibold">Grammar Plan</p>
                 <div className="mt-3 space-y-3">
                   {insights.grammarPlan.map((item) => (
@@ -370,51 +370,8 @@ export function StudentProgressInsights({
                     </div>
                   ))}
                 </div>
-              </div>
-
-              <div className="rounded-2xl border bg-background/80 p-4 shadow-sm">
-                <p className="text-sm font-semibold">Vocabulary Themes</p>
-                <div className="mt-3 space-y-3">
-                  {insights.vocabularyThemes.map((item) => (
-                    <div
-                      key={item.theme}
-                      className="rounded-xl bg-muted/50 p-3"
-                    >
-                      <p className="text-sm font-medium">{item.theme}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {item.reason}
-                      </p>
-                      {item.exampleWords.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {item.exampleWords.map((word) => (
-                            <Badge key={word} variant="secondary">
-                              {word}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              variants={{
-                hidden: { opacity: 0, y: 8 },
-                visible: { opacity: 1, y: 0 },
-              }}
-              className="rounded-2xl border bg-background/80 p-4 shadow-sm"
-            >
-              <p className="text-sm font-semibold">Next Actions</p>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                {insights.nextActions.map((item) => (
-                  <li key={item} className="rounded-lg bg-muted/50 px-3 py-2">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
+              </motion.div>
+            )}
           </motion.div>
         )}
       </CardContent>

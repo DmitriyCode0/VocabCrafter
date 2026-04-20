@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowLeft,
+  BookMarked,
   BookOpen,
   Flame,
   Star,
@@ -11,9 +12,6 @@ import {
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { DeletePassiveEvidenceButton } from "@/components/mastery/delete-passive-evidence-button";
-import { EditPassiveEvidenceDialog } from "@/components/mastery/edit-passive-evidence-dialog";
-import { ImportPassiveVocabularyCard } from "@/components/mastery/import-passive-vocabulary-card";
 import { TutorProgressReviewForm } from "@/components/progress/tutor-progress-review-form";
 import { TutorStudentProgressWorkspace } from "@/components/progress/tutor-student-progress-workspace";
 import { Badge } from "@/components/ui/badge";
@@ -33,17 +31,6 @@ import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
 
 export const dynamic = "force-dynamic";
-
-interface PassiveEvidenceRow {
-  id: string;
-  term: string;
-  definition: string | null;
-  item_type: "word" | "phrase";
-  source_type: "full_text" | "manual_list" | "curated_list";
-  source_label: string | null;
-  import_count: number;
-  last_imported_at: string;
-}
 
 interface StudentProgressReviewRow {
   id: string;
@@ -104,7 +91,6 @@ export default async function TutorStudentProgressPage({
   const [
     studentProfileResult,
     overrideResult,
-    passiveEvidenceResult,
     progressReviewsResult,
   ] = await Promise.all([
     supabaseAdmin
@@ -118,14 +104,6 @@ export default async function TutorStudentProgressPage({
       .eq("tutor_id", user.id)
       .eq("student_id", studentId)
       .maybeSingle(),
-    supabaseAdmin
-      .from("passive_vocabulary_evidence")
-      .select(
-        "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at",
-      )
-      .eq("student_id", studentId)
-      .order("last_imported_at", { ascending: false })
-      .range(0, 11),
     supabaseAdmin
       .from("student_progress_reviews")
       .select(
@@ -145,8 +123,6 @@ export default async function TutorStudentProgressPage({
     snapshot.overview.totalWords > 0 ||
     snapshot.passiveSignals.uniqueItems > 0;
   const initialOverride = parseTutorProgressOverride(overrideResult.data);
-  const passiveEvidenceItems = (passiveEvidenceResult.data ??
-    []) as PassiveEvidenceRow[];
   const progressReviews = (progressReviewsResult.data ??
     []) as StudentProgressReviewRow[];
   const studentName =
@@ -205,6 +181,7 @@ export default async function TutorStudentProgressPage({
         grammarNotice={snapshot.grammar.betaNotice}
         hasData={hasAnyRawData}
         initialOverride={initialOverride}
+        grammarTopicMastery={snapshot.grammarTopicMastery}
       />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
@@ -352,15 +329,14 @@ export default async function TutorStudentProgressPage({
             <CardContent>
               <div className="flex items-center gap-2">
                 <div className="text-2xl font-bold">
-                  {snapshot.overview.grammarCoveredCount}/
+                  {snapshot.overview.grammarMasteredCount}/
                   {snapshot.overview.grammarAvailableCount}
                 </div>
-                <Badge variant="secondary">Beta</Badge>
               </div>
               <Progress
                 value={
                   snapshot.overview.grammarAvailableCount > 0
-                    ? (snapshot.overview.grammarCoveredCount /
+                    ? (snapshot.overview.grammarMasteredCount /
                         snapshot.overview.grammarAvailableCount) *
                       100
                     : 0
@@ -402,7 +378,7 @@ export default async function TutorStudentProgressPage({
               {snapshot.passiveSignals.equivalentWordCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              single-word total used in passive-vocabulary estimates
+              level-adjusted recognition-weighted total used in passive-vocabulary estimates
             </p>
           </CardContent>
         </Card>
@@ -419,73 +395,39 @@ export default async function TutorStudentProgressPage({
         </Card>
       </div>
 
-      <ImportPassiveVocabularyCard
-        targetLanguage={snapshot.profile.targetLanguage}
-        studentId={studentId}
-        cardId="passive-recognition"
-      />
-
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent Passive Evidence</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BookMarked className="h-5 w-5 text-primary" />
+            Passive Vocabulary
+          </CardTitle>
           <CardDescription>
-            Review the latest passive-recognition imports for {studentName}.
-            These items stay out of review and can be edited or removed here.
+            Import passive-recognition evidence and review the latest library-tagged passive words on the dedicated passive-vocabulary page for {studentName}.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {passiveEvidenceItems.length === 0 ? (
-            <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-              No passive evidence imported for this student yet.
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">
+                  {snapshot.passiveSignals.uniqueItems} passive items
+                </Badge>
+                <Badge variant="outline">
+                  {snapshot.passiveSignals.equivalentWordCount} equivalent words
+                </Badge>
+                <Badge variant="secondary">Target {snapshot.profile.cefrLevel}</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {PASSIVE_EQUIVALENT_WORDS_EXPLANATION}
+              </p>
             </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {passiveEvidenceItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex flex-col gap-3 rounded-lg border p-3"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {item.term}
-                      </p>
-                      {item.definition && (
-                        <p className="truncate text-xs text-muted-foreground">
-                          {item.definition}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <EditPassiveEvidenceDialog evidence={item} />
-                      <DeletePassiveEvidenceButton
-                        evidenceId={item.id}
-                        term={item.term}
-                      />
-                    </div>
-                  </div>
 
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="outline">
-                      {item.item_type === "phrase" ? "Phrase" : "Word"}
-                    </Badge>
-                    <Badge variant="outline">
-                      {item.source_type.replace("_", " ")}
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    {item.source_label && <p>Source: {item.source_label}</p>}
-                    <p>
-                      Imported {item.import_count} time
-                      {item.import_count !== 1 ? "s" : ""}
-                    </p>
-                    <p>Last updated {formatAppDate(item.last_imported_at)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            <Button asChild variant="outline" id="passive-recognition">
+              <Link href={`/passive-vocabulary?student=${studentId}`}>
+                Open Passive Vocabulary
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

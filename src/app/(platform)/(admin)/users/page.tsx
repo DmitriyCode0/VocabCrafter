@@ -11,6 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Users, Shield, GraduationCap, BookOpen } from "lucide-react";
+import { getAllowedCefrLevels } from "@/lib/languages";
+import { CefrLevelSelector } from "./cefr-level-selector";
 import { RoleSelector } from "./role-selector";
 import { formatAppDate } from "@/lib/dates";
 
@@ -175,9 +177,13 @@ export default async function UsersPage() {
                       </TableCell>
                       <TableCell>
                         {profile.role === "student" ? (
-                          <Badge variant="outline" className="text-xs">
-                            {profile.cefr_level ?? "—"}
-                          </Badge>
+                          <CefrLevelSelector
+                            userId={profile.id}
+                            currentCefrLevel={profile.cefr_level}
+                            allowedLevels={getAllowedCefrLevels(
+                              profile.preferred_language,
+                            )}
+                          />
                         ) : (
                           <span className="text-muted-foreground text-sm">
                             —

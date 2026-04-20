@@ -2,11 +2,11 @@ import { z } from "zod";
 import type { StudentProgressAxis } from "@/lib/progress/profile-metrics";
 
 export const progressAxisKeySchema = z.enum([
-  "vocabulary",
-  "grammar",
-  "determination",
+  "active_vocab",
+  "grammar_variety",
+  "engagement",
   "accuracy",
-  "breadth",
+  "passive_vocab",
 ]);
 
 export const estimatedBandSchema = z.enum(["A0", "A1", "A2", "B1", "B2", "C1"]);

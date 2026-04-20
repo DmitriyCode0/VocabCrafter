@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { ChevronDown, Check, Loader2, RotateCcw, Save } from "lucide-react";
 import { motion } from "motion/react";
 import {
   PolarAngleAxis,
@@ -9,6 +11,7 @@ import {
   RadarChart,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,13 +19,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import type { StudentProgressAxis } from "@/lib/progress/profile-metrics";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import type {
+  GrammarTopicMasteryItem,
+  StudentProgressAxis,
+} from "@/lib/progress/profile-metrics";
 import { cn } from "@/lib/utils";
 
 const chartConfig = {
@@ -44,6 +53,110 @@ function getScoreTone(score: number) {
   return "text-rose-700 dark:text-rose-300";
 }
 
+interface GrammarTopicsDropdownProps {
+  topics: GrammarTopicMasteryItem[];
+  editable?: boolean;
+  onToggle?: (topicKey: string, checked: boolean) => void;
+}
+
+function GrammarTopicsDropdown({
+  topics,
+  editable,
+  onToggle,
+}: GrammarTopicsDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const masteredCount = topics.filter((t) => t.mastered).length;
+
+  // Group topics by level
+  const topicsByLevel = new Map<string, GrammarTopicMasteryItem[]>();
+  for (const topic of topics) {
+    const group = topicsByLevel.get(topic.level) ?? [];
+    group.push(topic);
+    topicsByLevel.set(topic.level, group);
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center gap-1.5 rounded-lg bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+      >
+        <ChevronDown
+          className={cn(
+            "h-3.5 w-3.5 transition-transform",
+            isOpen && "rotate-180",
+          )}
+        />
+        {masteredCount}/{topics.length} topics mastered
+      </button>
+
+      {isOpen && (
+        <div className="mt-2 max-h-64 space-y-3 overflow-y-auto rounded-lg border bg-background/90 p-3">
+          {Array.from(topicsByLevel.entries()).map(([level, levelTopics]) => (
+            <div key={level}>
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {level}
+              </p>
+              <div className="space-y-1">
+                {levelTopics.map((topic) => (
+                  <div
+                    key={topic.topicKey}
+                    className="flex items-center gap-2 rounded-md px-2 py-1"
+                  >
+                    {editable ? (
+                      <Checkbox
+                        checked={topic.mastered}
+                        onCheckedChange={(checked) =>
+                          onToggle?.(topic.topicKey, Boolean(checked))
+                        }
+                        disabled={topic.source === "system"}
+                        className="h-3.5 w-3.5"
+                      />
+                    ) : (
+                      <div className="flex h-3.5 w-3.5 items-center justify-center">
+                        {topic.mastered && (
+                          <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        )}
+                      </div>
+                    )}
+                    <span
+                      className={cn(
+                        "text-xs",
+                        topic.mastered
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {topic.label}
+                    </span>
+                    {topic.source === "system" && topic.mastered && (
+                      <Badge
+                        variant="outline"
+                        className="ml-auto h-4 px-1 text-[9px]"
+                      >
+                        auto
+                      </Badge>
+                    )}
+                    {topic.source === "tutor" && topic.mastered && (
+                      <Badge
+                        variant="secondary"
+                        className="ml-auto h-4 px-1 text-[9px]"
+                      >
+                        tutor
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface StudentSkillRadarProps {
   axes: StudentProgressAxis[];
   chartData: Array<{
@@ -53,6 +166,19 @@ interface StudentSkillRadarProps {
   }>;
   cefrLevel: string;
   grammarNotice: string;
+  editable?: boolean;
+  isDirty?: boolean;
+  isSaving?: boolean;
+  isResetting?: boolean;
+  onAxisChange?: (
+    key: StudentProgressAxis["key"],
+    field: "score" | "value" | "helper",
+    value: string,
+  ) => void;
+  onSave?: () => void;
+  onUpdateFromBase?: () => void;
+  grammarTopics?: GrammarTopicMasteryItem[];
+  onGrammarTopicToggle?: (topicKey: string, checked: boolean) => void;
 }
 
 export function StudentSkillRadar({
@@ -60,6 +186,15 @@ export function StudentSkillRadar({
   chartData,
   cefrLevel,
   grammarNotice,
+  editable,
+  isDirty,
+  isSaving,
+  isResetting,
+  onAxisChange,
+  onSave,
+  onUpdateFromBase,
+  grammarTopics,
+  onGrammarTopicToggle,
 }: StudentSkillRadarProps) {
   return (
     <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-secondary/20">
@@ -68,17 +203,48 @@ export function StudentSkillRadar({
           <div className="space-y-2">
             <CardTitle className="text-xl">Learning Profile</CardTitle>
             <CardDescription>
-              A five-axis view of your current learning experience. Grammar is
-              visible, but still marked as beta until it gets dedicated mastery
-              tracking.
+              A five-axis view of your current learning experience.
             </CardDescription>
           </div>
-          <Badge
-            variant="outline"
-            className="w-fit border-primary/30 bg-primary/5 text-primary"
-          >
-            Profile level target {cefrLevel}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {editable && (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={onSave}
+                  disabled={!isDirty || isSaving || isResetting}
+                >
+                  {isSaving ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Save
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={onUpdateFromBase}
+                  disabled={isSaving || isResetting}
+                >
+                  {isResetting ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Update from Base
+                </Button>
+              </>
+            )}
+            <Badge
+              variant="outline"
+              className="w-fit border-primary/30 bg-primary/5 text-primary"
+            >
+              {cefrLevel}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
 
@@ -172,22 +338,69 @@ export function StudentSkillRadar({
                     </Badge>
                   )}
                 </div>
-                <p
-                  className={cn(
-                    "text-sm font-semibold",
-                    getScoreTone(axis.score),
-                  )}
-                >
-                  {axis.score}/100
-                </p>
+                {editable ? (
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={axis.score}
+                      onChange={(event) =>
+                        onAxisChange?.(axis.key, "score", event.target.value)
+                      }
+                      className="h-7 w-16 text-right text-sm font-semibold"
+                    />
+                    <span className="text-sm text-muted-foreground">/100</span>
+                  </div>
+                ) : (
+                  <p
+                    className={cn(
+                      "text-sm font-semibold",
+                      getScoreTone(axis.score),
+                    )}
+                  >
+                    {axis.score}/100
+                  </p>
+                )}
               </div>
 
-              <p className="mt-2 text-sm font-medium text-foreground/90">
-                {axis.value}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {axis.helper}
-              </p>
+              {editable ? (
+                <div className="mt-2 space-y-2">
+                  <Input
+                    value={axis.value}
+                    onChange={(event) =>
+                      onAxisChange?.(axis.key, "value", event.target.value)
+                    }
+                    placeholder="Value line"
+                    className="h-8 text-sm"
+                  />
+                  <Textarea
+                    value={axis.helper}
+                    onChange={(event) =>
+                      onAxisChange?.(axis.key, "helper", event.target.value)
+                    }
+                    placeholder="Helper text"
+                    className="min-h-14 text-xs"
+                  />
+                </div>
+              ) : (
+                <>
+                  <p className="mt-2 text-sm font-medium text-foreground/90">
+                    {axis.value}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {axis.helper}
+                  </p>
+                </>
+              )}
+
+              {axis.key === "grammar_variety" && grammarTopics && (
+                <GrammarTopicsDropdown
+                  topics={grammarTopics}
+                  editable={editable}
+                  onToggle={onGrammarTopicToggle}
+                />
+              )}
 
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                 <motion.div

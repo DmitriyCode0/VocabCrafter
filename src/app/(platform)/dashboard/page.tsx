@@ -194,7 +194,7 @@ async function StudentDashboard({
             </CardHeader>
             <CardFooter className="mt-auto justify-center">
               <Button asChild variant="outline" className="w-full">
-                <Link href="/vocabulary#passive-recognition">
+                <Link href="/passive-vocabulary">
                   Add Passive Recognition
                 </Link>
               </Button>
@@ -327,8 +327,8 @@ async function TutorDashboard({
   const isQuizOver = quizPercentage >= 100;
   const passiveImportHref =
     connectedStudentIds.length === 1
-      ? `/students/${connectedStudentIds[0]}/progress#passive-recognition`
-      : "/students?intent=passive-recognition";
+      ? `/passive-vocabulary?student=${connectedStudentIds[0]}`
+      : "/passive-vocabulary";
   const passiveImportDescription =
     connectedStudentIds.length === 0
       ? "Connect a student first, then import text they already understand."
