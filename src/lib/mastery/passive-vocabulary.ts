@@ -40,8 +40,10 @@ export type PassiveVocabularyLibraryCefrLevel =
   (typeof PASSIVE_VOCABULARY_CEFR_LEVELS)[number];
 export type PassiveVocabularyPartOfSpeech =
   (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number];
-export interface PassiveVocabularyLibraryAttributes
-  extends Record<string, Json | undefined> {
+export interface PassiveVocabularyLibraryAttributes extends Record<
+  string,
+  Json | undefined
+> {
   ukrainianTranslation?: string | null;
 }
 
@@ -81,8 +83,8 @@ export function getPassiveVocabularyUkrainianTranslation(
   attributes?: PassiveVocabularyLibraryAttributes | null,
 ) {
   return (
-    normalizePassiveVocabularyLibraryAttributes(attributes).ukrainianTranslation ??
-    null
+    normalizePassiveVocabularyLibraryAttributes(attributes)
+      .ukrainianTranslation ?? null
   );
 }
 
@@ -90,10 +92,10 @@ export function withPassiveVocabularyUkrainianTranslation(
   attributes: PassiveVocabularyLibraryAttributes | null | undefined,
   ukrainianTranslation?: string | null,
 ) {
-  const nextAttributes = normalizePassiveVocabularyLibraryAttributes(attributes);
-  const normalizedTranslation = normalizePassiveVocabularyAttributeText(
-    ukrainianTranslation,
-  );
+  const nextAttributes =
+    normalizePassiveVocabularyLibraryAttributes(attributes);
+  const normalizedTranslation =
+    normalizePassiveVocabularyAttributeText(ukrainianTranslation);
 
   if (normalizedTranslation) {
     nextAttributes.ukrainianTranslation = normalizedTranslation;
@@ -107,9 +109,8 @@ export function withPassiveVocabularyUkrainianTranslation(
 export function getPassiveVocabularyCustomAttributes(
   attributes?: PassiveVocabularyLibraryAttributes | null,
 ) {
-  const customAttributes = normalizePassiveVocabularyLibraryAttributes(
-    attributes,
-  );
+  const customAttributes =
+    normalizePassiveVocabularyLibraryAttributes(attributes);
   delete customAttributes.ukrainianTranslation;
 
   return customAttributes;
@@ -126,8 +127,12 @@ export function formatPassiveVocabularyPartOfSpeech(value?: string | null) {
     .join(" ");
 }
 
-export function inferPassiveVocabularyItemType(value: string): PassiveVocabularyItemType {
-  return normalizePassiveVocabularyText(value).includes(" ") ? "phrase" : "word";
+export function inferPassiveVocabularyItemType(
+  value: string,
+): PassiveVocabularyItemType {
+  return normalizePassiveVocabularyText(value).includes(" ")
+    ? "phrase"
+    : "word";
 }
 
 export const passiveVocabularyImportItemSchema = z.object({

@@ -55,18 +55,24 @@ export function EditPassiveLibraryDialog({
   const [canonicalTerm, setCanonicalTerm] = useState(item.canonical_term);
   const [cefrLevel, setCefrLevel] = useState(item.cefr_level ?? "unknown");
   const [partOfSpeech, setPartOfSpeech] = useState(
-    item.item_type === "phrase" ? "phrase" : item.part_of_speech ?? "unknown",
+    item.item_type === "phrase" ? "phrase" : (item.part_of_speech ?? "unknown"),
   );
   const [ukrainianTranslation, setUkrainianTranslation] = useState(
     getPassiveVocabularyUkrainianTranslation(item.attributes) ?? "",
   );
   const [attributesJson, setAttributesJson] = useState(
-    JSON.stringify(getPassiveVocabularyCustomAttributes(item.attributes), null, 2),
+    JSON.stringify(
+      getPassiveVocabularyCustomAttributes(item.attributes),
+      null,
+      2,
+    ),
   );
   const availablePartsOfSpeech =
     item.item_type === "phrase"
       ? (["phrase"] as const)
-      : PASSIVE_VOCABULARY_PARTS_OF_SPEECH.filter((value) => value !== "phrase");
+      : PASSIVE_VOCABULARY_PARTS_OF_SPEECH.filter(
+          (value) => value !== "phrase",
+        );
 
   useEffect(() => {
     if (!open) {
@@ -76,13 +82,19 @@ export function EditPassiveLibraryDialog({
     setCanonicalTerm(item.canonical_term);
     setCefrLevel(item.cefr_level ?? "unknown");
     setPartOfSpeech(
-      item.item_type === "phrase" ? "phrase" : item.part_of_speech ?? "unknown",
+      item.item_type === "phrase"
+        ? "phrase"
+        : (item.part_of_speech ?? "unknown"),
     );
     setUkrainianTranslation(
       getPassiveVocabularyUkrainianTranslation(item.attributes) ?? "",
     );
     setAttributesJson(
-      JSON.stringify(getPassiveVocabularyCustomAttributes(item.attributes), null, 2),
+      JSON.stringify(
+        getPassiveVocabularyCustomAttributes(item.attributes),
+        null,
+        2,
+      ),
     );
   }, [item, open]);
 
@@ -115,9 +127,9 @@ export function EditPassiveLibraryDialog({
         }),
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to update passive library item");

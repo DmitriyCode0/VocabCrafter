@@ -1,12 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  BookMarked,
-  BookOpen,
-  Shield,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { BookMarked, BookOpen, Shield, TrendingUp, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ImportPassiveVocabularyCard } from "@/components/mastery/import-passive-vocabulary-card";
@@ -92,7 +86,9 @@ function buildStudentLabel(student: PassiveVocabularyStudentOption) {
 }
 
 function countAboveTargetLevels(
-  cefrCounts: ReturnType<typeof summarizePassiveVocabularyEvidence>["cefrCounts"],
+  cefrCounts: ReturnType<
+    typeof summarizePassiveVocabularyEvidence
+  >["cefrCounts"],
   targetLevel: CEFRLevel,
 ) {
   const targetIndex = CEFR_LEVELS.indexOf(targetLevel);
@@ -137,9 +133,13 @@ async function fetchTutorStudentOptions(
       ];
     })
     .sort((left, right) =>
-      buildStudentLabel(left).localeCompare(buildStudentLabel(right), undefined, {
-        sensitivity: "base",
-      }),
+      buildStudentLabel(left).localeCompare(
+        buildStudentLabel(right),
+        undefined,
+        {
+          sensitivity: "base",
+        },
+      ),
     );
 }
 
@@ -164,39 +164,45 @@ async function loadPassiveVocabularyWorkspace(
 ) {
   const supabaseAdmin = createAdminClient();
   const evidenceRange = getPaginationRange(evidencePage, EVIDENCE_PAGE_SIZE);
-  const [studentProfileResult, evidenceCountResult, summaryRowsResult, evidenceRowsResult] =
-    await Promise.all([
-      supabaseAdmin
-        .from("profiles")
-        .select("full_name, email, preferred_language, cefr_level")
-        .eq("id", studentId)
-        .single(),
-      supabaseAdmin
-        .from("passive_vocabulary_evidence")
-        .select("id", { count: "exact", head: true })
-        .eq("student_id", studentId),
-      supabaseAdmin
-        .from("passive_vocabulary_evidence")
-        .select(
-          "term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(cefr_level, part_of_speech)",
-        )
-        .eq("student_id", studentId),
-      supabaseAdmin
-        .from("passive_vocabulary_evidence")
-        .select(
-          "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(cefr_level, part_of_speech)",
-        )
-        .eq("student_id", studentId)
-        .order("last_imported_at", { ascending: false })
-        .range(evidenceRange.from, evidenceRange.to),
-    ]);
+  const [
+    studentProfileResult,
+    evidenceCountResult,
+    summaryRowsResult,
+    evidenceRowsResult,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("profiles")
+      .select("full_name, email, preferred_language, cefr_level")
+      .eq("id", studentId)
+      .single(),
+    supabaseAdmin
+      .from("passive_vocabulary_evidence")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", studentId),
+    supabaseAdmin
+      .from("passive_vocabulary_evidence")
+      .select(
+        "term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(cefr_level, part_of_speech)",
+      )
+      .eq("student_id", studentId),
+    supabaseAdmin
+      .from("passive_vocabulary_evidence")
+      .select(
+        "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(cefr_level, part_of_speech)",
+      )
+      .eq("student_id", studentId)
+      .order("last_imported_at", { ascending: false })
+      .range(evidenceRange.from, evidenceRange.to),
+  ]);
 
   if (studentProfileResult.error || !studentProfileResult.data) {
     return null;
   }
 
   const cefrLevel = normalizeCefrLevel(studentProfileResult.data.cefr_level);
-  const mapSummaryRow = (row: PassiveEvidenceQueryRow): PassiveVocabularyEvidenceRow => ({
+  const mapSummaryRow = (
+    row: PassiveEvidenceQueryRow,
+  ): PassiveVocabularyEvidenceRow => ({
     term: row.term,
     definition: row.definition,
     item_type: row.item_type,
@@ -214,10 +220,14 @@ async function loadPassiveVocabularyWorkspace(
         | null) ?? null,
   });
   const summary = summarizePassiveVocabularyEvidence(
-    ((summaryRowsResult.data ?? []) as PassiveEvidenceQueryRow[]).map(mapSummaryRow),
+    ((summaryRowsResult.data ?? []) as PassiveEvidenceQueryRow[]).map(
+      mapSummaryRow,
+    ),
     cefrLevel,
   );
-  const evidenceItems = ((evidenceRowsResult.data ?? []) as PassiveEvidenceQueryRow[]).map(
+  const evidenceItems = (
+    (evidenceRowsResult.data ?? []) as PassiveEvidenceQueryRow[]
+  ).map(
     (row): PassiveEvidenceListItem => ({
       id: row.id,
       term: row.term,
@@ -266,7 +276,10 @@ function resolveSelectedStudentId(
   students: PassiveVocabularyStudentOption[],
   fallbackStudentId: string | null,
 ) {
-  if (requestedStudentId && students.some((student) => student.id === requestedStudentId)) {
+  if (
+    requestedStudentId &&
+    students.some((student) => student.id === requestedStudentId)
+  ) {
     return requestedStudentId;
   }
 
@@ -331,7 +344,12 @@ export default async function PassiveVocabularyPage({
     : null;
 
   const supabaseAdmin = createAdminClient();
-  const [libraryCountResult, completedLibraryCountResult, needsReviewLibraryCountResult, libraryRowsResult] =
+  const [
+    libraryCountResult,
+    completedLibraryCountResult,
+    needsReviewLibraryCountResult,
+    libraryRowsResult,
+  ] =
     role === "superadmin"
       ? await Promise.all([
           supabaseAdmin
@@ -358,7 +376,9 @@ export default async function PassiveVocabularyPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Passive Vocabulary</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Passive Vocabulary
+        </h1>
         <p className="text-muted-foreground">{getHeaderDescription(role)}</p>
       </div>
 
@@ -367,7 +387,8 @@ export default async function PassiveVocabularyPage({
           <CardHeader>
             <CardTitle className="text-base">Choose Student</CardTitle>
             <CardDescription>
-              Tutors and admins can switch between students the same way they do on the history page.
+              Tutors and admins can switch between students the same way they do
+              on the history page.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -390,8 +411,15 @@ export default async function PassiveVocabularyPage({
                 {!workspace && (
                   <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                     {studentOptions.slice(0, 12).map((student) => (
-                      <Button key={student.id} asChild variant="outline" className="justify-start">
-                        <Link href={`/passive-vocabulary?student=${student.id}`}>
+                      <Button
+                        key={student.id}
+                        asChild
+                        variant="outline"
+                        className="justify-start"
+                      >
+                        <Link
+                          href={`/passive-vocabulary?student=${student.id}`}
+                        >
                           {buildStudentLabel(student)}
                         </Link>
                       </Button>
@@ -409,12 +437,17 @@ export default async function PassiveVocabularyPage({
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-semibold">{workspace.studentName}</h2>
-                {role !== "student" && <Badge variant="outline">Student Workspace</Badge>}
+                <h2 className="text-xl font-semibold">
+                  {workspace.studentName}
+                </h2>
+                {role !== "student" && (
+                  <Badge variant="outline">Student Workspace</Badge>
+                )}
                 <Badge variant="secondary">Target {workspace.cefrLevel}</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                {workspace.targetLanguageLabel} passive-recognition evidence for {workspace.studentEmail}.
+                {workspace.targetLanguageLabel} passive-recognition evidence for{" "}
+                {workspace.studentEmail}.
               </p>
             </div>
           </div>
@@ -422,20 +455,27 @@ export default async function PassiveVocabularyPage({
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Imported Items</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Imported Items
+                </CardTitle>
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{workspace.summary.uniqueItems}</div>
+                <div className="text-2xl font-bold">
+                  {workspace.summary.uniqueItems}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  {workspace.summary.wordCount} words and {workspace.summary.phraseCount} phrases
+                  {workspace.summary.wordCount} words and{" "}
+                  {workspace.summary.phraseCount} phrases
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Equivalent Words</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Equivalent Words
+                </CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -443,27 +483,35 @@ export default async function PassiveVocabularyPage({
                   {workspace.summary.equivalentWordCount}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {workspace.summary.rawEquivalentWordCount} raw items before level weighting
+                  {workspace.summary.rawEquivalentWordCount} raw items before
+                  level weighting
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Above Target</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Above Target
+                </CardTitle>
                 <BookMarked className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{workspace.aboveTargetCount}</div>
+                <div className="text-2xl font-bold">
+                  {workspace.aboveTargetCount}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  library-tagged words above the current {workspace.cefrLevel} target
+                  library-tagged words above the current {workspace.cefrLevel}{" "}
+                  target
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">What It Means</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  What It Means
+                </CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -482,9 +530,12 @@ export default async function PassiveVocabularyPage({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Recent Passive Evidence</CardTitle>
+              <CardTitle className="text-base">
+                Recent Passive Evidence
+              </CardTitle>
               <CardDescription>
-                Review imported passive-recognition items, including the shared library CEFR and part-of-speech metadata when available.
+                Review imported passive-recognition items, including the shared
+                library CEFR and part-of-speech metadata when available.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -515,17 +566,23 @@ export default async function PassiveVocabularyPage({
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Library Items</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Library Items
+                </CardTitle>
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{libraryCountResult?.count ?? 0}</div>
+                <div className="text-2xl font-bold">
+                  {libraryCountResult?.count ?? 0}
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Fully Tagged</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Fully Tagged
+                </CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -537,7 +594,9 @@ export default async function PassiveVocabularyPage({
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Needs Review</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Needs Review
+                </CardTitle>
                 <Shield className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -558,26 +617,38 @@ export default async function PassiveVocabularyPage({
             <CardHeader>
               <CardTitle className="text-base">Library Table</CardTitle>
               <CardDescription>
-                Every passive import feeds this shared library. Superadmins can correct canonical forms, CEFR levels, parts of speech, and future attributes here.
+                Every passive import feeds this shared library. Superadmins can
+                correct canonical forms, CEFR levels, parts of speech, and
+                future attributes here.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <PassiveLibraryAdminPanel
-                initialItems={
-                  (libraryRowsResult?.data ?? []).map((item) => ({
-                    id: item.id,
-                    canonical_term: item.canonical_term,
-                    normalized_term: item.normalized_term,
-                    item_type: item.item_type,
-                    cefr_level: item.cefr_level as "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null,
-                    part_of_speech: item.part_of_speech as PassiveVocabularyPartOfSpeech | null,
-                    attributes: normalizePassiveVocabularyLibraryAttributes(item.attributes),
-                    enrichment_status: item.enrichment_status,
-                    enrichment_error: item.enrichment_error,
-                    updated_at: item.updated_at,
-                  }))
+                initialItems={(libraryRowsResult?.data ?? []).map((item) => ({
+                  id: item.id,
+                  canonical_term: item.canonical_term,
+                  normalized_term: item.normalized_term,
+                  item_type: item.item_type,
+                  cefr_level: item.cefr_level as
+                    | "A1"
+                    | "A2"
+                    | "B1"
+                    | "B2"
+                    | "C1"
+                    | "C2"
+                    | null,
+                  part_of_speech:
+                    item.part_of_speech as PassiveVocabularyPartOfSpeech | null,
+                  attributes: normalizePassiveVocabularyLibraryAttributes(
+                    item.attributes,
+                  ),
+                  enrichment_status: item.enrichment_status,
+                  enrichment_error: item.enrichment_error,
+                  updated_at: item.updated_at,
+                }))}
+                initialHasMore={
+                  (libraryCountResult?.count ?? 0) > LIBRARY_PAGE_SIZE
                 }
-                initialHasMore={(libraryCountResult?.count ?? 0) > LIBRARY_PAGE_SIZE}
               />
             </CardContent>
           </Card>

@@ -11,22 +11,22 @@ import {
 } from "@/lib/mastery/passive-vocabulary";
 import { createClient } from "@/lib/supabase/server";
 
-const passiveVocabularyTranslationSchema = z.preprocess(
-  (value) => {
-    if (typeof value !== "string") {
-      return value;
-    }
+const passiveVocabularyTranslationSchema = z.preprocess((value) => {
+  if (typeof value !== "string") {
+    return value;
+  }
 
-    const normalizedValue = value.trim().replace(/\s+/g, " ");
-    return normalizedValue.length > 0 ? normalizedValue : null;
-  },
-  z.string().max(200).nullable().optional(),
-);
+  const normalizedValue = value.trim().replace(/\s+/g, " ");
+  return normalizedValue.length > 0 ? normalizedValue : null;
+}, z.string().max(200).nullable().optional());
 
 const updatePassiveLibraryItemSchema = z.object({
   canonicalTerm: z.string().trim().min(1).max(200),
   cefrLevel: z.enum(PASSIVE_VOCABULARY_CEFR_LEVELS).nullable().optional(),
-  partOfSpeech: z.enum(PASSIVE_VOCABULARY_PARTS_OF_SPEECH).nullable().optional(),
+  partOfSpeech: z
+    .enum(PASSIVE_VOCABULARY_PARTS_OF_SPEECH)
+    .nullable()
+    .optional(),
   ukrainianTranslation: passiveVocabularyTranslationSchema,
   attributes: z.record(z.string(), z.unknown()).optional(),
 });
@@ -39,7 +39,10 @@ async function requireSuperadmin() {
 
   if (!user) {
     return {
-      errorResponse: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      errorResponse: NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      ),
     };
   }
 
@@ -78,13 +81,14 @@ export async function PATCH(
     );
   }
 
-  const { data: existingItem, error: existingItemError } = await access.adminClient
-    .from("passive_vocabulary_library")
-    .select(
-      "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const { data: existingItem, error: existingItemError } =
+    await access.adminClient
+      .from("passive_vocabulary_library")
+      .select(
+        "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes",
+      )
+      .eq("id", id)
+      .maybeSingle();
 
   if (existingItemError) {
     return NextResponse.json(
@@ -117,11 +121,11 @@ export async function PATCH(
   const nextCefrLevel =
     existingItem.item_type === "phrase"
       ? null
-      : parsed.data.cefrLevel ?? existingItem.cefr_level;
+      : (parsed.data.cefrLevel ?? existingItem.cefr_level);
   const nextPartOfSpeech =
     existingItem.item_type === "phrase"
       ? "phrase"
-      : parsed.data.partOfSpeech ?? existingItem.part_of_speech;
+      : (parsed.data.partOfSpeech ?? existingItem.part_of_speech);
 
   const { data: updatedItem, error: updateError } = await access.adminClient
     .from("passive_vocabulary_library")
@@ -132,11 +136,13 @@ export async function PATCH(
       part_of_speech: nextPartOfSpeech,
       attributes: nextAttributes,
       enrichment_status:
-        existingItem.item_type === "phrase" || (nextCefrLevel && nextPartOfSpeech)
+        existingItem.item_type === "phrase" ||
+        (nextCefrLevel && nextPartOfSpeech)
           ? "completed"
           : "failed",
       enrichment_error:
-        existingItem.item_type === "phrase" || (nextCefrLevel && nextPartOfSpeech)
+        existingItem.item_type === "phrase" ||
+        (nextCefrLevel && nextPartOfSpeech)
           ? null
           : "Metadata still needs a CEFR level and part of speech.",
       updated_by: access.userId,
@@ -205,12 +211,13 @@ export async function PATCH(
     );
   }
 
-  const { data: canonicalRows, error: canonicalRowsError } = await access.adminClient
-    .from("passive_vocabulary_library_forms")
-    .select("id")
-    .eq("library_item_id", id)
-    .eq("is_canonical", true)
-    .eq("normalized_form", normalizedTerm);
+  const { data: canonicalRows, error: canonicalRowsError } =
+    await access.adminClient
+      .from("passive_vocabulary_library_forms")
+      .select("id")
+      .eq("library_item_id", id)
+      .eq("is_canonical", true)
+      .eq("normalized_form", normalizedTerm);
 
   if (canonicalRowsError) {
     return NextResponse.json(
