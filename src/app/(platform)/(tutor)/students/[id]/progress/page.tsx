@@ -88,30 +88,27 @@ export default async function TutorStudentProgressPage({
     }
   }
 
-  const [
-    studentProfileResult,
-    overrideResult,
-    progressReviewsResult,
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("profiles")
-      .select("full_name, email")
-      .eq("id", studentId)
-      .single(),
-    supabaseAdmin
-      .from("tutor_student_progress_overrides")
-      .select("axis_overrides, insights_override")
-      .eq("tutor_id", user.id)
-      .eq("student_id", studentId)
-      .maybeSingle(),
-    supabaseAdmin
-      .from("student_progress_reviews")
-      .select(
-        "id, tutor_id, content, rating, created_at, updated_at, profiles!student_progress_reviews_tutor_id_fkey(full_name, email)",
-      )
-      .eq("student_id", studentId)
-      .order("created_at", { ascending: false }),
-  ]);
+  const [studentProfileResult, overrideResult, progressReviewsResult] =
+    await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", studentId)
+        .single(),
+      supabaseAdmin
+        .from("tutor_student_progress_overrides")
+        .select("axis_overrides, insights_override")
+        .eq("tutor_id", user.id)
+        .eq("student_id", studentId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("student_progress_reviews")
+        .select(
+          "id, tutor_id, content, rating, created_at, updated_at, profiles!student_progress_reviews_tutor_id_fkey(full_name, email)",
+        )
+        .eq("student_id", studentId)
+        .order("created_at", { ascending: false }),
+    ]);
 
   if (studentProfileResult.error || !studentProfileResult.data) {
     redirect("/students");
@@ -378,7 +375,8 @@ export default async function TutorStudentProgressPage({
               {snapshot.passiveSignals.equivalentWordCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              level-adjusted recognition-weighted total used in passive-vocabulary estimates
+              level-adjusted recognition-weighted total used in
+              passive-vocabulary estimates
             </p>
           </CardContent>
         </Card>
@@ -402,7 +400,9 @@ export default async function TutorStudentProgressPage({
             Passive Vocabulary
           </CardTitle>
           <CardDescription>
-            Import passive-recognition evidence and review the latest library-tagged passive words on the dedicated passive-vocabulary page for {studentName}.
+            Import passive-recognition evidence and review the latest
+            library-tagged passive words on the dedicated passive-vocabulary
+            page for {studentName}.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -415,7 +415,9 @@ export default async function TutorStudentProgressPage({
                 <Badge variant="outline">
                   {snapshot.passiveSignals.equivalentWordCount} equivalent words
                 </Badge>
-                <Badge variant="secondary">Target {snapshot.profile.cefrLevel}</Badge>
+                <Badge variant="secondary">
+                  Target {snapshot.profile.cefrLevel}
+                </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
                 {PASSIVE_EQUIVALENT_WORDS_EXPLANATION}

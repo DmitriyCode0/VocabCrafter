@@ -335,35 +335,40 @@ export async function getStudentProgressSnapshot(
         right.correctCount - left.correctCount ||
         left.term.localeCompare(right.term),
     );
-  const passiveEvidenceRows = ((passiveEvidenceResult.data ?? []) as PassiveEvidenceWithLibraryRow[])
-    .map(
-      (row): PassiveVocabularyEvidenceRow => ({
-        term: row.term,
-        definition: row.definition,
-        item_type: row.item_type,
-        source_type: row.source_type,
-        source_label: row.source_label,
-        import_count: row.import_count,
-        last_imported_at: row.last_imported_at,
-        library_cefr_level:
-          (row.passive_vocabulary_library?.cefr_level as
-            | PassiveVocabularyEvidenceRow["library_cefr_level"]
-            | null) ?? null,
-        library_part_of_speech:
-          (row.passive_vocabulary_library?.part_of_speech as
-            | PassiveVocabularyEvidenceRow["library_part_of_speech"]
-            | null) ?? null,
-        library_attributes: row.passive_vocabulary_library?.attributes ?? null,
-      }),
-    );
+  const passiveEvidenceRows = (
+    (passiveEvidenceResult.data ?? []) as PassiveEvidenceWithLibraryRow[]
+  ).map(
+    (row): PassiveVocabularyEvidenceRow => ({
+      term: row.term,
+      definition: row.definition,
+      item_type: row.item_type,
+      source_type: row.source_type,
+      source_label: row.source_label,
+      import_count: row.import_count,
+      last_imported_at: row.last_imported_at,
+      library_cefr_level:
+        (row.passive_vocabulary_library?.cefr_level as
+          | PassiveVocabularyEvidenceRow["library_cefr_level"]
+          | null) ?? null,
+      library_part_of_speech:
+        (row.passive_vocabulary_library?.part_of_speech as
+          | PassiveVocabularyEvidenceRow["library_part_of_speech"]
+          | null) ?? null,
+      library_attributes: row.passive_vocabulary_library?.attributes ?? null,
+    }),
+  );
   const passiveSignals = summarizePassiveVocabularyEvidence(
     passiveEvidenceRows,
     cefrLevel,
   );
 
   const tutorMarkedTopics = new Map(
-    ((grammarMasteryResult.data ?? []) as Array<{ topic_key: string; source: string }>)
-      .map((row) => [row.topic_key, row.source as "system" | "tutor"]),
+    (
+      (grammarMasteryResult.data ?? []) as Array<{
+        topic_key: string;
+        source: string;
+      }>
+    ).map((row) => [row.topic_key, row.source as "system" | "tutor"]),
   );
 
   // --- Scored attempts (all types) ---
@@ -516,7 +521,9 @@ export async function getStudentProgressSnapshot(
       scoredCount: existing.scoredCount + (scorePercent == null ? 0 : 1),
       highScoreAttempts:
         existing.highScoreAttempts +
-        (scorePercent != null && scorePercent >= GRAMMAR_MASTERY_MIN_SCORE ? 1 : 0),
+        (scorePercent != null && scorePercent >= GRAMMAR_MASTERY_MIN_SCORE
+          ? 1
+          : 0),
     });
   }
 
@@ -534,7 +541,7 @@ export async function getStudentProgressSnapshot(
         label: topic.label,
         level: topic.level,
         mastered,
-        source: systemMastered ? "system" : tutorSource ?? null,
+        source: systemMastered ? "system" : (tutorSource ?? null),
         attempts: stats?.attempts ?? 0,
         highScoreAttempts: stats?.highScoreAttempts ?? 0,
         averageScore:
@@ -580,9 +587,7 @@ export async function getStudentProgressSnapshot(
   );
   const grammarVarietyScore =
     availableGrammarTopics.length > 0
-      ? clampScore(
-          (grammarMasteredCount / availableGrammarTopics.length) * 100,
-        )
+      ? clampScore((grammarMasteredCount / availableGrammarTopics.length) * 100)
       : 0;
 
   const axes: StudentProgressAxis[] = [

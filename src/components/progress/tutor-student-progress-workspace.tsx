@@ -577,10 +577,7 @@ export function TutorStudentProgressWorkspace({
     }
   }
 
-  async function handleGrammarTopicToggle(
-    topicKey: string,
-    checked: boolean,
-  ) {
+  async function handleGrammarTopicToggle(topicKey: string, checked: boolean) {
     setGrammarTopics((current) =>
       current.map((topic) => {
         if (topic.topicKey !== topicKey) return topic;
