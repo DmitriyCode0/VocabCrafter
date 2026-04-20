@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
 import { ImportVocabularyCard } from "@/components/mastery/import-vocabulary-card";
+import { formatAppDate } from "@/lib/dates";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { BookMarked, BookOpen, Clock, Star, TrendingUp, Zap } from "lucide-react";
 import {
