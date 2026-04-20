@@ -35,6 +35,7 @@ import {
   PASSIVE_EQUIVALENT_WORDS_EXPLANATION,
   summarizePassiveVocabularyEvidence,
   type PassiveVocabularyEvidenceRow,
+  type PassiveVocabularyPartOfSpeech,
 } from "@/lib/mastery/passive-vocabulary";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import type { Role } from "@/types/roles";
@@ -567,8 +568,8 @@ export default async function PassiveVocabularyPage({
                     canonical_term: item.canonical_term,
                     normalized_term: item.normalized_term,
                     item_type: item.item_type,
-                    cefr_level: item.cefr_level,
-                    part_of_speech: item.part_of_speech,
+                    cefr_level: item.cefr_level as "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null,
+                    part_of_speech: item.part_of_speech as PassiveVocabularyPartOfSpeech | null,
                     attributes:
                       item.attributes && typeof item.attributes === "object" && !Array.isArray(item.attributes)
                         ? (item.attributes as Record<string, unknown>)
