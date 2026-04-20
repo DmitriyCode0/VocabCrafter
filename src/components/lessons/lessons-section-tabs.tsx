@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BarChart3, CalendarDays, Loader2 } from "lucide-react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface LessonsSectionTabsProps {
@@ -15,6 +16,7 @@ export function LessonsSectionTabs({
   scheduleHref = "/lessons",
 }: LessonsSectionTabsProps) {
   const router = useRouter();
+  const { messages } = useAppI18n();
   const [loadingTab, setLoadingTab] = useState<string | null>(null);
 
   return (
@@ -42,7 +44,7 @@ export function LessonsSectionTabs({
           ) : (
             <CalendarDays className="h-5 w-5" />
           )}
-          Schedule
+          {messages.lessons.scheduleTab}
         </TabsTrigger>
         <TabsTrigger
           value="performance"
@@ -53,7 +55,7 @@ export function LessonsSectionTabs({
           ) : (
             <BarChart3 className="h-5 w-5" />
           )}
-          Performance
+          {messages.lessons.performanceTab}
         </TabsTrigger>
       </TabsList>
     </Tabs>

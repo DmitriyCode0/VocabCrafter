@@ -32,6 +32,7 @@ import {
   type LessonBalanceSummaryItem,
   type MonthlyLessonItem,
 } from "@/lib/lessons";
+import { getAppMessages } from "@/lib/i18n/messages";
 import { autoCompleteOverduePlannedLessons } from "@/lib/lessons-server";
 import {
   getGoogleCalendarConnectionSummary,
@@ -544,7 +545,8 @@ export default async function LessonsPage({
 }) {
   const resolvedSearchParams = await searchParams;
   const month = normalizeLessonMonthParam(resolvedSearchParams.month);
-  const { userId, role } = await getLessonsViewerAccess();
+  const { userId, role, appLanguage } = await getLessonsViewerAccess();
+  const messages = getAppMessages(appLanguage);
   await autoCompleteOverduePlannedLessons(
     role === "student" ? { studentId: userId } : { tutorId: userId },
   );
@@ -556,14 +558,15 @@ export default async function LessonsPage({
       <LessonsPageHeader
         role={role}
         currentSection="schedule"
-        description="View lessons month by month and keep tutor and student sessions in one calendar."
+        title={messages.lessons.title}
+        description={messages.lessons.scheduleDescription}
         scheduleHref={buildMonthHref(month)}
         actions={
           <>
             <Button variant="outline" size="sm" asChild>
               <Link href={buildMonthHref(previousMonth)}>
                 <ChevronLeft className="mr-1 h-4 w-4" />
-                Previous
+                {messages.common.previous}
               </Link>
             </Button>
             <Badge variant="outline" className="h-9 px-4 text-sm">
@@ -571,7 +574,7 @@ export default async function LessonsPage({
             </Badge>
             <Button variant="outline" size="sm" asChild>
               <Link href={buildMonthHref(nextMonth)}>
-                Next
+                {messages.common.next}
                 <ChevronRight className="ml-1 h-4 w-4" />
               </Link>
             </Button>

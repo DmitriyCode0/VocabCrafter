@@ -24,11 +24,13 @@ import {
   UserPlus,
   FileText,
 } from "lucide-react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
+import type { AppMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types/roles";
 
 interface NavItem {
-  label: string;
+  labelKey: keyof AppMessages["nav"];
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   roles: Role[];
@@ -36,144 +38,144 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   {
-    label: "Dashboard",
+    labelKey: "dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
     roles: ["student", "tutor", "superadmin"],
   },
   // Student items
   {
-    label: "My Quizzes",
+    labelKey: "myQuizzes",
     href: "/quizzes",
     icon: BookOpen,
     roles: ["student"],
   },
   {
-    label: "My Classes",
+    labelKey: "myClasses",
     href: "/classes",
     icon: GraduationCap,
     roles: ["student"],
   },
   {
-    label: "Lessons",
+    labelKey: "lessons",
     href: "/lessons",
     icon: CalendarDays,
     roles: ["student", "tutor"],
   },
   {
-    label: "Assignments",
+    labelKey: "assignments",
     href: "/assignments",
     icon: ClipboardList,
     roles: ["student"],
   },
   {
-    label: "Progress",
+    labelKey: "progress",
     href: "/progress",
     icon: TrendingUp,
     roles: ["student"],
   },
   {
-    label: "Vocab Mastery",
+    labelKey: "vocabMastery",
     href: "/vocabulary",
     icon: Zap,
     roles: ["student"],
   },
   {
-    label: "Feedback",
+    labelKey: "feedback",
     href: "/feedback",
     icon: MessageSquare,
     roles: ["student"],
   },
   {
-    label: "My Tutors",
+    labelKey: "myTutors",
     href: "/tutors",
     icon: UserCheck,
     roles: ["student"],
   },
   // Tutor items
   {
-    label: "My Quizzes",
+    labelKey: "myQuizzes",
     href: "/quizzes",
     icon: BookOpen,
     roles: ["tutor"],
   },
   {
-    label: "Classes",
+    labelKey: "classes",
     href: "/classes",
     icon: Users,
     roles: ["tutor"],
   },
   {
-    label: "Assignments",
+    labelKey: "assignments",
     href: "/assignments",
     icon: ClipboardList,
     roles: ["tutor"],
   },
   {
-    label: "Review",
+    labelKey: "review",
     href: "/review",
     icon: MessageSquare,
     roles: ["tutor"],
   },
   {
-    label: "Vocab Mastery",
+    labelKey: "vocabMastery",
     href: "/mastery",
     icon: Brain,
     roles: ["tutor"],
   },
   {
-    label: "My Students",
+    labelKey: "myStudents",
     href: "/students",
     icon: UserPlus,
     roles: ["tutor"],
   },
   // Shared items
   {
-    label: "History",
+    labelKey: "history",
     href: "/history",
     icon: History,
     roles: ["student", "tutor"],
   },
   {
-    label: "Passive Vocabulary",
+    labelKey: "passiveVocabulary",
     href: "/passive-vocabulary",
     icon: BookMarked,
     roles: ["student", "tutor", "superadmin"],
   },
   // Admin items
   {
-    label: "Analytics",
+    labelKey: "analytics",
     href: "/analytics",
     icon: BarChart3,
     roles: ["superadmin"],
   },
   {
-    label: "Users",
+    labelKey: "users",
     href: "/users",
     icon: Users,
     roles: ["superadmin"],
   },
   {
-    label: "Grammar Rules",
+    labelKey: "grammarRules",
     href: "/grammar-rules",
     icon: FileText,
     roles: ["superadmin"],
   },
   {
-    label: "Plans",
+    labelKey: "plans",
     href: "/plans",
     icon: Crown,
     roles: ["student", "tutor", "superadmin"],
   },
   {
-    label: "Billing",
+    labelKey: "billing",
     href: "/billing",
     icon: CreditCard,
     roles: ["student", "tutor", "superadmin"],
   },
   // Shared
   {
-    label: "Settings",
+    labelKey: "settings",
     href: "/settings",
     icon: Settings,
     roles: ["student", "tutor", "superadmin"],
@@ -186,6 +188,7 @@ interface NavLinksProps {
 
 export function NavLinks({ role }: NavLinksProps) {
   const pathname = usePathname();
+  const { messages } = useAppI18n();
 
   const filteredItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
@@ -204,7 +207,7 @@ export function NavLinks({ role }: NavLinksProps) {
           pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <motion.div
-            key={item.href + item.label}
+            key={item.href + item.labelKey}
             variants={{
               hidden: { opacity: 0, x: -12 },
               visible: { opacity: 1, x: 0 },
@@ -222,7 +225,7 @@ export function NavLinks({ role }: NavLinksProps) {
               )}
             >
               <item.icon className="h-6 w-6" />
-              {item.label}
+              {messages.nav[item.labelKey]}
             </Link>
           </motion.div>
         );

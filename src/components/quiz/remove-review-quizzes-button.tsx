@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Trash2 } from "lucide-react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,6 +24,7 @@ export function RemoveReviewQuizzesButton({
   reviewCount,
 }: RemoveReviewQuizzesButtonProps) {
   const router = useRouter();
+  const { messages } = useAppI18n();
   const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -71,7 +73,7 @@ export function RemoveReviewQuizzesButton({
           className="w-full sm:w-auto"
         >
           <Trash2 className="mr-2 h-4 w-4" />
-          Remove Reviews
+          {messages.quizzes.removeReviewsButton}
         </Button>
       </DialogTrigger>
       <DialogContent>

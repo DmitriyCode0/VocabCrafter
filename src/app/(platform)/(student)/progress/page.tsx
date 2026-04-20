@@ -22,6 +22,8 @@ import {
   PlusCircle,
   Trophy,
 } from "lucide-react";
+import { normalizeAppLanguage } from "@/lib/i18n/app-language";
+import { getAppMessages } from "@/lib/i18n/messages";
 import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 import {
   applyTutorAxisOverrides,
@@ -41,8 +43,13 @@ export default async function ProgressPage() {
 
   if (!user) redirect("/login");
 
-  const [snapshot, savedInsightsResult, publishedTutorOverride] =
+  const [profileResult, snapshot, savedInsightsResult, publishedTutorOverride] =
     await Promise.all([
+      supabase
+        .from("profiles")
+        .select("app_language")
+        .eq("id", user.id)
+        .single(),
       getStudentProgressSnapshot(user.id),
       supabase
         .from("student_progress_insights")
@@ -51,6 +58,9 @@ export default async function ProgressPage() {
         .maybeSingle(),
       getPublishedTutorProgressOverride(user.id),
     ]);
+  const messages = getAppMessages(
+    normalizeAppLanguage(profileResult.data?.app_language),
+  );
   const savedInsights = parseProgressInsightsValue(
     savedInsightsResult.data?.insights,
   );
@@ -73,33 +83,35 @@ export default async function ProgressPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Progress</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {messages.progress.title}
+          </h1>
           <p className="text-muted-foreground">
-            Track your learning profile, vocabulary growth, and quiz
-            performance.
+            {messages.progress.description}
           </p>
         </div>
 
         <Card>
           <CardHeader className="items-center text-center py-12">
             <TrendingUp className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">No progress data yet</CardTitle>
+            <CardTitle className="text-lg">
+              {messages.progress.noProgressTitle}
+            </CardTitle>
             <CardDescription>
-              Complete some quizzes to start tracking your learning progress and
-              see your improvement over time.
+              {messages.progress.noProgressDescription}
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex-col justify-center gap-3 pb-12 sm:flex-row">
             <Button asChild className="w-full max-w-xs">
               <Link href="/quizzes/new">
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Create a Quiz
+                {messages.progress.createQuiz}
               </Link>
             </Button>
             <Button asChild variant="outline" className="w-full max-w-xs">
               <Link href="/vocabulary">
                 <BookOpen className="mr-2 h-4 w-4" />
-                Open Vocab Mastery
+                {messages.progress.openVocabMastery}
               </Link>
             </Button>
           </CardFooter>
@@ -111,9 +123,11 @@ export default async function ProgressPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Progress</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {messages.progress.title}
+        </h1>
         <p className="text-muted-foreground">
-          Track your learning profile, vocabulary growth, and quiz performance.
+          {messages.progress.description}
         </p>
       </div>
 

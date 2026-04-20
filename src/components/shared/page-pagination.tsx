@@ -1,6 +1,17 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import type { AppMessages } from "@/lib/i18n/messages";
 import { getTotalPages } from "@/lib/pagination";
+
+type PagePaginationLabels = AppMessages["pagination"];
+
+const DEFAULT_LABELS: PagePaginationLabels = {
+  showing: "Showing",
+  of: "of",
+  previous: "Previous",
+  next: "Next",
+  page: "Page",
+};
 
 interface PagePaginationProps {
   pathname: string;
@@ -9,6 +20,7 @@ interface PagePaginationProps {
   totalItems: number;
   searchParams?: Record<string, string | string[] | undefined>;
   pageParam?: string;
+  labels?: PagePaginationLabels;
 }
 
 export function PagePagination({
@@ -18,6 +30,7 @@ export function PagePagination({
   totalItems,
   searchParams,
   pageParam = "page",
+  labels = DEFAULT_LABELS,
 }: PagePaginationProps) {
   const totalPages = getTotalPages(totalItems, pageSize);
 
@@ -55,7 +68,7 @@ export function PagePagination({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-muted-foreground">
-        Showing {startItem}-{endItem} of {totalItems}
+        {labels.showing} {startItem}-{endItem} {labels.of} {totalItems}
       </p>
       <div className="flex items-center gap-2">
         <Button asChild variant="outline" size="sm" disabled={currentPage <= 1}>
@@ -63,11 +76,11 @@ export function PagePagination({
             href={buildHref(currentPage - 1)}
             aria-disabled={currentPage <= 1}
           >
-            Previous
+            {labels.previous}
           </Link>
         </Button>
         <span className="text-sm text-muted-foreground">
-          Page {currentPage} of {totalPages}
+          {labels.page} {currentPage} {labels.of} {totalPages}
         </span>
         <Button
           asChild
@@ -79,7 +92,7 @@ export function PagePagination({
             href={buildHref(currentPage + 1)}
             aria-disabled={currentPage >= totalPages}
           >
-            Next
+            {labels.next}
           </Link>
         </Button>
       </div>

@@ -22,6 +22,7 @@ export interface Database {
           cefr_level: string;
           preferred_language: string;
           source_language: string;
+          app_language: string;
           ai_voice: string;
           plan: string;
           ai_calls_this_month: number;
@@ -39,6 +40,7 @@ export interface Database {
           cefr_level?: string;
           preferred_language?: string;
           source_language?: string;
+          app_language?: string;
           ai_voice?: string;
           plan?: string;
           ai_calls_this_month?: number;
@@ -56,6 +58,7 @@ export interface Database {
           cefr_level?: string;
           preferred_language?: string;
           source_language?: string;
+          app_language?: string;
           ai_voice?: string;
           plan?: string;
           ai_calls_this_month?: number;

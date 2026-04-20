@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { useUser } from "@/hooks/use-user";
 import {
   Card,
@@ -23,6 +25,11 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import { Loader2, Save } from "lucide-react";
+import {
+  APP_LANGUAGES,
+  normalizeAppLanguage,
+  type AppLanguage,
+} from "@/lib/i18n/app-language";
 import {
   TARGET_LANGUAGE_OPTIONS,
   SOURCE_LANGUAGE_OPTIONS,
@@ -60,10 +67,13 @@ interface SettingsDraft {
   cefrLevel: string;
   learningLanguage: LearningLanguage;
   sourceLanguage: SourceLanguage;
+  appLanguage: AppLanguage;
   aiVoice: GeminiTtsVoice;
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const { messages } = useAppI18n();
   const { profile, isLoading: profileLoading } = useUser();
   const [draft, setDraft] = useState<SettingsDraft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -76,6 +86,7 @@ export default function SettingsPage() {
   const profileSourceLanguage = normalizeSourceLanguage(
     profile?.source_language,
   );
+  const profileAppLanguage = normalizeAppLanguage(profile?.app_language);
   const profileAiVoice = normalizeGeminiTtsVoice(profile?.ai_voice);
   const profileAllowedCefrLevels = getAllowedCefrLevels(
     profileLearningLanguage,
@@ -92,6 +103,7 @@ export default function SettingsPage() {
     cefrLevel: profileCefrLevel,
     learningLanguage: profileLearningLanguage,
     sourceLanguage: profileSourceLanguage,
+    appLanguage: profileAppLanguage,
     aiVoice: profileAiVoice ?? DEFAULT_GEMINI_TTS_VOICE,
   };
 
@@ -99,6 +111,7 @@ export default function SettingsPage() {
   const learningLanguage =
     draft?.learningLanguage ?? baseDraft.learningLanguage;
   const sourceLanguage = draft?.sourceLanguage ?? baseDraft.sourceLanguage;
+  const appLanguage = draft?.appLanguage ?? baseDraft.appLanguage;
   const aiVoice = draft?.aiVoice ?? baseDraft.aiVoice;
   const rawCefrLevel = draft?.cefrLevel ?? baseDraft.cefrLevel;
   const selectedVoiceOption =
@@ -138,6 +151,7 @@ export default function SettingsPage() {
         cefr_level: cefrLevel,
         preferred_language: learningLanguage,
         source_language: sourceLanguage,
+        app_language: appLanguage,
         ai_voice: normalizedAiVoice,
       })
       .eq("id", profile.id);
@@ -158,6 +172,7 @@ export default function SettingsPage() {
 
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+      router.refresh();
     }
 
     setSaving(false);
@@ -174,9 +189,11 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {messages.settings.title}
+        </h1>
         <p className="text-muted-foreground">
-          Manage your account settings and preferences.
+          {messages.settings.description}
         </p>
       </div>
 
@@ -262,6 +279,37 @@ export default function SettingsPage() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="appLanguage">
+              {messages.settings.appLanguageLabel}
+            </Label>
+            <Select
+              value={appLanguage}
+              onValueChange={(value) => {
+                updateDraft((current) => ({
+                  ...current,
+                  appLanguage: value as AppLanguage,
+                }));
+              }}
+            >
+              <SelectTrigger id="appLanguage">
+                <SelectValue
+                  placeholder={messages.settings.appLanguagePlaceholder}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {APP_LANGUAGES.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {messages.common.languageNames[value]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {messages.settings.appLanguageDescription}
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -379,14 +427,14 @@ export default function SettingsPage() {
             {saving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
+                {messages.common.saving}
               </>
             ) : saved ? (
-              "Saved!"
+              messages.common.saved
             ) : (
               <>
                 <Save className="mr-2 h-4 w-4" />
-                Save Changes
+                {messages.common.saveChanges}
               </>
             )}
           </Button>

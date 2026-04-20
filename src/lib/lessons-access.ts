@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import type { Role } from "@/types/roles";
 
 interface LessonsViewerAccessOptions {
@@ -22,7 +23,7 @@ export async function getLessonsViewerAccess(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, app_language")
     .eq("id", user.id)
     .single();
 
@@ -40,6 +41,7 @@ export async function getLessonsViewerAccess(
     return {
       userId: user.id,
       role,
+      appLanguage: normalizeAppLanguage(profile.app_language),
     };
   }
 
@@ -50,5 +52,6 @@ export async function getLessonsViewerAccess(
   return {
     userId: user.id,
     role,
+    appLanguage: normalizeAppLanguage(profile.app_language),
   };
 }

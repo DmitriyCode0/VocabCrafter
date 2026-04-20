@@ -17,6 +17,11 @@ import { DeleteAssignmentButton } from "@/components/assignments/delete-assignme
 import { CreateAssignmentDialog } from "@/components/assignments/create-assignment-dialog";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import { PagePagination } from "@/components/shared/page-pagination";
+import { normalizeAppLanguage } from "@/lib/i18n/app-language";
+import {
+  getAppMessages,
+  type AppMessages,
+} from "@/lib/i18n/messages";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { formatAppDate } from "@/lib/dates";
 
@@ -42,11 +47,12 @@ export default async function AssignmentsPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, app_language")
     .eq("id", user.id)
     .single();
 
   const role = profile?.role ?? "student";
+  const messages = getAppMessages(normalizeAppLanguage(profile?.app_language));
 
   if (role === "student") {
     return (
@@ -54,6 +60,7 @@ export default async function AssignmentsPage({
         supabaseUserId={user.id}
         currentPage={currentPage}
         searchParams={resolvedSearchParams}
+        messages={messages}
       />
     );
   }
@@ -75,9 +82,11 @@ export default async function AssignmentsPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Assignments</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {messages.assignments.title}
+          </h1>
           <p className="text-muted-foreground">
-            Manage quiz assignments for your classes.
+            {messages.assignments.tutorDescription}
           </p>
         </div>
         <CreateAssignmentDialog />
@@ -87,9 +96,11 @@ export default async function AssignmentsPage({
         <Card>
           <CardHeader className="items-center text-center py-12">
             <ClipboardList className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">No assignments yet</CardTitle>
+            <CardTitle className="text-lg">
+              {messages.assignments.noAssignmentsTitle}
+            </CardTitle>
             <CardDescription>
-              Create your first assignment by selecting a class and quiz.
+              {messages.assignments.noAssignmentsTutorDescription}
             </CardDescription>
           </CardHeader>
           <CardFooter className="justify-center pb-12">
@@ -125,7 +136,9 @@ export default async function AssignmentsPage({
                             variant={isPastDue ? "destructive" : "outline"}
                             className="text-xs"
                           >
-                            {isPastDue ? "Past due" : "Due"}{" "}
+                            {isPastDue
+                              ? messages.assignments.pastDue
+                              : messages.assignments.due}{" "}
                             {formatAppDate(assignment.due_date)}
                           </Badge>
                         )}
@@ -140,12 +153,12 @@ export default async function AssignmentsPage({
                           href={`/classes/${cls.id}`}
                           className="hover:text-primary"
                         >
-                          Class: {cls.name}
+                          {messages.assignments.classLabel}: {cls.name}
                         </Link>
                       )}
                       {quiz && (
                         <span>
-                          Quiz: {quiz.title} (
+                          {messages.assignments.quizLabel}: {quiz.title} (
                           {ACTIVITY_LABELS[quiz.type] || quiz.type})
                         </span>
                       )}
@@ -156,7 +169,7 @@ export default async function AssignmentsPage({
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
-                      Created {formatAppDate(assignment.created_at)}
+                      {messages.assignments.created} {formatAppDate(assignment.created_at)}
                     </p>
                   </CardContent>
                 </Card>
@@ -169,6 +182,7 @@ export default async function AssignmentsPage({
             pageSize={ASSIGNMENTS_PAGE_SIZE}
             totalItems={totalAssignments ?? assignments.length}
             searchParams={resolvedSearchParams}
+            labels={messages.pagination}
           />
         </div>
       )}
@@ -182,10 +196,12 @@ async function StudentAssignments({
   supabaseUserId,
   currentPage,
   searchParams,
+  messages,
 }: {
   supabaseUserId: string;
   currentPage: number;
   searchParams: { page?: string };
+  messages: AppMessages;
 }) {
   const supabase = await createClient();
   const { from, to } = getPaginationRange(currentPage, ASSIGNMENTS_PAGE_SIZE);
@@ -202,22 +218,26 @@ async function StudentAssignments({
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Assignments</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {messages.assignments.title}
+          </h1>
           <p className="text-muted-foreground">
-            Quizzes assigned to you by your tutors.
+            {messages.assignments.studentDescription}
           </p>
         </div>
         <Card>
           <CardHeader className="items-center text-center py-12">
             <ClipboardList className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">No classes joined</CardTitle>
+            <CardTitle className="text-lg">
+              {messages.assignments.noClassesJoinedTitle}
+            </CardTitle>
             <CardDescription>
-              Join a class first to see assignments from your tutors.
+              {messages.assignments.noClassesJoinedDescription}
             </CardDescription>
           </CardHeader>
           <CardFooter className="justify-center pb-12">
             <Button asChild className="w-full max-w-xs" variant="outline">
-              <Link href="/classes">Go to Classes</Link>
+              <Link href="/classes">{messages.assignments.goToClasses}</Link>
             </Button>
           </CardFooter>
         </Card>
@@ -269,9 +289,11 @@ async function StudentAssignments({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Assignments</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {messages.assignments.title}
+        </h1>
         <p className="text-muted-foreground">
-          Quizzes assigned to you by your tutors.
+          {messages.assignments.studentDescription}
         </p>
       </div>
 
@@ -279,10 +301,11 @@ async function StudentAssignments({
         <Card>
           <CardHeader className="items-center text-center py-12">
             <ClipboardList className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">No assignments yet</CardTitle>
+            <CardTitle className="text-lg">
+              {messages.assignments.noAssignmentsTitle}
+            </CardTitle>
             <CardDescription>
-              Your tutors haven&apos;t assigned any quizzes yet. Check back
-              later!
+              {messages.assignments.noAssignmentsStudentDescription}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -319,13 +342,17 @@ async function StudentAssignments({
                       <div className="flex items-center gap-2">
                         {isCompleted ? (
                           <Badge variant="secondary">
-                            {pct !== null ? `${pct}%` : "Done"}
+                            {pct !== null
+                              ? `${pct}%`
+                              : messages.assignments.done}
                           </Badge>
                         ) : isPastDue ? (
-                          <Badge variant="destructive">Past due</Badge>
+                          <Badge variant="destructive">
+                            {messages.assignments.pastDue}
+                          </Badge>
                         ) : assignment.due_date ? (
                           <Badge variant="outline">
-                            Due {formatAppDate(assignment.due_date)}
+                            {messages.assignments.due} {formatAppDate(assignment.due_date)}
                           </Badge>
                         ) : null}
                       </div>
@@ -334,7 +361,11 @@ async function StudentAssignments({
                   <CardContent className="pt-0">
                     <div className="space-y-1">
                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        {cls && <span>Class: {cls.name}</span>}
+                        {cls && (
+                          <span>
+                            {messages.assignments.classLabel}: {cls.name}
+                          </span>
+                        )}
                         {quiz && (
                           <span>
                             {ACTIVITY_LABELS[quiz.type] || quiz.type} &middot;{" "}
@@ -358,7 +389,9 @@ async function StudentAssignments({
                         variant={isCompleted ? "outline" : "default"}
                       >
                         <Link href={`/quizzes/${quiz.id}`}>
-                          {isCompleted ? "Retry" : "Start"}
+                          {isCompleted
+                            ? messages.assignments.retry
+                            : messages.assignments.start}
                         </Link>
                       </Button>
                     </CardFooter>
@@ -373,6 +406,7 @@ async function StudentAssignments({
             pageSize={ASSIGNMENTS_PAGE_SIZE}
             totalItems={totalAssignments ?? assignments.length}
             searchParams={searchParams}
+            labels={messages.pagination}
           />
         </div>
       )}

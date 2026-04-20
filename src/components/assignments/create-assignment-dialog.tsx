@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +55,7 @@ export function CreateAssignmentDialog({
 }: CreateAssignmentDialogProps) {
   const router = useRouter();
   const supabase = createClient();
+  const { messages } = useAppI18n();
 
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -177,7 +179,7 @@ export function CreateAssignmentDialog({
       <DialogTrigger asChild>
         <Button size="sm">
           <PlusCircle className="mr-2 h-4 w-4" />
-          Create Assignment
+          {messages.assignments.createAssignmentButton}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">

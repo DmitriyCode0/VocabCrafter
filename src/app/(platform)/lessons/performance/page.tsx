@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LessonsPageHeader } from "@/components/lessons/lessons-page-header";
 import { TutorPerformanceDashboard } from "@/components/lessons/tutor-performance-dashboard";
+import { getAppMessages } from "@/lib/i18n/messages";
 import { getLessonsViewerAccess } from "@/lib/lessons-access";
 import { formatLessonMonthParam } from "@/lib/lessons";
 import { autoCompleteOverduePlannedLessons } from "@/lib/lessons-server";
@@ -274,7 +275,10 @@ function mapPerformanceLessons(rows: CompletedPerformanceLessonRow[]) {
 }
 
 export default async function LessonsPerformancePage() {
-  const { userId, role } = await getLessonsViewerAccess({ requireTutor: true });
+  const { userId, role, appLanguage } = await getLessonsViewerAccess({
+    requireTutor: true,
+  });
+  const messages = getAppMessages(appLanguage);
   const supabaseAdmin = createAdminClient();
   await autoCompleteOverduePlannedLessons({
     tutorId: userId,
@@ -414,12 +418,15 @@ export default async function LessonsPerformancePage() {
       <LessonsPageHeader
         role={role}
         currentSection="performance"
-        description="Tutor-only teaching analytics based on completed lessons from your schedule."
+        title={messages.lessons.title}
+        description={messages.lessons.performanceDescription}
         scheduleHref={`/lessons?month=${formatLessonMonthParam(today)}`}
         actions={
           <>
-            <Badge variant="secondary">Tutor only</Badge>
-            <Badge variant="outline">{today.getFullYear()} performance</Badge>
+            <Badge variant="secondary">{messages.lessons.tutorOnlyBadge}</Badge>
+            <Badge variant="outline">
+              {messages.lessons.performanceYearBadge}
+            </Badge>
           </>
         }
       />
