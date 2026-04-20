@@ -120,7 +120,7 @@ const passiveVocabularyEnrichmentItemSchema = z.object({
     .max(200)
     .nullable()
     .optional(),
-  attributes: z.record(z.unknown()).optional(),
+  attributes: z.record(z.string(), z.unknown()).optional(),
 });
 
 export interface PassiveVocabularyLibraryResolution {
@@ -616,7 +616,7 @@ async function enrichPassiveVocabularyWords(
           partOfSpeech: item.partOfSpeech,
           ukrainianTranslation: item.ukrainianTranslation ?? null,
           attributes: withPassiveVocabularyUkrainianTranslation(
-            item.attributes ?? {},
+            normalizePassiveVocabularyLibraryAttributes(item.attributes),
             item.ukrainianTranslation ?? null,
           ),
         });

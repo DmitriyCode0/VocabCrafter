@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Json } from "@/types/database";
 import type { CEFRLevel } from "@/types/quiz";
 
 export const PASSIVE_VOCABULARY_ITEM_TYPES = ["word", "phrase"] as const;
@@ -39,7 +40,8 @@ export type PassiveVocabularyLibraryCefrLevel =
   (typeof PASSIVE_VOCABULARY_CEFR_LEVELS)[number];
 export type PassiveVocabularyPartOfSpeech =
   (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number];
-export interface PassiveVocabularyLibraryAttributes extends Record<string, unknown> {
+export interface PassiveVocabularyLibraryAttributes
+  extends Record<string, Json | undefined> {
   ukrainianTranslation?: string | null;
 }
 

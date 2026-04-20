@@ -32,6 +32,7 @@ import {
 } from "@/lib/languages";
 import {
   getPassiveVocabularyEquivalentWeight,
+  normalizePassiveVocabularyLibraryAttributes,
   PASSIVE_EQUIVALENT_WORDS_EXPLANATION,
   summarizePassiveVocabularyEvidence,
   type PassiveVocabularyEvidenceRow,
@@ -570,10 +571,7 @@ export default async function PassiveVocabularyPage({
                     item_type: item.item_type,
                     cefr_level: item.cefr_level as "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null,
                     part_of_speech: item.part_of_speech as PassiveVocabularyPartOfSpeech | null,
-                    attributes:
-                      item.attributes && typeof item.attributes === "object" && !Array.isArray(item.attributes)
-                        ? (item.attributes as Record<string, unknown>)
-                        : {},
+                    attributes: normalizePassiveVocabularyLibraryAttributes(item.attributes),
                     enrichment_status: item.enrichment_status,
                     enrichment_error: item.enrichment_error,
                     updated_at: item.updated_at,

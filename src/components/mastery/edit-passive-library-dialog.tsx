@@ -10,6 +10,7 @@ import {
   getPassiveVocabularyCustomAttributes,
   getPassiveVocabularyUkrainianTranslation,
   formatPassiveVocabularyPartOfSpeech,
+  type PassiveVocabularyLibraryAttributes,
 } from "@/lib/mastery/passive-vocabulary";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +40,7 @@ interface EditPassiveLibraryDialogProps {
     item_type: "word" | "phrase";
     cefr_level: string | null;
     part_of_speech: string | null;
-    attributes: Record<string, unknown> | null;
+    attributes: PassiveVocabularyLibraryAttributes | null;
   };
   onSaved?: () => void | Promise<void>;
 }
@@ -86,14 +87,14 @@ export function EditPassiveLibraryDialog({
   }, [item, open]);
 
   async function handleSave() {
-    let parsedAttributes: Record<string, unknown>;
+    let parsedAttributes: PassiveVocabularyLibraryAttributes;
 
     try {
       const parsed = JSON.parse(attributesJson);
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
         throw new Error();
       }
-      parsedAttributes = parsed as Record<string, unknown>;
+      parsedAttributes = parsed as PassiveVocabularyLibraryAttributes;
     } catch {
       toast.error("Attributes must be a valid JSON object");
       return;

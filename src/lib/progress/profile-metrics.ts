@@ -14,6 +14,7 @@ import {
   getPrimaryGrammarTopic,
 } from "@/lib/utils";
 import {
+  normalizePassiveVocabularyLibraryAttributes,
   summarizePassiveVocabularyEvidence,
   type PassiveVocabularyEvidenceRow,
 } from "@/lib/mastery/passive-vocabulary";
@@ -354,7 +355,9 @@ export async function getStudentProgressSnapshot(
         (row.passive_vocabulary_library?.part_of_speech as
           | PassiveVocabularyEvidenceRow["library_part_of_speech"]
           | null) ?? null,
-      library_attributes: row.passive_vocabulary_library?.attributes ?? null,
+      library_attributes: normalizePassiveVocabularyLibraryAttributes(
+        row.passive_vocabulary_library?.attributes,
+      ),
     }),
   );
   const passiveSignals = summarizePassiveVocabularyEvidence(

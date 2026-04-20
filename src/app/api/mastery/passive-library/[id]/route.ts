@@ -28,7 +28,7 @@ const updatePassiveLibraryItemSchema = z.object({
   cefrLevel: z.enum(PASSIVE_VOCABULARY_CEFR_LEVELS).nullable().optional(),
   partOfSpeech: z.enum(PASSIVE_VOCABULARY_PARTS_OF_SPEECH).nullable().optional(),
   ukrainianTranslation: passiveVocabularyTranslationSchema,
-  attributes: z.record(z.unknown()).optional(),
+  attributes: z.record(z.string(), z.unknown()).optional(),
 });
 
 async function requireSuperadmin() {
