@@ -17,7 +17,14 @@ import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-wor
 import { ImportVocabularyCard } from "@/components/mastery/import-vocabulary-card";
 import { formatAppDate } from "@/lib/dates";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
-import { BookMarked, BookOpen, Clock, Star, TrendingUp, Zap } from "lucide-react";
+import {
+  BookMarked,
+  BookOpen,
+  Clock,
+  Star,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
 import {
   normalizeLearningLanguage,
   normalizeSourceLanguage,
@@ -304,7 +311,8 @@ export default async function VocabularyPage({
               {passiveEvidenceSummary.equivalentWordCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              level-adjusted recognition-weighted total used in passive-vocabulary estimates
+              level-adjusted recognition-weighted total used in
+              passive-vocabulary estimates
             </p>
           </CardContent>
         </Card>
