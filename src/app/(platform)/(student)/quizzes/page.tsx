@@ -38,29 +38,29 @@ export default async function QuizzesPage({
 
   if (!user) redirect("/login");
 
-  const [profileResult, totalQuizzesResult, reviewQuizzesResult, quizzesResult] =
-    await Promise.all([
-      supabase
-        .from("profiles")
-        .select("app_language")
-        .eq("id", user.id)
-        .single(),
-      supabase
-        .from("quizzes")
-        .select("id", { count: "exact", head: true })
-        .eq("creator_id", user.id),
-      supabase
-        .from("quizzes")
-        .select("id", { count: "exact", head: true })
-        .eq("creator_id", user.id)
-        .ilike("title", `${REVIEW_ACTIVITY_TITLE_PREFIX}%`),
-      supabase
-        .from("quizzes")
-        .select("*")
-        .eq("creator_id", user.id)
-        .order("created_at", { ascending: false })
-        .range(from, to),
-    ]);
+  const [
+    profileResult,
+    totalQuizzesResult,
+    reviewQuizzesResult,
+    quizzesResult,
+  ] = await Promise.all([
+    supabase.from("profiles").select("app_language").eq("id", user.id).single(),
+    supabase
+      .from("quizzes")
+      .select("id", { count: "exact", head: true })
+      .eq("creator_id", user.id),
+    supabase
+      .from("quizzes")
+      .select("id", { count: "exact", head: true })
+      .eq("creator_id", user.id)
+      .ilike("title", `${REVIEW_ACTIVITY_TITLE_PREFIX}%`),
+    supabase
+      .from("quizzes")
+      .select("*")
+      .eq("creator_id", user.id)
+      .order("created_at", { ascending: false })
+      .range(from, to),
+  ]);
 
   const messages = getAppMessages(
     normalizeAppLanguage(profileResult.data?.app_language),
@@ -88,7 +88,9 @@ export default async function QuizzesPage({
         <div className="flex flex-col gap-2 sm:flex-row">
           <RemoveReviewQuizzesButton reviewCount={reviewQuizCount} />
           <Button asChild variant="outline" className="w-full sm:w-auto">
-            <Link href="/quizzes/review">{messages.quizzes.reviewActivity}</Link>
+            <Link href="/quizzes/review">
+              {messages.quizzes.reviewActivity}
+            </Link>
           </Button>
           <Button asChild className="w-full sm:w-auto">
             <Link href="/quizzes/new">
@@ -112,7 +114,9 @@ export default async function QuizzesPage({
           </CardHeader>
           <CardFooter className="justify-center pb-12">
             <Button asChild className="w-full max-w-xs">
-              <Link href="/quizzes/new">{messages.quizzes.createFirstQuiz}</Link>
+              <Link href="/quizzes/new">
+                {messages.quizzes.createFirstQuiz}
+              </Link>
             </Button>
           </CardFooter>
         </Card>

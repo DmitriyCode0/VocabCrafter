@@ -1,15 +1,8 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import type { AppLanguage } from "@/lib/i18n/app-language";
-import {
-  getAppMessages,
-  type AppMessages,
-} from "@/lib/i18n/messages";
+import { getAppMessages, type AppMessages } from "@/lib/i18n/messages";
 
 interface AppLanguageContextValue {
   appLanguage: AppLanguage;

@@ -18,10 +18,7 @@ import { CreateAssignmentDialog } from "@/components/assignments/create-assignme
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
-import {
-  getAppMessages,
-  type AppMessages,
-} from "@/lib/i18n/messages";
+import { getAppMessages, type AppMessages } from "@/lib/i18n/messages";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { formatAppDate } from "@/lib/dates";
 
@@ -169,7 +166,8 @@ export default async function AssignmentsPage({
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
-                      {messages.assignments.created} {formatAppDate(assignment.created_at)}
+                      {messages.assignments.created}{" "}
+                      {formatAppDate(assignment.created_at)}
                     </p>
                   </CardContent>
                 </Card>
@@ -352,7 +350,8 @@ async function StudentAssignments({
                           </Badge>
                         ) : assignment.due_date ? (
                           <Badge variant="outline">
-                            {messages.assignments.due} {formatAppDate(assignment.due_date)}
+                            {messages.assignments.due}{" "}
+                            {formatAppDate(assignment.due_date)}
                           </Badge>
                         ) : null}
                       </div>

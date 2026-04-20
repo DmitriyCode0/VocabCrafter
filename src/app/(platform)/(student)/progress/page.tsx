@@ -126,9 +126,7 @@ export default async function ProgressPage() {
         <h1 className="text-2xl font-bold tracking-tight">
           {messages.progress.title}
         </h1>
-        <p className="text-muted-foreground">
-          {messages.progress.description}
-        </p>
+        <p className="text-muted-foreground">{messages.progress.description}</p>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">

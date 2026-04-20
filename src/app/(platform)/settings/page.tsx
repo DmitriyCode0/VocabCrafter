@@ -192,9 +192,7 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold tracking-tight">
           {messages.settings.title}
         </h1>
-        <p className="text-muted-foreground">
-          {messages.settings.description}
-        </p>
+        <p className="text-muted-foreground">{messages.settings.description}</p>
       </div>
 
       <Card>
