@@ -43,7 +43,7 @@ interface QuizPlayerProps {
   isOwner?: boolean;
 }
 
-const QUIZ_TIMER_IDLE_TIMEOUT_MS = 60_000;
+const QUIZ_TIMER_IDLE_TIMEOUT_MS = 15_000;
 
 function normalizeDiscussionPrompts(
   rawPrompts: DiscussionPrompt[],
