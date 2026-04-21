@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ export function DiscussionPlayer({
   onPromptsChange,
   onComplete,
 }: DiscussionPlayerProps) {
+  const { messages } = useAppI18n();
   const [regeneratingPromptId, setRegeneratingPromptId] = useState<
     number | null
   >(null);
@@ -76,14 +78,12 @@ export function DiscussionPlayer({
       vocabularyTerms[index];
 
     if (!sourceTerm || !vocabularyTerm) {
-      toast.error("Could not determine the target vocabulary for this prompt.");
+      toast.error(messages.quizSession.discussion.missingTargetVocab);
       return;
     }
 
     if (!quizConfig) {
-      toast.error(
-        "This quiz is missing its generation config, so the prompt cannot be regenerated.",
-      );
+      toast.error(messages.quizSession.discussion.missingConfig);
       return;
     }
 
@@ -108,8 +108,8 @@ export function DiscussionPlayer({
       if (!generateResponse.ok) {
         throw new Error(
           generated && "error" in generated
-            ? generated.error || "Failed to regenerate prompt"
-            : "Failed to regenerate prompt",
+            ? generated.error || messages.quizSession.discussion.regenerateFailed
+            : messages.quizSession.discussion.regenerateFailed,
         );
       }
 
@@ -119,7 +119,7 @@ export function DiscussionPlayer({
           : undefined;
 
       if (!nextPrompt) {
-        throw new Error("No regenerated prompt was returned.");
+        throw new Error(messages.quizSession.discussion.noRegeneratedPrompt);
       }
 
       const nextPrompts = prompts.map((currentPrompt, currentIndex) =>
@@ -148,14 +148,18 @@ export function DiscussionPlayer({
       } | null;
 
       if (!saveResponse.ok) {
-        throw new Error(saved?.error || "Failed to save regenerated prompt");
+        throw new Error(
+          saved?.error || messages.quizSession.discussion.saveFailed,
+        );
       }
 
       onPromptsChange?.(nextPrompts);
-      toast.success(`Regenerated prompt for \"${sourceTerm}\".`);
+      toast.success(messages.quizSession.discussion.regenerateSuccess(sourceTerm));
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to regenerate prompt",
+        error instanceof Error
+          ? error.message
+          : messages.quizSession.discussion.regenerateFailed,
       );
     } finally {
       setRegeneratingPromptId(null);
@@ -166,7 +170,9 @@ export function DiscussionPlayer({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Live Discussion</CardTitle>
+          <CardTitle className="text-lg">
+            {messages.quizSession.discussion.title}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {prompts.map((prompt, index) => (
@@ -179,15 +185,17 @@ export function DiscussionPlayer({
                   <Badge variant="outline">#{index + 1}</Badge>
                   <Badge variant="secondary">
                     {prompt.type === "agree-disagree"
-                      ? "Agree / Disagree"
-                      : "Open-ended"}
+                      ? messages.quizSession.discussion.agreeDisagree
+                      : messages.quizSession.discussion.openEnded}
                   </Badge>
                   {getPromptTerm(prompt, index) ? (
                     <Badge
                       variant="outline"
                       className="border-primary/25 bg-primary/5 text-primary"
                     >
-                      Target vocab: {getPromptTerm(prompt, index)}
+                      {messages.quizSession.discussion.targetVocab(
+                        getPromptTerm(prompt, index) ?? "",
+                      )}
                     </Badge>
                   ) : null}
                 </div>
@@ -203,12 +211,12 @@ export function DiscussionPlayer({
                       {regeneratingPromptId === prompt.id ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Regenerating...
+                          {messages.quizSession.discussion.regenerating}
                         </>
                       ) : (
                         <>
                           <RefreshCw className="mr-2 h-4 w-4" />
-                          Regenerate Question
+                          {messages.quizSession.discussion.regenerateQuestion}
                         </>
                       )}
                     </Button>
@@ -216,7 +224,7 @@ export function DiscussionPlayer({
                   <BrowserTtsButton
                     text={prompt.prompt}
                     language={quizConfig?.targetLanguage}
-                    label="Listen"
+                    label={messages.common.listen}
                   />
                 </div>
               </div>
@@ -231,12 +239,12 @@ export function DiscussionPlayer({
 
           {prompts.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              No discussion prompts were generated for this quiz.
+              {messages.quizSession.discussion.noPrompts}
             </p>
           )}
 
           <Button className="w-full" onClick={() => onComplete(prompts)}>
-            Finish Session
+            {messages.quizSession.discussion.finishSession}
           </Button>
         </CardContent>
       </Card>

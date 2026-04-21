@@ -24,9 +24,15 @@ import {
   Database,
 } from "lucide-react";
 import type { Role } from "@/types/roles";
-import { buildPlanFeatures, fmtLimit } from "@/lib/plans";
+import { fmtLimit } from "@/lib/plans";
 import { getPlan } from "@/lib/plans-server";
-import { formatAppMonthName } from "@/lib/dates";
+import { normalizeAppLanguage, type AppLanguage } from "@/lib/i18n/app-language";
+import { formatMonthNameForAppLanguage } from "@/lib/i18n/format";
+import { getAppMessages, type AppMessages } from "@/lib/i18n/messages";
+import {
+  getLocalizedPlanFeatures,
+  getLocalizedPlanName,
+} from "@/lib/i18n/plans";
 import {
   AUDIO_TOKENS_PER_SECOND,
   GEMINI_TEXT_INPUT_COST_PER_MILLION,
@@ -77,12 +83,14 @@ export default async function BillingPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, plan, ai_calls_this_month, ai_calls_reset_at")
+    .select("role, plan, ai_calls_this_month, ai_calls_reset_at, app_language")
     .eq("id", user.id)
     .single();
   if (!profile) redirect("/login");
 
   const role = profile.role as Role;
+  const appLanguage = normalizeAppLanguage(profile.app_language);
+  const messages = getAppMessages(appLanguage);
   const plan = await getPlan(profile.plan);
   const isSuperadmin = role === "superadmin";
 
@@ -143,16 +151,16 @@ export default async function BillingPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Billing &amp; Usage
+            {messages.billing.title}
           </h1>
           <p className="text-muted-foreground">
             {isSuperadmin
-              ? "Platform-wide usage metrics and AI cost tracking."
-              : "Your current plan and quota usage this month."}
+              ? messages.billing.adminDescription
+              : messages.billing.userDescription}
           </p>
         </div>
         <Button asChild variant="outline" className="w-full sm:w-auto">
-          <Link href="/plans">Open Plans</Link>
+          <Link href="/plans">{messages.billing.openPlans}</Link>
         </Button>
       </div>
 
@@ -162,21 +170,27 @@ export default async function BillingPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Crown className="h-5 w-5 text-yellow-500" />
-                {plan.name} Plan
+                {messages.billing.currentPlanTitle(
+                  getLocalizedPlanName(messages, plan.key),
+                )}
               </CardTitle>
               <Badge variant={plan.badge}>
-                {plan.price === 0 ? "Free" : `$${plan.price}/mo`}
+                {plan.price === 0
+                  ? messages.billing.freeBadge
+                  : messages.billing.paidBadge(plan.price)}
               </Badge>
             </div>
             <CardDescription>
               {plan.key === "free"
-                ? "You are on the Free tier — all core features included."
-                : `You are subscribed to the ${plan.name} plan.`}
+                ? messages.billing.freePlanDescription
+                : messages.billing.subscribedDescription(
+                    getLocalizedPlanName(messages, plan.key),
+                  )}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="grid gap-2 sm:grid-cols-2">
-              {buildPlanFeatures(plan).map((f) => (
+              {getLocalizedPlanFeatures(messages, plan).map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
                   {f}
@@ -191,37 +205,41 @@ export default async function BillingPage() {
       {/*  Usage meters                           */}
       {/* ═══════════════════════════════════════ */}
       {isSuperadmin ? (
-        <SuperadminOverviewCards />
+        <SuperadminOverviewCards appLanguage={appLanguage} messages={messages} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <UsageMeter
-            title="AI Calls"
+            title={messages.billing.usageTitles.aiCalls}
             icon={<Cpu className="h-4 w-4 text-muted-foreground" />}
             used={aiCallsUsed}
             limit={plan.aiCallsPerMonth}
             color="bg-violet-500"
+            messages={messages}
           />
           <UsageMeter
-            title="Quizzes Created"
+            title={messages.billing.usageTitles.quizzesCreated}
             icon={<BookOpen className="h-4 w-4 text-muted-foreground" />}
             used={quizUsed}
             limit={plan.quizzesPerMonth}
             color="bg-blue-500"
+            messages={messages}
           />
           <UsageMeter
-            title="Quiz Attempts"
+            title={messages.billing.usageTitles.quizAttempts}
             icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
             used={attemptUsed}
             limit={plan.attemptsPerMonth}
             color="bg-emerald-500"
+            messages={messages}
           />
           <UsageMeter
-            title="Word Banks"
+            title={messages.billing.usageTitles.wordBanks}
             icon={<Database className="h-4 w-4 text-muted-foreground" />}
             used={wbUsed}
             limit={plan.wordBanks}
             color="bg-amber-500"
             isTotal
+            messages={messages}
           />
         </div>
       )}
@@ -229,12 +247,20 @@ export default async function BillingPage() {
       {/* ═══════════════════════════════════════ */}
       {/*  Superadmin: Platform AI cost section   */}
       {/* ═══════════════════════════════════════ */}
-      {role === "superadmin" && <AdminUsageSection />}
+      {role === "superadmin" && (
+        <AdminUsageSection appLanguage={appLanguage} messages={messages} />
+      )}
     </div>
   );
 }
 
-async function SuperadminOverviewCards() {
+async function SuperadminOverviewCards({
+  appLanguage,
+  messages,
+}: {
+  appLanguage: AppLanguage;
+  messages: AppMessages;
+}) {
   const supabaseAdmin = createAdminClient();
 
   const monthStart = new Date();
@@ -285,33 +311,37 @@ async function SuperadminOverviewCards() {
   const totalAttempts = totalAttemptsResult.count ?? 0;
   const monthlyAttempts = monthlyAttemptsResult.count ?? 0;
   const totalWordBanks = totalWordBanksResult.count ?? 0;
-  const monthLabel = formatAppMonthName(new Date());
+  const monthLabel = formatMonthNameForAppLanguage(appLanguage, new Date());
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <PlatformStatCard
-        title="AI Calls"
+        title={messages.billing.usageTitles.aiCalls}
         icon={<Cpu className="h-4 w-4 text-muted-foreground" />}
         value={totalAiCallsThisMonth.toLocaleString()}
-        description={`${monthLabel} across all users`}
+        description={messages.billing.platformDescriptions.aiCalls(monthLabel)}
       />
       <PlatformStatCard
-        title="Quizzes Created"
+        title={messages.billing.usageTitles.quizzesCreated}
         icon={<BookOpen className="h-4 w-4 text-muted-foreground" />}
         value={totalQuizzes.toLocaleString()}
-        description={`${monthlyQuizzes.toLocaleString()} created this month`}
+        description={messages.billing.platformDescriptions.quizzesCreated(
+          monthlyQuizzes.toLocaleString(),
+        )}
       />
       <PlatformStatCard
-        title="Quiz Attempts"
+        title={messages.billing.usageTitles.quizAttempts}
         icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
         value={totalAttempts.toLocaleString()}
-        description={`${monthlyAttempts.toLocaleString()} completed this month`}
+        description={messages.billing.platformDescriptions.quizAttempts(
+          monthlyAttempts.toLocaleString(),
+        )}
       />
       <PlatformStatCard
-        title="Word Banks"
+        title={messages.billing.usageTitles.wordBanks}
         icon={<Database className="h-4 w-4 text-muted-foreground" />}
         value={totalWordBanks.toLocaleString()}
-        description="Currently saved across all users"
+        description={messages.billing.platformDescriptions.wordBanks}
       />
     </div>
   );
@@ -352,6 +382,7 @@ function UsageMeter({
   limit,
   color,
   isTotal,
+  messages,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -359,6 +390,7 @@ function UsageMeter({
   limit: number;
   color: string;
   isTotal?: boolean;
+  messages: AppMessages;
 }) {
   const percentage = pct(used, limit);
   const isWarning = percentage >= 80;
@@ -386,9 +418,13 @@ function UsageMeter({
         <p className="text-xs text-muted-foreground">
           {isFinite(limit)
             ? isTotal
-              ? `${Math.max(0, limit - used).toLocaleString()} remaining`
-              : `${Math.max(0, limit - used).toLocaleString()} remaining this month`
-            : "Unlimited"}
+              ? messages.billing.remaining(
+                  Math.max(0, limit - used).toLocaleString(),
+                )
+              : messages.billing.remainingThisMonth(
+                  Math.max(0, limit - used).toLocaleString(),
+                )
+            : messages.billing.unlimited}
         </p>
       </CardContent>
     </Card>
@@ -398,14 +434,20 @@ function UsageMeter({
 /* ─────────────────────────────────────────── */
 /*  Admin-only: platform-wide AI cost section  */
 /* ─────────────────────────────────────────── */
-async function AdminUsageSection() {
+async function AdminUsageSection({
+  appLanguage,
+  messages,
+}: {
+  appLanguage: AppLanguage;
+  messages: AppMessages;
+}) {
   const supabaseAdmin = createAdminClient();
 
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
   const monthISO = monthStart.toISOString();
-  const monthLabel = formatAppMonthName(new Date());
+  const monthLabel = formatMonthNameForAppLanguage(appLanguage, new Date());
 
   const [profilesResult, monthlyUsageEventsResult] = await Promise.all([
     supabaseAdmin
@@ -428,9 +470,11 @@ async function AdminUsageSection() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Platform AI Usage</CardTitle>
+          <CardTitle className="text-lg">
+            {messages.billing.loadFailedTitle}
+          </CardTitle>
           <CardDescription>
-            Unable to load Gemini paid-tier usage estimates right now.
+            {messages.billing.loadFailedDescription}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -493,18 +537,23 @@ async function AdminUsageSection() {
 
       <div>
         <h2 className="text-xl font-semibold tracking-tight">
-          Platform AI Usage
+          {messages.billing.platformAiUsageTitle}
         </h2>
         <p className="text-sm text-muted-foreground">
-          Paid-tier estimates for {GEMINI_MODEL} text generation and{" "}
-          {GEMINI_TTS_MODEL} text-to-speech in {monthLabel}
+          {messages.billing.platformAiUsageDescription(
+            GEMINI_MODEL,
+            GEMINI_TTS_MODEL,
+            monthLabel,
+          )}
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Text Requests</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {messages.billing.usageTitles.textRequests}
+            </CardTitle>
             <Cpu className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -512,26 +561,11 @@ async function AdminUsageSection() {
               {textRequestCount.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              {formatApproxUsd(textCost)} approx. •{" "}
-              {textPromptTokens.toLocaleString()} input /{" "}
-              {textResponseTokens.toLocaleString()} output tokens
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">TTS Requests</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {ttsRequestCount.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {formatApproxUsd(ttsCost)} approx. •{" "}
-              {ttsPromptTokens.toLocaleString()} text input /{" "}
-              {ttsAudioOutputTokens.toLocaleString()} audio output tokens
+              {messages.billing.textRequestsSummary(
+                formatApproxUsd(textCost),
+                textPromptTokens.toLocaleString(),
+                textResponseTokens.toLocaleString(),
+              )}
             </p>
           </CardContent>
         </Card>
@@ -539,7 +573,28 @@ async function AdminUsageSection() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              Tracked AI Cost
+              {messages.billing.usageTitles.ttsRequests}
+            </CardTitle>
+            <Zap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {ttsRequestCount.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {messages.billing.ttsRequestsSummary(
+                formatApproxUsd(ttsCost),
+                ttsPromptTokens.toLocaleString(),
+                ttsAudioOutputTokens.toLocaleString(),
+              )}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              {messages.billing.usageTitles.trackedAiCost}
             </CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -548,8 +603,10 @@ async function AdminUsageSection() {
               {formatApproxUsd(totalTrackedCost)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {trackedRequestCount.toLocaleString()} tracked requests in{" "}
-              {monthLabel}
+              {messages.billing.trackedCostSummary(
+                trackedRequestCount.toLocaleString(),
+                monthLabel,
+              )}
             </p>
           </CardContent>
         </Card>
@@ -557,7 +614,7 @@ async function AdminUsageSection() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              Unallocated Calls
+              {messages.billing.usageTitles.unallocatedCalls}
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -567,8 +624,8 @@ async function AdminUsageSection() {
             </div>
             <p className="text-xs text-muted-foreground">
               {legacyCombinedCalls > 0
-                ? "Older combined calls this month, excluded from the split estimates"
-                : "No pre-tracking calls left unallocated this month"}
+                ? messages.billing.unallocatedCallsOld
+                : messages.billing.unallocatedCallsNone}
             </p>
           </CardContent>
         </Card>
@@ -576,10 +633,11 @@ async function AdminUsageSection() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Pricing Basis</CardTitle>
+          <CardTitle className="text-lg">
+            {messages.billing.pricingBasisTitle}
+          </CardTitle>
           <CardDescription>
-            Official Google AI paid-tier pricing for the models currently used
-            in this app
+            {messages.billing.pricingBasisDescription}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
@@ -587,43 +645,42 @@ async function AdminUsageSection() {
             <div className="rounded-lg border bg-muted/30 p-3">
               <p className="font-medium text-foreground">{GEMINI_MODEL}</p>
               <p>
-                {formatApproxUsd(GEMINI_TEXT_INPUT_COST_PER_MILLION)} per 1M
-                input tokens
+                {messages.billing.inputTokensPrice(
+                  formatApproxUsd(GEMINI_TEXT_INPUT_COST_PER_MILLION),
+                )}
               </p>
               <p>
-                {formatApproxUsd(GEMINI_TEXT_OUTPUT_COST_PER_MILLION)} per 1M
-                output tokens
+                {messages.billing.outputTokensPrice(
+                  formatApproxUsd(GEMINI_TEXT_OUTPUT_COST_PER_MILLION),
+                )}
               </p>
             </div>
             <div className="rounded-lg border bg-muted/30 p-3">
               <p className="font-medium text-foreground">{GEMINI_TTS_MODEL}</p>
               <p>
-                {formatApproxUsd(GEMINI_TTS_INPUT_COST_PER_MILLION)} per 1M
-                input text tokens
+                {messages.billing.inputTextTokensPrice(
+                  formatApproxUsd(GEMINI_TTS_INPUT_COST_PER_MILLION),
+                )}
               </p>
               <p>
-                {formatApproxUsd(GEMINI_TTS_OUTPUT_COST_PER_MILLION)} per 1M
-                output audio tokens
+                {messages.billing.outputAudioTokensPrice(
+                  formatApproxUsd(GEMINI_TTS_OUTPUT_COST_PER_MILLION),
+                )}
               </p>
             </div>
           </div>
           <p className="text-xs">
-            Text requests use Gemini response token metadata. If Gemini omits
-            TTS audio token details, output audio is approximated from duration
-            at {AUDIO_TOKENS_PER_SECOND} audio tokens per second.
+            {messages.billing.estimationNote(AUDIO_TOKENS_PER_SECOND)}
           </p>
           <p className="text-xs">
-            {estimatedEventCount.toLocaleString()} tracked request
-            {estimatedEventCount === 1 ? " uses" : "s use"} fallback estimation
-            this month.
+            {messages.billing.estimatedRequests(estimatedEventCount)}
           </p>
           {legacyCombinedCalls > 0 && (
             <p className="text-xs">
-              Detailed text-vs-TTS tracking started after some {monthLabel} AI
-              usage had already been counted, so{" "}
-              {legacyCombinedCalls.toLocaleString()} earlier call
-              {legacyCombinedCalls === 1 ? " remains" : "s remain"} combined and
-              cannot be split across the two model cards.
+              {messages.billing.legacyCombinedCalls(
+                monthLabel,
+                legacyCombinedCalls.toLocaleString(),
+              )}
             </p>
           )}
         </CardContent>

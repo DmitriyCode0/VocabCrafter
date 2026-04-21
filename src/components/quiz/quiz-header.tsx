@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ACTIVITY_LABELS } from "@/lib/constants";
 import { ArrowLeft, Pencil, Check, X, Loader2 } from "lucide-react";
 
 interface QuizHeaderProps {
@@ -17,9 +17,14 @@ interface QuizHeaderProps {
 
 export function QuizHeader({ quizId, title, type, isOwner }: QuizHeaderProps) {
   const router = useRouter();
+  const { messages } = useAppI18n();
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
   const [isSaving, setIsSaving] = useState(false);
+  const activityLabel =
+    messages.createQuiz.activityLabels[
+      type as keyof typeof messages.createQuiz.activityLabels
+    ] || type;
 
   async function handleSave() {
     if (!editTitle.trim() || editTitle === title) {
@@ -52,7 +57,7 @@ export function QuizHeader({ quizId, title, type, isOwner }: QuizHeaderProps) {
       <Button variant="ghost" size="sm" asChild>
         <Link href="/quizzes">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+          {messages.quizSession.header.backToQuizzes}
         </Link>
       </Button>
       <div className="flex-1">
@@ -112,7 +117,7 @@ export function QuizHeader({ quizId, title, type, isOwner }: QuizHeaderProps) {
           </div>
         )}
         <p className="text-sm text-muted-foreground">
-          {ACTIVITY_LABELS[type] || type}
+          {activityLabel}
         </p>
       </div>
     </div>

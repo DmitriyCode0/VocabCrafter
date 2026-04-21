@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Trash2, Loader2 } from "lucide-react";
 import type { Quiz } from "@/types/database";
 import { ACTIVITY_LABELS } from "@/lib/constants";
@@ -26,7 +27,7 @@ import {
   getGrammarTopicDisplayName,
   getPrimaryGrammarTopic,
 } from "@/lib/utils";
-import { formatAppDate } from "@/lib/dates";
+import { formatDateForAppLanguage } from "@/lib/i18n/format";
 
 interface QuizCardProps {
   quiz: Quiz;
@@ -34,6 +35,7 @@ interface QuizCardProps {
 
 export function QuizCard({ quiz }: QuizCardProps) {
   const router = useRouter();
+  const { messages, appLanguage } = useAppI18n();
   const [isDeleting, setIsDeleting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const terms = quiz.vocabulary_terms as {
@@ -44,6 +46,15 @@ export function QuizCard({ quiz }: QuizCardProps) {
   const grammarTopic = grammarTopicKey
     ? getGrammarTopicDisplayName(quiz.config, grammarTopicKey)
     : null;
+  const typeLabel =
+    messages.quizzes.typeLabels[
+      quiz.type as keyof typeof messages.quizzes.typeLabels
+    ] ||
+    messages.createQuiz.quizWordPicker.typeLabels[
+      quiz.type as keyof typeof messages.createQuiz.quizWordPicker.typeLabels
+    ] ||
+    ACTIVITY_LABELS[quiz.type] ||
+    quiz.type;
 
   async function handleDelete(e: React.MouseEvent) {
     e.preventDefault();
@@ -77,7 +88,7 @@ export function QuizCard({ quiz }: QuizCardProps) {
                   {quiz.title}
                 </CardTitle>
                 <Badge variant="secondary" className="text-xs shrink-0">
-                  {ACTIVITY_LABELS[quiz.type] || quiz.type}
+                  {typeLabel}
                 </Badge>
               </div>
               <div className="flex min-w-0 flex-wrap items-start gap-2">
@@ -97,10 +108,12 @@ export function QuizCard({ quiz }: QuizCardProps) {
               </div>
             </div>
             <CardDescription>
-              {Array.isArray(terms) ? terms.length : 0} terms
+              {messages.quizzes.card.termCount(
+                Array.isArray(terms) ? terms.length : 0,
+              )}
             </CardDescription>
             <p className="text-xs text-muted-foreground">
-              {formatAppDate(quiz.created_at)}
+              {formatDateForAppLanguage(appLanguage, quiz.created_at)}
             </p>
           </CardHeader>
         </Card>
@@ -116,15 +129,15 @@ export function QuizCard({ quiz }: QuizCardProps) {
             e.stopPropagation();
             setDialogOpen(true);
           }}
+          aria-label={messages.quizzes.card.deleteAria}
         >
           <Trash2 className="h-4 w-4" />
         </Button>
         <DialogContent onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
-            <DialogTitle>Delete Quiz</DialogTitle>
+            <DialogTitle>{messages.quizzes.card.deleteTitle}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &ldquo;{quiz.title}&rdquo;? This
-              action cannot be undone.
+              {messages.quizzes.card.deleteDescription(quiz.title)}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -133,7 +146,7 @@ export function QuizCard({ quiz }: QuizCardProps) {
               onClick={() => setDialogOpen(false)}
               disabled={isDeleting}
             >
-              Cancel
+              {messages.common.cancel}
             </Button>
             <Button
               variant="destructive"
@@ -143,10 +156,10 @@ export function QuizCard({ quiz }: QuizCardProps) {
               {isDeleting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
+                  {messages.quizzes.card.deleting}
                 </>
               ) : (
-                "Delete"
+                messages.quizzes.card.deleteAction
               )}
             </Button>
           </DialogFooter>

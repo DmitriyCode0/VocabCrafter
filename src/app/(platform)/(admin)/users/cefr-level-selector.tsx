@@ -12,6 +12,7 @@ import { ALL_CEFR_LEVELS } from "@/lib/languages";
 import { toast } from "sonner";
 import { changeUserCefrLevel } from "./actions";
 import type { CEFRLevel } from "@/types/quiz";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 
 interface CefrLevelSelectorProps {
   userId: string;
@@ -35,6 +36,7 @@ export function CefrLevelSelector({
   currentCefrLevel,
   allowedLevels,
 }: CefrLevelSelectorProps) {
+  const { messages } = useAppI18n();
   const [cefrLevel, setCefrLevel] = useState<CEFRLevel>(() =>
     getInitialCefrLevel(currentCefrLevel, allowedLevels),
   );
@@ -53,10 +55,10 @@ export function CefrLevelSelector({
     startTransition(async () => {
       try {
         await changeUserCefrLevel(userId, newCefrLevel);
-        toast.success(`CEFR updated to ${newCefrLevel}`);
+        toast.success(messages.adminUsers.cefrUpdated(newCefrLevel));
       } catch {
         setCefrLevel(previousLevel);
-        toast.error("Failed to update CEFR level");
+        toast.error(messages.adminUsers.cefrUpdateFailed);
       }
     });
   }

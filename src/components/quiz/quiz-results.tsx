@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import {
   Card,
   CardContent,
@@ -30,6 +31,7 @@ import {
 interface QuizResultsProps {
   type: "mcq" | "gap_fill" | "translation" | "text_translation";
   quizId: string;
+  timeSpentSeconds: number;
   mcqResults?: MCQResult[];
   gapFillResults?: GapFillResult[];
   translationResults?: TranslationResult[];
@@ -41,6 +43,7 @@ interface QuizResultsProps {
 export function QuizResults({
   type,
   quizId,
+  timeSpentSeconds,
   mcqResults,
   gapFillResults,
   translationResults,
@@ -48,13 +51,20 @@ export function QuizResults({
   quizConfig,
   onRestart,
 }: QuizResultsProps) {
+  const { messages } = useAppI18n();
   const savedRef = useRef(false);
-  const targetLanguageLabel = getLearningLanguageLabel(
-    normalizeLearningLanguage(quizConfig?.targetLanguage),
+  const normalizedTargetLanguage = normalizeLearningLanguage(
+    quizConfig?.targetLanguage,
   );
-  const sourceLanguageLabel = getSourceLanguageLabel(
-    normalizeSourceLanguage(quizConfig?.sourceLanguage),
+  const normalizedSourceLanguage = normalizeSourceLanguage(
+    quizConfig?.sourceLanguage,
   );
+  const targetLanguageLabel =
+    messages.common.studyLanguageNames[normalizedTargetLanguage] ||
+    getLearningLanguageLabel(normalizedTargetLanguage);
+  const sourceLanguageLabel =
+    messages.common.studyLanguageNames[normalizedSourceLanguage] ||
+    getSourceLanguageLabel(normalizedSourceLanguage);
 
   useEffect(() => {
     if (savedRef.current) return;
@@ -67,6 +77,7 @@ export function QuizResults({
         { type: "mcq", results: mcqResults },
         correct,
         mcqResults.length,
+        timeSpentSeconds,
       );
     } else if (type === "gap_fill" && gapFillResults) {
       const correct = gapFillResults.filter((r) => r.isCorrect).length;
@@ -75,6 +86,7 @@ export function QuizResults({
         { type: "gap_fill", results: gapFillResults },
         correct,
         gapFillResults.length,
+        timeSpentSeconds,
       );
     } else if (type === "translation" && translationResults) {
       const avgScore = Math.round(
@@ -86,6 +98,7 @@ export function QuizResults({
         { type: "translation", results: translationResults },
         avgScore,
         100,
+        timeSpentSeconds,
       );
     } else if (type === "text_translation" && textTranslationResults) {
       const averageScore = Math.round(
@@ -97,11 +110,13 @@ export function QuizResults({
         { type: "text_translation", results: textTranslationResults },
         averageScore,
         100,
+        timeSpentSeconds,
       );
     }
   }, [
     type,
     quizId,
+    timeSpentSeconds,
     mcqResults,
     gapFillResults,
     textTranslationResults,
@@ -116,9 +131,11 @@ export function QuizResults({
       <div className="space-y-6">
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Quiz Complete!</CardTitle>
+            <CardTitle className="text-2xl">
+              {messages.quizSession.results.quizCompleteTitle}
+            </CardTitle>
             <CardDescription>
-              You scored {correct} out of {total} ({percentage}%)
+              {messages.quizSession.results.scored(correct, total, percentage)}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -139,11 +156,12 @@ export function QuizResults({
                 <div className="text-sm">
                   <p className="mb-1 font-medium">{result.question}</p>
                   <p>
-                    Your answer: <strong>{result.selectedAnswer || "—"}</strong>
+                    {messages.quizSession.results.yourAnswer}: <strong>{result.selectedAnswer || "—"}</strong>
                   </p>
                   {!result.isCorrect ? (
                     <p className="text-muted-foreground">
-                      Correct: <strong>{result.correctAnswer}</strong>
+                      {messages.quizSession.results.correctAnswer}:{" "}
+                      <strong>{result.correctAnswer}</strong>
                     </p>
                   ) : null}
                 </div>
@@ -153,12 +171,12 @@ export function QuizResults({
             <div className="flex gap-2 pt-4">
               <Button variant="outline" onClick={onRestart}>
                 <RotateCcw className="mr-2 h-4 w-4" />
-                Try Again
+                {messages.common.restart}
               </Button>
               <Button asChild className="flex-1">
                 <Link href="/quizzes">
                   <Home className="mr-2 h-4 w-4" />
-                  My Quizzes
+                  {messages.quizzes.title}
                 </Link>
               </Button>
             </div>
@@ -177,9 +195,11 @@ export function QuizResults({
       <div className="space-y-6">
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Quiz Complete!</CardTitle>
+            <CardTitle className="text-2xl">
+              {messages.quizSession.results.quizCompleteTitle}
+            </CardTitle>
             <CardDescription>
-              You scored {correct} out of {total} ({percentage}%)
+              {messages.quizSession.results.scored(correct, total, percentage)}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -199,11 +219,13 @@ export function QuizResults({
                 )}
                 <div className="text-sm">
                   <p>
-                    Your answer: <strong>{result.userAnswer}</strong>
+                    {messages.quizSession.results.yourAnswer}:{" "}
+                    <strong>{result.userAnswer}</strong>
                   </p>
                   {!result.isCorrect && (
                     <p className="text-muted-foreground">
-                      Correct: <strong>{result.correctAnswer}</strong>
+                      {messages.quizSession.results.correctAnswer}:{" "}
+                      <strong>{result.correctAnswer}</strong>
                     </p>
                   )}
                 </div>
@@ -213,12 +235,12 @@ export function QuizResults({
             <div className="flex gap-2 pt-4">
               <Button variant="outline" onClick={onRestart}>
                 <RotateCcw className="mr-2 h-4 w-4" />
-                Try Again
+                {messages.common.restart}
               </Button>
               <Button asChild className="flex-1">
                 <Link href="/quizzes">
                   <Home className="mr-2 h-4 w-4" />
-                  My Quizzes
+                  {messages.quizzes.title}
                 </Link>
               </Button>
             </div>
@@ -238,8 +260,12 @@ export function QuizResults({
       <div className="space-y-6">
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Translation Complete!</CardTitle>
-            <CardDescription>Average score: {avgScore}/100</CardDescription>
+            <CardTitle className="text-2xl">
+              {messages.quizSession.results.translationCompleteTitle}
+            </CardTitle>
+            <CardDescription>
+              {messages.quizSession.results.averageScore(avgScore)}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {translationResults.map((result, index) => {
@@ -253,7 +279,9 @@ export function QuizResults({
               return (
                 <div key={index} className="p-3 rounded-md bg-muted space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Sentence {index + 1}</p>
+                    <p className="text-sm font-medium">
+                      {messages.quizSession.results.sentenceLabel(index + 1)}
+                    </p>
                     <Badge
                       variant="outline"
                       className={
@@ -271,24 +299,29 @@ export function QuizResults({
                     {stripMarkdownEmphasis(result.ukrainianSentence)}
                   </p>
                   <p className="text-sm">
-                    Your translation: <em>{result.userTranslation}</em>
+                    {messages.quizSession.results.yourTranslation}:{" "}
+                    <em>{result.userTranslation}</em>
                   </p>
                   <div className="space-y-2 rounded-md bg-background/70 p-3">
                     <div className="flex items-start justify-between gap-3">
                       <p className="text-sm text-muted-foreground">
-                        Reference ({targetLanguageLabel}):{" "}
+                        {messages.quizSession.results.referenceTranslation(
+                          targetLanguageLabel,
+                        )}{" "}
                         <em>{result.referenceTranslation}</em>
                       </p>
                       <BrowserTtsButton
                         text={result.referenceTranslation}
                         language={quizConfig?.targetLanguage}
-                        label="Listen"
+                        label={messages.common.listen}
                         className="shrink-0"
                       />
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Source sentence ({sourceLanguageLabel})
+                    {messages.quizSession.results.sourceSentence(
+                      sourceLanguageLabel,
+                    )}
                   </p>
                   {visibleFeedback.length > 0 && (
                     <div className="text-xs text-muted-foreground space-y-0.5">
@@ -319,12 +352,12 @@ export function QuizResults({
             <div className="flex gap-2 pt-4">
               <Button variant="outline" onClick={onRestart}>
                 <RotateCcw className="mr-2 h-4 w-4" />
-                Try Again
+                {messages.common.restart}
               </Button>
               <Button asChild className="flex-1">
                 <Link href="/quizzes">
                   <Home className="mr-2 h-4 w-4" />
-                  My Quizzes
+                  {messages.quizzes.title}
                 </Link>
               </Button>
             </div>
@@ -346,14 +379,16 @@ export function QuizResults({
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">
-              Text Translation Complete!
+              {messages.quizSession.results.textTranslationCompleteTitle}
             </CardTitle>
-            <CardDescription>Score: {result.score}/100</CardDescription>
+            <CardDescription>
+              {messages.quizSession.results.scoreDescription(result.score)}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-md bg-muted p-4 space-y-2">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Source text ({sourceLanguageLabel})
+                {messages.quizSession.results.sourceText(sourceLanguageLabel)}
               </p>
               <p className="whitespace-pre-line text-sm leading-relaxed">
                 {stripMarkdownEmphasis(result.originalText)}
@@ -362,7 +397,7 @@ export function QuizResults({
 
             <div className="rounded-md bg-muted p-4 space-y-2">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Your translation
+                {messages.quizSession.results.yourTranslationTitle}
               </p>
               <p className="whitespace-pre-line text-sm">
                 <em>{result.userTranslation}</em>
@@ -373,7 +408,9 @@ export function QuizResults({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm text-muted-foreground">
-                    Reference ({targetLanguageLabel}):
+                    {messages.quizSession.results.referenceTranslation(
+                      targetLanguageLabel,
+                    )}
                   </p>
                   <p className="whitespace-pre-line text-sm italic">
                     {result.referenceTranslation}
@@ -382,7 +419,7 @@ export function QuizResults({
                 <BrowserTtsButton
                   text={result.referenceTranslation}
                   language={quizConfig?.targetLanguage}
-                  label="Listen"
+                  label={messages.common.listen}
                   className="shrink-0"
                 />
               </div>
@@ -416,12 +453,12 @@ export function QuizResults({
             <div className="flex gap-2 pt-4">
               <Button variant="outline" onClick={onRestart}>
                 <RotateCcw className="mr-2 h-4 w-4" />
-                Try Again
+                {messages.common.restart}
               </Button>
               <Button asChild className="flex-1">
                 <Link href="/quizzes">
                   <Home className="mr-2 h-4 w-4" />
-                  My Quizzes
+                  {messages.quizzes.title}
                 </Link>
               </Button>
             </div>

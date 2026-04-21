@@ -8,12 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Star } from "lucide-react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 
 interface ReviewFeedbackFormProps {
   attemptId: string;
 }
 
 export function ReviewFeedbackForm({ attemptId }: ReviewFeedbackFormProps) {
+  const { messages } = useAppI18n();
   const router = useRouter();
   const [content, setContent] = useState("");
   const [rating, setRating] = useState(0);
@@ -23,7 +25,7 @@ export function ReviewFeedbackForm({ attemptId }: ReviewFeedbackFormProps) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!content.trim()) {
-      toast.error("Please enter feedback");
+      toast.error(messages.reviewDetail.form.enterFeedback);
       return;
     }
 
@@ -41,16 +43,16 @@ export function ReviewFeedbackForm({ attemptId }: ReviewFeedbackFormProps) {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to submit feedback");
+        throw new Error(data.error || messages.reviewDetail.form.submitFailed);
       }
 
-      toast.success("Feedback submitted");
+      toast.success(messages.reviewDetail.form.submitted);
       setContent("");
       setRating(0);
       router.refresh();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to submit feedback",
+        err instanceof Error ? err.message : messages.reviewDetail.form.submitFailed,
       );
     } finally {
       setSaving(false);
@@ -60,12 +62,14 @@ export function ReviewFeedbackForm({ attemptId }: ReviewFeedbackFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Leave Feedback</CardTitle>
+        <CardTitle className="text-lg">
+          {messages.reviewDetail.form.title}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Rating (optional)</Label>
+            <Label>{messages.reviewDetail.form.rating}</Label>
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -89,10 +93,10 @@ export function ReviewFeedbackForm({ attemptId }: ReviewFeedbackFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="feedback">Feedback</Label>
+            <Label htmlFor="feedback">{messages.reviewDetail.form.feedback}</Label>
             <Textarea
               id="feedback"
-              placeholder="Write your feedback for the student..."
+              placeholder={messages.reviewDetail.form.placeholder}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={4}
@@ -100,7 +104,9 @@ export function ReviewFeedbackForm({ attemptId }: ReviewFeedbackFormProps) {
           </div>
 
           <Button type="submit" disabled={saving || !content.trim()}>
-            {saving ? "Submitting..." : "Submit Feedback"}
+            {saving
+              ? messages.reviewDetail.form.submitting
+              : messages.reviewDetail.form.submit}
           </Button>
         </form>
       </CardContent>

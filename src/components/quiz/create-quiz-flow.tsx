@@ -27,12 +27,12 @@ import { ParsedWordList } from "@/components/quiz/parsed-word-list";
 import { WordBankPicker } from "@/components/quiz/word-bank-picker";
 import { QuizWordPicker } from "@/components/quiz/quiz-word-picker";
 import { GrammarTopicSelector } from "@/components/quiz/grammar-topic-selector";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { useUser } from "@/hooks/use-user";
+import { formatDateForAppLanguage } from "@/lib/i18n/format";
 import {
   getAllowedCefrLevels,
   getDefaultCefrLevelForLanguage,
-  getLearningLanguageLabel,
-  getSourceLanguageLabel,
   normalizeLearningLanguage,
   normalizeSourceLanguage,
 } from "@/lib/languages";
@@ -57,18 +57,8 @@ import {
   GraduationCap,
 } from "lucide-react";
 import type { QuizTerm, CEFRLevel } from "@/types/quiz";
-import { formatAppDate } from "@/lib/dates";
 
 const CEFR_LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
-
-const CEFR_DESCRIPTIONS: Record<CEFRLevel, string> = {
-  A1: "Beginner",
-  A2: "Elementary",
-  B1: "Intermediate",
-  B2: "Upper Intermediate",
-  C1: "Advanced",
-  C2: "Proficiency",
-};
 
 const GRAMMAR_TOPIC_STORAGE_KEY = "vocab-crafter:last-grammar-topic";
 
@@ -100,43 +90,37 @@ interface CreateQuizFlowProps {
 
 const ACTIVITIES: {
   type: ActivityType;
-  label: string;
   icon: React.ReactNode;
 }[] = [
   {
     type: "mcq",
-    label: "Multiple Choice",
     icon: <CircleDot className="h-8 w-8" />,
   },
   {
     type: "flashcards",
-    label: "Flashcards",
     icon: <BookOpen className="h-8 w-8" />,
   },
   {
     type: "gap_fill",
-    label: "Fill in the Gap",
     icon: <PenLine className="h-8 w-8" />,
   },
   {
     type: "translation",
-    label: "Sentence Translation",
     icon: <Languages className="h-8 w-8" />,
   },
   {
     type: "text_translation",
-    label: "Text Translation",
     icon: <FileText className="h-8 w-8" />,
   },
   {
     type: "discussion",
-    label: "Live Discussion",
     icon: <MessageSquare className="h-8 w-8" />,
   },
 ];
 
 export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
   const router = useRouter();
+  const { messages, appLanguage } = useAppI18n();
   const { profile } = useUser();
   const grammarTopicStorageKey = profile?.id
     ? `${GRAMMAR_TOPIC_STORAGE_KEY}:${profile.id}`
@@ -145,8 +129,6 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
   const profileCefrLevel = profile?.cefr_level as CEFRLevel | undefined;
   const targetLanguage = normalizeLearningLanguage(profile?.preferred_language);
   const sourceLanguage = normalizeSourceLanguage(profile?.source_language);
-  const targetLanguageLabel = getLearningLanguageLabel(targetLanguage);
-  const sourceLanguageLabel = getSourceLanguageLabel(sourceLanguage);
   const allowedCefrLevels = getAllowedCefrLevels(targetLanguage);
   const defaultCefr =
     profileCefrLevel && allowedCefrLevels.includes(profileCefrLevel)
@@ -247,27 +229,7 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
   }
 
   function getActivityDescription(type: ActivityType) {
-    if (type === "mcq") {
-      return `Answer ${targetLanguageLabel.toLowerCase()} multiple-choice questions with one correct option and three distractors.`;
-    }
-
-    if (type === "text_translation") {
-      return `Translate a short ${sourceLanguageLabel.toLowerCase()} passage into ${targetLanguageLabel.toLowerCase()} with one full-text score.`;
-    }
-
-    if (type === "translation") {
-      return `Translate ${sourceLanguageLabel.toLowerCase()} sentences into ${targetLanguageLabel.toLowerCase()} using your vocabulary.`;
-    }
-
-    if (type === "gap_fill") {
-      return `Complete ${targetLanguageLabel.toLowerCase()} sentences with the correct vocabulary word.`;
-    }
-
-    if (type === "discussion") {
-      return `Generate CEFR-level topic sentences that naturally use your ${targetLanguageLabel.toLowerCase()} vocabulary for live speaking practice.`;
-    }
-
-    return `Flip cards to memorize ${targetLanguageLabel.toLowerCase()} terms and ${sourceLanguageLabel.toLowerCase()} meanings.`;
+    return messages.createQuiz.activityDescriptions[type];
   }
 
   function handleTermsParsed(parsed: QuizTerm[]) {
@@ -364,7 +326,9 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title || `Quiz - ${formatAppDate(new Date())}`,
+          title:
+            title ||
+            `${messages.createQuiz.defaultTitlePrefix} - ${formatDateForAppLanguage(appLanguage, new Date())}`,
           type: selectedActivity,
           cefrLevel,
           vocabularyTerms: terms,
@@ -390,11 +354,13 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Create New Quiz</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {messages.createQuiz.title}
+        </h1>
         <p className="text-muted-foreground">
-          {step === "input" && "Add vocabulary words to get started."}
-          {step === "edit" && "Review and edit your parsed vocabulary list."}
-          {step === "activity" && "Choose an activity type for your quiz."}
+          {step === "input" && messages.createQuiz.stepDescriptions.input}
+          {step === "edit" && messages.createQuiz.stepDescriptions.edit}
+          {step === "activity" && messages.createQuiz.stepDescriptions.activity}
         </p>
       </div>
 
@@ -407,7 +373,7 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
               : "text-muted-foreground"
           }
         >
-          1. Input
+          1. {messages.createQuiz.steps.input}
         </span>
         <ArrowRight className="h-3 w-3 text-muted-foreground" />
         <span
@@ -417,7 +383,7 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
               : "text-muted-foreground"
           }
         >
-          2. Edit
+          2. {messages.createQuiz.steps.edit}
         </span>
         <ArrowRight className="h-3 w-3 text-muted-foreground" />
         <span
@@ -427,7 +393,7 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
               : "text-muted-foreground"
           }
         >
-          3. Activity
+          3. {messages.createQuiz.steps.activity}
         </span>
       </div>
 
@@ -435,14 +401,20 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
       {step === "input" && (
         <Card>
           <CardHeader>
-            <CardTitle>Add Vocabulary</CardTitle>
+            <CardTitle>{messages.createQuiz.addVocabularyTitle}</CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="parse">
               <TabsList className="mb-4">
-                <TabsTrigger value="parse">Parse New</TabsTrigger>
-                <TabsTrigger value="saved">Saved Words</TabsTrigger>
-                <TabsTrigger value="quiz">From Quiz</TabsTrigger>
+                <TabsTrigger value="parse">
+                  {messages.createQuiz.tabs.parseNew}
+                </TabsTrigger>
+                <TabsTrigger value="saved">
+                  {messages.createQuiz.tabs.savedWords}
+                </TabsTrigger>
+                <TabsTrigger value="quiz">
+                  {messages.createQuiz.tabs.fromQuiz}
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="parse">
                 <WordInput
@@ -468,10 +440,9 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
       {step === "edit" && (
         <Card>
           <CardHeader>
-            <CardTitle>Review Vocabulary</CardTitle>
+            <CardTitle>{messages.createQuiz.reviewTitle}</CardTitle>
             <CardDescription>
-              Edit terms, fix translations, remove unwanted words, or add new
-              ones.
+              {messages.createQuiz.reviewDescription}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -488,29 +459,34 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
                 className="w-full sm:w-auto"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
+                {messages.common.back}
               </Button>
 
               <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="w-full sm:w-auto">
                     <Save className="mr-2 h-4 w-4" />
-                    Save to Word Bank
+                    {messages.createQuiz.saveToWordBank}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Save to Word Bank</DialogTitle>
+                    <DialogTitle>
+                      {messages.createQuiz.saveWordBankTitle}
+                    </DialogTitle>
                     <DialogDescription>
-                      Save these {terms.length} terms for reuse in future
-                      quizzes.
+                      {messages.createQuiz.saveWordBankDescription(
+                        terms.length,
+                      )}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-2">
-                    <Label htmlFor="bank-name">Bank Name</Label>
+                    <Label htmlFor="bank-name">
+                      {messages.createQuiz.bankNameLabel}
+                    </Label>
                     <Input
                       id="bank-name"
-                      placeholder="e.g., Unit 5 Vocabulary"
+                      placeholder={messages.createQuiz.bankNamePlaceholder}
                       value={bankName}
                       onChange={(e) => setBankName(e.target.value)}
                     />
@@ -523,12 +499,12 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
                       {isSavingBank ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
+                          {messages.common.saving}
                         </>
                       ) : bankSaved ? (
-                        "Saved!"
+                        messages.common.saved
                       ) : (
-                        "Save"
+                        messages.common.save
                       )}
                     </Button>
                   </DialogFooter>
@@ -540,7 +516,7 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
                 disabled={terms.length === 0}
                 className="w-full sm:flex-1"
               >
-                Choose Activity
+                {messages.createQuiz.chooseActivity}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -552,10 +528,12 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
       {step === "activity" && (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="quiz-title">Quiz Title (optional)</Label>
+            <Label htmlFor="quiz-title">
+              {messages.createQuiz.quizTitleLabel}
+            </Label>
             <Input
               id="quiz-title"
-              placeholder="e.g., Unit 5 Vocabulary"
+              placeholder={messages.createQuiz.quizTitlePlaceholder}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -582,7 +560,9 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
                   >
                     {activity.icon}
                   </div>
-                  <CardTitle className="text-base">{activity.label}</CardTitle>
+                  <CardTitle className="text-base">
+                    {messages.createQuiz.activityLabels[activity.type]}
+                  </CardTitle>
                   <CardDescription>
                     {getActivityDescription(activity.type)}
                   </CardDescription>
@@ -597,14 +577,14 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
               <GraduationCap className="h-5 w-5 text-muted-foreground" />
               <div className="space-y-0.5">
                 <Label htmlFor="cefr-select" className="font-medium">
-                  Difficulty Level
+                  {messages.createQuiz.difficultyLevel}
                 </Label>
                 <p className="text-xs text-muted-foreground">
                   {isTutor
-                    ? "Choose the CEFR difficulty for this quiz"
-                    : "Defaults to your profile level — override if needed"}
+                    ? messages.createQuiz.tutorDifficultyDescription
+                    : messages.createQuiz.studentDifficultyDescription}
                   {targetLanguage === "spanish"
-                    ? " Spanish is currently limited to A1."
+                    ? ` ${messages.createQuiz.spanishLimitedNote}`
                     : ""}
                 </p>
               </div>
@@ -618,7 +598,7 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
                   allowedCefrLevels.includes(lvl),
                 ).map((lvl) => (
                   <SelectItem key={lvl} value={lvl}>
-                    {lvl} — {CEFR_DESCRIPTIONS[lvl]}
+                    {lvl} - {messages.createQuiz.cefrDescriptions[lvl]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -647,7 +627,7 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
               className="w-full sm:w-auto"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {messages.common.back}
             </Button>
             <Button
               onClick={handleGenerate}
@@ -657,14 +637,17 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
               {isGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating{" "}
-                  {selectedActivity === "flashcards" ? "flashcards" : "quiz"}...
+                  {selectedActivity === "flashcards"
+                    ? messages.createQuiz.generatingFlashcards
+                    : messages.createQuiz.generatingQuiz}
                 </>
               ) : (
                 <>
-                  Generate{" "}
-                  {ACTIVITIES.find((a) => a.type === selectedActivity)?.label ||
-                    "Activity"}
+                  {messages.createQuiz.generateSelectedActivity(
+                    selectedActivity
+                      ? messages.createQuiz.activityLabels[selectedActivity]
+                      : messages.createQuiz.fallbackActivityLabel,
+                  )}
                 </>
               )}
             </Button>

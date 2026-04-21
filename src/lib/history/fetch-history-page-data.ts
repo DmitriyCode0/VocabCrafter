@@ -58,7 +58,7 @@ function normalizeFilterValue(value?: string | null) {
   return value;
 }
 
-async function fetchConnectedStudents(userId: string) {
+export async function fetchConnectedStudents(userId: string) {
   const supabaseAdmin = createAdminClient();
   const { data, error } = await supabaseAdmin
     .from("tutor_students")

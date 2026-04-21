@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,6 +38,7 @@ export function TextTranslationPlayer({
   quizConfig,
   onComplete,
 }: TextTranslationPlayerProps) {
+  const { messages } = useAppI18n();
   const [userTranslation, setUserTranslation] = useState("");
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluation, setEvaluation] = useState<{
@@ -44,12 +46,18 @@ export function TextTranslationPlayer({
     feedback: string;
   } | null>(null);
 
-  const targetLanguageLabel = getLearningLanguageLabel(
-    normalizeLearningLanguage(quizConfig?.targetLanguage),
+  const normalizedTargetLanguage = normalizeLearningLanguage(
+    quizConfig?.targetLanguage,
   );
-  const sourceLanguageLabel = getSourceLanguageLabel(
-    normalizeSourceLanguage(quizConfig?.sourceLanguage),
+  const normalizedSourceLanguage = normalizeSourceLanguage(
+    quizConfig?.sourceLanguage,
   );
+  const targetLanguageLabel =
+    messages.common.studyLanguageNames[normalizedTargetLanguage] ||
+    getLearningLanguageLabel(normalizedTargetLanguage);
+  const sourceLanguageLabel =
+    messages.common.studyLanguageNames[normalizedSourceLanguage] ||
+    getSourceLanguageLabel(normalizedSourceLanguage);
   const visibleFeedback = evaluation
     ? removeSuggestedAnswerLines(evaluation.feedback)
     : "";
@@ -94,7 +102,7 @@ export function TextTranslationPlayer({
         feedback:
           error instanceof Error
             ? error.message
-            : "Could not evaluate your translation. Please try again.",
+            : messages.quizSession.textTranslation.evaluationFailed,
       });
     } finally {
       setIsEvaluating(false);
@@ -129,7 +137,9 @@ export function TextTranslationPlayer({
     <div className="space-y-6">
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Passage translation</span>
+          <span className="text-muted-foreground">
+            {messages.quizSession.textTranslation.progressLabel}
+          </span>
           {evaluation && evaluation.score >= 0 && (
             <span className={`font-medium ${getScoreColor(evaluation.score)}`}>
               {evaluation.score}/100
@@ -143,12 +153,12 @@ export function TextTranslationPlayer({
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <CardTitle className="text-lg">
-              Translate the text to {targetLanguageLabel}
+              {messages.quizSession.textTranslation.title(targetLanguageLabel)}
             </CardTitle>
             <BrowserTtsButton
               text={content.originalText}
               language={quizConfig?.sourceLanguage}
-              label="Listen"
+              label={messages.common.listen}
             />
           </div>
         </CardHeader>
@@ -165,7 +175,9 @@ export function TextTranslationPlayer({
           <Textarea
             value={userTranslation}
             onChange={(event) => setUserTranslation(event.target.value)}
-            placeholder={`Write your ${targetLanguageLabel} translation here...`}
+            placeholder={messages.quizSession.textTranslation.placeholder(
+              targetLanguageLabel,
+            )}
             rows={10}
             disabled={!!evaluation || isEvaluating}
           />
@@ -179,10 +191,10 @@ export function TextTranslationPlayer({
               {isEvaluating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Evaluating...
+                  {messages.quizSession.textTranslation.evaluating}
                 </>
               ) : (
-                "Submit Translation"
+                messages.quizSession.textTranslation.submit
               )}
             </Button>
           )}
@@ -197,7 +209,7 @@ export function TextTranslationPlayer({
                 className="w-full"
                 variant="outline"
               >
-                Retry Evaluation
+                {messages.quizSession.textTranslation.retryEvaluation}
               </Button>
             </div>
           )}
@@ -205,7 +217,7 @@ export function TextTranslationPlayer({
           {evaluation && evaluation.score >= 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between rounded-md bg-muted p-3">
-                <span className="font-medium">Score</span>
+                <span className="font-medium">{messages.common.score}</span>
                 <span
                   className={`text-2xl font-bold ${getScoreColor(evaluation.score)}`}
                 >
@@ -214,7 +226,9 @@ export function TextTranslationPlayer({
               </div>
 
               <div className="rounded-md bg-muted p-3 space-y-1">
-                <p className="text-sm font-medium">Feedback:</p>
+                <p className="text-sm font-medium">
+                  {messages.common.feedback}:
+                </p>
                 <div className="text-sm space-y-0.5">
                   {visibleFeedback.split("\n").map((line, index) => {
                     const trimmed = line.trim();
@@ -244,7 +258,9 @@ export function TextTranslationPlayer({
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-sm font-medium">
-                      Reference translation ({targetLanguageLabel}):
+                      {messages.quizSession.textTranslation.referenceTranslation(
+                        targetLanguageLabel,
+                      )}
                     </p>
                     <p className="whitespace-pre-line text-sm italic">
                       {content.referenceTranslation}
@@ -253,14 +269,14 @@ export function TextTranslationPlayer({
                   <BrowserTtsButton
                     text={content.referenceTranslation}
                     language={quizConfig?.targetLanguage}
-                    label="Listen"
+                    label={messages.common.listen}
                     className="shrink-0"
                   />
                 </div>
               </div>
 
               <Button onClick={handleFinish} className="w-full">
-                View Results
+                {messages.quizSession.textTranslation.viewResults}
               </Button>
             </div>
           )}

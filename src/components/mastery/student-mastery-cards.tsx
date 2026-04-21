@@ -7,15 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { EditMasteryWordDialog } from "@/components/mastery/edit-mastery-word-dialog";
 import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
-
-const LEVEL_LABELS = [
-  "New",
-  "Seen",
-  "Learning",
-  "Familiar",
-  "Practiced",
-  "Mastered",
-] as const;
+import { useAppI18n } from "@/components/providers/app-language-provider";
 
 const LEVEL_COLORS = [
   "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
@@ -54,6 +46,7 @@ export function StudentMasteryCards({
 }: {
   students: StudentMasterySummary[];
 }) {
+  const { messages } = useAppI18n();
   const [expandedStudentId, setExpandedStudentId] = useState<string | null>(
     null,
   );
@@ -66,6 +59,14 @@ export function StudentMasteryCards({
   const [errorByStudent, setErrorByStudent] = useState<Record<string, string>>(
     {},
   );
+  const levelLabels = [
+    messages.tutorMastery.levelLabels.new,
+    messages.tutorMastery.levelLabels.seen,
+    messages.tutorMastery.levelLabels.learning,
+    messages.tutorMastery.levelLabels.familiar,
+    messages.tutorMastery.levelLabels.practiced,
+    messages.tutorMastery.levelLabels.mastered,
+  ] as const;
 
   async function loadWords(studentId: string) {
     setLoadingByStudent((current) => ({ ...current, [studentId]: true }));
@@ -125,7 +126,7 @@ export function StudentMasteryCards({
   if (students.length === 0) {
     return (
       <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-        No students found on this page.
+        {messages.tutorMastery.cards.noStudentsOnPage}
       </div>
     );
   }
@@ -147,12 +148,17 @@ export function StudentMasteryCards({
               <div className="min-w-0">
                 <h3 className="text-base font-semibold">{student.name}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {student.totalWords} words · avg level {student.avgLevel} ·{" "}
-                  {student.mastered} mastered
+                  {messages.tutorMastery.cards.summaryLine(
+                    student.totalWords,
+                    student.avgLevel,
+                    student.mastered,
+                  )}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {student.passiveEvidenceCount} passive evidence ·{" "}
-                  {student.equivalentWords} equivalent words
+                  {messages.tutorMastery.cards.passiveSummary(
+                    student.passiveEvidenceCount,
+                    student.equivalentWords,
+                  )}
                 </p>
               </div>
 
@@ -165,21 +171,23 @@ export function StudentMasteryCards({
                   }
                   aria-expanded={isExpanded}
                 >
-                  {isExpanded ? "Hide words" : "Show words"}
+                  {isExpanded
+                    ? messages.tutorMastery.cards.hideWords
+                    : messages.tutorMastery.cards.showWords}
                   <ChevronDown
                     className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                   />
                 </Button>
               ) : (
                 <span className="text-sm text-muted-foreground">
-                  No words yet
+                  {messages.tutorMastery.cards.noWordsYet}
                 </span>
               )}
             </div>
 
             <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap gap-1.5">
-                {LEVEL_LABELS.map((label, index) => {
+                {levelLabels.map((label, index) => {
                   const count = student.levelCounts[index] ?? 0;
                   if (count === 0) {
                     return null;
@@ -217,7 +225,7 @@ export function StudentMasteryCards({
                 {isLoading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading words...
+                    {messages.tutorMastery.cards.loadingWords}
                   </div>
                 ) : error ? (
                   <div className="flex items-center gap-3 text-sm text-destructive">
@@ -227,12 +235,12 @@ export function StudentMasteryCards({
                       size="sm"
                       onClick={() => void loadWords(student.studentId)}
                     >
-                      Retry
+                      {messages.tutorMastery.cards.retry}
                     </Button>
                   </div>
                 ) : words.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No words found.
+                    {messages.tutorMastery.cards.noWordsFound}
                   </p>
                 ) : (
                   <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -253,9 +261,13 @@ export function StudentMasteryCards({
                           <DeleteMasteryWordButton
                             wordId={word.id}
                             term={word.term}
-                            title="Delete word for student"
-                            description={`${word.term} will be removed from this student's Vocab Mastery list.`}
-                            successMessage={`Deleted ${word.term} from the student's Vocab Mastery list`}
+                            title={messages.tutorMastery.cards.deleteTitle}
+                            description={messages.tutorMastery.cards.deleteDescription(
+                              word.term,
+                            )}
+                            successMessage={messages.tutorMastery.cards.deleteSuccess(
+                              word.term,
+                            )}
                           />
                         </div>
                       </div>

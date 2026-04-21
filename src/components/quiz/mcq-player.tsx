@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import {
   Card,
   CardContent,
@@ -29,6 +30,7 @@ interface MCQPlayerProps {
 }
 
 export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
+  const { messages } = useAppI18n();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<string[]>(() =>
     questions.map(() => ""),
@@ -112,7 +114,7 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Question {currentIndex + 1} of {questions.length}
+            {messages.quizSession.mcq.progress(currentIndex + 1, questions.length)}
           </span>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
@@ -123,7 +125,7 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
                 className="h-8 w-8"
                 onClick={handlePrev}
                 disabled={currentIndex === 0}
-                aria-label="Previous question"
+                aria-label={messages.quizSession.mcq.previousAria}
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
@@ -134,13 +136,13 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
                 className="h-8 w-8"
                 onClick={handleNext}
                 disabled={currentIndex === questions.length - 1}
-                aria-label="Next question"
+                aria-label={messages.quizSession.mcq.nextAria}
               >
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
             <Badge variant="outline">
-              Score: {correctCount}/{completedCount}
+              {messages.quizSession.mcq.score(correctCount, completedCount)}
             </Badge>
           </div>
         </div>
@@ -149,9 +151,11 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Multiple choice</CardTitle>
+          <CardTitle className="text-lg">
+            {messages.quizSession.mcq.title}
+          </CardTitle>
           <CardDescription>
-            Pick the best answer for this vocabulary question.
+            {messages.quizSession.mcq.description}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -196,10 +200,10 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
             {!submitted ? (
               <>
                 <Button variant="outline" onClick={handleSkip}>
-                  Skip
+                  {messages.common.skip}
                 </Button>
                 <Button onClick={handleSubmit} disabled={!selectedAnswer}>
-                  Check
+                  {messages.common.check}
                 </Button>
               </>
             ) : (
@@ -211,11 +215,11 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
               >
                 {currentIndex < questions.length - 1 ? (
                   <>
-                    Next
+                    {messages.quizSession.mcq.nextQuestion}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 ) : (
-                  "Finish"
+                  messages.common.finish
                 )}
               </Button>
             )}
@@ -225,7 +229,7 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
           submitted &&
           !allCompleted ? (
             <p className="text-xs text-muted-foreground">
-              Use the arrows to review unanswered questions before finishing.
+              {messages.quizSession.mcq.reviewUnanswered}
             </p>
           ) : null}
 
@@ -244,22 +248,19 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
               )}
               <div>
                 {isCorrect ? (
-                  <p className="font-medium">Correct!</p>
+                  <p className="font-medium">{messages.quizSession.mcq.correct}</p>
                 ) : (
                   <>
                     <p className="font-medium">
-                      Not quite. The correct answer is:{" "}
-                      <span className="font-bold">
-                        {question.correctAnswer}
-                      </span>
+                      {messages.quizSession.mcq.incorrect(question.correctAnswer)}
                     </p>
                     {selectedAnswer ? (
                       <p className="text-sm opacity-90">
-                        You selected {selectedAnswer}.
+                        {messages.quizSession.mcq.selected(selectedAnswer)}
                       </p>
                     ) : (
                       <p className="text-sm opacity-90">
-                        You skipped this question.
+                        {messages.quizSession.mcq.skipped}
                       </p>
                     )}
                   </>

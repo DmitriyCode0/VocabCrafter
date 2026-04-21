@@ -14,7 +14,9 @@ import Link from "next/link";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
-import { formatAppDate } from "@/lib/dates";
+import { normalizeAppLanguage } from "@/lib/i18n/app-language";
+import { formatDateForAppLanguage } from "@/lib/i18n/format";
+import { getAppMessages } from "@/lib/i18n/messages";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,32 @@ export default async function ReviewPage({
 
   if (!user) redirect("/login");
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("app_language")
+    .eq("id", user.id)
+    .single();
+
+  const appLanguage = normalizeAppLanguage(profile?.app_language);
+  const messages = getAppMessages(appLanguage);
+
+  function getActivityLabel(type: string | null | undefined) {
+    if (!type) {
+      return "";
+    }
+
+    return (
+      messages.quizzes.typeLabels[
+        type as keyof typeof messages.quizzes.typeLabels
+      ] ||
+      messages.createQuiz.quizWordPicker.typeLabels[
+        type as keyof typeof messages.createQuiz.quizWordPicker.typeLabels
+      ] ||
+      ACTIVITY_LABELS[type] ||
+      type
+    );
+  }
+
   // Get all classes this tutor owns
   const { data: classes } = await supabase
     .from("classes")
@@ -48,18 +76,21 @@ export default async function ReviewPage({
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Review</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {messages.reviewPage.title}
+          </h1>
           <p className="text-muted-foreground">
-            Review student submissions and provide feedback.
+            {messages.reviewPage.description}
           </p>
         </div>
         <Card>
           <CardHeader className="items-center text-center py-12">
             <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">No classes yet</CardTitle>
+            <CardTitle className="text-lg">
+              {messages.reviewPage.noClassesTitle}
+            </CardTitle>
             <CardDescription>
-              Create a class first so students can join and submit quiz
-              attempts.
+              {messages.reviewPage.noClassesDescription}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -82,18 +113,21 @@ export default async function ReviewPage({
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Review</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {messages.reviewPage.title}
+          </h1>
           <p className="text-muted-foreground">
-            Review student submissions and provide feedback.
+            {messages.reviewPage.description}
           </p>
         </div>
         <Card>
           <CardHeader className="items-center text-center py-12">
             <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">No students yet</CardTitle>
+            <CardTitle className="text-lg">
+              {messages.reviewPage.noStudentsTitle}
+            </CardTitle>
             <CardDescription>
-              Students will appear here once they join your classes and complete
-              quizzes.
+              {messages.reviewPage.noStudentsDescription}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -123,18 +157,21 @@ export default async function ReviewPage({
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Review</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {messages.reviewPage.title}
+          </h1>
           <p className="text-muted-foreground">
-            Review student submissions and provide feedback.
+            {messages.reviewPage.description}
           </p>
         </div>
         <Card>
           <CardHeader className="items-center text-center py-12">
             <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">No quizzes assigned</CardTitle>
+            <CardTitle className="text-lg">
+              {messages.reviewPage.noQuizzesTitle}
+            </CardTitle>
             <CardDescription>
-              Create assignments for your classes so student submissions appear
-              here.
+              {messages.reviewPage.noQuizzesDescription}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -172,9 +209,11 @@ export default async function ReviewPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Review</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {messages.reviewPage.title}
+        </h1>
         <p className="text-muted-foreground">
-          Review student submissions and provide feedback.
+          {messages.reviewPage.description}
         </p>
       </div>
 
@@ -182,10 +221,11 @@ export default async function ReviewPage({
         <Card>
           <CardHeader className="items-center text-center py-12">
             <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">No submissions yet</CardTitle>
+            <CardTitle className="text-lg">
+              {messages.reviewPage.noSubmissionsTitle}
+            </CardTitle>
             <CardDescription>
-              Student quiz attempts will appear here once they start completing
-              activities.
+              {messages.reviewPage.noSubmissionsDescription}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -219,13 +259,17 @@ export default async function ReviewPage({
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base">
-                          {student?.full_name ?? student?.email ?? "Unknown"}
+                          {student?.full_name ??
+                            student?.email ??
+                            messages.reviewPage.unknownStudent}
                         </CardTitle>
                         <div className="flex items-center gap-2">
                           {reviewed ? (
-                            <Badge variant="secondary">Reviewed</Badge>
+                            <Badge variant="secondary">
+                              {messages.reviewPage.reviewed}
+                            </Badge>
                           ) : (
-                            <Badge>Needs Review</Badge>
+                            <Badge>{messages.reviewPage.needsReview}</Badge>
                           )}
                           {pct !== null && (
                             <Badge
@@ -247,11 +291,15 @@ export default async function ReviewPage({
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         {quiz && (
                           <span>
-                            {quiz.title} (
-                            {ACTIVITY_LABELS[quiz.type] || quiz.type})
+                            {quiz.title} ({getActivityLabel(quiz.type)})
                           </span>
                         )}
-                        <span>{formatAppDate(attempt.completed_at)}</span>
+                        <span>
+                          {formatDateForAppLanguage(
+                            appLanguage,
+                            attempt.completed_at,
+                          )}
+                        </span>
                       </div>
                     </CardContent>
                   </Card>
@@ -265,6 +313,7 @@ export default async function ReviewPage({
             pageSize={REVIEW_PAGE_SIZE}
             totalItems={totalAttempts ?? attempts.length}
             searchParams={resolvedSearchParams}
+            labels={messages.pagination}
           />
         </div>
       )}

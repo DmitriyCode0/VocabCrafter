@@ -12,12 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { changeUserRole } from "./actions";
 import type { Role } from "@/types/roles";
-
-const ROLES: { value: Role; label: string }[] = [
-  { value: "student", label: "Student" },
-  { value: "tutor", label: "Tutor" },
-  { value: "superadmin", label: "Admin" },
-];
+import { useAppI18n } from "@/components/providers/app-language-provider";
 
 const BADGE_VARIANT: Record<
   Role,
@@ -40,13 +35,19 @@ export function RoleSelector({
   currentRole,
   isSelf,
 }: RoleSelectorProps) {
+  const { messages } = useAppI18n();
   const [role, setRole] = useState<Role>(currentRole);
   const [isPending, startTransition] = useTransition();
+  const roles: { value: Role; label: string }[] = [
+    { value: "student", label: messages.adminUsers.roleLabels.student },
+    { value: "tutor", label: messages.adminUsers.roleLabels.tutor },
+    { value: "superadmin", label: messages.adminUsers.roleLabels.superadmin },
+  ];
 
   if (isSelf) {
     return (
       <Badge variant={BADGE_VARIANT[role]}>
-        {ROLES.find((r) => r.value === role)?.label}
+        {roles.find((entry) => entry.value === role)?.label}
       </Badge>
     );
   }
@@ -59,10 +60,14 @@ export function RoleSelector({
     startTransition(async () => {
       try {
         await changeUserRole(userId, newRole);
-        toast.success(`Role updated to ${newRole}`);
+        toast.success(
+          messages.adminUsers.roleUpdated(
+            roles.find((entry) => entry.value === newRole)?.label ?? newRole,
+          ),
+        );
       } catch {
         setRole(previous); // revert
-        toast.error("Failed to update role");
+        toast.error(messages.adminUsers.roleUpdateFailed);
       }
     });
   }
@@ -73,7 +78,7 @@ export function RoleSelector({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {ROLES.map((r) => (
+        {roles.map((r) => (
           <SelectItem key={r.value} value={r.value} className="text-xs">
             {r.label}
           </SelectItem>

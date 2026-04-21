@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRef, useState, type ChangeEvent, type ClipboardEvent } from "react";
 import { toast } from "sonner";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -73,6 +74,7 @@ export function WordInput({
   targetLanguage,
   sourceLanguage,
 }: WordInputProps) {
+  const { messages } = useAppI18n();
   const [text, setText] = useState("");
   const [screenshots, setScreenshots] = useState<ScreenshotDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +84,7 @@ export function WordInput({
     const remainingSlots = MAX_SCREENSHOTS - screenshots.length;
 
     if (remainingSlots <= 0) {
-      setError(`You can attach up to ${MAX_SCREENSHOTS} screenshots.`);
+      setError(messages.createQuiz.wordInput.attachLimitError(MAX_SCREENSHOTS));
       return;
     }
 
@@ -91,12 +93,12 @@ export function WordInput({
 
     for (const file of validFiles) {
       if (!isAcceptedImageType(file.type)) {
-        setError("Only PNG, JPEG, and WEBP screenshots are supported.");
+        setError(messages.createQuiz.wordInput.invalidImageTypeError);
         continue;
       }
 
       if (file.size > MAX_SCREENSHOT_SIZE_BYTES) {
-        setError("Each screenshot must be 5 MB or smaller.");
+        setError(messages.createQuiz.wordInput.screenshotSizeError(5));
         continue;
       }
 
@@ -105,7 +107,9 @@ export function WordInput({
         id: createScreenshotId(),
         name:
           file.name ||
-          `Screenshot ${screenshots.length + nextDrafts.length + 1}`,
+          messages.createQuiz.wordInput.screenshotLabel(
+            screenshots.length + nextDrafts.length + 1,
+          ),
         mimeType: file.type,
         dataUrl,
       });
@@ -117,7 +121,9 @@ export function WordInput({
     }
 
     if (files.length > remainingSlots) {
-      toast.error(`Only the first ${MAX_SCREENSHOTS} screenshots were kept.`);
+      toast.error(
+        messages.createQuiz.wordInput.keepFirstScreenshots(MAX_SCREENSHOTS),
+      );
     }
   }
 
@@ -172,13 +178,17 @@ export function WordInput({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to parse words");
+        throw new Error(data.error || messages.createQuiz.wordInput.parseFailed);
       }
 
       const data = await res.json();
       onParsed(data.terms);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to parse words");
+      setError(
+        err instanceof Error
+          ? err.message
+          : messages.createQuiz.wordInput.parseFailed,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -187,7 +197,9 @@ export function WordInput({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="word-input">Paste your vocabulary or notes</Label>
+        <Label htmlFor="word-input">
+          {messages.createQuiz.wordInput.pasteVocabularyLabel}
+        </Label>
         <Textarea
           id="word-input"
           value={text}
@@ -198,18 +210,21 @@ export function WordInput({
           className="font-mono text-sm"
         />
         <p className="text-xs text-muted-foreground">
-          You can paste text directly, upload screenshots, or paste a screenshot
-          from your clipboard.
+          {messages.createQuiz.wordInput.pasteHelper}
         </p>
       </div>
 
       <div className="space-y-3 rounded-lg border border-dashed bg-muted/20 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <p className="text-sm font-medium">Add screenshots</p>
+            <p className="text-sm font-medium">
+              {messages.createQuiz.wordInput.addScreenshotsTitle}
+            </p>
             <p className="text-xs text-muted-foreground">
-              PNG, JPEG, or WEBP. Up to {MAX_SCREENSHOTS} screenshots, 5 MB
-              each.
+              {messages.createQuiz.wordInput.screenshotRules(
+                MAX_SCREENSHOTS,
+                5,
+              )}
             </p>
           </div>
           <>
@@ -229,7 +244,7 @@ export function WordInput({
               className="w-full sm:w-auto"
             >
               <ImagePlus className="mr-2 h-4 w-4" />
-              Upload Screenshots
+              {messages.createQuiz.wordInput.uploadScreenshots}
             </Button>
           </>
         </div>
@@ -243,7 +258,10 @@ export function WordInput({
               >
                 <Image
                   src={screenshot.dataUrl}
-                  alt={screenshot.name || `Screenshot ${index + 1}`}
+                  alt={
+                    screenshot.name ||
+                    messages.createQuiz.wordInput.screenshotLabel(index + 1)
+                  }
                   width={640}
                   height={256}
                   unoptimized
@@ -252,10 +270,11 @@ export function WordInput({
                 <div className="flex items-center justify-between gap-2 p-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">
-                      {screenshot.name || `Screenshot ${index + 1}`}
+                      {screenshot.name ||
+                        messages.createQuiz.wordInput.screenshotLabel(index + 1)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Screenshot {index + 1}
+                      {messages.createQuiz.wordInput.screenshotLabel(index + 1)}
                     </p>
                   </div>
                   <Button
@@ -267,7 +286,9 @@ export function WordInput({
                     className="h-8 w-8 shrink-0"
                   >
                     <X className="h-4 w-4" />
-                    <span className="sr-only">Remove screenshot</span>
+                    <span className="sr-only">
+                      {messages.createQuiz.wordInput.removeScreenshot}
+                    </span>
                   </Button>
                 </div>
               </div>
@@ -286,12 +307,12 @@ export function WordInput({
         {isLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Parsing vocabulary...
+            {messages.createQuiz.wordInput.parsingVocabulary}
           </>
         ) : (
           <>
             <Sparkles className="mr-2 h-4 w-4" />
-            Parse with AI
+            {messages.createQuiz.wordInput.parseWithAi}
           </>
         )}
       </Button>

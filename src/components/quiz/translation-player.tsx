@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +47,7 @@ export function TranslationPlayer({
   canPreviewQuestions = false,
   onComplete,
 }: TranslationPlayerProps) {
+  const { messages } = useAppI18n();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userTranslation, setUserTranslation] = useState("");
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -58,12 +60,18 @@ export function TranslationPlayer({
 
   const question = questions[currentIndex];
   const grammarTopic = getPrimaryGrammarTopic(quizConfig);
-  const targetLanguageLabel = getLearningLanguageLabel(
-    normalizeLearningLanguage(quizConfig?.targetLanguage),
+  const normalizedTargetLanguage = normalizeLearningLanguage(
+    quizConfig?.targetLanguage,
   );
-  const sourceLanguageLabel = getSourceLanguageLabel(
-    normalizeSourceLanguage(quizConfig?.sourceLanguage),
+  const normalizedSourceLanguage = normalizeSourceLanguage(
+    quizConfig?.sourceLanguage,
   );
+  const targetLanguageLabel =
+    messages.common.studyLanguageNames[normalizedTargetLanguage] ||
+    getLearningLanguageLabel(normalizedTargetLanguage);
+  const sourceLanguageLabel =
+    messages.common.studyLanguageNames[normalizedSourceLanguage] ||
+    getSourceLanguageLabel(normalizedSourceLanguage);
   const visibleFeedback = evaluation
     ? removeSuggestedAnswerLines(evaluation.feedback)
     : "";
@@ -154,7 +162,7 @@ export function TranslationPlayer({
         feedback:
           error instanceof Error
             ? error.message
-            : "Could not evaluate your translation. Please try again.",
+            : messages.quizSession.translation.evaluationFailed,
       });
     } finally {
       setIsEvaluating(false);
@@ -220,7 +228,10 @@ export function TranslationPlayer({
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Sentence {currentIndex + 1} of {questions.length}
+            {messages.quizSession.translation.progress(
+              currentIndex + 1,
+              questions.length,
+            )}
           </span>
           <div className="flex items-center gap-2">
             {canUsePreviewArrows && questions.length > 1 && (
@@ -232,7 +243,7 @@ export function TranslationPlayer({
                   className="h-8 w-8"
                   onClick={() => handlePreviewNavigation(currentIndex - 1)}
                   disabled={currentIndex === 0}
-                  aria-label="Previous sentence"
+                  aria-label={messages.quizSession.translation.previousAria}
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
@@ -243,14 +254,16 @@ export function TranslationPlayer({
                   className="h-8 w-8"
                   onClick={() => handlePreviewNavigation(currentIndex + 1)}
                   disabled={currentIndex === questions.length - 1}
-                  aria-label="Next sentence"
+                  aria-label={messages.quizSession.translation.nextAria}
                 >
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
             )}
             {results.length > 0 && (
-              <Badge variant="outline">Avg Score: {avgScore}/100</Badge>
+              <Badge variant="outline">
+                {messages.quizSession.translation.averageScore(avgScore)}
+              </Badge>
             )}
           </div>
         </div>
@@ -261,22 +274,24 @@ export function TranslationPlayer({
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <CardTitle className="text-lg">
-              Translate to {targetLanguageLabel}
+              {messages.quizSession.translation.title(targetLanguageLabel)}
             </CardTitle>
             <BrowserTtsButton
               text={stripMarkdownEmphasis(question.ukrainianSentence)}
               language={quizConfig?.sourceLanguage}
-              label="Listen"
+              label={messages.common.listen}
             />
           </div>
 
-          {grammarTopic && (
+          {displayedGrammarTopic && (
             <div>
               <Badge
                 variant="outline"
                 className="mt-2 h-auto w-fit max-w-full whitespace-normal break-words border-amber-300 bg-amber-50 text-left leading-tight text-amber-900"
               >
-                Grammar Focus: {grammarTopic}
+                {messages.quizSession.translation.grammarFocus(
+                  displayedGrammarTopic,
+                )}
               </Badge>
             </div>
           )}
@@ -309,7 +324,9 @@ export function TranslationPlayer({
                 handleSubmit();
               }
             }}
-            placeholder={`Type your ${targetLanguageLabel} translation... (Enter to submit, Shift+Enter for new line)`}
+            placeholder={messages.quizSession.translation.placeholder(
+              targetLanguageLabel,
+            )}
             rows={3}
             disabled={!!evaluation || isEvaluating}
           />
@@ -324,10 +341,10 @@ export function TranslationPlayer({
                 {isEvaluating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Evaluating...
+                    {messages.quizSession.translation.evaluating}
                   </>
                 ) : (
-                  "Submit Translation"
+                  messages.quizSession.translation.submit
                 )}
               </Button>
               <Button
@@ -337,7 +354,7 @@ export function TranslationPlayer({
                 disabled={isEvaluating}
                 onClick={handleShowTranslation}
               >
-                Show Translation (0/100)
+                {messages.quizSession.translation.showTranslation}
               </Button>
             </div>
           )}
@@ -352,7 +369,7 @@ export function TranslationPlayer({
                 className="w-full"
                 variant="outline"
               >
-                Retry Evaluation
+                {messages.quizSession.translation.retryEvaluation}
               </Button>
             </div>
           )}
@@ -360,7 +377,7 @@ export function TranslationPlayer({
           {evaluation && evaluation.score >= 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 rounded-md bg-muted">
-                <span className="font-medium">Score</span>
+                <span className="font-medium">{messages.common.score}</span>
                 <span
                   className={`text-2xl font-bold ${getScoreColor(evaluation.score)}`}
                 >
@@ -370,7 +387,9 @@ export function TranslationPlayer({
 
               {hasVisibleFeedback && (
                 <div className="p-3 rounded-md bg-muted space-y-1">
-                  <p className="text-sm font-medium">Feedback:</p>
+                  <p className="text-sm font-medium">
+                    {messages.common.feedback}:
+                  </p>
                   <div className="text-sm space-y-0.5">
                     {visibleFeedback.split("\n").map((line, i) => {
                       const trimmed = line.trim();
@@ -400,7 +419,9 @@ export function TranslationPlayer({
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-sm font-medium">
-                      Reference translation ({targetLanguageLabel}):
+                      {messages.quizSession.translation.referenceTranslation(
+                        targetLanguageLabel,
+                      )}
                     </p>
                     <p className="text-sm italic">
                       {question.englishReference}
@@ -409,7 +430,7 @@ export function TranslationPlayer({
                   <BrowserTtsButton
                     text={question.englishReference}
                     language={quizConfig?.targetLanguage}
-                    label="Listen"
+                    label={messages.common.listen}
                     className="shrink-0"
                   />
                 </div>
@@ -423,28 +444,28 @@ export function TranslationPlayer({
                     onClick={() => setShowLearningNote((current) => !current)}
                   >
                     {showLearningNote
-                      ? "Hide learning note"
-                      : "Reveal learning note"}
+                      ? messages.quizSession.translation.hideLearningNote
+                      : messages.quizSession.translation.revealLearningNote}
                   </Button>
 
                   {showLearningNote && (
                     <div className="mt-2 rounded-md bg-background/70 p-3 text-sm text-muted-foreground space-y-2">
                       <p>
                         <span className="font-medium text-foreground">
-                          Small translation:
+                          {messages.quizSession.translation.smallTranslation}
                         </span>{" "}
                         {question.englishReference}
                       </p>
                       <p>
                         <span className="font-medium text-foreground">
-                          Target vocab:
+                          {messages.quizSession.translation.targetVocab}
                         </span>{" "}
                         {question.sourceTerm}
                       </p>
                       {displayedGrammarTopic && (
                         <p>
                           <span className="font-medium text-foreground">
-                            Grammar:
+                            {messages.quizSession.translation.grammar}
                           </span>{" "}
                           {displayedGrammarTopic}
                         </p>
@@ -457,11 +478,11 @@ export function TranslationPlayer({
               <Button onClick={handleNext} className="w-full">
                 {currentIndex < questions.length - 1 ? (
                   <>
-                    Next Sentence
+                    {messages.quizSession.translation.nextSentence}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 ) : (
-                  "View Results"
+                  messages.quizSession.translation.viewResults
                 )}
               </Button>
             </div>

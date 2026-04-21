@@ -17,14 +17,34 @@ import { DeleteAssignmentButton } from "@/components/assignments/delete-assignme
 import { CreateAssignmentDialog } from "@/components/assignments/create-assignment-dialog";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import { PagePagination } from "@/components/shared/page-pagination";
-import { normalizeAppLanguage } from "@/lib/i18n/app-language";
+import {
+  normalizeAppLanguage,
+  type AppLanguage,
+} from "@/lib/i18n/app-language";
 import { getAppMessages, type AppMessages } from "@/lib/i18n/messages";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
-import { formatAppDate } from "@/lib/dates";
+import { formatDateForAppLanguage } from "@/lib/i18n/format";
 
 export const dynamic = "force-dynamic";
 
 const ASSIGNMENTS_PAGE_SIZE = 10;
+
+function getActivityLabel(messages: AppMessages, type: string | null | undefined) {
+  if (!type) {
+    return "";
+  }
+
+  return (
+    messages.createQuiz.activityLabels[
+      type as keyof typeof messages.createQuiz.activityLabels
+    ] ||
+    messages.createQuiz.quizWordPicker.typeLabels[
+      type as keyof typeof messages.createQuiz.quizWordPicker.typeLabels
+    ] ||
+    ACTIVITY_LABELS[type] ||
+    type
+  );
+}
 
 export default async function AssignmentsPage({
   searchParams,
@@ -49,7 +69,8 @@ export default async function AssignmentsPage({
     .single();
 
   const role = profile?.role ?? "student";
-  const messages = getAppMessages(normalizeAppLanguage(profile?.app_language));
+  const appLanguage = normalizeAppLanguage(profile?.app_language);
+  const messages = getAppMessages(appLanguage);
 
   if (role === "student") {
     return (
@@ -57,6 +78,7 @@ export default async function AssignmentsPage({
         supabaseUserId={user.id}
         currentPage={currentPage}
         searchParams={resolvedSearchParams}
+        appLanguage={appLanguage}
         messages={messages}
       />
     );
@@ -136,7 +158,10 @@ export default async function AssignmentsPage({
                             {isPastDue
                               ? messages.assignments.pastDue
                               : messages.assignments.due}{" "}
-                            {formatAppDate(assignment.due_date)}
+                            {formatDateForAppLanguage(
+                              appLanguage,
+                              assignment.due_date,
+                            )}
                           </Badge>
                         )}
                         <DeleteAssignmentButton assignmentId={assignment.id} />
@@ -156,7 +181,7 @@ export default async function AssignmentsPage({
                       {quiz && (
                         <span>
                           {messages.assignments.quizLabel}: {quiz.title} (
-                          {ACTIVITY_LABELS[quiz.type] || quiz.type})
+                          {getActivityLabel(messages, quiz.type)})
                         </span>
                       )}
                     </div>
@@ -167,7 +192,10 @@ export default async function AssignmentsPage({
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
                       {messages.assignments.created}{" "}
-                      {formatAppDate(assignment.created_at)}
+                      {formatDateForAppLanguage(
+                        appLanguage,
+                        assignment.created_at,
+                      )}
                     </p>
                   </CardContent>
                 </Card>
@@ -194,11 +222,13 @@ async function StudentAssignments({
   supabaseUserId,
   currentPage,
   searchParams,
+  appLanguage,
   messages,
 }: {
   supabaseUserId: string;
   currentPage: number;
   searchParams: { page?: string };
+  appLanguage: AppLanguage;
   messages: AppMessages;
 }) {
   const supabase = await createClient();
@@ -351,7 +381,10 @@ async function StudentAssignments({
                         ) : assignment.due_date ? (
                           <Badge variant="outline">
                             {messages.assignments.due}{" "}
-                            {formatAppDate(assignment.due_date)}
+                            {formatDateForAppLanguage(
+                              appLanguage,
+                              assignment.due_date,
+                            )}
                           </Badge>
                         ) : null}
                       </div>
@@ -367,7 +400,7 @@ async function StudentAssignments({
                         )}
                         {quiz && (
                           <span>
-                            {ACTIVITY_LABELS[quiz.type] || quiz.type} &middot;{" "}
+                            {getActivityLabel(messages, quiz.type)} &middot;{" "}
                             {quiz.cefr_level}
                           </span>
                         )}

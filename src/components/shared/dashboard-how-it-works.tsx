@@ -3,9 +3,11 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { AppMessages } from "@/lib/i18n/messages";
 import type { Role } from "@/types/roles";
 import { BookOpenText, Sparkles, X } from "lucide-react";
 
@@ -20,97 +22,93 @@ const SPOTLIGHT_PADDING = 12;
 const SPOTLIGHT_RADIUS = 28;
 const OVERLAY_PANEL_CLASS = "fixed bg-slate-950/60 backdrop-blur-[2px]";
 
-const TOUR_STEPS: Record<Role, TourStep[]> = {
-  student: [
-    {
-      targetId: "student-new-quiz",
-      title: "New Quiz",
-      description:
-        "Open the quiz builder to generate a fresh AI activity set from your vocabulary list.",
-    },
-    {
-      targetId: "student-review-activity",
-      title: "Review Activity",
-      description:
-        "Start a focused review round that queues overdue words first and then backfills with your weakest tracked words.",
-    },
-    {
-      targetId: "student-quizzes-created",
-      title: "Quizzes Created",
-      description:
-        "This mirrors your monthly quiz quota so you can see how many generations remain on your plan.",
-    },
-    {
-      targetId: "student-day-streak",
-      title: "Day Streak",
-      description:
-        "Your streak counts consecutive days with quiz activity and helps you track practice consistency.",
-    },
-    {
-      targetId: "student-total-words",
-      title: "Total Words Tracked",
-      description:
-        "This shows how many vocabulary terms are currently tracked in your learning library.",
-    },
-  ],
-  tutor: [
-    {
-      targetId: "tutor-new-quiz",
-      title: "New Quiz Page",
-      description:
-        "Create AI-powered quiz sets that you can assign to classes or use for targeted practice.",
-    },
-    {
-      targetId: "tutor-review",
-      title: "Review Page",
-      description:
-        "Inspect student attempts, score open-ended answers, and leave feedback where needed.",
-    },
-    {
-      targetId: "tutor-students",
-      title: "Students Page",
-      description:
-        "Use this page to monitor your student roster and jump into individual learner context faster.",
-    },
-  ],
-  superadmin: [
-    {
-      targetId: "admin-quizzes-created",
-      title: "Quizzes Created",
-      description:
-        "This total tracks all quizzes ever generated on the platform, with the helper text showing how many were created this month.",
-      hint: "Use Analytics when you want the creator-by-creator breakdown.",
-    },
-    {
-      targetId: "admin-text-requests",
-      title: "Text Requests",
-      description:
-        "This shows the current month's tracked text-generation requests using the same Gemini usage data and pricing basis as Billing.",
-      hint: "Open Billing for token totals and the detailed pricing basis.",
-    },
-    {
-      targetId: "admin-tts-requests",
-      title: "TTS Requests",
-      description:
-        "This card counts the current month's tracked text-to-speech requests and summarizes their estimated cost.",
-      hint: "Billing shows the split between text input tokens and audio output tokens.",
-    },
-    {
-      targetId: "admin-tracked-cost",
-      title: "Tracked Cost",
-      description:
-        "This combines the tracked text and TTS spend for the current month so you can see the platform's measured AI cost at a glance.",
-      hint: "It only includes requests captured in ai_usage_events, not older legacy combined counters.",
-    },
-    {
-      targetId: "admin-total-users",
-      title: "Total Users",
-      description:
-        "This is the current number of registered users across the platform.",
-      hint: "Use the Users page to inspect roles, onboarding state, and account changes.",
-    },
-  ],
-};
+function getTourSteps(messages: AppMessages): Record<Role, TourStep[]> {
+  return {
+    student: [
+      {
+        targetId: "student-new-quiz",
+        title: messages.dashboard.guide.studentSteps.newQuiz.title,
+        description: messages.dashboard.guide.studentSteps.newQuiz.description,
+      },
+      {
+        targetId: "student-review-activity",
+        title: messages.dashboard.guide.studentSteps.reviewActivity.title,
+        description:
+          messages.dashboard.guide.studentSteps.reviewActivity.description,
+      },
+      {
+        targetId: "student-quizzes-created",
+        title: messages.dashboard.guide.studentSteps.quizzesCreated.title,
+        description:
+          messages.dashboard.guide.studentSteps.quizzesCreated.description,
+      },
+      {
+        targetId: "student-day-streak",
+        title: messages.dashboard.guide.studentSteps.dayStreak.title,
+        description: messages.dashboard.guide.studentSteps.dayStreak.description,
+      },
+      {
+        targetId: "student-total-words",
+        title: messages.dashboard.guide.studentSteps.totalWords.title,
+        description: messages.dashboard.guide.studentSteps.totalWords.description,
+      },
+    ],
+    tutor: [
+      {
+        targetId: "tutor-new-quiz",
+        title: messages.dashboard.guide.tutorSteps.newQuiz.title,
+        description: messages.dashboard.guide.tutorSteps.newQuiz.description,
+      },
+      {
+        targetId: "tutor-review",
+        title: messages.dashboard.guide.tutorSteps.review.title,
+        description: messages.dashboard.guide.tutorSteps.review.description,
+      },
+      {
+        targetId: "tutor-students",
+        title: messages.dashboard.guide.tutorSteps.students.title,
+        description: messages.dashboard.guide.tutorSteps.students.description,
+      },
+    ],
+    superadmin: [
+      {
+        targetId: "admin-quizzes-created",
+        title: messages.dashboard.guide.superadminSteps.quizzesCreated.title,
+        description:
+          messages.dashboard.guide.superadminSteps.quizzesCreated.description,
+        hint: messages.dashboard.guide.superadminSteps.quizzesCreated.hint,
+      },
+      {
+        targetId: "admin-text-requests",
+        title: messages.dashboard.guide.superadminSteps.textRequests.title,
+        description:
+          messages.dashboard.guide.superadminSteps.textRequests.description,
+        hint: messages.dashboard.guide.superadminSteps.textRequests.hint,
+      },
+      {
+        targetId: "admin-tts-requests",
+        title: messages.dashboard.guide.superadminSteps.ttsRequests.title,
+        description:
+          messages.dashboard.guide.superadminSteps.ttsRequests.description,
+        hint: messages.dashboard.guide.superadminSteps.ttsRequests.hint,
+      },
+      {
+        targetId: "admin-tracked-cost",
+        title: messages.dashboard.guide.superadminSteps.trackedCost.title,
+        description:
+          messages.dashboard.guide.superadminSteps.trackedCost.description,
+        hint: messages.dashboard.guide.superadminSteps.trackedCost.hint,
+      },
+      {
+        targetId: "admin-total-users",
+        title: messages.dashboard.guide.superadminSteps.totalUsers.title,
+        description:
+          messages.dashboard.guide.superadminSteps.totalUsers.description,
+        hint: messages.dashboard.guide.superadminSteps.totalUsers.hint,
+      },
+    ],
+  };
+}
 
 function getStorageKey(role: Role) {
   return `dashboard-how-it-works:${role}`;
@@ -123,6 +121,7 @@ export function DashboardHowItWorksButton({
   role: Role;
   placement?: "page" | "header";
 }) {
+  const { messages } = useAppI18n();
   const [hasSeen, setHasSeen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -137,6 +136,7 @@ export function DashboardHowItWorksButton({
   } | null>(null);
   const isHeaderPlacement = placement === "header";
   const portalRoot = typeof document === "undefined" ? null : document.body;
+  const tourSteps = getTourSteps(messages);
 
   const activeStep = steps[stepIndex] ?? null;
 
@@ -250,11 +250,11 @@ export function DashboardHowItWorksButton({
   }
 
   function openTour() {
-    const availableSteps = TOUR_STEPS[role].filter((step) =>
+    const availableSteps = tourSteps[role].filter((step) =>
       document.querySelector(`[data-tour-id="${step.targetId}"]`),
     );
 
-    setSteps(availableSteps.length > 0 ? availableSteps : TOUR_STEPS[role]);
+    setSteps(availableSteps.length > 0 ? availableSteps : tourSteps[role]);
     setStepDirection(1);
     setStepIndex(0);
     setIsOpen(true);
@@ -296,16 +296,16 @@ export function DashboardHowItWorksButton({
           onClick={openTour}
         >
           <BookOpenText className="h-4 w-4" />
-          How It Works
+          {messages.dashboard.guide.buttonLabel}
           {!isHeaderPlacement && !hasSeen && isHydrated && (
             <span className="rounded-full bg-background/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-current">
-              New
+              {messages.dashboard.guide.newBadge}
             </span>
           )}
         </Button>
         {!isHeaderPlacement && !hasSeen && isHydrated && (
           <p className="text-xs text-muted-foreground sm:text-right">
-            One guided walkthrough for this dashboard.
+            {messages.dashboard.guide.helperText}
           </p>
         )}
       </div>
@@ -481,7 +481,9 @@ export function DashboardHowItWorksButton({
                   <div className="flex items-start justify-end">
                     <Button variant="ghost" size="icon-sm" onClick={closeTour}>
                       <X className="h-4 w-4" />
-                      <span className="sr-only">Close guide</span>
+                      <span className="sr-only">
+                        {messages.dashboard.guide.closeGuide}
+                      </span>
                     </Button>
                   </div>
 
@@ -512,7 +514,10 @@ export function DashboardHowItWorksButton({
                     >
                       <div className="space-y-3">
                         <Badge variant="outline" className="w-fit">
-                          Step {stepIndex + 1} of {steps.length}
+                          {messages.dashboard.guide.stepOf(
+                            stepIndex + 1,
+                            steps.length,
+                          )}
                         </Badge>
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2">
@@ -553,7 +558,7 @@ export function DashboardHowItWorksButton({
                             onClick={closeTour}
                             className="w-full sm:w-auto"
                           >
-                            Close
+                            {messages.dashboard.guide.close}
                           </Button>
                           {stepIndex > 0 && (
                             <Button
@@ -561,7 +566,7 @@ export function DashboardHowItWorksButton({
                               onClick={goToPreviousStep}
                               className="w-full sm:w-auto"
                             >
-                              Back
+                              {messages.dashboard.guide.back}
                             </Button>
                           )}
                         </div>
@@ -570,7 +575,9 @@ export function DashboardHowItWorksButton({
                           onClick={goToNextStep}
                           className="w-full sm:w-auto"
                         >
-                          {stepIndex === steps.length - 1 ? "Finish" : "Next"}
+                          {stepIndex === steps.length - 1
+                            ? messages.dashboard.guide.finish
+                            : messages.dashboard.guide.next}
                         </Button>
                       </div>
                     </motion.div>

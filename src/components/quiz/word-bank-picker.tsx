@@ -7,10 +7,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useAppI18n } from "@/components/providers/app-language-provider";
+import { formatDateForAppLanguage } from "@/lib/i18n/format";
 import { Button } from "@/components/ui/button";
 import { Loader2, Trash2, BookOpen } from "lucide-react";
 import type { QuizTerm } from "@/types/quiz";
-import { formatAppDate } from "@/lib/dates";
 
 interface WordBankPickerProps {
   onSelect: (terms: QuizTerm[]) => void;
@@ -24,6 +25,7 @@ interface WordBankItem {
 }
 
 export function WordBankPicker({ onSelect }: WordBankPickerProps) {
+  const { messages, appLanguage } = useAppI18n();
   const [banks, setBanks] = useState<WordBankItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function WordBankPicker({ onSelect }: WordBankPickerProps) {
       const data = await res.json();
       setBanks(data.wordBanks || []);
     } catch {
-      setError("Failed to load saved word banks.");
+      setError(messages.createQuiz.wordBankPicker.loadFailed);
     } finally {
       setIsLoading(false);
     }
@@ -58,7 +60,7 @@ export function WordBankPicker({ onSelect }: WordBankPickerProps) {
       if (!res.ok) throw new Error("Failed to delete");
       setBanks(banks.filter((b) => b.id !== id));
     } catch {
-      setError("Failed to delete word bank.");
+      setError(messages.createQuiz.wordBankPicker.deleteFailed);
     } finally {
       setDeletingId(null);
     }
@@ -81,8 +83,7 @@ export function WordBankPicker({ onSelect }: WordBankPickerProps) {
       <div className="py-8 text-center">
         <BookOpen className="mx-auto h-8 w-8 text-muted-foreground/50" />
         <p className="mt-2 text-sm text-muted-foreground">
-          No saved word banks yet. Parse new words and save them to create your
-          first bank.
+          {messages.createQuiz.wordBankPicker.emptyState}
         </p>
       </div>
     );
@@ -91,7 +92,7 @@ export function WordBankPicker({ onSelect }: WordBankPickerProps) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Select a saved word bank to use its vocabulary.
+        {messages.createQuiz.wordBankPicker.helperDescription}
       </p>
       <div className="grid gap-3">
         {banks.map((bank) => (
@@ -104,8 +105,10 @@ export function WordBankPicker({ onSelect }: WordBankPickerProps) {
               <div>
                 <CardTitle className="text-base">{bank.name}</CardTitle>
                 <CardDescription>
-                  {bank.terms.length} term{bank.terms.length !== 1 ? "s" : ""}{" "}
-                  &middot; {formatAppDate(bank.created_at)}
+                  {messages.createQuiz.wordBankPicker.bankMeta(
+                    bank.terms.length,
+                    formatDateForAppLanguage(appLanguage, bank.created_at),
+                  )}
                 </CardDescription>
               </div>
               <Button

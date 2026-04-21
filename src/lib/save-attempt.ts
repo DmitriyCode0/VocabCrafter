@@ -3,12 +3,19 @@ export async function saveAttempt(
   answers: Record<string, unknown>,
   score: number | null,
   maxScore: number | null,
+  timeSpentSeconds?: number,
 ) {
   try {
     await fetch("/api/quiz-attempts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quizId, answers, score, maxScore }),
+      body: JSON.stringify({
+        quizId,
+        answers,
+        score,
+        maxScore,
+        timeSpentSeconds,
+      }),
     });
   } catch (err) {
     console.error("Failed to save attempt:", err);

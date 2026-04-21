@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ export function GrammarTopicSelector({
   selectedTopics,
   onTopicsChange,
 }: GrammarTopicSelectorProps) {
+  const { messages } = useAppI18n();
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(
     () => new Set(levels[0] ? [levels[0].level] : []),
   );
@@ -57,15 +59,21 @@ export function GrammarTopicSelector({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium">
-          Grammar Focus{" "}
-          <span className="text-muted-foreground font-normal">(optional)</span>
+          {messages.createQuiz.grammarTopics.title}{" "}
+          <span className="text-muted-foreground font-normal">
+            ({messages.createQuiz.grammarTopics.optional})
+          </span>
         </p>
         {selectedTopics.length > 0 && (
-          <Badge variant="secondary">{selectedTopics.length} selected</Badge>
+          <Badge variant="secondary">
+            {messages.createQuiz.grammarTopics.selectedCount(
+              selectedTopics.length,
+            )}
+          </Badge>
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Select one grammar topic to focus on in the generated sentences.
+        {messages.createQuiz.grammarTopics.description}
       </p>
 
       <div className="rounded-md border divide-y">
@@ -103,7 +111,7 @@ export function GrammarTopicSelector({
                     className="h-auto p-0 text-xs text-muted-foreground"
                     onClick={() => onTopicsChange([])}
                   >
-                    Clear
+                    {messages.createQuiz.grammarTopics.clear}
                   </Button>
                 )}
               </div>

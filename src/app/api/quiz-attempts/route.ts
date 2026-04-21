@@ -14,6 +14,7 @@ const createAttemptSchema = z.object({
   answers: z.record(z.string(), z.unknown()),
   score: z.number().min(0).nullable(),
   maxScore: z.number().min(0).nullable(),
+  timeSpentSeconds: z.number().int().min(0).optional(),
 });
 
 const getAttemptsQuerySchema = z.object({
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { quizId, answers, score, maxScore } = parsed.data;
+    const { quizId, answers, score, maxScore, timeSpentSeconds } = parsed.data;
 
     const { data: attempt, error: insertError } = await supabase
       .from("quiz_attempts")
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
         answers: answers as Record<string, unknown>,
         score,
         max_score: maxScore,
+        time_spent_seconds: timeSpentSeconds ?? 0,
       })
       .select()
       .single();

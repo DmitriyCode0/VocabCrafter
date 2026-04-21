@@ -118,9 +118,9 @@ export default function SettingsPage() {
     getGeminiTtsVoiceOption(aiVoice) ?? getGeminiTtsVoiceOption(profileAiVoice);
   const previewSamples = getGeminiTtsPreviewSamples(learningLanguage);
   const selectedLearningLanguageLabel =
-    TARGET_LANGUAGE_OPTIONS.find((option) => option.value === learningLanguage)
-      ?.label ?? "English";
+    messages.common.studyLanguageNames[learningLanguage];
   const isUnsavedVoiceChange = aiVoice !== profileAiVoice;
+  const voiceDescriptionMap = messages.settings.aiVoice.voiceDescriptions;
 
   const allowedCefrLevels = getAllowedCefrLevels(learningLanguage);
   const cefrLevel = allowedCefrLevels.includes(
@@ -197,17 +197,15 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>
-            Update your personal information and language level.
-          </CardDescription>
+          <CardTitle>{messages.settings.profileTitle}</CardTitle>
+          <CardDescription>{messages.settings.profileDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="fullName">Full Name</Label>
+            <Label htmlFor="fullName">{messages.settings.fullNameLabel}</Label>
             <Input
               id="fullName"
-              placeholder="Your full name"
+              placeholder={messages.settings.fullNamePlaceholder}
               value={fullName}
               onChange={(event) =>
                 updateDraft((current) => ({
@@ -219,7 +217,9 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="learningLanguage">Language You Are Learning</Label>
+            <Label htmlFor="learningLanguage">
+              {messages.settings.learningLanguageLabel}
+            </Label>
             <Select
               value={learningLanguage}
               onValueChange={(value) => {
@@ -243,12 +243,14 @@ export default function SettingsPage() {
               }}
             >
               <SelectTrigger id="learningLanguage">
-                <SelectValue placeholder="Select a learning language" />
+                <SelectValue
+                  placeholder={messages.settings.learningLanguagePlaceholder}
+                />
               </SelectTrigger>
               <SelectContent>
                 {TARGET_LANGUAGE_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    {messages.common.studyLanguageNames[option.value]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -256,7 +258,9 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="sourceLanguage">Language You Learn From</Label>
+            <Label htmlFor="sourceLanguage">
+              {messages.settings.sourceLanguageLabel}
+            </Label>
             <Select
               value={sourceLanguage}
               onValueChange={(value) => {
@@ -267,12 +271,14 @@ export default function SettingsPage() {
               }}
             >
               <SelectTrigger id="sourceLanguage">
-                <SelectValue placeholder="Select a source language" />
+                <SelectValue
+                  placeholder={messages.settings.sourceLanguagePlaceholder}
+                />
               </SelectTrigger>
               <SelectContent>
                 {SOURCE_LANGUAGE_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    {messages.common.studyLanguageNames[option.value]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -311,7 +317,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="aiVoice">AI Voice</Label>
+            <Label htmlFor="aiVoice">{messages.settings.aiVoice.label}</Label>
             <Select
               value={aiVoice}
               onValueChange={(value) => {
@@ -322,18 +328,22 @@ export default function SettingsPage() {
               }}
             >
               <SelectTrigger id="aiVoice">
-                <SelectValue placeholder="Select an AI voice" />
+                <SelectValue
+                  placeholder={messages.settings.aiVoice.placeholder}
+                />
               </SelectTrigger>
               <SelectContent>
                 {GEMINI_TTS_VOICE_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label} - {option.description}
+                    {option.label} - {voiceDescriptionMap[
+                      option.description as keyof typeof voiceDescriptionMap
+                    ]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Choose which Gemini voice is used for quiz audio playback.
+              {messages.settings.aiVoice.description}
             </p>
 
             <div className="rounded-xl border bg-muted/30 p-4">
@@ -341,20 +351,27 @@ export default function SettingsPage() {
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium">
-                      Preview {selectedVoiceOption?.label ?? aiVoice}
+                      {messages.settings.aiVoice.previewTitle(
+                        selectedVoiceOption?.label ?? aiVoice,
+                      )}
                     </p>
                     <span className="rounded-full border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                      {selectedVoiceOption?.description ?? "Voice sample"}
+                      {selectedVoiceOption
+                        ? voiceDescriptionMap[
+                            selectedVoiceOption.description as keyof typeof voiceDescriptionMap
+                          ]
+                        : messages.settings.aiVoice.previewFallbackBadge}
                     </span>
                     {isUnsavedVoiceChange && (
                       <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-                        Not saved yet
+                        {messages.settings.aiVoice.unsavedBadge}
                       </span>
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Hear how this voice sounds in{" "}
-                    {selectedLearningLanguageLabel} before you save it.
+                    {messages.settings.aiVoice.previewDescription(
+                      selectedLearningLanguageLabel,
+                    )}
                   </p>
                 </div>
               </div>
@@ -366,7 +383,9 @@ export default function SettingsPage() {
                     className="space-y-3 rounded-lg border bg-background p-3"
                   >
                     <div className="space-y-1">
-                      <p className="text-sm font-medium">{sample.label}</p>
+                      <p className="text-sm font-medium">
+                        {messages.settings.aiVoice.quickPreviewLabel}
+                      </p>
                       <p className="text-sm text-muted-foreground">
                         {sample.text}
                       </p>
@@ -375,7 +394,7 @@ export default function SettingsPage() {
                       text={sample.text}
                       language={learningLanguage}
                       voice={aiVoice}
-                      label={`Play ${sample.label.toLowerCase()}`}
+                      label={messages.settings.aiVoice.playPreview}
                       className="w-full justify-center"
                     />
                   </div>
@@ -383,15 +402,14 @@ export default function SettingsPage() {
               </div>
 
               <p className="mt-3 text-xs text-muted-foreground">
-                Preview uses the selected voice immediately, even before saving.
-                Each preview counts as a regular AI audio request.
+                {messages.settings.aiVoice.previewNote}
               </p>
             </div>
           </div>
 
           {profile?.role === "student" && (
             <div className="space-y-2">
-              <Label htmlFor="cefrLevel">Level (CEFR)</Label>
+              <Label htmlFor="cefrLevel">{messages.settings.cefrLevelLabel}</Label>
               <Select
                 value={cefrLevel}
                 onValueChange={(value) => {
@@ -402,7 +420,9 @@ export default function SettingsPage() {
                 }}
               >
                 <SelectTrigger id="cefrLevel">
-                  <SelectValue placeholder="Select your level" />
+                  <SelectValue
+                    placeholder={messages.settings.cefrLevelPlaceholder}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {allowedCefrLevels.map((level) => (
@@ -413,8 +433,7 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                This determines quiz difficulty and available grammar topics.
-                Spanish is currently limited to A1 for testing.
+                {messages.settings.cefrLevelDescription}
               </p>
             </div>
           )}
@@ -441,17 +460,17 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Appearance</CardTitle>
+          <CardTitle>{messages.settings.appearanceTitle}</CardTitle>
           <CardDescription>
-            Customize how VocabCrafter 2.0 looks on your device.
+            {messages.settings.appearanceDescription}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">Theme</p>
+              <p className="text-sm font-medium">{messages.common.theme}</p>
               <p className="text-xs text-muted-foreground">
-                Switch between light, dark, and system theme.
+                {messages.settings.themeDescription}
               </p>
             </div>
             <ThemeToggle />

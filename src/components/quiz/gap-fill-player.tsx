@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import {
   Card,
   CardContent,
@@ -35,6 +36,7 @@ export function GapFillPlayer({
   quizConfig,
   onComplete,
 }: GapFillPlayerProps) {
+  const { messages } = useAppI18n();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<string[]>(() =>
     questions.map(() => ""),
@@ -125,7 +127,10 @@ export function GapFillPlayer({
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Question {currentIndex + 1} of {questions.length}
+            {messages.quizSession.gapFill.progress(
+              currentIndex + 1,
+              questions.length,
+            )}
           </span>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
@@ -136,7 +141,7 @@ export function GapFillPlayer({
                 className="h-8 w-8"
                 onClick={handlePrev}
                 disabled={currentIndex === 0}
-                aria-label="Previous question"
+                aria-label={messages.quizSession.gapFill.previousAria}
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
@@ -147,13 +152,13 @@ export function GapFillPlayer({
                 className="h-8 w-8"
                 onClick={handleNext}
                 disabled={currentIndex === questions.length - 1}
-                aria-label="Next question"
+                aria-label={messages.quizSession.gapFill.nextAria}
               >
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
             <Badge variant="outline">
-              Score: {correctCount}/{completedCount}
+              {messages.quizSession.gapFill.score(correctCount, completedCount)}
             </Badge>
           </div>
         </div>
@@ -163,27 +168,31 @@ export function GapFillPlayer({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-lg">Fill in the blank</CardTitle>
+            <CardTitle className="text-lg">
+              {messages.quizSession.gapFill.title}
+            </CardTitle>
             <BrowserTtsButton
               text={spokenSentence}
               language={targetLanguage}
-              label="Listen"
+              label={messages.common.listen}
             />
           </div>
           <CardDescription>
-            Type the missing word to complete the sentence.
+            {messages.quizSession.gapFill.description}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-lg leading-relaxed">{question.sentence}</p>
 
-          <p className="text-sm text-muted-foreground">Hint: {question.hint}</p>
+          <p className="text-sm text-muted-foreground">
+            {messages.quizSession.gapFill.hint(question.hint)}
+          </p>
 
           <div className="flex gap-2">
             <Input
               value={userAnswer}
               onChange={(e) => handleAnswerChange(e.target.value)}
-              placeholder="Type your answer..."
+              placeholder={messages.quizSession.gapFill.placeholder}
               disabled={submitted}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -203,10 +212,10 @@ export function GapFillPlayer({
             {!submitted ? (
               <>
                 <Button variant="outline" onClick={handleSkip}>
-                  Skip
+                  {messages.common.skip}
                 </Button>
                 <Button onClick={handleSubmit} disabled={!userAnswer.trim()}>
-                  Check
+                  {messages.common.check}
                 </Button>
               </>
             ) : (
@@ -218,11 +227,11 @@ export function GapFillPlayer({
               >
                 {currentIndex < questions.length - 1 ? (
                   <>
-                    Next
+                    {messages.quizSession.gapFill.nextQuestion}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 ) : (
-                  "Finish"
+                  messages.common.finish
                 )}
               </Button>
             )}
@@ -232,7 +241,7 @@ export function GapFillPlayer({
             submitted &&
             !allCompleted && (
               <p className="text-xs text-muted-foreground">
-                Use the arrows to review unanswered questions before finishing.
+                {messages.quizSession.gapFill.reviewUnanswered}
               </p>
             )}
 
@@ -251,14 +260,15 @@ export function GapFillPlayer({
               )}
               <div>
                 {isCorrect ? (
-                  <p className="font-medium">Correct!</p>
+                  <p className="font-medium">
+                    {messages.quizSession.gapFill.correct}
+                  </p>
                 ) : (
                   <>
                     <p className="font-medium">
-                      Not quite. The correct answer is:{" "}
-                      <span className="font-bold">
-                        {question.correctAnswer}
-                      </span>
+                      {messages.quizSession.gapFill.incorrect(
+                        question.correctAnswer,
+                      )}
                     </p>
                   </>
                 )}

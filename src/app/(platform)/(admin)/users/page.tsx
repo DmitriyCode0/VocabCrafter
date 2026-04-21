@@ -14,21 +14,11 @@ import { Users, Shield, GraduationCap, BookOpen } from "lucide-react";
 import { getAllowedCefrLevels } from "@/lib/languages";
 import { CefrLevelSelector } from "./cefr-level-selector";
 import { RoleSelector } from "./role-selector";
-import { formatAppDate } from "@/lib/dates";
+import { normalizeAppLanguage } from "@/lib/i18n/app-language";
+import { formatDateForAppLanguage } from "@/lib/i18n/format";
+import { getAppMessages } from "@/lib/i18n/messages";
 
 export const dynamic = "force-dynamic";
-
-const ROLE_CONFIG: Record<
-  string,
-  {
-    label: string;
-    variant: "default" | "secondary" | "destructive" | "outline";
-  }
-> = {
-  student: { label: "Student", variant: "secondary" },
-  tutor: { label: "Tutor", variant: "default" },
-  superadmin: { label: "Admin", variant: "destructive" },
-};
 
 export default async function UsersPage() {
   const supabase = await createClient();
@@ -42,11 +32,34 @@ export default async function UsersPage() {
   // Verify superadmin role
   const { data: currentProfile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, app_language")
     .eq("id", user.id)
     .single();
 
   if (currentProfile?.role !== "superadmin") redirect("/dashboard");
+
+  const appLanguage = normalizeAppLanguage(currentProfile?.app_language);
+  const messages = getAppMessages(appLanguage);
+  const roleConfig: Record<
+    string,
+    {
+      label: string;
+      variant: "default" | "secondary" | "destructive" | "outline";
+    }
+  > = {
+    student: {
+      label: messages.adminUsers.roleLabels.student,
+      variant: "secondary",
+    },
+    tutor: {
+      label: messages.adminUsers.roleLabels.tutor,
+      variant: "default",
+    },
+    superadmin: {
+      label: messages.adminUsers.roleLabels.superadmin,
+      variant: "destructive",
+    },
+  };
 
   const currentUserId = user.id;
 
@@ -84,9 +97,11 @@ export default async function UsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {messages.adminUsers.title}
+        </h1>
         <p className="text-muted-foreground">
-          Manage platform users, roles, and permissions.
+          {messages.adminUsers.description}
         </p>
       </div>
 
@@ -94,7 +109,9 @@ export default async function UsersPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Students</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {messages.adminUsers.summaryTitles.students}
+            </CardTitle>
             <GraduationCap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -103,7 +120,9 @@ export default async function UsersPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Tutors</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {messages.adminUsers.summaryTitles.tutors}
+            </CardTitle>
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -112,7 +131,9 @@ export default async function UsersPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Admins</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {messages.adminUsers.summaryTitles.admins}
+            </CardTitle>
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -126,32 +147,32 @@ export default async function UsersPage() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Users className="h-5 w-5" />
-            All Users ({profiles?.length ?? 0})
+            {messages.adminUsers.allUsers(profiles?.length ?? 0)}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {!profiles || profiles.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              No users found.
+              {messages.adminUsers.noUsersFound}
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Change Role</TableHead>
-                  <TableHead>CEFR</TableHead>
-                  <TableHead>Quizzes</TableHead>
-                  <TableHead>Attempts</TableHead>
-                  <TableHead>Onboarded</TableHead>
-                  <TableHead>Joined</TableHead>
+                  <TableHead>{messages.adminUsers.columns.name}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.email}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.role}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.changeRole}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.cefr}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.quizzes}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.attempts}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.onboarded}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.joined}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {profiles.map((profile) => {
-                  const config = ROLE_CONFIG[profile.role] ?? {
+                  const config = roleConfig[profile.role] ?? {
                     label: profile.role,
                     variant: "outline" as const,
                   };
@@ -195,16 +216,16 @@ export default async function UsersPage() {
                       <TableCell>
                         {profile.onboarding_completed ? (
                           <Badge variant="secondary" className="text-xs">
-                            Yes
+                            {messages.adminUsers.yes}
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-xs">
-                            No
+                            {messages.adminUsers.no}
                           </Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {formatAppDate(profile.created_at)}
+                        {formatDateForAppLanguage(appLanguage, profile.created_at)}
                       </TableCell>
                     </TableRow>
                   );

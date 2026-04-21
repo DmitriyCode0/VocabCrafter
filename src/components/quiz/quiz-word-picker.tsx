@@ -8,9 +8,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useAppI18n } from "@/components/providers/app-language-provider";
+import { formatDateForAppLanguage } from "@/lib/i18n/format";
 import { Loader2, FileText } from "lucide-react";
 import type { QuizTerm } from "@/types/quiz";
-import { formatAppDate } from "@/lib/dates";
 
 interface QuizWordPickerProps {
   onSelect: (terms: QuizTerm[]) => void;
@@ -25,18 +26,8 @@ interface QuizItem {
   created_at: string;
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  flashcards: "Flashcards",
-  gap_fill: "Gap Fill",
-  translation: "Translation",
-  mcq: "Multiple Choice",
-  matching: "Matching",
-  discussion: "Live Discussion",
-  text_translation: "Text Translation",
-  translation_list: "Translation List",
-};
-
 export function QuizWordPicker({ onSelect }: QuizWordPickerProps) {
+  const { messages, appLanguage } = useAppI18n();
   const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +47,7 @@ export function QuizWordPicker({ onSelect }: QuizWordPickerProps) {
       const data = await res.json();
       setQuizzes(data.quizzes || []);
     } catch {
-      setError("Failed to load quizzes.");
+      setError(messages.createQuiz.quizWordPicker.loadFailed);
     } finally {
       setIsLoading(false);
     }
@@ -79,8 +70,7 @@ export function QuizWordPicker({ onSelect }: QuizWordPickerProps) {
       <div className="py-8 text-center">
         <FileText className="mx-auto h-8 w-8 text-muted-foreground/50" />
         <p className="mt-2 text-sm text-muted-foreground">
-          No quizzes available yet. Create a quiz or complete an assigned quiz
-          to reuse its vocabulary.
+          {messages.createQuiz.quizWordPicker.emptyState}
         </p>
       </div>
     );
@@ -89,8 +79,7 @@ export function QuizWordPicker({ onSelect }: QuizWordPickerProps) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Select one of your quizzes or a passed assignment quiz to reuse its
-        vocabulary terms.
+        {messages.createQuiz.quizWordPicker.helperDescription}
       </p>
       <div className="grid gap-3">
         {quizzes.map((quiz) => (
@@ -103,14 +92,17 @@ export function QuizWordPicker({ onSelect }: QuizWordPickerProps) {
               <div>
                 <CardTitle className="text-base">{quiz.title}</CardTitle>
                 <CardDescription>
-                  {quiz.vocabulary_terms.length} term
-                  {quiz.vocabulary_terms.length !== 1 ? "s" : ""} &middot;{" "}
-                  {formatAppDate(quiz.created_at)}
+                  {messages.createQuiz.quizWordPicker.quizMeta(
+                    quiz.vocabulary_terms.length,
+                    formatDateForAppLanguage(appLanguage, quiz.created_at),
+                  )}
                 </CardDescription>
               </div>
               <div className="flex gap-2">
                 <Badge variant="secondary">
-                  {TYPE_LABELS[quiz.type] || quiz.type}
+                  {messages.createQuiz.quizWordPicker.typeLabels[
+                    quiz.type as keyof typeof messages.createQuiz.quizWordPicker.typeLabels
+                  ] || quiz.type}
                 </Badge>
                 <Badge variant="outline">{quiz.cefr_level}</Badge>
               </div>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { removeSuggestedAnswerLines, stripMarkdownEmphasis } from "@/lib/utils";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 
 interface EditableTranslationResult {
   ukrainianSentence?: string;
@@ -104,6 +105,7 @@ export function EditableTranslationResults({
   results,
   onScoreSaved,
 }: EditableTranslationResultsProps) {
+  const { messages } = useAppI18n();
   const router = useRouter();
   const [scores, setScores] = useState(
     results.map((result) => String(result.score ?? 0)),
@@ -140,7 +142,9 @@ export function EditableTranslationResults({
         const data = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new Error(data?.error || "Failed to update score");
+        throw new Error(
+          data?.error || messages.reviewDetail.translationResults.updateFailed,
+        );
       }
 
       const data = (await response.json()) as {
@@ -167,11 +171,13 @@ export function EditableTranslationResults({
         maxScore: data.maxScore,
       });
 
-      toast.success("Translation score updated");
+      toast.success(messages.reviewDetail.translationResults.updateSuccess);
       router.refresh();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to update score",
+        error instanceof Error
+          ? error.message
+          : messages.reviewDetail.translationResults.updateFailed,
       );
     } finally {
       setSavingIndex(null);
@@ -181,8 +187,12 @@ export function EditableTranslationResults({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-sm">Translation Answers</h3>
-        <Badge variant="outline">Current overall: {overallScore}/100</Badge>
+        <h3 className="font-medium text-sm">
+          {messages.reviewDetail.translationResults.title}
+        </h3>
+        <Badge variant="outline">
+          {messages.reviewDetail.translationResults.currentOverall(overallScore)}
+        </Badge>
       </div>
 
       {results.map((result, index) => {
@@ -199,7 +209,7 @@ export function EditableTranslationResults({
                   Q{index + 1}
                 </Badge>
                 <span className="text-sm text-muted-foreground">
-                  Translation item
+                  {messages.reviewDetail.translationResults.itemLabel}
                 </span>
               </div>
 
@@ -221,7 +231,9 @@ export function EditableTranslationResults({
                   onClick={() => handleSave(index)}
                   disabled={savingIndex === index || score < 0 || score > 100}
                 >
-                  {savingIndex === index ? "Saving..." : "Save"}
+                  {savingIndex === index
+                    ? messages.reviewDetail.translationResults.saving
+                    : messages.reviewDetail.translationResults.save}
                 </Button>
                 <Badge
                   variant="outline"
@@ -242,7 +254,7 @@ export function EditableTranslationResults({
             <div className="space-y-3 p-4">
               {result.ukrainianSentence && (
                 <TranslationSection
-                  label="Question"
+                  label={messages.reviewDetail.translationResults.question}
                   tone="question"
                   content={stripMarkdownEmphasis(result.ukrainianSentence)}
                 />
@@ -250,7 +262,7 @@ export function EditableTranslationResults({
 
               {result.userTranslation && (
                 <TranslationSection
-                  label="Student Response"
+                  label={messages.reviewDetail.translationResults.studentResponse}
                   tone="student"
                   content={<em>{result.userTranslation}</em>}
                 />
@@ -258,7 +270,7 @@ export function EditableTranslationResults({
 
               {result.referenceTranslation && (
                 <TranslationSection
-                  label="Reference Answer"
+                  label={messages.reviewDetail.translationResults.referenceAnswer}
                   tone="reference"
                   content={<em>{result.referenceTranslation}</em>}
                 />
@@ -266,7 +278,7 @@ export function EditableTranslationResults({
 
               {result.feedback && (
                 <TranslationSection
-                  label="AI Feedback"
+                  label={messages.reviewDetail.translationResults.aiFeedback}
                   tone="feedback"
                   content={<FeedbackChecklist feedback={result.feedback} />}
                 />

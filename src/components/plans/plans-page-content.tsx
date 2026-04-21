@@ -21,11 +21,17 @@ import {
   PLAN_LIMIT_DETAILS,
   PLAN_LIMIT_DETAIL_ORDER,
   PLAN_ORDER,
-  buildPlanFeatures,
-  fmtLimit,
   type PlanDefinition,
   type PlanKey,
 } from "@/lib/plans";
+import { useAppI18n } from "@/components/providers/app-language-provider";
+import type { AppMessages } from "@/lib/i18n/messages";
+import {
+  getLocalizedPlanDescription,
+  getLocalizedPlanFeatures,
+  getLocalizedPlanLimitDetail,
+  getLocalizedPlanName,
+} from "@/lib/i18n/plans";
 import type { Role } from "@/types/roles";
 import { savePlanLimits } from "@/app/(platform)/plans/actions";
 
@@ -59,30 +65,38 @@ function toPlanEditorState(plan: PlanDefinition): PlanEditorState {
   };
 }
 
-function parseRequiredNumber(value: string, label: string) {
+function parseRequiredNumber(
+  value: string,
+  label: string,
+  messages: AppMessages["plans"]["editor"],
+) {
   const normalized = value.trim();
 
   if (!normalized) {
-    throw new Error(`${label} is required`);
+    throw new Error(messages.required(label));
   }
 
   const parsed = Number(normalized);
 
   if (!Number.isInteger(parsed) || parsed < 0) {
-    throw new Error(`${label} must be a whole number of 0 or more`);
+    throw new Error(messages.wholeNumber(label));
   }
 
   return parsed;
 }
 
-function parseOptionalNumber(value: string, label: string) {
+function parseOptionalNumber(
+  value: string,
+  label: string,
+  messages: AppMessages["plans"]["editor"],
+) {
   const normalized = value.trim();
 
   if (!normalized) {
     return null;
   }
 
-  return parseRequiredNumber(normalized, label);
+  return parseRequiredNumber(normalized, label, messages);
 }
 
 function getPlanIcon(planKey: PlanKey) {
@@ -102,6 +116,7 @@ export function PlansPageContent({
   plans,
   role,
 }: PlansPageContentProps) {
+  const { messages } = useAppI18n();
   const router = useRouter();
   const isSuperadmin = role === "superadmin";
   const [isPending, startTransition] = useTransition();
@@ -155,24 +170,36 @@ export function PlansPageContent({
       try {
         const updatedPlan = await savePlanLimits({
           key: planKey,
-          price: parseRequiredNumber(draft.price, "Price"),
+          price: parseRequiredNumber(
+            draft.price,
+            messages.plans.editor.monthlyPrice,
+            messages.plans.editor,
+          ),
           aiCallsPerMonth: parseRequiredNumber(
             draft.aiCallsPerMonth,
-            "AI calls per month",
+            messages.plans.editor.aiCallsPerMonth,
+            messages.plans.editor,
           ),
           reportsPerMonth: parseOptionalNumber(
             draft.reportsPerMonth,
-            "Reports per month",
+            messages.plans.editor.reportsPerMonth,
+            messages.plans.editor,
           ),
           quizzesPerMonth: parseOptionalNumber(
             draft.quizzesPerMonth,
-            "Quizzes per month",
+            messages.plans.editor.quizzesPerMonth,
+            messages.plans.editor,
           ),
           attemptsPerMonth: parseOptionalNumber(
             draft.attemptsPerMonth,
-            "Attempts per month",
+            messages.plans.editor.attemptsPerMonth,
+            messages.plans.editor,
           ),
-          wordBanks: parseOptionalNumber(draft.wordBanks, "Word banks"),
+          wordBanks: parseOptionalNumber(
+            draft.wordBanks,
+            messages.plans.editor.wordBanks,
+            messages.plans.editor,
+          ),
         });
 
         setPlansState((current) => ({
@@ -183,11 +210,17 @@ export function PlansPageContent({
           ...current,
           [planKey]: toPlanEditorState(updatedPlan),
         }));
-        toast.success(`${updatedPlan.name} plan limits saved`);
+        toast.success(
+          messages.plans.editor.saved(
+            getLocalizedPlanName(messages, updatedPlan.key),
+          ),
+        );
         router.refresh();
       } catch (error) {
         toast.error(
-          error instanceof Error ? error.message : "Failed to save plan limits",
+          error instanceof Error
+            ? error.message
+            : messages.plans.editor.saveFailed,
         );
       } finally {
         setPendingPlanKey(null);
@@ -198,10 +231,11 @@ export function PlansPageContent({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Plans</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {messages.plans.title}
+        </h1>
         <p className="text-muted-foreground">
-          Compare plan limits, understand how each quota works, and review what
-          counts toward usage.
+          {messages.plans.description}
         </p>
       </div>
 
@@ -209,6 +243,11 @@ export function PlansPageContent({
         {orderedPlans.map((plan) => {
           const Icon = getPlanIcon(plan.key);
           const isCurrent = currentPlanKey === plan.key;
+          const planName = getLocalizedPlanName(messages, plan.key);
+          const planDescription = getLocalizedPlanDescription(
+            messages,
+            plan.key,
+          );
 
           return (
             <Card
@@ -233,13 +272,17 @@ export function PlansPageContent({
                             : "h-4 w-4 text-muted-foreground"
                       }
                     />
-                    {plan.name}
+                    {planName}
                   </CardTitle>
                   <div className="flex items-center gap-2">
-                    {isCurrent && <Badge className="text-xs">Current</Badge>}
+                    {isCurrent && (
+                      <Badge className="text-xs">
+                        {messages.plans.currentBadge}
+                      </Badge>
+                    )}
                     {plan.highlighted && !isCurrent && (
                       <Badge variant="secondary" className="text-xs">
-                        Popular
+                        {messages.plans.popularBadge}
                       </Badge>
                     )}
                   </div>
@@ -247,78 +290,87 @@ export function PlansPageContent({
                 <div className="space-y-1 pt-1">
                   <div>
                     <span className="text-3xl font-bold">
-                      {plan.price === 0 ? "Free" : `$${plan.price}`}
+                      {plan.price === 0
+                        ? messages.plans.freePrice
+                        : `$${plan.price}`}
                     </span>
                     {plan.price > 0 && (
                       <span className="text-sm text-muted-foreground">
                         {" "}
-                        / month
+                        {messages.plans.perMonth}
                       </span>
                     )}
                   </div>
-                  <CardDescription>{plan.description}</CardDescription>
+                  <CardDescription>{planDescription}</CardDescription>
                 </div>
               </CardHeader>
 
               <CardContent className="space-y-5 pt-0 text-sm">
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                   <div>
-                    <p className="font-medium">
-                      {fmtLimit(plan.aiCallsPerMonth)}
-                    </p>
+                    <p className="font-medium">{plan.aiCallsPerMonth}</p>
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
-                        label="AI calls"
-                        description={PLAN_LIMIT_DETAILS.aiCalls.description}
+                        label={messages.plans.usageLabels.aiCalls}
+                        description={getLocalizedPlanLimitDetail(
+                          messages,
+                          "aiCalls",
+                        ).description}
                       />
                     </p>
                   </div>
                   <div>
-                    <p className="font-medium">
-                      {fmtLimit(plan.reportsPerMonth)}
-                    </p>
+                    <p className="font-medium">{plan.reportsPerMonth}</p>
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
-                        label="Reports"
-                        description={PLAN_LIMIT_DETAILS.reports.description}
+                        label={messages.plans.usageLabels.reports}
+                        description={getLocalizedPlanLimitDetail(
+                          messages,
+                          "reports",
+                        ).description}
                       />
                     </p>
                   </div>
                   <div>
-                    <p className="font-medium">
-                      {fmtLimit(plan.quizzesPerMonth)}
-                    </p>
+                    <p className="font-medium">{plan.quizzesPerMonth}</p>
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
-                        label="Quizzes"
-                        description={PLAN_LIMIT_DETAILS.quizzes.description}
+                        label={messages.plans.usageLabels.quizzes}
+                        description={getLocalizedPlanLimitDetail(
+                          messages,
+                          "quizzes",
+                        ).description}
                       />
                     </p>
                   </div>
                   <div>
-                    <p className="font-medium">
-                      {fmtLimit(plan.attemptsPerMonth)}
-                    </p>
+                    <p className="font-medium">{plan.attemptsPerMonth}</p>
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
-                        label="Attempts"
-                        description={PLAN_LIMIT_DETAILS.attempts.description}
+                        label={messages.plans.usageLabels.attempts}
+                        description={getLocalizedPlanLimitDetail(
+                          messages,
+                          "attempts",
+                        ).description}
                       />
                     </p>
                   </div>
                   <div>
-                    <p className="font-medium">{fmtLimit(plan.wordBanks)}</p>
+                    <p className="font-medium">{plan.wordBanks}</p>
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
-                        label="Word banks"
-                        description={PLAN_LIMIT_DETAILS.wordBanks.description}
+                        label={messages.plans.usageLabels.wordBanks}
+                        description={getLocalizedPlanLimitDetail(
+                          messages,
+                          "wordBanks",
+                        ).description}
                       />
                     </p>
                   </div>
                 </div>
 
                 <ul className="space-y-1.5 text-muted-foreground">
-                  {buildPlanFeatures(plan).map((feature) => (
+                  {getLocalizedPlanFeatures(messages, plan).map((feature) => (
                     <li key={feature} className="flex items-start gap-2">
                       <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                       <span>{feature}</span>
@@ -334,30 +386,33 @@ export function PlansPageContent({
       <div className="space-y-4">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">
-            How Limits Work
+            {messages.plans.howLimitsWorkTitle}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Hover the info icons on plan cards for quick definitions, or use the
-            detailed breakdown below.
+            {messages.plans.howLimitsWorkDescription}
           </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           {PLAN_LIMIT_DETAIL_ORDER.map((detailKey) => {
             const detail = PLAN_LIMIT_DETAILS[detailKey];
+            const localizedDetail = getLocalizedPlanLimitDetail(
+              messages,
+              detailKey,
+            );
 
             return (
               <Card key={detailKey}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <detail.icon className="h-4 w-4 text-primary" />
-                    {detail.title}
+                    {localizedDetail.title}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <p>{detail.description}</p>
-                  {detail.extra && (
-                    <p className="text-xs leading-5">{detail.extra}</p>
+                  <p>{localizedDetail.description}</p>
+                  {localizedDetail.extra && (
+                    <p className="text-xs leading-5">{localizedDetail.extra}</p>
                   )}
                 </CardContent>
               </Card>
@@ -370,11 +425,10 @@ export function PlansPageContent({
         <div className="space-y-4">
           <div>
             <h2 className="text-xl font-semibold tracking-tight">
-              Configure Plan Limits
+              {messages.plans.editor.title}
             </h2>
             <p className="text-sm text-muted-foreground">
-              Update plan numbers here. Changes affect quota checks, dashboard
-              limits, and plan comparison cards.
+              {messages.plans.editor.description}
             </p>
           </div>
 
@@ -386,19 +440,26 @@ export function PlansPageContent({
               return (
                 <Card key={`${plan.key}-editor`}>
                   <CardHeader>
-                    <CardTitle className="text-base">{plan.name}</CardTitle>
-                    <CardDescription>{plan.description}</CardDescription>
+                    <CardTitle className="text-base">
+                      {getLocalizedPlanName(messages, plan.key)}
+                    </CardTitle>
+                    <CardDescription>
+                      {getLocalizedPlanDescription(messages, plan.key)}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Label htmlFor={`${plan.key}-price`}>
-                          Monthly price
+                          {messages.plans.editor.monthlyPrice}
                         </Label>
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={PLAN_LIMIT_DETAILS.price.description}
+                          description={getLocalizedPlanLimitDetail(
+                            messages,
+                            "price",
+                          ).description}
                         />
                       </div>
                       <Input
@@ -416,12 +477,15 @@ export function PlansPageContent({
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Label htmlFor={`${plan.key}-ai-calls`}>
-                          AI calls / month
+                          {messages.plans.editor.aiCallsPerMonth}
                         </Label>
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={PLAN_LIMIT_DETAILS.aiCalls.description}
+                          description={getLocalizedPlanLimitDetail(
+                            messages,
+                            "aiCalls",
+                          ).description}
                         />
                       </div>
                       <Input
@@ -443,12 +507,15 @@ export function PlansPageContent({
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Label htmlFor={`${plan.key}-reports`}>
-                          Reports / month
+                          {messages.plans.editor.reportsPerMonth}
                         </Label>
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={PLAN_LIMIT_DETAILS.reports.description}
+                          description={getLocalizedPlanLimitDetail(
+                            messages,
+                            "reports",
+                          ).description}
                         />
                       </div>
                       <Input
@@ -456,7 +523,7 @@ export function PlansPageContent({
                         type="number"
                         min="0"
                         step="1"
-                        placeholder="0 disables reports"
+                        placeholder={messages.plans.editor.reportsPlaceholder}
                         value={draft.reportsPerMonth}
                         onChange={(event) =>
                           updateField(
@@ -471,12 +538,15 @@ export function PlansPageContent({
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Label htmlFor={`${plan.key}-quizzes`}>
-                          Quizzes / month
+                          {messages.plans.editor.quizzesPerMonth}
                         </Label>
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={PLAN_LIMIT_DETAILS.quizzes.description}
+                          description={getLocalizedPlanLimitDetail(
+                            messages,
+                            "quizzes",
+                          ).description}
                         />
                       </div>
                       <Input
@@ -484,7 +554,7 @@ export function PlansPageContent({
                         type="number"
                         min="0"
                         step="1"
-                        placeholder="Leave blank for unlimited"
+                        placeholder={messages.plans.editor.unlimitedPlaceholder}
                         value={draft.quizzesPerMonth}
                         onChange={(event) =>
                           updateField(
@@ -499,12 +569,15 @@ export function PlansPageContent({
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Label htmlFor={`${plan.key}-attempts`}>
-                          Attempts / month
+                          {messages.plans.editor.attemptsPerMonth}
                         </Label>
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={PLAN_LIMIT_DETAILS.attempts.description}
+                          description={getLocalizedPlanLimitDetail(
+                            messages,
+                            "attempts",
+                          ).description}
                         />
                       </div>
                       <Input
@@ -512,7 +585,7 @@ export function PlansPageContent({
                         type="number"
                         min="0"
                         step="1"
-                        placeholder="Leave blank for unlimited"
+                        placeholder={messages.plans.editor.unlimitedPlaceholder}
                         value={draft.attemptsPerMonth}
                         onChange={(event) =>
                           updateField(
@@ -527,12 +600,15 @@ export function PlansPageContent({
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Label htmlFor={`${plan.key}-word-banks`}>
-                          Word banks
+                          {messages.plans.editor.wordBanks}
                         </Label>
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={PLAN_LIMIT_DETAILS.wordBanks.description}
+                          description={getLocalizedPlanLimitDetail(
+                            messages,
+                            "wordBanks",
+                          ).description}
                         />
                       </div>
                       <Input
@@ -540,7 +616,7 @@ export function PlansPageContent({
                         type="number"
                         min="0"
                         step="1"
-                        placeholder="Leave blank for unlimited"
+                        placeholder={messages.plans.editor.unlimitedPlaceholder}
                         value={draft.wordBanks}
                         onChange={(event) =>
                           updateField(plan.key, "wordBanks", event.target.value)
@@ -549,9 +625,7 @@ export function PlansPageContent({
                     </div>
 
                     <p className="text-xs text-muted-foreground">
-                      Leave quizzes, attempts, or word banks blank to keep them
-                      unlimited for this plan. Set reports to 0 to disable
-                      report generation.
+                      {messages.plans.editor.helperText}
                     </p>
 
                     <Button
@@ -560,7 +634,9 @@ export function PlansPageContent({
                       className="w-full"
                     >
                       <Save className="h-4 w-4" />
-                      {savingThisPlan ? "Saving..." : "Save Limits"}
+                      {savingThisPlan
+                        ? messages.plans.editor.saving
+                        : messages.plans.editor.save}
                     </Button>
                   </CardContent>
                 </Card>

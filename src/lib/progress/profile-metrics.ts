@@ -22,6 +22,22 @@ import type { CEFRLevel } from "@/types/quiz";
 
 const CEFR_LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
+export const CEFR_GUIDED_HOURS: Record<
+  CEFRLevel,
+  {
+    minHours: number;
+    maxHours: number;
+    averageHours: number;
+  }
+> = {
+  A1: { minHours: 90, maxHours: 100, averageHours: 95 },
+  A2: { minHours: 180, maxHours: 200, averageHours: 190 },
+  B1: { minHours: 350, maxHours: 400, averageHours: 375 },
+  B2: { minHours: 500, maxHours: 600, averageHours: 550 },
+  C1: { minHours: 700, maxHours: 800, averageHours: 750 },
+  C2: { minHours: 1000, maxHours: 1200, averageHours: 1100 },
+};
+
 /**
  * CEFR-based vocabulary targets.
  *
@@ -90,6 +106,7 @@ interface AttemptQuizRow {
 interface AttemptRow {
   score: number | null;
   max_score: number | null;
+  time_spent_seconds: number | null;
   completed_at: string;
   quizzes: AttemptQuizRow | null;
 }
@@ -203,6 +220,50 @@ export interface StudentProgressSnapshot {
     grammarAvailableCount: number;
     createdQuizCount: number;
   };
+  timeMetrics: {
+    appLearningSeconds: number;
+    appLearningHours: number;
+    lessonHours: number;
+    totalLearningHours: number;
+    completedLessons: number;
+  };
+  cefrGuidedHours: {
+    source: string;
+    levels: Array<{
+      level: CEFRLevel;
+      minHours: number;
+      maxHours: number;
+      averageHours: number;
+    }>;
+    currentLevel: {
+      level: CEFRLevel;
+      minHours: number;
+      maxHours: number;
+      averageHours: number;
+      progressPercent: number;
+      remainingHours: number;
+    };
+    nextLevel:
+      | {
+          level: CEFRLevel;
+          minHours: number;
+          maxHours: number;
+          averageHours: number;
+          progressPercent: number;
+          remainingHours: number;
+        }
+      | null;
+  };
+  overallPerformance: {
+    score: number;
+    band: "needs_focus" | "building" | "on_track" | "strong";
+    components: {
+      time: number;
+      grammar: number;
+      knownWords: number;
+      addedWords: number;
+    };
+  };
   activityStats: StudentProgressActivityStat[];
   recentAttempts: StudentProgressRecentAttempt[];
   grammar: {
@@ -250,6 +311,16 @@ function normalizeCefrLevel(value?: string | null): CEFRLevel {
   return CEFR_LEVELS.includes(value as CEFRLevel) ? (value as CEFRLevel) : "A1";
 }
 
+function getNextCefrLevel(level: CEFRLevel) {
+  const levelIndex = CEFR_LEVELS.indexOf(level);
+
+  if (levelIndex < 0 || levelIndex === CEFR_LEVELS.length - 1) {
+    return null;
+  }
+
+  return CEFR_LEVELS[levelIndex + 1] ?? null;
+}
+
 function getScorePercent(attempt: AttemptRow) {
   if (
     attempt.score == null ||
@@ -274,6 +345,7 @@ export async function getStudentProgressSnapshot(
     quizCountResult,
     passiveEvidenceResult,
     grammarMasteryResult,
+    completedLessonsCountResult,
   ] = await Promise.all([
     supabaseAdmin
       .from("profiles")
@@ -283,7 +355,7 @@ export async function getStudentProgressSnapshot(
     supabaseAdmin
       .from("quiz_attempts")
       .select(
-        "score, max_score, completed_at, quizzes(title, type, cefr_level, vocabulary_terms, config)",
+        "score, max_score, time_spent_seconds, completed_at, quizzes(title, type, cefr_level, vocabulary_terms, config)",
       )
       .eq("student_id", userId)
       .order("completed_at", { ascending: false }),
@@ -308,6 +380,11 @@ export async function getStudentProgressSnapshot(
       .from("student_grammar_topic_mastery")
       .select("topic_key, source")
       .eq("student_id", userId),
+    supabaseAdmin
+      .from("tutor_student_lessons")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", userId)
+      .eq("status", "completed"),
   ]);
 
   if (profileResult.error || !profileResult.data) {
@@ -364,6 +441,17 @@ export async function getStudentProgressSnapshot(
     passiveEvidenceRows,
     cefrLevel,
   );
+  const completedLessons = completedLessonsCountResult.count ?? 0;
+  const appLearningSeconds = attempts.reduce(
+    (total, attempt) => total + (attempt.time_spent_seconds ?? 0),
+    0,
+  );
+  const appLearningHoursRaw = appLearningSeconds / 3600;
+  const lessonHours = completedLessons;
+  const totalLearningHoursRaw = appLearningHoursRaw + lessonHours;
+  const currentGuidedHours = CEFR_GUIDED_HOURS[cefrLevel];
+  const nextLevel = getNextCefrLevel(cefrLevel);
+  const nextGuidedHours = nextLevel ? CEFR_GUIDED_HOURS[nextLevel] : null;
 
   const tutorMarkedTopics = new Map(
     (
@@ -592,6 +680,29 @@ export async function getStudentProgressSnapshot(
     availableGrammarTopics.length > 0
       ? clampScore((grammarMasteredCount / availableGrammarTopics.length) * 100)
       : 0;
+  const timeProgressScore = clampScore(
+    (totalLearningHoursRaw / currentGuidedHours.averageHours) * 100,
+  );
+  const knownWordsScore = clampScore(
+    (masteredWords / ACTIVE_VOCAB_TARGETS[cefrLevel]) * 100,
+  );
+  const addedWordsScore = clampScore(
+    (totalWords / ACTIVE_VOCAB_TARGETS[cefrLevel]) * 100,
+  );
+  const overallPerformanceScore = clampScore(
+    timeProgressScore * 0.3 +
+      grammarVarietyScore * 0.25 +
+      knownWordsScore * 0.25 +
+      addedWordsScore * 0.2,
+  );
+  const overallPerformanceBand: StudentProgressSnapshot["overallPerformance"]["band"] =
+    overallPerformanceScore >= 85
+      ? "strong"
+      : overallPerformanceScore >= 70
+        ? "on_track"
+        : overallPerformanceScore >= 50
+          ? "building"
+          : "needs_focus";
 
   const axes: StudentProgressAxis[] = [
     {
@@ -639,7 +750,6 @@ export async function getStudentProgressSnapshot(
   ];
 
   // Day streak (still used in overview cards)
-  const streakDaysSet = new Set<string>();
   const today = new Date().toISOString().slice(0, 10);
   let streakDays = 0;
   const allDates = new Set(
@@ -684,6 +794,61 @@ export async function getStudentProgressSnapshot(
       grammarMasteredCount,
       grammarAvailableCount: availableGrammarTopics.length,
       createdQuizCount: quizCountResult.count ?? 0,
+    },
+    timeMetrics: {
+      appLearningSeconds,
+      appLearningHours: Number(appLearningHoursRaw.toFixed(1)),
+      lessonHours,
+      totalLearningHours: Number(totalLearningHoursRaw.toFixed(1)),
+      completedLessons,
+    },
+    cefrGuidedHours: {
+      source:
+        "Approximate cumulative guided learning hours based on Cambridge English CEFR guidance from beginner level.",
+      levels: CEFR_LEVELS.map((level) => ({
+        level,
+        minHours: CEFR_GUIDED_HOURS[level].minHours,
+        maxHours: CEFR_GUIDED_HOURS[level].maxHours,
+        averageHours: CEFR_GUIDED_HOURS[level].averageHours,
+      })),
+      currentLevel: {
+        level: cefrLevel,
+        minHours: currentGuidedHours.minHours,
+        maxHours: currentGuidedHours.maxHours,
+        averageHours: currentGuidedHours.averageHours,
+        progressPercent: timeProgressScore,
+        remainingHours: Number(
+          Math.max(0, currentGuidedHours.averageHours - totalLearningHoursRaw).toFixed(
+            1,
+          ),
+        ),
+      },
+      nextLevel: nextLevel && nextGuidedHours
+        ? {
+            level: nextLevel,
+            minHours: nextGuidedHours.minHours,
+            maxHours: nextGuidedHours.maxHours,
+            averageHours: nextGuidedHours.averageHours,
+            progressPercent: clampScore(
+              (totalLearningHoursRaw / nextGuidedHours.averageHours) * 100,
+            ),
+            remainingHours: Number(
+              Math.max(0, nextGuidedHours.averageHours - totalLearningHoursRaw).toFixed(
+                1,
+              ),
+            ),
+          }
+        : null,
+    },
+    overallPerformance: {
+      score: overallPerformanceScore,
+      band: overallPerformanceBand,
+      components: {
+        time: timeProgressScore,
+        grammar: grammarVarietyScore,
+        knownWords: knownWordsScore,
+        addedWords: addedWordsScore,
+      },
     },
     activityStats,
     recentAttempts: attempts.slice(0, 10).map((attempt) => ({

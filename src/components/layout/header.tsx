@@ -10,6 +10,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { NavLinks } from "./nav-links";
 import { UserMenu } from "./user-menu";
 import { DashboardHowItWorksButton } from "@/components/shared/dashboard-how-it-works";
@@ -22,6 +23,7 @@ interface HeaderProps {
 
 export function Header({ profile }: HeaderProps) {
   const pathname = usePathname();
+  const { messages } = useAppI18n();
   const isDashboard = pathname === "/dashboard";
 
   return (
@@ -31,11 +33,13 @@ export function Header({ profile }: HeaderProps) {
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" className="md:hidden">
             <Menu className="h-5 w-5" />
-            <span className="sr-only">Toggle menu</span>
+            <span className="sr-only">{messages.header.toggleMenu}</span>
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-0">
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SheetTitle className="sr-only">
+            {messages.header.navigation}
+          </SheetTitle>
           <div className="flex h-16 items-center border-b px-4">
             <Link
               href="/dashboard"

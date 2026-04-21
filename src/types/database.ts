@@ -734,6 +734,7 @@ export interface Database {
           answers: Record<string, unknown>;
           score: number | null;
           max_score: number | null;
+          time_spent_seconds: number;
           completed_at: string;
         };
         Insert: {
@@ -743,12 +744,14 @@ export interface Database {
           answers: Record<string, unknown>;
           score?: number | null;
           max_score?: number | null;
+          time_spent_seconds?: number;
           completed_at?: string;
         };
         Update: {
           answers?: Record<string, unknown>;
           score?: number | null;
           max_score?: number | null;
+          time_spent_seconds?: number;
         };
         Relationships: [
           {

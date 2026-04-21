@@ -10,9 +10,10 @@ import {
 } from "@/components/ui/card";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { StudentMasteryCards } from "@/components/mastery/student-mastery-cards";
-import { PASSIVE_EQUIVALENT_WORDS_EXPLANATION } from "@/lib/mastery/passive-vocabulary";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { Users } from "lucide-react";
+import { normalizeAppLanguage } from "@/lib/i18n/app-language";
+import { getAppMessages } from "@/lib/i18n/messages";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,14 @@ export default async function TutorMasteryPage({
 
   if (!user) redirect("/login");
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("app_language")
+    .eq("id", user.id)
+    .single();
+
+  const messages = getAppMessages(normalizeAppLanguage(profile?.app_language));
+
   const supabaseAdmin = createAdminClient();
 
   // Get tutor's classes
@@ -63,19 +72,20 @@ export default async function TutorMasteryPage({
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Student Vocab Mastery
+            {messages.tutorMastery.title}
           </h1>
           <p className="text-muted-foreground">
-            See how well your students know their vocabulary.
+            {messages.tutorMastery.description}
           </p>
         </div>
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">No classes yet</h3>
+            <h3 className="text-lg font-medium">
+              {messages.tutorMastery.noClassesTitle}
+            </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Create a class and invite students to see their vocabulary mastery
-              here.
+              {messages.tutorMastery.noClassesDescription}
             </p>
           </CardContent>
         </Card>
@@ -96,18 +106,20 @@ export default async function TutorMasteryPage({
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Student Vocab Mastery
+            {messages.tutorMastery.title}
           </h1>
           <p className="text-muted-foreground">
-            See how well your students know their vocabulary.
+            {messages.tutorMastery.description}
           </p>
         </div>
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">No students enrolled</h3>
+            <h3 className="text-lg font-medium">
+              {messages.tutorMastery.noStudentsTitle}
+            </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Your students will appear here once they join a class.
+              {messages.tutorMastery.noStudentsDescription}
             </p>
           </CardContent>
         </Card>
@@ -183,7 +195,10 @@ export default async function TutorMasteryPage({
 
     return {
       studentId: sid,
-      name: profile?.full_name ?? profile?.email ?? "Unknown",
+      name:
+        profile?.full_name ??
+        profile?.email ??
+        messages.tutorMastery.unknownStudent,
       totalWords: total,
       mastered,
       avgLevel: Math.round(avgLevel * 10) / 10,
@@ -224,26 +239,25 @@ export default async function TutorMasteryPage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
-          Student Vocab Mastery
+          {messages.tutorMastery.title}
         </h1>
         <p className="text-muted-foreground">
-          See how well your students know their vocabulary across all classes,
-          including passive evidence imported from text they already understand.
+          {messages.tutorMastery.description}
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Student Overview</CardTitle>
+          <CardTitle className="text-base">
+            {messages.tutorMastery.studentOverviewTitle}
+          </CardTitle>
           <CardDescription>
-            Student summaries load first. Expand a student to load their words.
-            Equivalent words is the single-word total from passive evidence used
-            in passive-vocabulary estimates.
+            {messages.tutorMastery.studentOverviewDescription}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            {PASSIVE_EQUIVALENT_WORDS_EXPLANATION}
+            {messages.tutorProgressPage.passiveExplanation}
           </p>
           <StudentMasteryCards students={studentSummaries} />
         </CardContent>
@@ -255,6 +269,7 @@ export default async function TutorMasteryPage({
         pageSize={MASTERY_PAGE_SIZE}
         totalItems={totalStudents}
         searchParams={resolvedSearchParams}
+        labels={messages.pagination}
       />
     </div>
   );

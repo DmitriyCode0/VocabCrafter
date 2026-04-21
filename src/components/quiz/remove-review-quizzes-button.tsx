@@ -42,14 +42,14 @@ export function RemoveReviewQuizzesButton({
       } | null;
 
       if (!response.ok) {
-        throw new Error(data?.error || "Failed to remove review sessions");
+        throw new Error(data?.error || messages.quizzes.reviewRemoval.failed);
       }
 
       const deletedCount = data?.deletedCount ?? 0;
       toast.success(
         deletedCount > 0
-          ? `Removed ${deletedCount} review session${deletedCount === 1 ? "" : "s"}.`
-          : "No review sessions to remove.",
+          ? messages.quizzes.reviewRemoval.success(deletedCount)
+          : messages.quizzes.reviewRemoval.emptySuccess,
       );
       setOpen(false);
       router.refresh();
@@ -57,7 +57,7 @@ export function RemoveReviewQuizzesButton({
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to remove review sessions",
+          : messages.quizzes.reviewRemoval.failed,
       );
     } finally {
       setIsDeleting(false);
@@ -78,11 +78,11 @@ export function RemoveReviewQuizzesButton({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Remove Review Sessions</DialogTitle>
+          <DialogTitle>{messages.quizzes.reviewRemoval.title}</DialogTitle>
           <DialogDescription>
             {reviewCount > 0
-              ? `This will permanently delete ${reviewCount} saved review session${reviewCount === 1 ? "" : "s"} from My Quizzes, along with any attempts tied to them. This cannot be undone.`
-              : "There are no saved review sessions to remove."}
+              ? messages.quizzes.reviewRemoval.description(reviewCount)
+              : messages.quizzes.reviewRemoval.emptyDescription}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -91,7 +91,7 @@ export function RemoveReviewQuizzesButton({
             onClick={() => setOpen(false)}
             disabled={isDeleting}
           >
-            Cancel
+            {messages.common.cancel}
           </Button>
           <Button
             variant="destructive"
@@ -101,10 +101,10 @@ export function RemoveReviewQuizzesButton({
             {isDeleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Removing...
+                {messages.common.removing}
               </>
             ) : (
-              "Remove"
+              messages.common.remove
             )}
           </Button>
         </DialogFooter>

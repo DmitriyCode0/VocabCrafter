@@ -11,7 +11,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, BookOpen } from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
-import { formatAppDate } from "@/lib/dates";
+import { normalizeAppLanguage } from "@/lib/i18n/app-language";
+import { formatDateForAppLanguage } from "@/lib/i18n/format";
+import { getAppMessages } from "@/lib/i18n/messages";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +40,33 @@ export default async function StudentFeedbackPage() {
 
   if (!user) redirect("/login");
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("app_language")
+    .eq("id", user.id)
+    .single();
+
+  const appLanguage = normalizeAppLanguage(profile?.app_language);
+  const messages = getAppMessages(appLanguage);
+
   const supabaseAdmin = createAdminClient();
+
+  function getActivityLabel(type: string | null | undefined) {
+    if (!type) {
+      return "";
+    }
+
+    return (
+      messages.quizzes.typeLabels[
+        type as keyof typeof messages.quizzes.typeLabels
+      ] ||
+      messages.createQuiz.quizWordPicker.typeLabels[
+        type as keyof typeof messages.createQuiz.quizWordPicker.typeLabels
+      ] ||
+      ACTIVITY_LABELS[type] ||
+      type
+    );
+  }
 
   // Fetch all feedback on this student's quiz attempts
   // We join feedback → quiz_attempts → quizzes, and feedback → profiles (tutor name)
@@ -64,9 +92,11 @@ export default async function StudentFeedbackPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">My Feedback</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {messages.studentFeedback.title}
+        </h1>
         <p className="text-muted-foreground">
-          Feedback from tutors on your quiz submissions
+          {messages.studentFeedback.description}
         </p>
       </div>
 
@@ -74,10 +104,11 @@ export default async function StudentFeedbackPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">No feedback yet</h3>
+            <h3 className="text-lg font-medium">
+              {messages.studentFeedback.emptyTitle}
+            </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Your tutors&apos; feedback on your quiz submissions will appear
-              here.
+              {messages.studentFeedback.emptyDescription}
             </p>
           </CardContent>
         </Card>
@@ -100,12 +131,12 @@ export default async function StudentFeedbackPage() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base flex items-center gap-2">
                       <BookOpen className="h-4 w-4 text-muted-foreground" />
-                      {quiz?.title ?? "Quiz"}
+                      {quiz?.title ?? messages.studentFeedback.quizFallback}
                     </CardTitle>
                     <div className="flex items-center gap-2">
                       {quiz && (
                         <Badge variant="outline" className="text-xs">
-                          {ACTIVITY_LABELS[quiz.type] || quiz.type}
+                          {getActivityLabel(quiz.type)}
                         </Badge>
                       )}
                       {pct !== null && (
@@ -126,9 +157,13 @@ export default async function StudentFeedbackPage() {
                   </div>
                   <CardDescription className="flex items-center justify-between">
                     <span>
-                      From <strong>{tutor?.full_name ?? "Tutor"}</strong>
+                      {messages.studentFeedback.fromTutor(
+                        tutor?.full_name ?? messages.studentFeedback.tutorFallback,
+                      )}
                     </span>
-                    <span>{formatAppDate(fb.created_at)}</span>
+                    <span>
+                      {formatDateForAppLanguage(appLanguage, fb.created_at)}
+                    </span>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">

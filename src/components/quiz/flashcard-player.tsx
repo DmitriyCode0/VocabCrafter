@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import {
   Card,
   CardContent,
@@ -40,6 +41,7 @@ export function FlashcardPlayer({
   quizConfig,
   onComplete,
 }: FlashcardPlayerProps) {
+  const { messages } = useAppI18n();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
@@ -95,20 +97,23 @@ export function FlashcardPlayer({
           <div className="space-y-3 lg:flex-1">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-medium text-foreground">
-                Card {currentIndex + 1} of {cards.length}
+                {messages.quizSession.flashcards.progress(
+                  currentIndex + 1,
+                  cards.length,
+                )}
               </span>
               <span className="text-muted-foreground">
-                {remainingCount} remaining
+                {messages.quizSession.flashcards.remaining(remainingCount)}
               </span>
             </div>
             <Progress value={progress} className="h-2.5" />
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline" className="text-green-600">
-              Know: {known.size}
+              {messages.quizSession.flashcards.knowCount(known.size)}
             </Badge>
             <Badge variant="outline" className="text-orange-600">
-              Learning: {learning.size}
+              {messages.quizSession.flashcards.learningCount(learning.size)}
             </Badge>
           </div>
         </div>
@@ -128,8 +133,8 @@ export function FlashcardPlayer({
           tabIndex={0}
           aria-label={
             isFlipped
-              ? "Flashcard back. Press to show the front."
-              : "Flashcard front. Press to reveal the translation."
+              ? messages.quizSession.flashcards.backAria
+              : messages.quizSession.flashcards.frontAria
           }
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-primary/[0.06] opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100" />
@@ -139,7 +144,7 @@ export function FlashcardPlayer({
               <BrowserTtsButton
                 text={isFlipped ? card.definition : card.term}
                 language={isFlipped ? sourceLanguage : targetLanguage}
-                label="Listen"
+                label={messages.common.listen}
                 className="bg-background/80 shadow-sm backdrop-blur-sm hover:bg-background/90"
               />
             </div>
@@ -217,14 +222,14 @@ export function FlashcardPlayer({
               className="flex-1 border-orange-500/25 bg-orange-500/5 text-orange-600 hover:bg-orange-500/10"
               onClick={handleStillLearning}
             >
-              Still Learning
+              {messages.quizSession.flashcards.stillLearning}
             </Button>
             <Button
               className="flex-1 border-primary/25 bg-primary/10 text-primary hover:bg-primary/15"
               variant="outline"
               onClick={handleKnow}
             >
-              Know It
+              {messages.quizSession.flashcards.knowIt}
             </Button>
           </>
         )}
@@ -235,7 +240,7 @@ export function FlashcardPlayer({
             className="flex-1 border-primary/20 bg-primary/5 hover:bg-primary/10"
             onClick={() => setIsFlipped(true)}
           >
-            Flip Card
+            {messages.quizSession.flashcards.flipCard}
           </Button>
         )}
 
@@ -253,17 +258,21 @@ export function FlashcardPlayer({
       {allReviewed && (
         <Card>
           <CardHeader className="text-center">
-            <CardTitle>Session Complete!</CardTitle>
+            <CardTitle>
+              {messages.quizSession.flashcards.sessionCompleteTitle}
+            </CardTitle>
             <CardDescription>
-              You know {known.size} of {cards.length} terms.{" "}
-              {learning.size > 0 &&
-                `${learning.size} term${learning.size !== 1 ? "s" : ""} still need practice.`}
+              {messages.quizSession.flashcards.sessionCompleteDescription(
+                known.size,
+                cards.length,
+                learning.size,
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex gap-2 justify-center">
             <Button onClick={restart}>
               <RotateCcw className="mr-2 h-4 w-4" />
-              Restart
+              {messages.common.restart}
             </Button>
             <Button
               onClick={() => {
@@ -276,7 +285,7 @@ export function FlashcardPlayer({
                 onComplete(results, known.size, cards.length);
               }}
             >
-              Done
+              {messages.common.done}
             </Button>
           </CardContent>
         </Card>

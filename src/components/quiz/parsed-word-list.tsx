@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Trash2 } from "lucide-react";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import type { QuizTerm } from "@/types/quiz";
 import {
   getLearningLanguageLabel,
@@ -33,10 +34,15 @@ export function ParsedWordList({
   targetLanguage,
   sourceLanguage,
 }: ParsedWordListProps) {
+  const { messages } = useAppI18n();
   const [newTerm, setNewTerm] = useState("");
   const [newDefinition, setNewDefinition] = useState("");
-  const targetLanguageLabel = getLearningLanguageLabel(targetLanguage);
-  const sourceLanguageLabel = getSourceLanguageLabel(sourceLanguage);
+  const targetLanguageLabel =
+    messages.common.studyLanguageNames[targetLanguage] ||
+    getLearningLanguageLabel(targetLanguage);
+  const sourceLanguageLabel =
+    messages.common.studyLanguageNames[sourceLanguage] ||
+    getSourceLanguageLabel(sourceLanguage);
 
   function updateTerm(
     index: number,
@@ -66,8 +72,7 @@ export function ParsedWordList({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {terms.length} term{terms.length !== 1 ? "s" : ""} parsed. Edit,
-          remove, or add more below.
+          {messages.createQuiz.parsedWordList.parsedCount(terms.length)}
         </p>
       </div>
 
@@ -116,7 +121,7 @@ export function ParsedWordList({
                 <Input
                   value={newTerm}
                   onChange={(e) => setNewTerm(e.target.value)}
-                  placeholder={`Add ${targetLanguageLabel} term...`}
+                  placeholder={messages.createQuiz.parsedWordList.addTermPlaceholder}
                   className="h-8"
                   onKeyDown={(e) => e.key === "Enter" && addTerm()}
                 />
@@ -125,7 +130,9 @@ export function ParsedWordList({
                 <Input
                   value={newDefinition}
                   onChange={(e) => setNewDefinition(e.target.value)}
-                  placeholder={`Add ${sourceLanguageLabel.toLowerCase()} meaning...`}
+                  placeholder={
+                    messages.createQuiz.parsedWordList.addMeaningPlaceholder
+                  }
                   className="h-8"
                   onKeyDown={(e) => e.key === "Enter" && addTerm()}
                 />

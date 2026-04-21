@@ -23,6 +23,7 @@ import {
   UserCheck,
   UserPlus,
   FileText,
+  Trophy,
 } from "lucide-react";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import type { AppMessages } from "@/lib/i18n/messages";
@@ -127,6 +128,12 @@ const NAV_ITEMS: NavItem[] = [
     labelKey: "myStudents",
     href: "/students",
     icon: UserPlus,
+    roles: ["tutor"],
+  },
+  {
+    labelKey: "results",
+    href: "/results",
+    icon: Trophy,
     roles: ["tutor"],
   },
   // Shared items

@@ -15,8 +15,12 @@ import { ArrowLeft, MessageSquare } from "lucide-react";
 import { ReviewFeedbackForm } from "@/components/review/review-feedback-form";
 import { EditableTranslationResults } from "@/components/review/editable-translation-results";
 import { ACTIVITY_LABELS } from "@/lib/constants";
-import { removeSuggestedAnswerLines, stripMarkdownEmphasis } from "@/lib/utils";
-import { formatAppDate, formatAppDateTime } from "@/lib/dates";
+import { normalizeAppLanguage } from "@/lib/i18n/app-language";
+import {
+  formatDateForAppLanguage,
+  formatDateTimeForAppLanguage,
+} from "@/lib/i18n/format";
+import { getAppMessages } from "@/lib/i18n/messages";
 
 export const dynamic = "force-dynamic";
 
@@ -37,12 +41,32 @@ export default async function ReviewDetailPage({
   // Verify the user is a tutor or superadmin before using admin client
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, app_language")
     .eq("id", user.id)
     .single();
 
   if (!profile || (profile.role !== "tutor" && profile.role !== "superadmin")) {
     redirect("/dashboard");
+  }
+
+  const appLanguage = normalizeAppLanguage(profile.app_language);
+  const messages = getAppMessages(appLanguage);
+
+  function getActivityLabel(type: string | null | undefined) {
+    if (!type) {
+      return "";
+    }
+
+    return (
+      messages.quizzes.typeLabels[
+        type as keyof typeof messages.quizzes.typeLabels
+      ] ||
+      messages.createQuiz.quizWordPicker.typeLabels[
+        type as keyof typeof messages.createQuiz.quizWordPicker.typeLabels
+      ] ||
+      ACTIVITY_LABELS[type] ||
+      type
+    );
   }
 
   // Use admin client to bypass RLS for cross-table queries
@@ -110,16 +134,18 @@ export default async function ReviewDetailPage({
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
-          <Link href="/review">
+          <Link href="/review" aria-label={messages.reviewDetail.backToReview}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Review Submission
+            {messages.reviewDetail.title}
           </h1>
           <p className="text-muted-foreground">
-            {student?.full_name ?? student?.email ?? "Unknown Student"}
+            {student?.full_name ??
+              student?.email ??
+              messages.reviewDetail.unknownStudent}
           </p>
         </div>
       </div>
@@ -128,11 +154,13 @@ export default async function ReviewDetailPage({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">{quiz?.title ?? "Quiz"}</CardTitle>
+            <CardTitle className="text-lg">
+              {quiz?.title ?? messages.reviewDetail.quizFallback}
+            </CardTitle>
             <div className="flex items-center gap-2">
               {quiz && (
                 <Badge variant="outline">
-                  {ACTIVITY_LABELS[quiz.type] || quiz.type}
+                  {getActivityLabel(quiz.type)}
                 </Badge>
               )}
               {pct !== null && (
@@ -145,26 +173,33 @@ export default async function ReviewDetailPage({
                         : "destructive"
                   }
                 >
-                  Score: {pct}%
+                  {messages.reviewDetail.scoreBadge(pct)}
                 </Badge>
               )}
             </div>
           </div>
           <CardDescription>
-            Completed {formatAppDateTime(attempt.completed_at)}
+            {messages.reviewDetail.completedAt(
+              formatDateTimeForAppLanguage(appLanguage, attempt.completed_at),
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {scored && (
             <p className="text-sm text-muted-foreground mb-4">
-              Raw score: {Number(attempt.score)} / {Number(attempt.max_score)}
+              {messages.reviewDetail.rawScore(
+                Number(attempt.score),
+                Number(attempt.max_score),
+              )}
             </p>
           )}
 
           {/* Show answers based on quiz type */}
           {quiz?.type === "gap_fill" && answerResults.length > 0 && (
             <div className="space-y-2">
-              <h3 className="font-medium text-sm">Student Answers</h3>
+              <h3 className="font-medium text-sm">
+                {messages.reviewDetail.studentAnswers}
+              </h3>
               {answerResults.map((result, index) => {
                 const r = result as {
                   userAnswer?: string;
@@ -181,14 +216,16 @@ export default async function ReviewDetailPage({
                     }`}
                   >
                     <span className="font-mono text-muted-foreground shrink-0">
-                      Q{index + 1}:
+                      {messages.reviewDetail.answerNumber(index + 1)}
                     </span>
                     <div>
                       <p>
-                        Answer: <strong>{r.userAnswer ?? "—"}</strong>
+                        {messages.reviewDetail.answerLabel}:{" "}
+                        <strong>{r.userAnswer ?? "-"}</strong>
                         {r.isCorrect === false && r.correctAnswer && (
                           <span className="text-muted-foreground ml-2">
-                            (Correct: <strong>{r.correctAnswer}</strong>)
+                            ({messages.reviewDetail.correctLabel}:{" "}
+                            <strong>{r.correctAnswer}</strong>)
                           </span>
                         )}
                       </p>
@@ -197,7 +234,9 @@ export default async function ReviewDetailPage({
                       variant="outline"
                       className={`ml-auto shrink-0 text-xs ${r.isCorrect ? "text-green-600" : "text-red-600"}`}
                     >
-                      {r.isCorrect ? "Correct" : "Wrong"}
+                      {r.isCorrect
+                        ? messages.reviewDetail.correctBadge
+                        : messages.reviewDetail.wrongBadge}
                     </Badge>
                   </div>
                 );
@@ -223,11 +262,12 @@ export default async function ReviewDetailPage({
           {quiz?.type === "flashcards" && (
             <div className="text-sm text-muted-foreground">
               <p>
-                Flashcard session —{" "}
                 {scored
-                  ? `${Number(attempt.score)} of ${Number(attempt.max_score)} cards marked as known`
-                  : "completed"}
-                .
+                  ? messages.reviewDetail.flashcardKnown(
+                      Number(attempt.score),
+                      Number(attempt.max_score),
+                    )
+                  : messages.reviewDetail.flashcardCompleted}
               </p>
             </div>
           )}
@@ -240,7 +280,7 @@ export default async function ReviewDetailPage({
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
-              Previous Feedback
+              {messages.reviewDetail.previousFeedback}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -252,7 +292,7 @@ export default async function ReviewDetailPage({
                 <div key={fb.id} className="border rounded-lg p-3 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">
-                      {fbAuthor?.full_name ?? "Tutor"}
+                      {fbAuthor?.full_name ?? messages.reviewDetail.tutorFallback}
                     </span>
                     <div className="flex items-center gap-2">
                       {fb.rating && (
@@ -262,7 +302,7 @@ export default async function ReviewDetailPage({
                         </Badge>
                       )}
                       <span className="text-xs text-muted-foreground">
-                        {formatAppDate(fb.created_at)}
+                        {formatDateForAppLanguage(appLanguage, fb.created_at)}
                       </span>
                     </div>
                   </div>

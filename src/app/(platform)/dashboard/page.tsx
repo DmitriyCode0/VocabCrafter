@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
+import {
+  normalizeAppLanguage,
+  type AppLanguage,
+} from "@/lib/i18n/app-language";
+import { formatMonthNameForAppLanguage } from "@/lib/i18n/format";
+import { getAppMessages, type AppMessages } from "@/lib/i18n/messages";
 import type { Role } from "@/types/roles";
 import {
   Card,
@@ -33,7 +39,6 @@ import {
   AnimatedCard,
 } from "@/components/ui/animated-dashboard";
 import { calculateDayStreak } from "@/lib/history/calculate-day-streak";
-import { formatAppMonthName } from "@/lib/dates";
 import { calculateTextCostUsd, calculateTtsCostUsd } from "@/lib/ai/usage";
 
 export const dynamic = "force-dynamic";
@@ -66,30 +71,41 @@ export default async function DashboardPage() {
   if (!profile) redirect("/login");
 
   const role = profile.role as Role;
+  const appLanguage = normalizeAppLanguage(profile.app_language);
+  const messages = getAppMessages(appLanguage);
+  const displayName = profile.full_name || profile.email;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
-          Welcome back, {profile.full_name || profile.email}
+          {messages.dashboard.welcomeBack(displayName)}
         </h1>
         <p className="text-muted-foreground">
-          {role === "student" &&
-            "Practice vocabulary, take quizzes, and track your progress."}
-          {role === "tutor" &&
-            "Manage your classes, assign quizzes, and review student work."}
+          {role === "student" && messages.dashboard.roleDescriptions.student}
+          {role === "tutor" && messages.dashboard.roleDescriptions.tutor}
           {role === "superadmin" &&
-            "Monitor platform analytics and manage users."}
+            messages.dashboard.roleDescriptions.superadmin}
         </p>
       </div>
 
       {role === "student" && (
-        <StudentDashboard userId={user.id} planKey={profile.plan} />
+        <StudentDashboard
+          userId={user.id}
+          planKey={profile.plan}
+          messages={messages}
+        />
       )}
       {role === "tutor" && (
-        <TutorDashboard userId={user.id} planKey={profile.plan} />
+        <TutorDashboard
+          userId={user.id}
+          planKey={profile.plan}
+          messages={messages}
+        />
       )}
-      {role === "superadmin" && <AdminDashboard />}
+      {role === "superadmin" && (
+        <AdminDashboard appLanguage={appLanguage} messages={messages} />
+      )}
     </div>
   );
 }
@@ -97,9 +113,11 @@ export default async function DashboardPage() {
 async function StudentDashboard({
   userId,
   planKey,
+  messages,
 }: {
   userId: string;
   planKey?: string | null;
+  messages: AppMessages;
 }) {
   const supabase = await createClient();
   const supabaseAdmin = createAdminClient();
@@ -146,15 +164,19 @@ async function StudentDashboard({
             <CardHeader className="flex flex-row items-center gap-2">
               <PlusCircle className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle className="text-base">New Quiz</CardTitle>
+                <CardTitle className="text-base">
+                  {messages.dashboard.student.newQuizTitle}
+                </CardTitle>
                 <CardDescription>
-                  Generate a new AI-powered quiz
+                  {messages.dashboard.student.newQuizDescription}
                 </CardDescription>
               </div>
             </CardHeader>
             <CardFooter className="mt-auto justify-center">
               <Button asChild className="w-full">
-                <Link href="/quizzes/new">Create Quiz</Link>
+                <Link href="/quizzes/new">
+                  {messages.dashboard.student.createQuizButton}
+                </Link>
               </Button>
             </CardFooter>
           </Card>
@@ -165,15 +187,19 @@ async function StudentDashboard({
             <CardHeader className="flex flex-row items-center gap-2">
               <Target className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle className="text-base">Review Activity</CardTitle>
+                <CardTitle className="text-base">
+                  {messages.dashboard.student.reviewTitle}
+                </CardTitle>
                 <CardDescription>
-                  Practice due and least known words
+                  {messages.dashboard.student.reviewDescription}
                 </CardDescription>
               </div>
             </CardHeader>
             <CardFooter className="mt-auto justify-center">
               <Button asChild variant="outline" className="w-full">
-                <Link href="/quizzes/review">Start Review</Link>
+                <Link href="/quizzes/review">
+                  {messages.dashboard.student.startReviewButton}
+                </Link>
               </Button>
             </CardFooter>
           </Card>
@@ -185,17 +211,17 @@ async function StudentDashboard({
               <BookMarked className="h-5 w-5 text-primary" />
               <div>
                 <CardTitle className="text-base">
-                  Add Passive Recognition
+                  {messages.dashboard.student.passiveTitle}
                 </CardTitle>
                 <CardDescription>
-                  Import words from text you already understand
+                  {messages.dashboard.student.passiveDescription}
                 </CardDescription>
               </div>
             </CardHeader>
             <CardFooter className="mt-auto justify-center">
               <Button asChild variant="outline" className="w-full">
                 <Link href="/passive-vocabulary">
-                  Add Passive Recognition
+                  {messages.dashboard.student.passiveButton}
                 </Link>
               </Button>
             </CardFooter>
@@ -206,7 +232,7 @@ async function StudentDashboard({
           <Card data-tour-id="student-quizzes-created">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
-                Quizzes Created
+                {messages.dashboard.student.quizzesCreatedTitle}
               </CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -225,8 +251,10 @@ async function StudentDashboard({
               </div>
               <p className="text-xs text-muted-foreground">
                 {isFinite(quizLimit)
-                  ? `${Math.max(0, quizLimit - (monthlyQuizCount ?? 0)).toLocaleString()} remaining this month`
-                  : "Unlimited"}
+                  ? messages.dashboard.student.remainingThisMonth(
+                      Math.max(0, quizLimit - (monthlyQuizCount ?? 0)),
+                    )
+                  : messages.dashboard.student.unlimited}
               </p>
             </CardContent>
           </Card>
@@ -235,13 +263,15 @@ async function StudentDashboard({
         <AnimatedCard>
           <Card data-tour-id="student-day-streak">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Day Streak</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {messages.dashboard.student.dayStreakTitle}
+              </CardTitle>
               <Flame className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{dayStreak}</div>
               <p className="text-xs text-muted-foreground">
-                consecutive day{dayStreak !== 1 ? "s" : ""}
+                {messages.dashboard.student.consecutiveDays(dayStreak)}
               </p>
             </CardContent>
           </Card>
@@ -251,14 +281,14 @@ async function StudentDashboard({
           <Card data-tour-id="student-total-words">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
-                Total Words Tracked
+                {messages.dashboard.student.totalWordsTitle}
               </CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalWordsTracked ?? 0}</div>
               <p className="text-xs text-muted-foreground">
-                vocabulary terms in your library
+                {messages.dashboard.student.totalWordsDescription}
               </p>
             </CardContent>
           </Card>
@@ -271,9 +301,11 @@ async function StudentDashboard({
 async function TutorDashboard({
   userId,
   planKey,
+  messages,
 }: {
   userId: string;
   planKey?: string | null;
+  messages: AppMessages;
 }) {
   const supabase = await createClient();
   const supabaseAdmin = createAdminClient();
@@ -331,16 +363,16 @@ async function TutorDashboard({
       : "/passive-vocabulary";
   const passiveImportDescription =
     connectedStudentIds.length === 0
-      ? "Connect a student first, then import text they already understand."
+      ? messages.dashboard.tutor.passiveDescriptionNone
       : connectedStudentIds.length === 1
-        ? "Jump straight into passive-recognition import for your connected student."
-        : "Choose a connected student, then import text they already understand.";
+        ? messages.dashboard.tutor.passiveDescriptionSingle
+        : messages.dashboard.tutor.passiveDescriptionMultiple;
   const passiveImportButtonLabel =
     connectedStudentIds.length === 0
-      ? "Connect Student First"
+      ? messages.dashboard.tutor.passiveButtonNone
       : connectedStudentIds.length === 1
-        ? "Import Passive Vocabulary"
-        : "Choose Student";
+        ? messages.dashboard.tutor.passiveButtonSingle
+        : messages.dashboard.tutor.passiveButtonMultiple;
 
   return (
     <div className="space-y-6">
@@ -350,15 +382,19 @@ async function TutorDashboard({
             <CardHeader className="flex flex-row items-center gap-2">
               <PlusCircle className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle className="text-base">New Quiz</CardTitle>
+                <CardTitle className="text-base">
+                  {messages.dashboard.tutor.newQuizTitle}
+                </CardTitle>
                 <CardDescription>
-                  Generate a new AI-powered quiz
+                  {messages.dashboard.tutor.newQuizDescription}
                 </CardDescription>
               </div>
             </CardHeader>
             <CardFooter className="mt-auto justify-center">
               <Button asChild className="w-full">
-                <Link href="/quizzes/new">Create Quiz</Link>
+                <Link href="/quizzes/new">
+                  {messages.dashboard.tutor.createQuizButton}
+                </Link>
               </Button>
             </CardFooter>
           </Card>
@@ -369,13 +405,19 @@ async function TutorDashboard({
             <CardHeader className="flex flex-row items-center gap-2">
               <MessageSquare className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle className="text-base">Review</CardTitle>
-                <CardDescription>Review student submissions</CardDescription>
+                <CardTitle className="text-base">
+                  {messages.dashboard.tutor.reviewTitle}
+                </CardTitle>
+                <CardDescription>
+                  {messages.dashboard.tutor.reviewDescription}
+                </CardDescription>
               </div>
             </CardHeader>
             <CardFooter className="mt-auto justify-center">
               <Button asChild variant="outline" className="w-full">
-                <Link href="/review">Review Work</Link>
+                <Link href="/review">
+                  {messages.dashboard.tutor.reviewButton}
+                </Link>
               </Button>
             </CardFooter>
           </Card>
@@ -387,7 +429,7 @@ async function TutorDashboard({
               <BookMarked className="h-5 w-5 text-primary" />
               <div>
                 <CardTitle className="text-base">
-                  Import Passive Vocabulary
+                  {messages.dashboard.tutor.passiveTitle}
                 </CardTitle>
                 <CardDescription>{passiveImportDescription}</CardDescription>
               </div>
@@ -411,16 +453,22 @@ async function TutorDashboard({
         <AnimatedCard>
           <Card data-tour-id="tutor-students">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Students</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {messages.dashboard.tutor.studentsTitle}
+              </CardTitle>
               <GraduationCap className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalStudents}</div>
-              <p className="text-xs text-muted-foreground">enrolled students</p>
+              <p className="text-xs text-muted-foreground">
+                {messages.dashboard.tutor.enrolledStudents}
+              </p>
             </CardContent>
             <CardFooter className="mt-auto justify-center">
               <Button asChild variant="outline" className="w-full">
-                <Link href="/students">View Students</Link>
+                <Link href="/students">
+                  {messages.dashboard.tutor.viewStudentsButton}
+                </Link>
               </Button>
             </CardFooter>
           </Card>
@@ -430,7 +478,7 @@ async function TutorDashboard({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
-                Quizzes Created
+                {messages.dashboard.tutor.quizzesCreatedTitle}
               </CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -449,8 +497,10 @@ async function TutorDashboard({
               </div>
               <p className="text-xs text-muted-foreground">
                 {isFinite(quizLimit)
-                  ? `${Math.max(0, quizLimit - (monthlyQuizCount ?? 0)).toLocaleString()} remaining this month`
-                  : "Unlimited"}
+                  ? messages.dashboard.tutor.remainingThisMonth(
+                      Math.max(0, quizLimit - (monthlyQuizCount ?? 0)),
+                    )
+                  : messages.dashboard.tutor.unlimited}
               </p>
             </CardContent>
           </Card>
@@ -460,14 +510,20 @@ async function TutorDashboard({
   );
 }
 
-async function AdminDashboard() {
+async function AdminDashboard({
+  appLanguage,
+  messages,
+}: {
+  appLanguage: AppLanguage;
+  messages: AppMessages;
+}) {
   const supabaseAdmin = createAdminClient();
 
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
   const monthISO = monthStart.toISOString();
-  const monthLabel = formatAppMonthName(new Date());
+  const monthLabel = formatMonthNameForAppLanguage(appLanguage, new Date());
 
   const [
     { count: userCount },
@@ -522,7 +578,7 @@ async function AdminDashboard() {
           <Card data-tour-id="admin-quizzes-created">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
-                Quizzes Created
+                {messages.dashboard.admin.quizzesCreatedTitle}
               </CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -531,7 +587,9 @@ async function AdminDashboard() {
                 {(totalQuizCount ?? 0).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                {(monthlyQuizCount ?? 0).toLocaleString()} created this month
+                {messages.dashboard.admin.createdThisMonth(
+                  monthlyQuizCount ?? 0,
+                )}
               </p>
             </CardContent>
           </Card>
@@ -541,7 +599,7 @@ async function AdminDashboard() {
           <Card data-tour-id="admin-text-requests">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
-                Text Requests
+                {messages.dashboard.admin.textRequestsTitle}
               </CardTitle>
               <Cpu className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -550,7 +608,7 @@ async function AdminDashboard() {
                 {textRequestCount.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                {formatApproxUsd(textCost)} tracked in {monthLabel}
+                {formatApproxUsd(textCost)} {messages.dashboard.admin.trackedInMonth(monthLabel)}
               </p>
             </CardContent>
           </Card>
@@ -560,7 +618,7 @@ async function AdminDashboard() {
           <Card data-tour-id="admin-tts-requests">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
-                TTS Requests
+                {messages.dashboard.admin.ttsRequestsTitle}
               </CardTitle>
               <Zap className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -569,7 +627,7 @@ async function AdminDashboard() {
                 {ttsRequestCount.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                {formatApproxUsd(ttsCost)} tracked in {monthLabel}
+                {formatApproxUsd(ttsCost)} {messages.dashboard.admin.trackedInMonth(monthLabel)}
               </p>
             </CardContent>
           </Card>
@@ -579,7 +637,7 @@ async function AdminDashboard() {
           <Card data-tour-id="admin-tracked-cost">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
-                Tracked Cost
+                {messages.dashboard.admin.trackedCostTitle}
               </CardTitle>
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -588,8 +646,10 @@ async function AdminDashboard() {
                 {formatApproxUsd(totalTrackedCost)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {trackedRequestCount.toLocaleString()} tracked AI requests in{" "}
-                {monthLabel}
+                {messages.dashboard.admin.trackedRequestsInMonth(
+                  trackedRequestCount,
+                  monthLabel,
+                )}
               </p>
             </CardContent>
           </Card>
@@ -598,12 +658,16 @@ async function AdminDashboard() {
         <AnimatedCard>
           <Card data-tour-id="admin-total-users">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {messages.dashboard.admin.totalUsersTitle}
+              </CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{userCount ?? 0}</div>
-              <p className="text-xs text-muted-foreground">registered users</p>
+              <p className="text-xs text-muted-foreground">
+                {messages.dashboard.admin.registeredUsers}
+              </p>
             </CardContent>
           </Card>
         </AnimatedCard>
@@ -615,13 +679,19 @@ async function AdminDashboard() {
             <CardHeader className="flex flex-row items-center gap-2">
               <BarChart3 className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle className="text-base">Analytics</CardTitle>
-                <CardDescription>Platform usage and metrics</CardDescription>
+                <CardTitle className="text-base">
+                  {messages.dashboard.admin.analyticsTitle}
+                </CardTitle>
+                <CardDescription>
+                  {messages.dashboard.admin.analyticsDescription}
+                </CardDescription>
               </div>
             </CardHeader>
             <CardFooter className="mt-auto justify-center">
               <Button asChild className="w-full">
-                <Link href="/analytics">View Analytics</Link>
+                <Link href="/analytics">
+                  {messages.dashboard.admin.viewAnalyticsButton}
+                </Link>
               </Button>
             </CardFooter>
           </Card>
@@ -632,13 +702,19 @@ async function AdminDashboard() {
             <CardHeader className="flex flex-row items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle className="text-base">Users</CardTitle>
-                <CardDescription>Manage platform users</CardDescription>
+                <CardTitle className="text-base">
+                  {messages.dashboard.admin.usersTitle}
+                </CardTitle>
+                <CardDescription>
+                  {messages.dashboard.admin.usersDescription}
+                </CardDescription>
               </div>
             </CardHeader>
             <CardFooter className="mt-auto justify-center">
               <Button asChild variant="outline" className="w-full">
-                <Link href="/users">Manage Users</Link>
+                <Link href="/users">
+                  {messages.dashboard.admin.manageUsersButton}
+                </Link>
               </Button>
             </CardFooter>
           </Card>

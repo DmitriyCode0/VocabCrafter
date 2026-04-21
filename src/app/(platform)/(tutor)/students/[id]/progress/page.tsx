@@ -5,7 +5,6 @@ import {
   BookMarked,
   BookOpen,
   Flame,
-  Star,
   Target,
   TrendingUp,
   Trophy,
@@ -24,8 +23,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { formatAppDate } from "@/lib/dates";
-import { PASSIVE_EQUIVALENT_WORDS_EXPLANATION } from "@/lib/mastery/passive-vocabulary";
+import { normalizeAppLanguage } from "@/lib/i18n/app-language";
+import { formatDateForAppLanguage } from "@/lib/i18n/format";
+import { getAppMessages } from "@/lib/i18n/messages";
 import { parseTutorProgressOverride } from "@/lib/progress/contracts";
 import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
@@ -64,7 +64,7 @@ export default async function TutorStudentProgressPage({
   const supabaseAdmin = createAdminClient();
   const { data: profile, error: profileError } = await supabaseAdmin
     .from("profiles")
-    .select("role")
+    .select("role, app_language")
     .eq("id", user.id)
     .single();
 
@@ -75,6 +75,9 @@ export default async function TutorStudentProgressPage({
   ) {
     redirect("/dashboard");
   }
+
+  const appLanguage = normalizeAppLanguage(profile.app_language);
+  const messages = getAppMessages(appLanguage);
 
   if (profile.role !== "superadmin") {
     const hasAccess = await tutorHasStudentAccess(
@@ -125,7 +128,7 @@ export default async function TutorStudentProgressPage({
   const studentName =
     studentProfileResult.data.full_name ||
     studentProfileResult.data.email ||
-    "Student";
+    messages.tutorProgressPage.studentFallback;
 
   return (
     <div className="space-y-6">
@@ -138,7 +141,7 @@ export default async function TutorStudentProgressPage({
           >
             <Link href="/students">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to My Students
+              {messages.tutorProgressPage.backToStudents}
             </Link>
           </Button>
 
@@ -147,25 +150,32 @@ export default async function TutorStudentProgressPage({
               <h1 className="text-2xl font-bold tracking-tight">
                 {studentName}
               </h1>
-              <Badge variant="outline">Tutor Progress View</Badge>
+              <Badge variant="outline">
+                {messages.tutorProgressPage.tutorView}
+              </Badge>
               <Badge variant="secondary">
-                Target {snapshot.profile.cefrLevel}
+                {messages.tutorProgressPage.targetLabel(
+                  snapshot.profile.cefrLevel,
+                )}
               </Badge>
             </div>
             <p className="text-muted-foreground">
-              Review this student&apos;s computed learning profile, then curate
-              your own coaching version of the radar metrics, AI suggestions,
-              and progress comments.
+              {messages.tutorProgressPage.description(studentName)}
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/results?student=${studentId}`}>View Results</Link>
+          </Button>
           <Badge variant="outline">
             {snapshot.profile.targetLanguageLabel}
           </Badge>
           <Badge variant="outline">
-            Source {snapshot.profile.sourceLanguageLabel}
+            {messages.tutorProgressPage.sourceLabel(
+              snapshot.profile.sourceLanguageLabel,
+            )}
           </Badge>
         </div>
       </div>
@@ -185,24 +195,25 @@ export default async function TutorStudentProgressPage({
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Progress Reviews & Comments
+              {messages.tutorProgressPage.progressReviewsTitle}
             </CardTitle>
             <CardDescription>
-              Tutors can leave progress reviews, coaching notes, and comments
-              about how {studentName} is developing over time.
+              {messages.tutorProgressPage.progressReviewsDescription(
+                studentName,
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {progressReviews.length === 0 ? (
               <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                No progress reviews yet.
+                {messages.tutorProgressPage.noProgressReviews}
               </div>
             ) : (
               progressReviews.map((review) => {
                 const authorName =
                   review.profiles?.full_name ||
                   review.profiles?.email ||
-                  "Tutor";
+                  messages.tutorProgressPage.tutorFallback;
 
                 return (
                   <div
@@ -213,7 +224,10 @@ export default async function TutorStudentProgressPage({
                       <div>
                         <p className="text-sm font-medium">{authorName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatAppDate(review.created_at)}
+                          {formatDateForAppLanguage(
+                            appLanguage,
+                            review.created_at,
+                          )}
                         </p>
                       </div>
                       {review.rating ? (
@@ -243,11 +257,10 @@ export default async function TutorStudentProgressPage({
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              No raw progress data yet
+              {messages.tutorProgressPage.noRawDataTitle}
             </CardTitle>
             <CardDescription>
-              This student has not built enough quiz or vocabulary history to
-              populate the raw overview cards yet.
+              {messages.tutorProgressPage.noRawDataDescription}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -255,7 +268,9 @@ export default async function TutorStudentProgressPage({
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Avg Score</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {messages.tutorProgressPage.avgScore}
+              </CardTitle>
               <Trophy className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -271,7 +286,9 @@ export default async function TutorStudentProgressPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Avg Mastery</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {messages.tutorProgressPage.avgMastery}
+              </CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -279,22 +296,7 @@ export default async function TutorStudentProgressPage({
                 {snapshot.overview.avgMasteryLevel.toFixed(1)}
               </div>
               <p className="text-xs text-muted-foreground">
-                out of 5 mastery levels
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Day Streak</CardTitle>
-              <Flame className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {snapshot.overview.streakDays}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                consecutive day{snapshot.overview.streakDays !== 1 ? "s" : ""}
+                {messages.tutorProgressPage.outOfFive}
               </p>
             </CardContent>
           </Card>
@@ -302,7 +304,26 @@ export default async function TutorStudentProgressPage({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
-                Unique Words
+                {messages.tutorProgressPage.dayStreak}
+              </CardTitle>
+              <Flame className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {snapshot.overview.streakDays}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {messages.tutorProgressPage.consecutiveDays(
+                  snapshot.overview.streakDays,
+                )}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">
+                {messages.tutorProgressPage.uniqueWords}
               </CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -311,7 +332,9 @@ export default async function TutorStudentProgressPage({
                 {snapshot.overview.totalWords}
               </div>
               <p className="text-xs text-muted-foreground">
-                {snapshot.overview.masteredWords} mastered words
+                {messages.tutorProgressPage.masteredWords(
+                  snapshot.overview.masteredWords,
+                )}
               </p>
             </CardContent>
           </Card>
@@ -319,7 +342,7 @@ export default async function TutorStudentProgressPage({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
-                Grammar Topics
+                {messages.tutorProgressPage.grammarTopics}
               </CardTitle>
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -349,7 +372,7 @@ export default async function TutorStudentProgressPage({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              Passive Evidence
+              {messages.tutorProgressPage.passiveEvidence}
             </CardTitle>
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -358,7 +381,7 @@ export default async function TutorStudentProgressPage({
               {snapshot.passiveSignals.uniqueItems}
             </div>
             <p className="text-xs text-muted-foreground">
-              words and phrases tracked as recognition only
+              {messages.tutorProgressPage.passiveEvidenceDescription}
             </p>
           </CardContent>
         </Card>
@@ -366,7 +389,7 @@ export default async function TutorStudentProgressPage({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              Equivalent Words
+              {messages.tutorProgressPage.equivalentWords}
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -375,19 +398,20 @@ export default async function TutorStudentProgressPage({
               {snapshot.passiveSignals.equivalentWordCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              level-adjusted recognition-weighted total used in
-              passive-vocabulary estimates
+              {messages.tutorProgressPage.equivalentWordsDescription}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">What It Means</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {messages.tutorProgressPage.whatItMeans}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              {PASSIVE_EQUIVALENT_WORDS_EXPLANATION}
+              {messages.tutorProgressPage.passiveExplanation}
             </p>
           </CardContent>
         </Card>
@@ -397,12 +421,12 @@ export default async function TutorStudentProgressPage({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <BookMarked className="h-5 w-5 text-primary" />
-            Passive Vocabulary
+            {messages.tutorProgressPage.passiveVocabularyTitle}
           </CardTitle>
           <CardDescription>
-            Import passive-recognition evidence and review the latest
-            library-tagged passive words on the dedicated passive-vocabulary
-            page for {studentName}.
+            {messages.tutorProgressPage.passiveVocabularyDescription(
+              studentName,
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -410,23 +434,29 @@ export default async function TutorStudentProgressPage({
             <div className="space-y-2">
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline">
-                  {snapshot.passiveSignals.uniqueItems} passive items
+                  {messages.tutorProgressPage.passiveItems(
+                    snapshot.passiveSignals.uniqueItems,
+                  )}
                 </Badge>
                 <Badge variant="outline">
-                  {snapshot.passiveSignals.equivalentWordCount} equivalent words
+                  {messages.tutorProgressPage.equivalentWordsBadge(
+                    snapshot.passiveSignals.equivalentWordCount,
+                  )}
                 </Badge>
                 <Badge variant="secondary">
-                  Target {snapshot.profile.cefrLevel}
+                  {messages.tutorProgressPage.targetLabel(
+                    snapshot.profile.cefrLevel,
+                  )}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                {PASSIVE_EQUIVALENT_WORDS_EXPLANATION}
+                {messages.tutorProgressPage.passiveExplanation}
               </p>
             </div>
 
             <Button asChild variant="outline" id="passive-recognition">
               <Link href={`/passive-vocabulary?student=${studentId}`}>
-                Open Passive Vocabulary
+                {messages.tutorProgressPage.openPassiveVocabulary}
               </Link>
             </Button>
           </div>
