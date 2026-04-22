@@ -9,6 +9,7 @@ export interface HistoryAttempt extends Record<string, unknown> {
   student_id: string;
   score: number | null;
   max_score: number | null;
+  time_spent_seconds: number | null;
   completed_at: string;
   quizzes?: {
     title: string | null;
@@ -58,6 +59,34 @@ function normalizeFilterValue(value?: string | null) {
   return value;
 }
 
+function toHistoryStudent(profile: unknown): HistoryStudent | null {
+  if (!profile || Array.isArray(profile) || typeof profile !== "object") {
+    return null;
+  }
+
+  const candidate = profile as Record<string, unknown>;
+
+  if (typeof candidate.id !== "string") {
+    return null;
+  }
+
+  return {
+    id: candidate.id,
+    full_name: typeof candidate.full_name === "string" ? candidate.full_name : null,
+    email: typeof candidate.email === "string" ? candidate.email : null,
+    avatar_url:
+      typeof candidate.avatar_url === "string" ? candidate.avatar_url : null,
+    cefr_level:
+      typeof candidate.cefr_level === "string" ? candidate.cefr_level : null,
+  } satisfies HistoryStudent;
+}
+
+function dedupeHistoryStudents(students: HistoryStudent[]) {
+  return Array.from(
+    new Map(students.map((student) => [student.id, student])).values(),
+  );
+}
+
 export async function fetchConnectedStudents(userId: string) {
   const supabaseAdmin = createAdminClient();
   const { data, error } = await supabaseAdmin
@@ -73,22 +102,66 @@ export async function fetchConnectedStudents(userId: string) {
   }
 
   return (data ?? []).flatMap((connection) => {
-    const profile = connection.profiles;
+    const student = toHistoryStudent(connection.profiles);
 
-    if (!profile || typeof profile.id !== "string") {
-      return [];
-    }
-
-    return [
-      {
-        id: profile.id,
-        full_name: profile.full_name ?? null,
-        email: profile.email ?? null,
-        avatar_url: profile.avatar_url ?? null,
-        cefr_level: profile.cefr_level ?? null,
-      } satisfies HistoryStudent,
-    ];
+    return student && student.id !== userId ? [student] : [];
   });
+}
+
+async function fetchHistoryStudents(userId: string) {
+  const supabaseAdmin = createAdminClient();
+  const [directConnectionsResult, classesResult] = await Promise.all([
+    supabaseAdmin
+      .from("tutor_students")
+      .select(
+        "student_id, profiles!tutor_students_student_id_fkey(id, full_name, email, avatar_url, cefr_level)",
+      )
+      .eq("tutor_id", userId)
+      .eq("status", "active"),
+    supabaseAdmin
+      .from("classes")
+      .select("id")
+      .eq("tutor_id", userId)
+      .eq("is_active", true),
+  ]);
+
+  if (directConnectionsResult.error) {
+    throw directConnectionsResult.error;
+  }
+
+  if (classesResult.error) {
+    throw classesResult.error;
+  }
+
+  const directStudents = (directConnectionsResult.data ?? []).flatMap(
+    (connection) => {
+      const student = toHistoryStudent(connection.profiles);
+
+      return student && student.id !== userId ? [student] : [];
+    },
+  );
+  const classIds = (classesResult.data ?? []).map((classItem) => classItem.id);
+
+  if (classIds.length === 0) {
+    return dedupeHistoryStudents(directStudents);
+  }
+
+  const { data: members, error: membersError } = await supabaseAdmin
+    .from("class_members")
+    .select("student_id, profiles(id, full_name, email, avatar_url, cefr_level)")
+    .in("class_id", classIds);
+
+  if (membersError) {
+    throw membersError;
+  }
+
+  const classStudents = (members ?? []).flatMap((member) => {
+    const student = toHistoryStudent(member.profiles);
+
+    return student && student.id !== userId ? [student] : [];
+  });
+
+  return dedupeHistoryStudents([...directStudents, ...classStudents]);
 }
 
 export async function fetchHistoryPageData({
@@ -105,8 +178,7 @@ export async function fetchHistoryPageData({
   const normalizedQuizType = normalizeFilterValue(quizType);
   const normalizedQuizId = normalizeFilterValue(quizId);
   const requestedStudentId = normalizeFilterValue(studentId);
-  const students =
-    role === "student" ? [] : await fetchConnectedStudents(userId);
+  const students = role === "student" ? [] : await fetchHistoryStudents(userId);
   const allowedStudentIds =
     role === "student"
       ? [userId]

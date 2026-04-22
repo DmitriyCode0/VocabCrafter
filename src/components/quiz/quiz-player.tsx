@@ -118,7 +118,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
 
   const content = quiz.generated_content as Record<string, unknown>;
   const vocabularyTerms = useMemo(
-    () => ((quiz.vocabulary_terms ?? []) as unknown as QuizTerm[]),
+    () => (quiz.vocabulary_terms ?? []) as unknown as QuizTerm[],
     [quiz.vocabulary_terms],
   );
   const quizConfig = quiz.config as
@@ -144,8 +144,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
       return elapsedMsRef.current;
     }
 
-    const idleCutoff =
-      lastActivityAtRef.current + QUIZ_TIMER_IDLE_TIMEOUT_MS;
+    const idleCutoff = lastActivityAtRef.current + QUIZ_TIMER_IDLE_TIMEOUT_MS;
     const activeUntil = Math.min(now, idleCutoff);
 
     if (activeUntil > activeStartedAtRef.current) {
@@ -314,7 +313,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
           setCompletedTimeSpentSeconds(getCompletedElapsedSeconds());
           setShowResults(true);
         }}
-      />
+      />,
     );
   }
 
@@ -345,8 +344,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
                 {percentage >= 80
                   ? messages.quizSession.flashcardsResult.encouragementHigh
                   : percentage >= 50
-                    ? messages.quizSession.flashcardsResult
-                        .encouragementMedium
+                    ? messages.quizSession.flashcardsResult.encouragementMedium
                     : messages.quizSession.flashcardsResult.encouragementLow}
               </p>
               <div className="flex gap-2 pt-4">
@@ -373,7 +371,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
         cards={cards}
         quizConfig={quizConfig ?? undefined}
         onComplete={handleFlashcardComplete}
-      />
+      />,
     );
   }
 
@@ -400,7 +398,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
           setCompletedTimeSpentSeconds(getCompletedElapsedSeconds());
           setShowResults(true);
         }}
-      />
+      />,
     );
   }
 
@@ -430,7 +428,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
           setCompletedTimeSpentSeconds(getCompletedElapsedSeconds());
           setShowResults(true);
         }}
-      />
+      />,
     );
   }
 
@@ -460,7 +458,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
           setCompletedTimeSpentSeconds(getCompletedElapsedSeconds());
           setShowResults(true);
         }}
-      />
+      />,
     );
   }
 
@@ -523,7 +521,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
           setCompletedTimeSpentSeconds(completedElapsedSeconds);
           setShowResults(true);
         }}
-      />
+      />,
     );
   }
 

@@ -23,7 +23,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { History, ChevronDown, ChevronUp, Loader2, User } from "lucide-react";
+import {
+  History,
+  ChevronDown,
+  ChevronUp,
+  Clock3,
+  Loader2,
+  User,
+} from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import {
   getGrammarTopicDisplayName,
@@ -106,6 +113,29 @@ function updateAttemptTranslationScore(
   });
 }
 
+function formatAttemptDuration(totalSeconds?: number | null) {
+  if (!Number.isFinite(totalSeconds) || (totalSeconds ?? 0) <= 0) {
+    return null;
+  }
+
+  const safeSeconds = Math.max(0, Math.round(totalSeconds ?? 0));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+
+  if (hours > 0) {
+    return [hours, minutes, seconds]
+      .map((value, index) =>
+        index === 0 ? String(value) : String(value).padStart(2, "0"),
+      )
+      .join(":");
+  }
+
+  return [minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+}
+
 const AttemptCard = React.memo(function AttemptCard({
   attempt,
   isTutor,
@@ -135,6 +165,7 @@ const AttemptCard = React.memo(function AttemptCard({
   const grammarTopic = grammarTopicKey
     ? getGrammarTopicDisplayName(quiz?.config, grammarTopicKey)
     : null;
+  const loggedDuration = formatAttemptDuration(attempt.time_spent_seconds);
 
   return (
     <Card>
@@ -195,6 +226,12 @@ const AttemptCard = React.memo(function AttemptCard({
             {scored && (
               <span className="ml-2">
                 Score: {Number(attempt.score)} / {Number(attempt.max_score)}
+              </span>
+            )}
+            {loggedDuration && (
+              <span className="ml-2 inline-flex items-center gap-1">
+                <Clock3 className="h-3.5 w-3.5" />
+                Time: {loggedDuration}
               </span>
             )}
           </span>
@@ -437,7 +474,7 @@ export function HistoryClient({
         </h1>
         <p className="text-muted-foreground">
           {isTutor
-            ? "View your own and your connected students' quiz attempts."
+            ? "View your own and your students' quiz attempts."
             : "View all your past quiz attempts and results."}
         </p>
       </div>
