@@ -151,7 +151,6 @@ export function StudentMasteryCards({
                   {messages.tutorMastery.cards.summaryLine(
                     student.totalWords,
                     student.avgLevel,
-                    student.mastered,
                   )}
                 </p>
                 <p className="text-sm text-muted-foreground">

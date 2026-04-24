@@ -23,9 +23,14 @@ import {
   UserCheck,
   UserPlus,
   FileText,
-  Trophy,
 } from "lucide-react";
 import { useAppI18n } from "@/components/providers/app-language-provider";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { AppMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types/roles";
@@ -131,10 +136,16 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["tutor"],
   },
   {
-    labelKey: "results",
+    labelKey: "progress",
     href: "/results",
-    icon: Trophy,
+    icon: TrendingUp,
     roles: ["tutor"],
+  },
+  {
+    labelKey: "plansAndReports",
+    href: "/plans-and-reports",
+    icon: FileText,
+    roles: ["student", "tutor"],
   },
   // Shared items
   {
@@ -191,9 +202,10 @@ const NAV_ITEMS: NavItem[] = [
 
 interface NavLinksProps {
   role: Role;
+  collapsed?: boolean;
 }
 
-export function NavLinks({ role }: NavLinksProps) {
+export function NavLinks({ role, collapsed = false }: NavLinksProps) {
   const pathname = usePathname();
   const { messages } = useAppI18n();
 
@@ -209,34 +221,47 @@ export function NavLinks({ role }: NavLinksProps) {
         visible: { transition: { staggerChildren: 0.04 } },
       }}
     >
-      {filteredItems.map((item) => {
-        const isActive =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
-        return (
-          <motion.div
-            key={item.href + item.labelKey}
-            variants={{
-              hidden: { opacity: 0, x: -12 },
-              visible: { opacity: 1, x: 0 },
-            }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-          >
-            <Link
-              href={item.href}
-              data-active={isActive}
-              className={cn(
-                "nav-link-animated flex items-center gap-4 rounded-lg px-4 py-3 text-base",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
+      <TooltipProvider>
+        {filteredItems.map((item) => {
+          const isActive =
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const label = messages.nav[item.labelKey];
+
+          return (
+            <motion.div
+              key={item.href + item.labelKey}
+              variants={{
+                hidden: { opacity: 0, x: -12 },
+                visible: { opacity: 1, x: 0 },
+              }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
             >
-              <item.icon className="h-6 w-6" />
-              {messages.nav[item.labelKey]}
-            </Link>
-          </motion.div>
-        );
-      })}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={item.href}
+                    data-active={isActive}
+                    aria-label={collapsed ? label : undefined}
+                    className={cn(
+                      "nav-link-animated flex items-center rounded-lg py-3 text-base transition-[padding,justify-content] duration-200 ease-out",
+                      collapsed ? "justify-center px-0" : "gap-4 px-4",
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    <item.icon className="h-6 w-6 shrink-0" />
+                    <span className={cn("truncate", collapsed && "sr-only")}>
+                      {label}
+                    </span>
+                  </Link>
+                </TooltipTrigger>
+                {collapsed ? <TooltipContent side="right">{label}</TooltipContent> : null}
+              </Tooltip>
+            </motion.div>
+          );
+        })}
+      </TooltipProvider>
     </motion.nav>
   );
 }

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import { ReviewFeedbackForm } from "@/components/review/review-feedback-form";
+import { EditableGapFillResults } from "@/components/review/editable-gap-fill-results";
 import { EditableTranslationResults } from "@/components/review/editable-translation-results";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
@@ -196,52 +197,17 @@ export default async function ReviewDetailPage({
 
           {/* Show answers based on quiz type */}
           {quiz?.type === "gap_fill" && answerResults.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="font-medium text-sm">
-                {messages.reviewDetail.studentAnswers}
-              </h3>
-              {answerResults.map((result, index) => {
-                const r = result as {
+            <EditableGapFillResults
+              attemptId={id}
+              results={
+                answerResults as {
+                  sentence?: string;
                   userAnswer?: string;
                   correctAnswer?: string;
                   isCorrect?: boolean;
-                };
-                return (
-                  <div
-                    key={index}
-                    className={`flex items-start gap-3 text-sm rounded px-3 py-2 ${
-                      r.isCorrect
-                        ? "bg-green-50 dark:bg-green-950/30"
-                        : "bg-red-50 dark:bg-red-950/30"
-                    }`}
-                  >
-                    <span className="font-mono text-muted-foreground shrink-0">
-                      {messages.reviewDetail.answerNumber(index + 1)}
-                    </span>
-                    <div>
-                      <p>
-                        {messages.reviewDetail.answerLabel}:{" "}
-                        <strong>{r.userAnswer ?? "-"}</strong>
-                        {r.isCorrect === false && r.correctAnswer && (
-                          <span className="text-muted-foreground ml-2">
-                            ({messages.reviewDetail.correctLabel}:{" "}
-                            <strong>{r.correctAnswer}</strong>)
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={`ml-auto shrink-0 text-xs ${r.isCorrect ? "text-green-600" : "text-red-600"}`}
-                    >
-                      {r.isCorrect
-                        ? messages.reviewDetail.correctBadge
-                        : messages.reviewDetail.wrongBadge}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
+                }[]
+              }
+            />
           )}
 
           {quiz?.type === "translation" && answerResults.length > 0 && (

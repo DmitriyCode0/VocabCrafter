@@ -72,7 +72,8 @@ function toHistoryStudent(profile: unknown): HistoryStudent | null {
 
   return {
     id: candidate.id,
-    full_name: typeof candidate.full_name === "string" ? candidate.full_name : null,
+    full_name:
+      typeof candidate.full_name === "string" ? candidate.full_name : null,
     email: typeof candidate.email === "string" ? candidate.email : null,
     avatar_url:
       typeof candidate.avatar_url === "string" ? candidate.avatar_url : null,
@@ -148,7 +149,9 @@ async function fetchHistoryStudents(userId: string) {
 
   const { data: members, error: membersError } = await supabaseAdmin
     .from("class_members")
-    .select("student_id, profiles(id, full_name, email, avatar_url, cefr_level)")
+    .select(
+      "student_id, profiles(id, full_name, email, avatar_url, cefr_level)",
+    )
     .in("class_id", classIds);
 
   if (membersError) {

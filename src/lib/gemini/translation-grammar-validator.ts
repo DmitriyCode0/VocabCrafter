@@ -43,11 +43,12 @@ SOURCE SENTENCE (${sourceLanguageLabel}) stored in the compatibility field "ukra
 TARGET REFERENCE (${targetLanguageLabel}) stored in the compatibility field "englishReference":
 "${question.englishReference}"
 
-Return valid=true ONLY if BOTH conditions are true:
+Return valid=true ONLY if ALL THREE conditions are true:
 1. The ${targetLanguageLabel} reference clearly uses the target grammar topic.
 2. A student translating the ${sourceLanguageLabel} sentence naturally would reasonably be expected to use that same grammar.
+3. The ${sourceLanguageLabel} sentence is itself grammatical and natural, with correct inflection/agreement for the source language.
 
-Return valid=false if the grammar is optional, if multiple natural English renderings would avoid the target grammar, or if the reference sentence itself does not clearly demonstrate the topic.
+Return valid=false if the grammar is optional, if multiple natural ${targetLanguageLabel} renderings would avoid the target grammar, if the reference sentence itself does not clearly demonstrate the topic, or if the ${sourceLanguageLabel} sentence has awkward or incorrect inflection/agreement.
 
 Respond with JSON in this exact format:
 {

@@ -1006,8 +1006,18 @@ export interface Database {
           connect_code: string | null;
           status: string;
           lesson_price_cents: number;
+          plan_title: string | null;
+          goal_summary: string | null;
+          objectives: Json;
+          grammar_topic_keys: Json;
+          report_language: string;
+          monthly_quiz_target: number | null;
+          monthly_completed_lessons_target: number | null;
+          monthly_new_mastery_words_target: number | null;
+          monthly_average_score_target: number | null;
           created_at: string;
           connected_at: string | null;
+          updated_at: string;
         };
         Insert: {
           id?: string;
@@ -1016,8 +1026,18 @@ export interface Database {
           connect_code?: string | null;
           status?: string;
           lesson_price_cents?: number;
+          plan_title?: string | null;
+          goal_summary?: string | null;
+          objectives?: Json;
+          grammar_topic_keys?: Json;
+          report_language?: string;
+          monthly_quiz_target?: number | null;
+          monthly_completed_lessons_target?: number | null;
+          monthly_new_mastery_words_target?: number | null;
+          monthly_average_score_target?: number | null;
           created_at?: string;
           connected_at?: string | null;
+          updated_at?: string;
         };
         Update: {
           status?: string;
@@ -1025,6 +1045,16 @@ export interface Database {
           connected_at?: string | null;
           connect_code?: string | null;
           lesson_price_cents?: number;
+          plan_title?: string | null;
+          goal_summary?: string | null;
+          objectives?: Json;
+          grammar_topic_keys?: Json;
+          report_language?: string;
+          monthly_quiz_target?: number | null;
+          monthly_completed_lessons_target?: number | null;
+          monthly_new_mastery_words_target?: number | null;
+          monthly_average_score_target?: number | null;
+          updated_at?: string;
         };
         Relationships: [
           {
@@ -1037,6 +1067,96 @@ export interface Database {
           {
             foreignKeyName: "tutor_students_student_id_fkey";
             columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tutor_student_monthly_reports: {
+        Row: {
+          id: string;
+          tutor_id: string;
+          student_id: string;
+          generated_by: string | null;
+          report_month: string;
+          period_start: string;
+          period_end: string;
+          generation_source: string;
+          status: string;
+          title: string;
+          ai_draft: string | null;
+          published_content: string | null;
+          tutor_addendum: string | null;
+          plan_snapshot: Json;
+          metrics_snapshot: Json;
+          generation_error: string | null;
+          created_at: string;
+          updated_at: string;
+          generated_at: string;
+          published_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          tutor_id: string;
+          student_id: string;
+          generated_by?: string | null;
+          report_month: string;
+          period_start: string;
+          period_end: string;
+          generation_source: string;
+          status: string;
+          title: string;
+          ai_draft?: string | null;
+          published_content?: string | null;
+          tutor_addendum?: string | null;
+          plan_snapshot?: Json;
+          metrics_snapshot?: Json;
+          generation_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          generated_at?: string;
+          published_at?: string | null;
+        };
+        Update: {
+          tutor_id?: string;
+          student_id?: string;
+          generated_by?: string | null;
+          report_month?: string;
+          period_start?: string;
+          period_end?: string;
+          generation_source?: string;
+          status?: string;
+          title?: string;
+          ai_draft?: string | null;
+          published_content?: string | null;
+          tutor_addendum?: string | null;
+          plan_snapshot?: Json;
+          metrics_snapshot?: Json;
+          generation_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          generated_at?: string;
+          published_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_monthly_reports_generated_by_fkey";
+            columns: ["generated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_monthly_reports_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_monthly_reports_tutor_id_fkey";
+            columns: ["tutor_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -1186,6 +1306,8 @@ export type TutorStudentLesson =
   Database["public"]["Tables"]["tutor_student_lessons"]["Row"];
 export type TutorStudentBalanceTransaction =
   Database["public"]["Tables"]["tutor_student_balance_transactions"]["Row"];
+export type TutorStudentMonthlyReport =
+  Database["public"]["Tables"]["tutor_student_monthly_reports"]["Row"];
 export type TutorStudentProgressOverride =
   Database["public"]["Tables"]["tutor_student_progress_overrides"]["Row"];
 export type PassiveVocabularyEvidence =

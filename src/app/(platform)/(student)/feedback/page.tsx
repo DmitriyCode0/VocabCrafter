@@ -158,7 +158,8 @@ export default async function StudentFeedbackPage() {
                   <CardDescription className="flex items-center justify-between">
                     <span>
                       {messages.studentFeedback.fromTutor(
-                        tutor?.full_name ?? messages.studentFeedback.tutorFallback,
+                        tutor?.full_name ??
+                          messages.studentFeedback.tutorFallback,
                       )}
                     </span>
                     <span>

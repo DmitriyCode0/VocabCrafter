@@ -11,7 +11,6 @@ import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import {
   getGrammarTopicDisplayName,
   getPrimaryGrammarTopic,
-  removeSuggestedAnswerLines,
   stripMarkdownEmphasis,
 } from "@/lib/utils";
 import type { TranslationQuestion, QuizConfig } from "@/types/quiz";
@@ -22,6 +21,7 @@ import {
   normalizeSourceLanguage,
 } from "@/lib/languages";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
+import { TranslationFeedbackList } from "@/components/quiz/translation-feedback-list";
 
 interface TranslationPlayerProps {
   questions: TranslationQuestion[];
@@ -72,10 +72,7 @@ export function TranslationPlayer({
   const sourceLanguageLabel =
     messages.common.studyLanguageNames[normalizedSourceLanguage] ||
     getSourceLanguageLabel(normalizedSourceLanguage);
-  const visibleFeedback = evaluation
-    ? removeSuggestedAnswerLines(evaluation.feedback)
-    : "";
-  const hasVisibleFeedback = visibleFeedback.trim().length > 0;
+  const hasVisibleFeedback = Boolean(evaluation?.feedback.trim());
   const canUsePreviewArrows =
     canPreviewQuestions && results.length === 0 && !evaluation && !isEvaluating;
   const progress =
@@ -390,28 +387,10 @@ export function TranslationPlayer({
                   <p className="text-sm font-medium">
                     {messages.common.feedback}:
                   </p>
-                  <div className="text-sm space-y-0.5">
-                    {visibleFeedback.split("\n").map((line, i) => {
-                      const trimmed = line.trim();
-                      if (!trimmed) return null;
-                      const isPass = trimmed.startsWith("✓");
-                      const isFail = trimmed.startsWith("✗");
-                      return (
-                        <p
-                          key={i}
-                          className={
-                            isFail
-                              ? "text-red-500"
-                              : isPass
-                                ? "text-green-600 dark:text-green-400"
-                                : ""
-                          }
-                        >
-                          {trimmed}
-                        </p>
-                      );
-                    })}
-                  </div>
+                  <TranslationFeedbackList
+                    feedback={evaluation.feedback}
+                    itemClassName="text-sm"
+                  />
                 </div>
               )}
 

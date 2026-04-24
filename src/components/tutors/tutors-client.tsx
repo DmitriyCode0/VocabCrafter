@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -22,7 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { UserPlus, Users, Loader2, Trash2 } from "lucide-react";
+import { BookOpen, Target, UserPlus, Users, Loader2, Trash2 } from "lucide-react";
 import { formatAppDate } from "@/lib/dates";
 
 interface TutorProfile {
@@ -182,26 +183,43 @@ export function TutorsClient({ connections }: TutorsClientProps) {
                   <CardDescription>{tutor?.email}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">
-                      Since{" "}
-                      {conn.connected_at
-                        ? formatAppDate(conn.connected_at as string)
-                        : "—"}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => handleDelete(conn.id as string)}
-                      disabled={deletingId === (conn.id as string)}
-                    >
-                      {deletingId === (conn.id as string) ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        Since{" "}
+                        {conn.connected_at
+                          ? formatAppDate(conn.connected_at as string)
+                          : "—"}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => handleDelete(conn.id as string)}
+                        disabled={deletingId === (conn.id as string)}
+                      >
+                        {deletingId === (conn.id as string) ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/plan?tutor=${tutor?.id ?? ""}`}>
+                          <Target className="mr-2 h-4 w-4" />
+                          Plan
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/progress/monthly">
+                          <BookOpen className="mr-2 h-4 w-4" />
+                          Progress
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BookMarked,
   BookOpen,
+  FileText,
   Flame,
   Target,
   TrendingUp,
@@ -167,7 +168,21 @@ export default async function TutorStudentProgressPage({
 
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link href={`/results?student=${studentId}`}>View Results</Link>
+            <Link href={`/plans-and-reports?student=${studentId}`}>
+              <Target className="mr-2 h-4 w-4" />
+              Plan
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/plans-and-reports/reports?student=${studentId}`}>
+              <FileText className="mr-2 h-4 w-4" />
+              Monthly Reports
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/results?student=${studentId}`}>
+              {messages.tutorProgressPage.viewProgress}
+            </Link>
           </Button>
           <Badge variant="outline">
             {snapshot.profile.targetLanguageLabel}

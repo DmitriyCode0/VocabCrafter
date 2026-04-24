@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { CheckCircle2, XCircle, RotateCcw, Home } from "lucide-react";
 import { saveAttempt } from "@/lib/save-attempt";
-import { removeSuggestedAnswerLines, stripMarkdownEmphasis } from "@/lib/utils";
+import { stripMarkdownEmphasis } from "@/lib/utils";
+import { TranslationFeedbackList } from "@/components/quiz/translation-feedback-list";
 import type { GapFillResult } from "./gap-fill-player";
 import type { MCQResult } from "./mcq-player";
 import type { TextTranslationResult } from "./text-translation-player";
@@ -269,13 +270,6 @@ export function QuizResults({
           </CardHeader>
           <CardContent className="space-y-4">
             {translationResults.map((result, index) => {
-              const visibleFeedback = removeSuggestedAnswerLines(
-                result.feedback,
-              )
-                .split("\n")
-                .map((line) => line.trim())
-                .filter(Boolean);
-
               return (
                 <div key={index} className="p-3 rounded-md bg-muted space-y-2">
                   <div className="flex items-center justify-between">
@@ -323,27 +317,11 @@ export function QuizResults({
                       sourceLanguageLabel,
                     )}
                   </p>
-                  {visibleFeedback.length > 0 && (
-                    <div className="text-xs text-muted-foreground space-y-0.5">
-                      {visibleFeedback.map((line, i) => {
-                        const isPass = line.startsWith("✓");
-                        const isFail = line.startsWith("✗");
-                        return (
-                          <p
-                            key={i}
-                            className={
-                              isFail
-                                ? "text-red-500"
-                                : isPass
-                                  ? "text-green-600 dark:text-green-400"
-                                  : ""
-                            }
-                          >
-                            {line}
-                          </p>
-                        );
-                      })}
-                    </div>
+                  {result.feedback.trim() && (
+                    <TranslationFeedbackList
+                      feedback={result.feedback}
+                      itemClassName="text-xs"
+                    />
                   )}
                 </div>
               );
@@ -426,28 +404,10 @@ export function QuizResults({
             </div>
 
             <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground space-y-0.5">
-              {removeSuggestedAnswerLines(result.feedback)
-                .split("\n")
-                .map((line, index) => {
-                  const trimmed = line.trim();
-                  if (!trimmed) return null;
-                  const isPass = trimmed.startsWith("✓");
-                  const isFail = trimmed.startsWith("✗");
-                  return (
-                    <p
-                      key={index}
-                      className={
-                        isFail
-                          ? "text-red-500"
-                          : isPass
-                            ? "text-green-600 dark:text-green-400"
-                            : ""
-                      }
-                    >
-                      {trimmed}
-                    </p>
-                  );
-                })}
+              <TranslationFeedbackList
+                feedback={result.feedback}
+                itemClassName="text-xs"
+              />
             </div>
 
             <div className="flex gap-2 pt-4">

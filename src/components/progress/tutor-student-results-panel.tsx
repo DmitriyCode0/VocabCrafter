@@ -44,13 +44,13 @@ export function TutorStudentResultsPanel({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight">{studentName}</h2>
-            <Badge variant="outline">Results</Badge>
+            <Badge variant="outline">{messages.tutorProgressPage.overallTab}</Badge>
             <Badge variant="secondary">
               {messages.tutorProgressPage.targetLabel(snapshot.profile.cefrLevel)}
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            Read-only performance view combining timed app learning, lessons, vocabulary growth, grammar coverage, and recent results.
+            Read-only progress view combining timed app learning, lessons, vocabulary growth, grammar coverage, and recent results.
           </p>
         </div>
 
@@ -64,13 +64,13 @@ export function TutorStudentResultsPanel({
           <Button asChild variant="outline" size="sm">
             <Link href={`/students/${studentId}/progress`}>
               <BookMarked className="mr-2 h-4 w-4" />
-              Open Coaching Workspace
+              {messages.tutorProgressPage.openCoachingWorkspace}
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href={`/history?student=${studentId}`}>
               <History className="mr-2 h-4 w-4" />
-              Open History
+              {messages.tutorProgressPage.openHistory}
             </Link>
           </Button>
         </div>
@@ -79,9 +79,9 @@ export function TutorStudentResultsPanel({
       {!hasAnyData ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">No results yet</CardTitle>
+            <CardTitle className="text-base">No progress yet</CardTitle>
             <CardDescription>
-              This student has not built enough saved activity or lesson history to populate the results view.
+              This student has not built enough saved activity or lesson history to populate the progress view.
             </CardDescription>
           </CardHeader>
         </Card>

@@ -7,6 +7,7 @@ import type {
   GrammarChallenge,
   TeacherPersona,
 } from "@/types/quiz";
+import type { AppLanguage } from "@/lib/i18n/app-language";
 import { formatGrammarRulesSection } from "@/lib/grammar/prompt-sections";
 import {
   getLearningLanguageLabel,
@@ -139,6 +140,43 @@ function getGrammarRulesSection(
     topicDetails,
     topicLabels,
   );
+}
+
+function getTranslationSentenceFormationRules(config: QuizConfig): string {
+  const {
+    targetLanguage,
+    sourceLanguage,
+    targetLanguageLabel,
+    sourceLanguageLabel,
+  } = getLanguageContext(config);
+
+  const targetInflectionRules =
+    targetLanguage === "english"
+      ? `TARGET-WORD INFLECTION POLICY:
+- The ${targetLanguageLabel} reference sentence may use a natural inflected form of the target word when grammar requires it.
+- If the target word is a verb, allowed forms include the base form, to-infinitive, third-person singular (-s/-es), past simple, and past participle.
+- Use correct regular or irregular verb forms when needed.
+- If the target word is a regular count noun, singular and regular plural (-s/-es) forms are both allowed when natural.
+- The "sourceTerm" field MUST still remain the original ${targetLanguageLabel} vocabulary item from the input list exactly as provided.`
+      : `TARGET-WORD INFLECTION POLICY:
+- The ${targetLanguageLabel} reference sentence may inflect the target word naturally when grammar requires it.
+- The "sourceTerm" field MUST still remain the original ${targetLanguageLabel} vocabulary item from the input list exactly as provided.`;
+
+  const sourceSentenceRules =
+    sourceLanguage === "ukrainian"
+      ? `SOURCE-SENTENCE QUALITY POLICY:
+- The ${sourceLanguageLabel} sentence must be grammatically correct and natural, not a literal dictionary-form template.
+- Inflect Ukrainian nouns, adjectives, pronouns, numerals, and verbs correctly for case, number, gender, person, tense, and agreement.
+- Do NOT leave a Ukrainian word in its dictionary form if the sentence requires another form.
+- Prefer natural Ukrainian phrasing and agreement throughout the full sentence.
+- Good patterns: "Він не має паперової карти." and "Вони не працюють у великому аеропорту."`
+      : `SOURCE-SENTENCE QUALITY POLICY:
+- The ${sourceLanguageLabel} sentence must be fully grammatical and natural in the source language.
+- Use the correct inflected source-language word form that the sentence requires.`;
+
+  return `${targetInflectionRules}
+
+${sourceSentenceRules}`;
 }
 
 // ─── Teacher Persona ─────────────────────────────────────────────
@@ -382,6 +420,7 @@ export function getTranslationPrompt(
     config.grammarTopicDetails,
     config.grammarTopicLabels,
   );
+  const sentenceFormationRules = getTranslationSentenceFormationRules(config);
 
   const termList = terms
     .map(
@@ -399,8 +438,10 @@ RULE 1 — ONE VOCABULARY WORD PER SENTENCE:
 Each sentence must use EXACTLY ONE word/phrase from the provided vocabulary list. NEVER combine multiple vocabulary words in a single sentence.
 
 RULE 2 — VOCABULARY MUST BE PRESENT:
-The ${sourceLanguageLabel} meaning of the target vocabulary word MUST appear in the source sentence. The word may be inflected — but it must be recognizably derived from the provided ${sourceLanguageLabel} meaning.
-- Example: if the word is "гора" (mountain), you may use "гору", "горі", "гір" — but "пагорб" (hill) is NOT acceptable.
+The ${sourceLanguageLabel} meaning of the target vocabulary word MUST appear in the source sentence in the grammatically correct surface form that the sentence requires.
+- The word may be inflected, but it must remain clearly derived from the provided ${sourceLanguageLabel} meaning.
+- Example: if the source-language meaning is "карта", you may use "карти" or "картою" when the sentence requires it, but not a different noun.
+- Example: if the source-language meaning is "працювати", you may use "працюють" when the sentence requires that verb form.
 
 RULE 3 — HIGHLIGHT THE TARGET WORD:
 Return the exact form of the source-language vocabulary word as it appears in your sentence in the "highlightText" field. This will be bolded in the UI for the student.
@@ -416,6 +457,9 @@ The student is at level **${config.cefrLevel}**. Sentence complexity, vocabulary
 
 RULE 6 — SENSIBLE SENTENCES:
 Every sentence must make logical sense in the real world. No absurd, nonsensical, or contradictory statements.
+
+RULE 7 — INFLECTION AND SENTENCE FORMATION:
+${sentenceFormationRules}
 
 ═══ CONTEXT ═══
 ${difficultyInstruction}
@@ -603,6 +647,7 @@ export function getEvaluationPrompt(
   referenceTranslation: string,
   targetTerm: string | undefined,
   grammarValidationReason: string | undefined,
+  appLanguage: AppLanguage,
   config: QuizConfig,
 ): string {
   const { targetLanguageLabel, sourceLanguageLabel } =
@@ -649,6 +694,7 @@ export function getEvaluationPrompt(
   const validatedGrammarInstruction = grammarValidationReason
     ? `This question was validated during quiz generation as genuinely requiring the selected grammar. Validation note: ${grammarValidationReason}`
     : "";
+  const feedbackLanguageLabel = appLanguage === "uk" ? "Ukrainian" : "English";
 
   return `${personality}
 ${personaInstruction}
@@ -658,6 +704,7 @@ If the student's answer is random letters (e.g., "asdf", "kjlhg", "123123"), non
 
 **Task:** Evaluate the student's translation of a ${sourceLanguageLabel} sentence into ${targetLanguageLabel}.
 **Student Proficiency Level:** ${config.cefrLevel}
+**Feedback Language:** ${feedbackLanguageLabel}
 **Target Grammar:** ${grammarCheckInstruction}
 ${targetTerm ? `**Target Vocabulary:** ${targetTerm}` : ""}
 ${validatedGrammarInstruction}
@@ -684,16 +731,27 @@ You MUST evaluate the student's translation against these 5 categories. For each
 Score the translation from 0 to 100 based on these checks. The final numeric score must always be an integer between 0 and 100.
 
 ═══ FEEDBACK FORMAT ═══
-Return feedback as a CONCISE checklist. One line per category. Use ✓ for pass, ✗ for fail.
-After the checklist, add a short "Suggested answer:" line only if the student made mistakes.
+Return EXACTLY five metric objects: vocabulary, grammar, meaning, mechanics, naturalness.
+Each metric must include:
+- passed: boolean
+- comment: a short explanation written in ${feedbackLanguageLabel}
 
-Example feedback:
-"✓ Vocabulary: 'mountain' translated correctly.\n✗ Grammar: Expected Past Simple, but Present Simple was used.\n✓ Meaning: Core meaning preserved.\n✗ Mechanics: Missing period at the end.\n✓ Naturalness: Reads naturally.\n\nSuggested: She climbed the mountain yesterday."
+Rules for metric comments:
+- Keep each comment concise.
+- Do not include category names inside the comment.
+- Do not include checkmarks, numbering, or bullets inside the comment.
+- Do not include any suggested answer.
 
 Respond with JSON in this exact format:
 {
   "score": 85,
-  "feedback": "checklist feedback here"
+  "metrics": {
+    "vocabulary": { "passed": true, "comment": "required word is used correctly." },
+    "grammar": { "passed": false, "comment": "third-person singular needs 'doesn't' here." },
+    "meaning": { "passed": true, "comment": "core meaning is preserved." },
+    "mechanics": { "passed": false, "comment": "article before 'map' is missing." },
+    "naturalness": { "passed": false, "comment": "the sentence sounds unnatural because of the auxiliary verb." }
+  }
 }`;
 }
 

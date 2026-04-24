@@ -2,15 +2,28 @@
 
 import { Badge } from "@/components/ui/badge";
 import {
+  EditableAttemptTime,
+  type AttemptTimeSaveResult,
+} from "@/components/history/editable-attempt-time";
+import {
+  EditableGapFillResults,
+  type GapFillResultSaveResult,
+} from "@/components/review/editable-gap-fill-results";
+import {
   EditableTranslationResults,
   type TranslationScoreSaveResult,
 } from "@/components/review/editable-translation-results";
-import { removeSuggestedAnswerLines, stripMarkdownEmphasis } from "@/lib/utils";
+import { TranslationFeedbackList } from "@/components/quiz/translation-feedback-list";
+import { stripMarkdownEmphasis } from "@/lib/utils";
 
 interface AttemptDetailProps {
   attempt: Record<string, unknown>;
   canEditTranslationScores?: boolean;
+  canEditGapFillResults?: boolean;
+  canEditTimeSpent?: boolean;
   onTranslationScoreSaved?: (result: TranslationScoreSaveResult) => void;
+  onGapFillResultSaved?: (result: GapFillResultSaveResult) => void;
+  onTimeSpentSaved?: (result: AttemptTimeSaveResult) => void;
 }
 
 interface GapFillResult {
@@ -54,66 +67,92 @@ interface MatchingResult {
 export function AttemptDetail({
   attempt,
   canEditTranslationScores = false,
+  canEditGapFillResults = false,
+  canEditTimeSpent = false,
   onTranslationScoreSaved,
+  onGapFillResultSaved,
+  onTimeSpentSaved,
 }: AttemptDetailProps) {
   const quiz = attempt.quizzes as Record<string, unknown> | null;
   const rawAnswers = attempt.answers as Record<string, unknown> | null;
   const quizType = quiz?.type as string;
+  const attemptId = typeof attempt.id === "string" ? attempt.id : "";
+  const timeSpentSeconds =
+    typeof attempt.time_spent_seconds === "number"
+      ? attempt.time_spent_seconds
+      : 0;
+  const timeEditor = canEditTimeSpent && attemptId ? (
+    <EditableAttemptTime
+      attemptId={attemptId}
+      initialTimeSpentSeconds={timeSpentSeconds}
+      onTimeSaved={onTimeSpentSaved}
+    />
+  ) : null;
+  const detailContent = (() => {
+    if (!rawAnswers) {
+      return (
+        <p className="text-sm text-muted-foreground">
+          No detailed answers recorded for this attempt.
+        </p>
+      );
+    }
 
-  if (!rawAnswers) {
+    const results = (rawAnswers.results ?? []) as Record<string, unknown>[];
+
+    if (quizType === "gap_fill") {
+      return canEditGapFillResults && attemptId ? (
+        <EditableGapFillResults
+          attemptId={attemptId}
+          results={results as unknown as GapFillResult[]}
+          onResultSaved={onGapFillResultSaved}
+        />
+      ) : (
+        <GapFillDetail results={results as unknown as GapFillResult[]} />
+      );
+    }
+
+    if (quizType === "mcq") {
+      return <MCQDetail results={results as unknown as MCQResult[]} />;
+    }
+
+    if (quizType === "translation") {
+      return (
+        <TranslationDetail
+          attemptId={attemptId}
+          results={results as unknown as TranslationResult[]}
+          canEdit={canEditTranslationScores}
+          onScoreSaved={onTranslationScoreSaved}
+        />
+      );
+    }
+
+    if (quizType === "text_translation") {
+      return (
+        <TextTranslationDetail
+          results={results as unknown as TextTranslationResult[]}
+        />
+      );
+    }
+
+    if (quizType === "flashcards") {
+      return <FlashcardDetail answers={rawAnswers} />;
+    }
+
+    if (quizType === "matching") {
+      return <MatchingDetail results={results as unknown as MatchingResult[]} />;
+    }
+
     return (
-      <p className="text-sm text-muted-foreground">
-        No detailed answers recorded for this attempt.
-      </p>
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium">Raw Answers</h4>
+        <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-60">
+          {JSON.stringify(rawAnswers, null, 2)}
+        </pre>
+      </div>
     );
-  }
+  })();
 
-  const results = (rawAnswers.results ?? []) as Record<string, unknown>[];
-
-  if (quizType === "gap_fill") {
-    return <GapFillDetail results={results as unknown as GapFillResult[]} />;
-  }
-
-  if (quizType === "mcq") {
-    return <MCQDetail results={results as unknown as MCQResult[]} />;
-  }
-
-  if (quizType === "translation") {
-    return (
-      <TranslationDetail
-        attemptId={typeof attempt.id === "string" ? attempt.id : ""}
-        results={results as unknown as TranslationResult[]}
-        canEdit={canEditTranslationScores}
-        onScoreSaved={onTranslationScoreSaved}
-      />
-    );
-  }
-
-  if (quizType === "text_translation") {
-    return (
-      <TextTranslationDetail
-        results={results as unknown as TextTranslationResult[]}
-      />
-    );
-  }
-
-  if (quizType === "flashcards") {
-    return <FlashcardDetail answers={rawAnswers} />;
-  }
-
-  if (quizType === "matching") {
-    return <MatchingDetail results={results as unknown as MatchingResult[]} />;
-  }
-
-  // Generic fallback — show raw JSON
-  return (
-    <div className="space-y-2">
-      <h4 className="text-sm font-medium">Raw Answers</h4>
-      <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-60">
-        {JSON.stringify(rawAnswers, null, 2)}
-      </pre>
-    </div>
-  );
+  return <div className="space-y-4">{timeEditor}{detailContent}</div>;
 }
 
 function GapFillDetail({ results }: { results: GapFillResult[] }) {
@@ -275,37 +314,11 @@ function TranslationDetail({
             </p>
           )}
           {r.feedback && (
-            <div className="text-xs text-muted-foreground whitespace-pre-line mt-1">
-              {removeSuggestedAnswerLines(r.feedback)
-                .split("\n")
-                .map((line, j) => {
-                  const trimmed = line.trim();
-                  if (trimmed.startsWith("✓")) {
-                    return (
-                      <p key={j} className="text-green-600">
-                        {trimmed}
-                      </p>
-                    );
-                  }
-                  if (trimmed.startsWith("✗")) {
-                    return (
-                      <p key={j} className="text-red-600">
-                        {trimmed}
-                      </p>
-                    );
-                  }
-                  if (
-                    trimmed.startsWith("Suggested") ||
-                    trimmed.startsWith("suggested")
-                  ) {
-                    return (
-                      <p key={j} className="italic">
-                        {trimmed}
-                      </p>
-                    );
-                  }
-                  return <p key={j}>{trimmed}</p>;
-                })}
+            <div className="mt-1">
+              <TranslationFeedbackList
+                feedback={r.feedback}
+                itemClassName="text-xs"
+              />
             </div>
           )}
         </div>
@@ -389,27 +402,11 @@ function TextTranslationDetail({
           </div>
         )}
         {result.feedback && (
-          <div className="text-xs text-muted-foreground whitespace-pre-line mt-1">
-            {removeSuggestedAnswerLines(result.feedback)
-              .split("\n")
-              .map((line, index) => {
-                const trimmed = line.trim();
-                if (trimmed.startsWith("✓")) {
-                  return (
-                    <p key={index} className="text-green-600">
-                      {trimmed}
-                    </p>
-                  );
-                }
-                if (trimmed.startsWith("✗")) {
-                  return (
-                    <p key={index} className="text-red-600">
-                      {trimmed}
-                    </p>
-                  );
-                }
-                return <p key={index}>{trimmed}</p>;
-              })}
+          <div className="mt-1">
+            <TranslationFeedbackList
+              feedback={result.feedback}
+              itemClassName="text-xs"
+            />
           </div>
         )}
       </div>

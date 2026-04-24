@@ -4,11 +4,13 @@ import { generateFromGeminiWithUsage, GEMINI_MODEL } from "@/lib/gemini/client";
 import { getEvaluationPrompt } from "@/lib/gemini/prompts";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { recordAIUsageEvent } from "@/lib/ai/usage";
+import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import {
   resolveGrammarTopicEvaluationInstructions,
   resolveGrammarTopicLabels,
   resolveGrammarTopicPromptDetails,
 } from "@/lib/grammar/prompt-overrides";
+import { formatTranslationFeedback } from "@/lib/translation-feedback";
 import { z } from "zod";
 import type { QuizConfig } from "@/types/quiz";
 
@@ -35,6 +37,23 @@ const requestSchema = z.object({
     .optional(),
 });
 
+const evaluationMetricSchema = z.object({
+  passed: z.boolean(),
+  comment: z.preprocess((value) => {
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value
+        .filter((item): item is string => typeof item === "string")
+        .join(" ");
+    }
+
+    return value;
+  }, z.string().trim().min(1)),
+});
+
 const evaluationResponseSchema = z.object({
   score: z.preprocess((value) => {
     const clampScore = (score: number) => Math.min(100, Math.max(0, score));
@@ -50,19 +69,13 @@ const evaluationResponseSchema = z.object({
 
     return value;
   }, z.number().min(0).max(100)),
-  feedback: z.preprocess((value) => {
-    if (typeof value === "string") {
-      return value;
-    }
-
-    if (Array.isArray(value)) {
-      return value
-        .filter((item): item is string => typeof item === "string")
-        .join("\n");
-    }
-
-    return value;
-  }, z.string().min(1)),
+  metrics: z.object({
+    vocabulary: evaluationMetricSchema,
+    grammar: evaluationMetricSchema,
+    meaning: evaluationMetricSchema,
+    mechanics: evaluationMetricSchema,
+    naturalness: evaluationMetricSchema,
+  }),
 });
 
 export async function POST(request: Request) {
@@ -76,6 +89,13 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("app_language")
+      .eq("id", user.id)
+      .single();
+    const appLanguage = normalizeAppLanguage(profile?.app_language);
 
     const body = await request.json();
     const parsed = requestSchema.safeParse(body);
@@ -139,6 +159,7 @@ export async function POST(request: Request) {
       referenceTranslation,
       targetTerm,
       grammarValidationReason,
+      appLanguage,
       evalConfig,
     );
 
@@ -163,7 +184,10 @@ export async function POST(request: Request) {
     // Increment AI call counter after successful evaluation
     await incrementAICalls(user.id);
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      score: result.score,
+      feedback: formatTranslationFeedback(result.metrics, appLanguage),
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

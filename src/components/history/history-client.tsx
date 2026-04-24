@@ -42,6 +42,8 @@ import {
   type HistoryAttempt,
   type HistoryStudent,
 } from "@/lib/history/fetch-history-page-data";
+import type { AttemptTimeSaveResult } from "./editable-attempt-time";
+import type { GapFillResultSaveResult } from "@/components/review/editable-gap-fill-results";
 import type { TranslationScoreSaveResult } from "@/components/review/editable-translation-results";
 import type { Role } from "@/types/roles";
 import { AttemptDetail } from "./attempt-detail";
@@ -113,6 +115,60 @@ function updateAttemptTranslationScore(
   });
 }
 
+function updateAttemptTimeSpent(
+  attempts: HistoryAttempt[],
+  attemptId: string,
+  result: AttemptTimeSaveResult,
+) {
+  return attempts.map((attempt) => {
+    if (attempt.id !== attemptId) {
+      return attempt;
+    }
+
+    return {
+      ...attempt,
+      time_spent_seconds: result.timeSpentSeconds,
+    };
+  });
+}
+
+function updateAttemptGapFillResult(
+  attempts: HistoryAttempt[],
+  attemptId: string,
+  result: GapFillResultSaveResult,
+) {
+  return attempts.map((attempt) => {
+    if (attempt.id !== attemptId) {
+      return attempt;
+    }
+
+    const currentAnswers =
+      attempt.answers && typeof attempt.answers === "object"
+        ? (attempt.answers as Record<string, unknown>)
+        : {};
+    const currentResults = Array.isArray(currentAnswers.results)
+      ? [...(currentAnswers.results as Record<string, unknown>[])]
+      : [];
+
+    if (currentResults[result.questionIndex]) {
+      currentResults[result.questionIndex] = {
+        ...currentResults[result.questionIndex],
+        isCorrect: result.isCorrect,
+      };
+    }
+
+    return {
+      ...attempt,
+      score: result.overallScore,
+      max_score: result.maxScore,
+      answers: {
+        ...currentAnswers,
+        results: currentResults,
+      },
+    };
+  });
+}
+
 function formatAttemptDuration(totalSeconds?: number | null) {
   if (!Number.isFinite(totalSeconds) || (totalSeconds ?? 0) <= 0) {
     return null;
@@ -143,6 +199,8 @@ const AttemptCard = React.memo(function AttemptCard({
   isExpanded,
   onToggleExpand,
   onTranslationScoreSaved,
+  onGapFillResultSaved,
+  onTimeSpentSaved,
 }: {
   attempt: HistoryAttempt;
   isTutor: boolean;
@@ -153,6 +211,11 @@ const AttemptCard = React.memo(function AttemptCard({
     attemptId: string,
     result: TranslationScoreSaveResult,
   ) => void;
+  onGapFillResultSaved: (
+    attemptId: string,
+    result: GapFillResultSaveResult,
+  ) => void;
+  onTimeSpentSaved: (attemptId: string, result: AttemptTimeSaveResult) => void;
 }) {
   const quiz = attempt.quizzes;
   const student = attempt.profiles;
@@ -166,6 +229,7 @@ const AttemptCard = React.memo(function AttemptCard({
     ? getGrammarTopicDisplayName(quiz?.config, grammarTopicKey)
     : null;
   const loggedDuration = formatAttemptDuration(attempt.time_spent_seconds);
+  const canEditTimeSpent = Boolean(isTutor && !isOwnAttempt);
 
   return (
     <Card>
@@ -223,11 +287,6 @@ const AttemptCard = React.memo(function AttemptCard({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             {formatAppDateTime(attempt.completed_at)}
-            {scored && (
-              <span className="ml-2">
-                Score: {Number(attempt.score)} / {Number(attempt.max_score)}
-              </span>
-            )}
             {loggedDuration && (
               <span className="ml-2 inline-flex items-center gap-1">
                 <Clock3 className="h-3.5 w-3.5" />
@@ -260,9 +319,15 @@ const AttemptCard = React.memo(function AttemptCard({
             <AttemptDetail
               attempt={attempt as Record<string, unknown>}
               canEditTranslationScores={isTutor && quiz?.type === "translation"}
+              canEditGapFillResults={isTutor && quiz?.type === "gap_fill"}
+              canEditTimeSpent={canEditTimeSpent}
               onTranslationScoreSaved={(result) =>
                 onTranslationScoreSaved(attempt.id, result)
               }
+              onGapFillResultSaved={(result) =>
+                onGapFillResultSaved(attempt.id, result)
+              }
+              onTimeSpentSaved={(result) => onTimeSpentSaved(attempt.id, result)}
             />
           </div>
         )}
@@ -466,6 +531,24 @@ export function HistoryClient({
     [],
   );
 
+  const handleTimeSpentSaved = useCallback(
+    (attemptId: string, result: AttemptTimeSaveResult) => {
+      setAttempts((currentAttempts) =>
+        updateAttemptTimeSpent(currentAttempts, attemptId, result),
+      );
+    },
+    [],
+  );
+
+  const handleGapFillResultSaved = useCallback(
+    (attemptId: string, result: GapFillResultSaveResult) => {
+      setAttempts((currentAttempts) =>
+        updateAttemptGapFillResult(currentAttempts, attemptId, result),
+      );
+    },
+    [],
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -557,6 +640,8 @@ export function HistoryClient({
               isExpanded={expandedId === attempt.id}
               onToggleExpand={handleToggleExpand}
               onTranslationScoreSaved={handleTranslationScoreSaved}
+              onGapFillResultSaved={handleGapFillResultSaved}
+              onTimeSpentSaved={handleTimeSpentSaved}
             />
           ))}
 

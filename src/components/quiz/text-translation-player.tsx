@@ -15,7 +15,7 @@ import {
   normalizeLearningLanguage,
   normalizeSourceLanguage,
 } from "@/lib/languages";
-import { removeSuggestedAnswerLines } from "@/lib/utils";
+import { TranslationFeedbackList } from "@/components/quiz/translation-feedback-list";
 
 export interface TextTranslationResult {
   originalText: string;
@@ -58,9 +58,6 @@ export function TextTranslationPlayer({
   const sourceLanguageLabel =
     messages.common.studyLanguageNames[normalizedSourceLanguage] ||
     getSourceLanguageLabel(normalizedSourceLanguage);
-  const visibleFeedback = evaluation
-    ? removeSuggestedAnswerLines(evaluation.feedback)
-    : "";
   const progress = evaluation ? 100 : 50;
 
   async function handleSubmit() {
@@ -229,29 +226,10 @@ export function TextTranslationPlayer({
                 <p className="text-sm font-medium">
                   {messages.common.feedback}:
                 </p>
-                <div className="text-sm space-y-0.5">
-                  {visibleFeedback.split("\n").map((line, index) => {
-                    const trimmed = line.trim();
-                    if (!trimmed) return null;
-                    const isPass = trimmed.startsWith("✓");
-                    const isFail = trimmed.startsWith("✗");
-
-                    return (
-                      <p
-                        key={index}
-                        className={
-                          isFail
-                            ? "text-red-500"
-                            : isPass
-                              ? "text-green-600 dark:text-green-400"
-                              : ""
-                        }
-                      >
-                        {trimmed}
-                      </p>
-                    );
-                  })}
-                </div>
+                <TranslationFeedbackList
+                  feedback={evaluation.feedback}
+                  itemClassName="text-sm"
+                />
               </div>
 
               <div className="rounded-md bg-muted p-3 space-y-2">

@@ -7,10 +7,16 @@ import {
   tutorHasStudentAccess,
 } from "@/lib/rbac/tutor-access";
 
-const updateTranslationScoreSchema = z.object({
-  questionIndex: z.number().int().min(0),
-  score: z.number().min(0).max(100),
-});
+const updateAttemptSchema = z.union([
+  z.object({
+    questionIndex: z.number().int().min(0),
+    score: z.number().min(0).max(100),
+  }),
+  z.object({
+    questionIndex: z.number().int().min(0),
+    isCorrect: z.boolean(),
+  }),
+]);
 
 export async function PATCH(
   request: NextRequest,
@@ -39,13 +45,13 @@ export async function PATCH(
 
     if (profile.role !== "tutor" && profile.role !== "superadmin") {
       return NextResponse.json(
-        { error: "Only tutors can edit translation scores" },
+        { error: "Only tutors can edit attempt results" },
         { status: 403 },
       );
     }
 
     const body = await request.json();
-    const parsed = updateTranslationScoreSchema.safeParse(body);
+    const parsed = updateAttemptSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -74,9 +80,9 @@ export async function PATCH(
 
     const quiz = attempt.quizzes as { type: string; creator_id: string } | null;
 
-    if (!quiz || quiz.type !== "translation") {
+    if (!quiz || (quiz.type !== "translation" && quiz.type !== "gap_fill")) {
       return NextResponse.json(
-        { error: "Only translation attempts can be edited" },
+        { error: "Only translation and gap-fill attempts can be edited" },
         { status: 400 },
       );
     }
@@ -122,22 +128,54 @@ export async function PATCH(
       );
     }
 
-    results[parsed.data.questionIndex] = {
-      ...targetResult,
-      score: Math.round(parsed.data.score),
-    };
+    let overallScore = 0;
+    let maxScore = 0;
 
-    const numericScores = results.map((result) => {
-      const score = result.score;
-      return typeof score === "number" && Number.isFinite(score) ? score : 0;
-    });
-    const overallScore =
-      numericScores.length > 0
-        ? Math.round(
-            numericScores.reduce((sum, score) => sum + score, 0) /
-              numericScores.length,
-          )
-        : 0;
+    if (quiz.type === "translation") {
+      if (!("score" in parsed.data)) {
+        return NextResponse.json(
+          { error: "Translation attempts require a score update" },
+          { status: 400 },
+        );
+      }
+
+      results[parsed.data.questionIndex] = {
+        ...targetResult,
+        score: Math.round(parsed.data.score),
+      };
+
+      const numericScores = results.map((result) => {
+        const score = result.score;
+        return typeof score === "number" && Number.isFinite(score)
+          ? score
+          : 0;
+      });
+      overallScore =
+        numericScores.length > 0
+          ? Math.round(
+              numericScores.reduce((sum, score) => sum + score, 0) /
+                numericScores.length,
+            )
+          : 0;
+      maxScore = 100;
+    } else {
+      if (!("isCorrect" in parsed.data)) {
+        return NextResponse.json(
+          { error: "Gap-fill attempts require a correct/wrong update" },
+          { status: 400 },
+        );
+      }
+
+      results[parsed.data.questionIndex] = {
+        ...targetResult,
+        isCorrect: parsed.data.isCorrect,
+      };
+
+      overallScore = results.reduce((sum, result) => {
+        return sum + (result.isCorrect === true ? 1 : 0);
+      }, 0);
+      maxScore = results.length;
+    }
 
     const updatedAnswers = {
       ...answers,
@@ -149,7 +187,7 @@ export async function PATCH(
       .update({
         answers: updatedAnswers,
         score: overallScore,
-        max_score: 100,
+        max_score: maxScore,
       })
       .eq("id", id);
 
@@ -159,7 +197,7 @@ export async function PATCH(
 
     return NextResponse.json({
       overallScore,
-      maxScore: 100,
+      maxScore,
       result: results[parsed.data.questionIndex],
     });
   } catch (error) {

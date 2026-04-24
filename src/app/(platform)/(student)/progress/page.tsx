@@ -13,6 +13,7 @@ import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
 import { StudentProgressInsights } from "@/components/progress/student-progress-insights";
 import { StudentResultsSummary } from "@/components/progress/student-results-summary";
 import { StudentProgressOverviewCards } from "@/components/progress/student-progress-overview-cards";
+import { TutorProgressPageHeader } from "@/components/progress/tutor-progress-page-header";
 import {
   TrendingUp,
   BookOpen,
@@ -71,6 +72,7 @@ export default async function ProgressPage() {
     publishedTutorOverride?.override.insightsOverride ?? savedInsights;
   const hasAnyData =
     snapshot.overview.totalAttempts > 0 ||
+    snapshot.timeMetrics.completedLessons > 0 ||
     snapshot.overview.totalWords > 0 ||
     snapshot.passiveSignals.uniqueItems > 0 ||
     Boolean(publishedTutorOverride);
@@ -78,14 +80,12 @@ export default async function ProgressPage() {
   if (!hasAnyData) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {messages.progress.title}
-          </h1>
-          <p className="text-muted-foreground">
-            {messages.progress.description}
-          </p>
-        </div>
+        <TutorProgressPageHeader
+          currentSection="overall"
+          basePath="/progress"
+          title={messages.progress.title}
+          description={messages.progress.description}
+        />
 
         <Card>
           <CardHeader className="items-center text-center py-12">
@@ -118,12 +118,12 @@ export default async function ProgressPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {messages.progress.title}
-        </h1>
-        <p className="text-muted-foreground">{messages.progress.description}</p>
-      </div>
+      <TutorProgressPageHeader
+        currentSection="overall"
+        basePath="/progress"
+        title={messages.progress.title}
+        description={messages.progress.description}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <StudentSkillRadar

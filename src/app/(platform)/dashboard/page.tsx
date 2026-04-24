@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { StudentOverallPerformanceCard } from "@/components/progress/student-overall-performance-card";
 import Link from "next/link";
 import {
   BookOpen,
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/animated-dashboard";
 import { calculateDayStreak } from "@/lib/history/calculate-day-streak";
 import { calculateTextCostUsd, calculateTtsCostUsd } from "@/lib/ai/usage";
+import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -131,6 +133,7 @@ async function StudentDashboard({
     { count: monthlyQuizCount },
     { data: attemptRows },
     { count: totalWordsTracked },
+    progressSnapshot,
   ] = await Promise.all([
     supabase
       .from("quizzes")
@@ -146,6 +149,7 @@ async function StudentDashboard({
       .from("word_mastery")
       .select("id", { count: "exact", head: true })
       .eq("student_id", userId),
+    getStudentProgressSnapshot(userId),
   ]);
 
   const quizLimit = plan.quizzesPerMonth;
@@ -158,7 +162,7 @@ async function StudentDashboard({
 
   return (
     <div className="space-y-6">
-      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
         <AnimatedCard>
           <Card data-tour-id="student-new-quiz">
             <CardHeader className="flex flex-row items-center gap-2">
@@ -278,6 +282,14 @@ async function StudentDashboard({
         </AnimatedCard>
 
         <AnimatedCard>
+          <StudentOverallPerformanceCard
+            snapshot={progressSnapshot}
+            href="/progress#overall-performance"
+            ctaLabel={messages.nav.progress}
+          />
+        </AnimatedCard>
+
+        <AnimatedCard>
           <Card data-tour-id="student-total-words">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
@@ -316,11 +328,9 @@ async function TutorDashboard({
   monthStart.setHours(0, 0, 0, 0);
 
   const [
-    { data: classes },
     { count: monthlyQuizCount },
     { data: connections },
   ] = await Promise.all([
-    supabase.from("classes").select("id").eq("tutor_id", userId),
     supabase
       .from("quizzes")
       .select("*", { count: "exact", head: true })
@@ -333,7 +343,6 @@ async function TutorDashboard({
       .eq("status", "active"),
   ]);
 
-  const classIds = classes?.map((classItem) => classItem.id) ?? [];
   const connectedStudentIds = Array.from(
     new Set(
       (connections ?? [])
@@ -341,17 +350,7 @@ async function TutorDashboard({
         .filter((studentId) => studentId !== userId),
     ),
   );
-  let totalStudents = 0;
-
-  if (classIds.length > 0) {
-    const { data: members } = await supabaseAdmin
-      .from("class_members")
-      .select("student_id")
-      .in("class_id", classIds);
-
-    totalStudents = new Set((members ?? []).map((member) => member.student_id))
-      .size;
-  }
+  const totalStudents = connectedStudentIds.length;
 
   const quizLimit = plan.quizzesPerMonth;
   const quizPercentage = pct(monthlyQuizCount ?? 0, quizLimit);

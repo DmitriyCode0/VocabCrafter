@@ -6,8 +6,9 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TranslationFeedbackList } from "@/components/quiz/translation-feedback-list";
 import { cn } from "@/lib/utils";
-import { removeSuggestedAnswerLines, stripMarkdownEmphasis } from "@/lib/utils";
+import { stripMarkdownEmphasis } from "@/lib/utils";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 
 interface EditableTranslationResult {
@@ -32,40 +33,8 @@ interface EditableTranslationResultsProps {
 }
 
 function FeedbackChecklist({ feedback }: { feedback: string }) {
-  const lines = removeSuggestedAnswerLines(feedback)
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  if (lines.length === 0) {
-    return null;
-  }
-
   return (
-    <div className="space-y-2">
-      {lines.map((line, index) => {
-        const isPass = line.startsWith("✓");
-        const isFail = line.startsWith("✗");
-
-        return (
-          <div
-            key={`${line}-${index}`}
-            className={cn(
-              "rounded-md border px-3 py-2 text-xs leading-relaxed",
-              isPass &&
-                "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300",
-              isFail &&
-                "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300",
-              !isPass &&
-                !isFail &&
-                "border-border bg-background text-muted-foreground",
-            )}
-          >
-            {line}
-          </div>
-        );
-      })}
-    </div>
+    <TranslationFeedbackList feedback={feedback} itemClassName="text-xs" />
   );
 }
 

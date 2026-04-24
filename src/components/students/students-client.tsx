@@ -32,6 +32,8 @@ import {
   Link2,
   TrendingUp,
   BookMarked,
+  FileText,
+  Target,
 } from "lucide-react";
 import Link from "next/link";
 import { formatAppDate } from "@/lib/dates";
@@ -440,6 +442,22 @@ export function StudentsClient({
                       >
                         <BookMarked className="mr-2 h-4 w-4" />
                         Coach
+                      </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link
+                        href={`/plans-and-reports?student=${conn.student_id as string}`}
+                      >
+                        <Target className="mr-2 h-4 w-4" />
+                        Plan
+                      </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link
+                        href={`/plans-and-reports/reports?student=${conn.student_id as string}`}
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        Reports
                       </Link>
                     </Button>
                     <Button variant="outline" size="sm" asChild>

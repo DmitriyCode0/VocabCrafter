@@ -117,6 +117,8 @@ const EN_MESSAGES = {
     lessons: "Lessons",
     assignments: "Assignments",
     progress: "Progress",
+    plansAndReports: "Plans and reports",
+    plan: "Plan",
     vocabMastery: "Vocab Mastery",
     feedback: "Feedback",
     myTutors: "My Tutors",
@@ -504,7 +506,7 @@ const EN_MESSAGES = {
       passiveButtonSingle: "Import Passive Vocabulary",
       passiveButtonMultiple: "Choose Student",
       studentsTitle: "Students",
-      enrolledStudents: "enrolled students",
+      enrolledStudents: "connected students",
       viewStudentsButton: "View Students",
       quizzesCreatedTitle: "Quizzes Created",
       remainingThisMonth: (count: number) => `${count} remaining this month`,
@@ -657,11 +659,24 @@ const EN_MESSAGES = {
     title: "Progress",
     description:
       "Track your learning profile, vocabulary growth, and quiz performance.",
+    overallTab: "Overall",
+    monthlyTab: "Monthly",
+    monthlyDescription:
+      "Compare your completed quizzes and lessons across the last 30 days.",
     noProgressTitle: "No progress data yet",
     noProgressDescription:
       "Complete some quizzes to start tracking your learning progress and see your improvement over time.",
+    noMonthlyActivityTitle: "No monthly activity yet",
+    noMonthlyActivityDescription:
+      "You do not have completed quizzes or lessons recorded in the last 30 days.",
     createQuiz: "Create a Quiz",
     openVocabMastery: "Open Vocab Mastery",
+    completedQuizzes: "Completed quizzes",
+    completedLessons: "Completed lessons",
+    activeDays: "Active days",
+    monthlyChartTitle: "Monthly activity mix",
+    monthlyChartDescription: (startLabel: string, endLabel: string) =>
+      `Completed quizzes and lessons from ${startLabel} to ${endLabel}.`,
   },
   studentFeedback: {
     title: "My Feedback",
@@ -736,6 +751,17 @@ const EN_MESSAGES = {
       updateSuccess: "Translation score updated",
       updateFailed: "Failed to update score",
     },
+    gapFillResults: {
+      title: "Gap Fill Answers",
+      currentOverall: (score: number, maxScore: number) =>
+        `Current overall: ${score}/${maxScore}`,
+      itemLabel: "Gap-fill item",
+      markCorrect: "Mark Correct",
+      markWrong: "Mark Wrong",
+      saving: "Saving...",
+      updateSuccess: "Gap-fill result updated",
+      updateFailed: "Failed to update gap-fill result",
+    },
   },
   tutorProgressPage: {
     studentFallback: "Student",
@@ -745,6 +771,26 @@ const EN_MESSAGES = {
     targetLabel: (level: string) => `Target ${level}`,
     description: (name: string) =>
       `Review ${name}'s computed learning profile, then curate your own coaching version of the radar metrics, AI suggestions, and progress comments.`,
+    overviewDescription:
+      "Review one connected student at a time with the same performance summary used in student progress reporting.",
+    monthlyDescription:
+      "Compare completed quizzes and lessons for one connected student across the last 30 days.",
+    overallTab: "Overall",
+    monthlyTab: "Monthly",
+    viewProgress: "View Progress",
+    openCoachingWorkspace: "Open Coaching Workspace",
+    openHistory: "Open History",
+    monthlyPanelDescription: (name: string) =>
+      `Track ${name}'s completed quizzes and lessons across the last 30 days.`,
+    monthlyChartTitle: "Monthly activity mix",
+    monthlyChartDescription: (startLabel: string, endLabel: string) =>
+      `Completed quizzes and lessons from ${startLabel} to ${endLabel}.`,
+    completedQuizzes: "Completed quizzes",
+    completedLessons: "Completed lessons",
+    activeDays: "Active days",
+    noMonthlyActivityTitle: "No monthly activity yet",
+    noMonthlyActivityDescription:
+      "This student has no completed quizzes or lessons recorded in the last 30 days.",
     sourceLabel: (language: string) => `Source ${language}`,
     progressReviewsTitle: "Progress Reviews & Comments",
     progressReviewsDescription: (name: string) =>
@@ -780,6 +826,41 @@ const EN_MESSAGES = {
     equivalentWordsBadge: (count: number) =>
       `${count} ${formatPluralizedCount("en", count, { one: "equivalent word", other: "equivalent words" })}`,
     openPassiveVocabulary: "Open Passive Vocabulary",
+  },
+  tutorPlansReportsPage: {
+    title: "Plans and reports",
+    description:
+      "Manage one connected student's learning plan and monthly reports from a single workspace.",
+    plansTab: "Plans",
+    reportsTab: "Reports",
+    plansDescription:
+      "Review and update one connected student's learning plan.",
+    reportsDescription:
+      "Generate, edit, and export one connected student's monthly reports.",
+    planPanelDescription: (name: string) =>
+      `Review and update ${name}'s goals, grammar focus, and monthly targets.`,
+    reportsPanelDescription: (name: string) =>
+      `Generate, edit, and export ${name}'s monthly reports from one place.`,
+    noStudentTitle: "No student selected",
+    noStudentDescription:
+      "Connect a student first, then choose them here to open their plans and reports workspace.",
+    studentSpecificNotice:
+      "Plans and reports is student-specific, so this page always shows one learner at a time.",
+  },
+  studentPlansReportsPage: {
+    title: "Plans and reports",
+    description:
+      "Review the learning plans and monthly reports your tutors share with you.",
+    plansDescription:
+      "Review the goals, objectives, grammar focus, and monthly targets your tutors set for you.",
+    reportsDescription:
+      "Read and download the monthly reports your tutors publish for you.",
+    noPlansTitle: "No plans available yet",
+    noPlansDescription:
+      "Your connected tutors can publish a plan for you once they set goals and objectives.",
+    noReportsTitle: "No monthly reports yet",
+    noReportsDescription:
+      "Monthly reports will appear here after your tutor publishes them.",
   },
   adminUsers: {
     title: "Users",
@@ -838,10 +919,10 @@ const EN_MESSAGES = {
     },
     cards: {
       noStudentsOnPage: "No students found on this page.",
-      summaryLine: (totalWords: number, avgLevel: number, mastered: number) =>
-        `${totalWords} ${formatPluralizedCount("en", totalWords, { one: "word", other: "words" })} · avg level ${avgLevel} · ${mastered} mastered`,
+      summaryLine: (totalWords: number, avgLevel: number) =>
+        `${formatPluralizedCount("en", totalWords, { one: "word", other: "words" })} · avg level ${avgLevel}`,
       passiveSummary: (passiveEvidenceCount: number, equivalentWords: number) =>
-        `${passiveEvidenceCount} passive evidence · ${equivalentWords} ${formatPluralizedCount("en", equivalentWords, { one: "equivalent word", other: "equivalent words" })}`,
+        `${passiveEvidenceCount} passive evidence · ${formatPluralizedCount("en", equivalentWords, { one: "equivalent word", other: "equivalent words" })}`,
       showWords: "Show words",
       hideWords: "Hide words",
       noWordsYet: "No words yet",
@@ -1167,6 +1248,8 @@ const UK_MESSAGES: AppMessages = {
     lessons: "Уроки",
     assignments: "Завдання",
     progress: "Прогрес",
+    plansAndReports: "Плани та звіти",
+    plan: "План",
     vocabMastery: "Засвоєння слів",
     feedback: "Відгук",
     myTutors: "Мої викладачі",
@@ -1564,7 +1647,7 @@ const UK_MESSAGES: AppMessages = {
       passiveButtonSingle: "Імпортувати пасивний словник",
       passiveButtonMultiple: "Обрати студента",
       studentsTitle: "Студенти",
-      enrolledStudents: "студентів навчається",
+      enrolledStudents: "під’єднаних студентів",
       viewStudentsButton: "Переглянути студентів",
       quizzesCreatedTitle: "Створено вікторин",
       remainingThisMonth: (count: number) =>
@@ -1721,11 +1804,24 @@ const UK_MESSAGES: AppMessages = {
     title: "Прогрес",
     description:
       "Відстежуйте свій навчальний профіль, зростання словникового запасу та результати вікторин.",
+    overallTab: "Загалом",
+    monthlyTab: "Щомісяця",
+    monthlyDescription:
+      "Порівнюйте свої завершені вікторини та уроки за останні 30 днів.",
     noProgressTitle: "Поки немає даних про прогрес",
     noProgressDescription:
       "Пройдіть кілька вікторин, щоб почати відстежувати свій прогрес і бачити покращення з часом.",
+    noMonthlyActivityTitle: "Ще немає місячної активності",
+    noMonthlyActivityDescription:
+      "За останні 30 днів у вас немає завершених вікторин або уроків.",
     createQuiz: "Створити вікторину",
     openVocabMastery: "Відкрити засвоєння слів",
+    completedQuizzes: "Завершені вікторини",
+    completedLessons: "Завершені уроки",
+    activeDays: "Активні дні",
+    monthlyChartTitle: "Місячна структура активності",
+    monthlyChartDescription: (startLabel: string, endLabel: string) =>
+      `Завершені вікторини та уроки з ${startLabel} до ${endLabel}.`,
   },
   studentFeedback: {
     title: "Мій відгук",
@@ -1800,6 +1896,17 @@ const UK_MESSAGES: AppMessages = {
       updateSuccess: "Оцінку перекладу оновлено",
       updateFailed: "Не вдалося оновити оцінку",
     },
+    gapFillResults: {
+      title: "Відповіді на заповнення пропусків",
+      currentOverall: (score: number, maxScore: number) =>
+        `Поточний результат: ${score}/${maxScore}`,
+      itemLabel: "Елемент із пропуском",
+      markCorrect: "Позначити правильно",
+      markWrong: "Позначити неправильно",
+      saving: "Збереження...",
+      updateSuccess: "Результат заповнення пропуску оновлено",
+      updateFailed: "Не вдалося оновити результат заповнення пропуску",
+    },
   },
   tutorProgressPage: {
     studentFallback: "Студент",
@@ -1809,6 +1916,26 @@ const UK_MESSAGES: AppMessages = {
     targetLabel: (level: string) => `Ціль ${level}`,
     description: (name: string) =>
       `Перегляньте обчислений навчальний профіль ${name}, а потім сформуйте власну викладацьку версію радарних метрик, AI-підказок і коментарів до прогресу.`,
+    overviewDescription:
+      "Переглядайте одного під’єднаного студента за раз, використовуючи той самий підсумок успішності, що й у студентському прогресі.",
+    monthlyDescription:
+      "Порівнюйте завершені вікторини та уроки одного під’єднаного студента за останні 30 днів.",
+    overallTab: "Загалом",
+    monthlyTab: "Щомісяця",
+    viewProgress: "Переглянути прогрес",
+    openCoachingWorkspace: "Відкрити простір коучингу",
+    openHistory: "Відкрити історію",
+    monthlyPanelDescription: (name: string) =>
+      `Переглядайте завершені вікторини та уроки ${name} за останні 30 днів.`,
+    monthlyChartTitle: "Місячна структура активності",
+    monthlyChartDescription: (startLabel: string, endLabel: string) =>
+      `Завершені вікторини та уроки з ${startLabel} до ${endLabel}.`,
+    completedQuizzes: "Завершені вікторини",
+    completedLessons: "Завершені уроки",
+    activeDays: "Активні дні",
+    noMonthlyActivityTitle: "Ще немає місячної активності",
+    noMonthlyActivityDescription:
+      "У цього студента немає завершених вікторин або уроків за останні 30 днів.",
     sourceLabel: (language: string) => `Мова-джерело: ${language}`,
     progressReviewsTitle: "Огляди прогресу та коментарі",
     progressReviewsDescription: (name: string) =>
@@ -1844,6 +1971,41 @@ const UK_MESSAGES: AppMessages = {
     equivalentWordsBadge: (count: number) =>
       `${count} ${formatPluralizedCount("uk", count, { one: "еквівалентне слово", few: "еквівалентні слова", many: "еквівалентних слів" })}`,
     openPassiveVocabulary: "Відкрити пасивний словник",
+  },
+  tutorPlansReportsPage: {
+    title: "Плани та звіти",
+    description:
+      "Керуйте навчальним планом і щомісячними звітами одного під’єднаного студента з єдиного простору.",
+    plansTab: "Плани",
+    reportsTab: "Звіти",
+    plansDescription:
+      "Переглядайте та оновлюйте навчальний план одного під’єднаного студента.",
+    reportsDescription:
+      "Створюйте, редагуйте та експортуйте щомісячні звіти одного під’єднаного студента.",
+    planPanelDescription: (name: string) =>
+      `Переглядайте та оновлюйте цілі, граматичний фокус і щомісячні орієнтири для ${name}.`,
+    reportsPanelDescription: (name: string) =>
+      `Створюйте, редагуйте та експортуйте щомісячні звіти для ${name} в одному місці.`,
+    noStudentTitle: "Студента не вибрано",
+    noStudentDescription:
+      "Спочатку під’єднайте студента, а потім виберіть його тут, щоб відкрити простір планів і звітів.",
+    studentSpecificNotice:
+      "Плани та звіти прив’язані до конкретного студента, тому ця сторінка завжди показує одного учня за раз.",
+  },
+  studentPlansReportsPage: {
+    title: "Плани та звіти",
+    description:
+      "Переглядайте навчальні плани й щомісячні звіти, якими з вами діляться викладачі.",
+    plansDescription:
+      "Переглядайте цілі, завдання, граматичний фокус і щомісячні орієнтири, які для вас встановили викладачі.",
+    reportsDescription:
+      "Читайте й завантажуйте щомісячні звіти, які для вас публікують викладачі.",
+    noPlansTitle: "Поки немає планів",
+    noPlansDescription:
+      "Ваші викладачі зможуть опублікувати план для вас після того, як визначать цілі та завдання.",
+    noReportsTitle: "Поки немає щомісячних звітів",
+    noReportsDescription:
+      "Щомісячні звіти з’являться тут після того, як викладач опублікує їх для вас.",
   },
   adminUsers: {
     title: "Користувачі",
@@ -1902,10 +2064,10 @@ const UK_MESSAGES: AppMessages = {
     },
     cards: {
       noStudentsOnPage: "На цій сторінці студентів не знайдено.",
-      summaryLine: (totalWords: number, avgLevel: number, mastered: number) =>
-        `${totalWords} ${formatPluralizedCount("uk", totalWords, { one: "слово", few: "слова", many: "слів" })} · сер. рівень ${avgLevel} · ${mastered} ${formatPluralizedCount("uk", mastered, { one: "засвоєне", few: "засвоєні", many: "засвоєних" })}`,
+      summaryLine: (totalWords: number, avgLevel: number) =>
+        `${formatPluralizedCount("uk", totalWords, { one: "слово", few: "слова", many: "слів" })} · сер. рівень ${avgLevel}`,
       passiveSummary: (passiveEvidenceCount: number, equivalentWords: number) =>
-        `${passiveEvidenceCount} ${formatPluralizedCount("uk", passiveEvidenceCount, { one: "пасивне свідчення", few: "пасивні свідчення", many: "пасивних свідчень" })} · ${equivalentWords} ${formatPluralizedCount("uk", equivalentWords, { one: "еквівалентне слово", few: "еквівалентні слова", many: "еквівалентних слів" })}`,
+        `${formatPluralizedCount("uk", passiveEvidenceCount, { one: "пасивне свідчення", few: "пасивні свідчення", many: "пасивних свідчень" })} · ${formatPluralizedCount("uk", equivalentWords, { one: "еквівалентне слово", few: "еквівалентні слова", many: "еквівалентних слів" })}`,
       showWords: "Показати слова",
       hideWords: "Сховати слова",
       noWordsYet: "Поки немає слів",

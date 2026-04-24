@@ -9,6 +9,7 @@ export type AIUsageFeature =
   | "parse_input"
   | "evaluate"
   | "progress_insights"
+  | "monthly_report"
   | "passive_vocabulary_enrichment"
   | "tts";
 
