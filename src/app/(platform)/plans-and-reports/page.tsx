@@ -129,24 +129,34 @@ export default async function PlansAndReportsPage({
                       <div>
                         <CardTitle className="text-base">{tutorName}</CardTitle>
                         <CardDescription>
-                          Updated {formatDateForAppLanguage(appLanguage, entry.updatedAt)}
+                          Updated{" "}
+                          {formatDateForAppLanguage(
+                            appLanguage,
+                            entry.updatedAt,
+                          )}
                         </CardDescription>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Badge variant="secondary">
-                          Report: {getReportLanguageLabel(entry.plan.reportLanguage)}
+                          Report:{" "}
+                          {getReportLanguageLabel(entry.plan.reportLanguage)}
                         </Badge>
                         <Badge variant="outline">
                           Quiz target: {entry.plan.monthlyQuizTarget ?? "n/a"}
                         </Badge>
                         <Badge variant="outline">
-                          Lesson target: {entry.plan.monthlyCompletedLessonsTarget ?? "n/a"}
+                          Lesson target:{" "}
+                          {entry.plan.monthlyCompletedLessonsTarget ?? "n/a"}
                         </Badge>
                         <Badge variant="outline">
-                          New words: {entry.plan.monthlyNewMasteryWordsTarget ?? "n/a"}
+                          New words:{" "}
+                          {entry.plan.monthlyNewMasteryWordsTarget ?? "n/a"}
                         </Badge>
                         <Badge variant="outline">
-                          Avg score target: {formatPercentage(entry.plan.monthlyAverageScoreTarget)}
+                          Avg score target:{" "}
+                          {formatPercentage(
+                            entry.plan.monthlyAverageScoreTarget,
+                          )}
                         </Badge>
                       </div>
                     </div>
@@ -163,7 +173,9 @@ export default async function PlansAndReportsPage({
                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                               Plan title
                             </p>
-                            <p className="font-medium">{entry.plan.planTitle}</p>
+                            <p className="font-medium">
+                              {entry.plan.planTitle}
+                            </p>
                           </div>
                         ) : null}
 
@@ -244,8 +256,12 @@ export default async function PlansAndReportsPage({
   }
 
   const { student: requestedStudentId } = resolvedSearchParams;
-  const { userId, role: tutorRole, students, activeStudentId } =
-    await getTutorProgressPageData(requestedStudentId);
+  const {
+    userId,
+    role: tutorRole,
+    students,
+    activeStudentId,
+  } = await getTutorProgressPageData(requestedStudentId);
 
   if (tutorRole !== "tutor") {
     redirect("/dashboard");
@@ -363,7 +379,9 @@ export default async function PlansAndReportsPage({
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-2xl font-bold tracking-tight">{studentName}</h2>
+              <h2 className="text-2xl font-bold tracking-tight">
+                {studentName}
+              </h2>
               <Badge variant="outline">
                 {messages.tutorPlansReportsPage.plansTab}
               </Badge>

@@ -18,7 +18,10 @@ async function requireTutorAccess(studentId: string) {
 
   if (!user) {
     return {
-      errorResponse: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      errorResponse: NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      ),
     };
   }
 
@@ -37,7 +40,11 @@ async function requireTutorAccess(studentId: string) {
     };
   }
 
-  const hasAccess = await tutorHasStudentAccess(supabaseAdmin, user.id, studentId);
+  const hasAccess = await tutorHasStudentAccess(
+    supabaseAdmin,
+    user.id,
+    studentId,
+  );
 
   if (!hasAccess) {
     return {
@@ -63,7 +70,10 @@ export async function GET(
   }
 
   try {
-    const reports = await listTutorStudentMonthlyReports(access.user.id, studentId);
+    const reports = await listTutorStudentMonthlyReports(
+      access.user.id,
+      studentId,
+    );
     return NextResponse.json({ reports });
   } catch (error) {
     console.error("Load monthly reports error:", error);
@@ -106,7 +116,10 @@ export async function POST(
 
     if (result.report.status === "quota_blocked") {
       return NextResponse.json(
-        { error: result.report.generationError || "Monthly report quota reached" },
+        {
+          error:
+            result.report.generationError || "Monthly report quota reached",
+        },
         { status: 429 },
       );
     }
@@ -122,10 +135,10 @@ export async function POST(
   } catch (error) {
     console.error("Generate monthly report error:", error);
     const message =
-      error instanceof Error ? error.message : "Failed to generate monthly report";
-    const status = message.includes("Set up a plan")
-      ? 400
-      : 500;
+      error instanceof Error
+        ? error.message
+        : "Failed to generate monthly report";
+    const status = message.includes("Set up a plan") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

@@ -37,7 +37,9 @@ export function Sidebar({ profile }: SidebarProps) {
           )}
         >
           <BookOpen className="h-6 w-6 shrink-0 text-primary" />
-          <span className={cn("truncate", collapsed && "sr-only")}>VocabCrafter 2.0</span>
+          <span className={cn("truncate", collapsed && "sr-only")}>
+            VocabCrafter 2.0
+          </span>
         </Link>
         <Button
           type="button"

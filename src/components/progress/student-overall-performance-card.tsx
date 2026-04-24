@@ -63,12 +63,15 @@ export function StudentOverallPerformanceCard({
   href,
   ctaLabel,
 }: StudentOverallPerformanceCardProps) {
-  const performanceBand = PERFORMANCE_BAND_COPY[snapshot.overallPerformance.band];
+  const performanceBand =
+    PERFORMANCE_BAND_COPY[snapshot.overallPerformance.band];
 
   return (
     <Card id={id} className={id ? "scroll-mt-24" : undefined}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium">Overall Performance</CardTitle>
+        <CardTitle className="text-sm font-medium">
+          Overall Performance
+        </CardTitle>
         <Trophy className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="space-y-3">

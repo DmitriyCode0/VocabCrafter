@@ -153,7 +153,10 @@ function formatProgressValue(actual: number, target: number | null) {
   return `${formatNumber(actual, 0)} / ${formatNumber(target, 0)}`;
 }
 
-function formatPercentageProgressValue(actual: number | null, target: number | null) {
+function formatPercentageProgressValue(
+  actual: number | null,
+  target: number | null,
+) {
   if (target == null) {
     return formatPercentage(actual);
   }
@@ -201,7 +204,12 @@ export function TutorStudentMonthlyReportsWorkspace({
     setReportTitle(currentReport?.title ?? "");
     setPublishedContent(currentReport?.publishedContent ?? "");
     setTutorAddendum(currentReport?.tutorAddendum ?? "");
-  }, [currentReport?.id, currentReport?.publishedContent, currentReport?.title, currentReport?.tutorAddendum]);
+  }, [
+    currentReport?.id,
+    currentReport?.publishedContent,
+    currentReport?.title,
+    currentReport?.tutorAddendum,
+  ]);
 
   useEffect(() => {
     setReportLanguage(plan.reportLanguage);
@@ -229,7 +237,9 @@ export function TutorStudentMonthlyReportsWorkspace({
         throw new Error(data?.error || "Failed to update report language");
       }
 
-      toast.success(`Report language set to ${getReportLanguageLabel(nextLanguage)}`);
+      toast.success(
+        `Report language set to ${getReportLanguageLabel(nextLanguage)}`,
+      );
       router.refresh();
     } catch (error) {
       setReportLanguage(previousLanguage);
@@ -332,9 +342,9 @@ export function TutorStudentMonthlyReportsWorkspace({
               Current Plan
             </CardTitle>
             <CardDescription>
-              Monthly reports use the student&apos;s plan page as their source of
-              truth. Update goals and objectives there, then generate the report
-              from this page.
+              Monthly reports use the student&apos;s plan page as their source
+              of truth. Update goals and objectives there, then generate the
+              report from this page.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -381,7 +391,8 @@ export function TutorStudentMonthlyReportsWorkspace({
                 New words: {plan.monthlyNewMasteryWordsTarget ?? "n/a"}
               </Badge>
               <Badge variant="outline">
-                Avg score target: {formatPercentage(plan.monthlyAverageScoreTarget)}
+                Avg score target:{" "}
+                {formatPercentage(plan.monthlyAverageScoreTarget)}
               </Badge>
             </div>
 
@@ -418,8 +429,8 @@ export function TutorStudentMonthlyReportsWorkspace({
               Current Month Snapshot
             </CardTitle>
             <CardDescription>
-              {currentMonthLabel}. Use the current-month metrics and the saved plan
-              to create one published report for the student.
+              {currentMonthLabel}. Use the current-month metrics and the saved
+              plan to create one published report for the student.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -435,13 +446,20 @@ export function TutorStudentMonthlyReportsWorkspace({
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Completed quizzes</p>
+                <p className="text-xs text-muted-foreground">
+                  Completed quizzes
+                </p>
                 <p className="text-2xl font-semibold">
-                  {formatProgressValue(metrics.completedQuizzes, plan.monthlyQuizTarget)}
+                  {formatProgressValue(
+                    metrics.completedQuizzes,
+                    plan.monthlyQuizTarget,
+                  )}
                 </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Completed lessons</p>
+                <p className="text-xs text-muted-foreground">
+                  Completed lessons
+                </p>
                 <p className="text-2xl font-semibold">
                   {formatProgressValue(
                     metrics.completedLessons,
@@ -451,10 +469,14 @@ export function TutorStudentMonthlyReportsWorkspace({
               </div>
               <div className="rounded-lg border px-3 py-3">
                 <p className="text-xs text-muted-foreground">Total hours</p>
-                <p className="text-2xl font-semibold">{formatHours(metrics.totalHours)}</p>
+                <p className="text-2xl font-semibold">
+                  {formatHours(metrics.totalHours)}
+                </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">New mastery words</p>
+                <p className="text-xs text-muted-foreground">
+                  New mastery words
+                </p>
                 <p className="text-2xl font-semibold">
                   {formatProgressValue(
                     metrics.newMasteryWords,
@@ -468,10 +490,14 @@ export function TutorStudentMonthlyReportsWorkspace({
               </div>
               <div className="rounded-lg border px-3 py-3">
                 <p className="text-xs text-muted-foreground">Words practiced</p>
-                <p className="text-2xl font-semibold">{metrics.practicedWords}</p>
+                <p className="text-2xl font-semibold">
+                  {metrics.practicedWords}
+                </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Average quiz score</p>
+                <p className="text-xs text-muted-foreground">
+                  Average quiz score
+                </p>
                 <p className="text-2xl font-semibold">
                   {formatPercentageProgressValue(
                     metrics.averageScore,
@@ -517,7 +543,8 @@ export function TutorStudentMonthlyReportsWorkspace({
                 ) : null}
               </div>
               <p className="text-xs text-muted-foreground">
-                The selected language will be used the next time you generate or regenerate this monthly report.
+                The selected language will be used the next time you generate or
+                regenerate this monthly report.
               </p>
             </div>
 
@@ -534,7 +561,9 @@ export function TutorStudentMonthlyReportsWorkspace({
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    {currentReport ? "Regenerate Current Report" : "Generate Current Report"}
+                    {currentReport
+                      ? "Regenerate Current Report"
+                      : "Generate Current Report"}
                   </>
                 )}
               </Button>
@@ -559,15 +588,15 @@ export function TutorStudentMonthlyReportsWorkspace({
             Current Published Report
           </CardTitle>
           <CardDescription>
-            Edit the student-visible report after generation. The original AI draft
-            stays stored separately.
+            Edit the student-visible report after generation. The original AI
+            draft stays stored separately.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {!currentReport || !currentReport.publishedContent ? (
             <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-              No published report for {currentMonthLabel} yet. Update the plan if
-              needed, then generate one when you are ready.
+              No published report for {currentMonthLabel} yet. Update the plan
+              if needed, then generate one when you are ready.
             </div>
           ) : (
             <>
@@ -581,7 +610,9 @@ export function TutorStudentMonthlyReportsWorkspace({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="monthly-report-content">Published content</Label>
+                <Label htmlFor="monthly-report-content">
+                  Published content
+                </Label>
                 <Textarea
                   id="monthly-report-content"
                   value={publishedContent}
@@ -623,8 +654,8 @@ export function TutorStudentMonthlyReportsWorkspace({
         <CardHeader>
           <CardTitle className="text-base">Report History</CardTitle>
           <CardDescription>
-            Previous monthly reports for {studentName}. Published reports are visible
-            on the student&apos;s Feedback page.
+            Previous monthly reports for {studentName}. Published reports are
+            visible on the student&apos;s Feedback page.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -659,7 +690,10 @@ export function TutorStudentMonthlyReportsWorkspace({
 
                 <div className="flex flex-wrap gap-2 text-xs">
                   <Badge variant="outline">
-                    Report: {getReportLanguageLabel(report.goalsSnapshot.reportLanguage)}
+                    Report:{" "}
+                    {getReportLanguageLabel(
+                      report.goalsSnapshot.reportLanguage,
+                    )}
                   </Badge>
                   <Badge variant="outline">
                     Quizzes: {report.metricsSnapshot.completedQuizzes}
@@ -680,7 +714,8 @@ export function TutorStudentMonthlyReportsWorkspace({
                       : ""}
                   </Badge>
                   <Badge variant="outline">
-                    Avg score: {formatPercentageProgressValue(
+                    Avg score:{" "}
+                    {formatPercentageProgressValue(
                       report.metricsSnapshot.averageScore,
                       report.goalsSnapshot.monthlyAverageScoreTarget,
                     )}
@@ -690,13 +725,16 @@ export function TutorStudentMonthlyReportsWorkspace({
                   </Badge>
                   {report.goalsSnapshot.grammarTopicKeys.length > 0 ? (
                     <Badge variant="outline">
-                      Grammar topics: {report.goalsSnapshot.grammarTopicKeys.length}
+                      Grammar topics:{" "}
+                      {report.goalsSnapshot.grammarTopicKeys.length}
                     </Badge>
                   ) : null}
                 </div>
 
                 <p className="text-sm whitespace-pre-wrap text-muted-foreground">
-                  {report.publishedContent || report.generationError || "No published content."}
+                  {report.publishedContent ||
+                    report.generationError ||
+                    "No published content."}
                 </p>
               </div>
             ))

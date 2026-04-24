@@ -42,7 +42,8 @@ const EN_MESSAGES = {
     title: "Settings",
     description: "Manage your account settings and interface language.",
     profileTitle: "Profile",
-    profileDescription: "Update your personal information and study preferences.",
+    profileDescription:
+      "Update your personal information and study preferences.",
     fullNameLabel: "Full Name",
     fullNamePlaceholder: "Your full name",
     learningLanguageLabel: "Language You Are Learning",
@@ -216,10 +217,10 @@ const EN_MESSAGES = {
     },
     activityDescriptions: {
       mcq: "Answer multiple-choice questions with one correct option and three distractors.",
-      flashcards:
-        "Flip cards to memorize your terms and their meanings.",
+      flashcards: "Flip cards to memorize your terms and their meanings.",
       gap_fill: "Complete sentences with the correct vocabulary word.",
-      translation: "Translate sentences using the vocabulary you are practicing.",
+      translation:
+        "Translate sentences using the vocabulary you are practicing.",
       text_translation:
         "Translate a short text and receive one overall full-text score.",
       discussion:
@@ -342,8 +343,7 @@ const EN_MESSAGES = {
       yourAnswer: "Your answer",
       correctAnswer: "Correct",
       yourTranslation: "Your translation",
-      referenceTranslation: (language: string) =>
-        `Reference (${language}):`,
+      referenceTranslation: (language: string) => `Reference (${language}):`,
       sourceSentence: (language: string) => `Source sentence (${language})`,
       sourceText: (language: string) => `Source text (${language})`,
       yourTranslationTitle: "Your translation",
@@ -444,7 +444,8 @@ const EN_MESSAGES = {
       saveFailed: "Failed to save regenerated prompt",
     },
     flashcards: {
-      progress: (current: number, total: number) => `Card ${current} of ${total}`,
+      progress: (current: number, total: number) =>
+        `Card ${current} of ${total}`,
       remaining: (count: number) => `${count} remaining`,
       knowCount: (count: number) => `Know: ${count}`,
       learningCount: (count: number) => `Learning: ${count}`,
@@ -601,22 +602,19 @@ const EN_MESSAGES = {
           title: "TTS Requests",
           description:
             "This card counts the current month's tracked text-to-speech requests and summarizes their estimated cost.",
-          hint:
-            "Billing shows the split between text input tokens and audio output tokens.",
+          hint: "Billing shows the split between text input tokens and audio output tokens.",
         },
         trackedCost: {
           title: "Tracked Cost",
           description:
             "This combines the tracked text and TTS spend for the current month so you can see the platform's measured AI cost at a glance.",
-          hint:
-            "It only includes requests captured in ai_usage_events, not older legacy combined counters.",
+          hint: "It only includes requests captured in ai_usage_events, not older legacy combined counters.",
         },
         totalUsers: {
           title: "Total Users",
           description:
             "This is the current number of registered users across the platform.",
-          hint:
-            "Use the Users page to inspect roles, onboarding state, and account changes.",
+          hint: "Use the Users page to inspect roles, onboarding state, and account changes.",
         },
       },
     },
@@ -810,8 +808,7 @@ const EN_MESSAGES = {
       `${count} ${formatPluralizedCount("en", count, { one: "mastered word", other: "mastered words" })}`,
     grammarTopics: "Grammar Topics",
     passiveEvidence: "Passive Evidence",
-    passiveEvidenceDescription:
-      "words and phrases tracked as recognition only",
+    passiveEvidenceDescription: "words and phrases tracked as recognition only",
     equivalentWords: "Equivalent Words",
     equivalentWordsDescription:
       "level-adjusted recognition-weighted total used in passive-vocabulary estimates",
@@ -1104,8 +1101,7 @@ const EN_MESSAGES = {
       `${count} tracked requests in ${month}`,
     unallocatedCallsOld:
       "Older combined calls this month, excluded from the split estimates",
-    unallocatedCallsNone:
-      "No pre-tracking calls left unallocated this month",
+    unallocatedCallsNone: "No pre-tracking calls left unallocated this month",
     pricingBasisTitle: "Pricing Basis",
     pricingBasisDescription:
       "Official Google AI paid-tier pricing for the models currently used in this app",
@@ -1173,7 +1169,8 @@ const UK_MESSAGES: AppMessages = {
     title: "Налаштування",
     description: "Керуйте налаштуваннями акаунта та мовою інтерфейсу.",
     profileTitle: "Профіль",
-    profileDescription: "Оновіть особисту інформацію та навчальні налаштування.",
+    profileDescription:
+      "Оновіть особисту інформацію та навчальні налаштування.",
     fullNameLabel: "Повне ім'я",
     fullNamePlaceholder: "Ваше повне ім'я",
     learningLanguageLabel: "Мова, яку ви вивчаєте",
@@ -1350,7 +1347,8 @@ const UK_MESSAGES: AppMessages = {
       flashcards:
         "Перегортайте картки, щоб запам’ятовувати слова та їхні значення.",
       gap_fill: "Заповнюйте пропуски правильним словом із вашої лексики.",
-      translation: "Перекладайте речення, використовуючи лексику, яку ви вивчаєте.",
+      translation:
+        "Перекладайте речення, використовуючи лексику, яку ви вивчаєте.",
       text_translation:
         "Перекладіть короткий текст і отримайте одну загальну оцінку за весь уривок.",
       discussion:
@@ -1390,8 +1388,7 @@ const UK_MESSAGES: AppMessages = {
       parseFailed: "Не вдалося розпізнати слова",
       attachLimitError: (max: number) =>
         `Можна додати не більше ${max} скриншотів.`,
-      invalidImageTypeError:
-        "Підтримуються лише скриншоти PNG, JPEG і WEBP.",
+      invalidImageTypeError: "Підтримуються лише скриншоти PNG, JPEG і WEBP.",
       screenshotSizeError: (sizeMb: number) =>
         `Кожен скриншот має бути не більшим за ${sizeMb} МБ.`,
       screenshotReadError: "Не вдалося прочитати скриншот",
@@ -1458,7 +1455,8 @@ const UK_MESSAGES: AppMessages = {
       description: (known: number, total: number, percentage: number) =>
         `Ви знали ${known} із ${total} слів (${percentage}%).`,
       encouragementHigh: "Чудова робота! Ви знаєте більшість цих слів.",
-      encouragementMedium: "Хороший прогрес! Продовжуйте практикуватися, щоб покращити результат.",
+      encouragementMedium:
+        "Хороший прогрес! Продовжуйте практикуватися, щоб покращити результат.",
       encouragementLow: "Продовжуйте вчитися! Практика дає результат.",
     },
     discussionResult: {
@@ -1535,8 +1533,7 @@ const UK_MESSAGES: AppMessages = {
       submit: "Надіслати переклад",
       showTranslation: "Показати переклад (0/100)",
       retryEvaluation: "Спробувати оцінити ще раз",
-      evaluationFailed:
-        "Не вдалося оцінити ваш переклад. Спробуйте ще раз.",
+      evaluationFailed: "Не вдалося оцінити ваш переклад. Спробуйте ще раз.",
       referenceTranslation: (language: string) =>
         `Еталонний переклад (${language}):`,
       hideLearningNote: "Сховати навчальну нотатку",
@@ -1555,8 +1552,7 @@ const UK_MESSAGES: AppMessages = {
       evaluating: "Оцінюємо...",
       submit: "Надіслати переклад",
       retryEvaluation: "Спробувати оцінити ще раз",
-      evaluationFailed:
-        "Не вдалося оцінити ваш переклад. Спробуйте ще раз.",
+      evaluationFailed: "Не вдалося оцінити ваш переклад. Спробуйте ще раз.",
       referenceTranslation: (language: string) =>
         `Еталонний переклад (${language}):`,
       viewResults: "Переглянути результати",
@@ -1581,12 +1577,14 @@ const UK_MESSAGES: AppMessages = {
       saveFailed: "Не вдалося зберегти повторно згенерований промпт",
     },
     flashcards: {
-      progress: (current: number, total: number) => `Картка ${current} з ${total}`,
+      progress: (current: number, total: number) =>
+        `Картка ${current} з ${total}`,
       remaining: (count: number) => `Залишилося ${count}`,
       knowCount: (count: number) => `Знаю: ${count}`,
       learningCount: (count: number) => `Вивчаю: ${count}`,
       frontAria: "Лицьова сторона картки. Натисніть, щоб побачити переклад.",
-      backAria: "Зворотна сторона картки. Натисніть, щоб повернутися на лицьову.",
+      backAria:
+        "Зворотна сторона картки. Натисніть, щоб повернутися на лицьову.",
       stillLearning: "Ще вивчаю",
       knowIt: "Знаю",
       flipCard: "Перевернути картку",
@@ -1606,22 +1604,21 @@ const UK_MESSAGES: AppMessages = {
         "Практикуйте лексику, проходьте вікторини та відстежуйте свій прогрес.",
       tutor:
         "Керуйте своїми класами, призначайте вікторини та перевіряйте роботу студентів.",
-      superadmin:
-        "Відстежуйте аналітику платформи та керуйте користувачами.",
+      superadmin: "Відстежуйте аналітику платформи та керуйте користувачами.",
     },
     student: {
       newQuizTitle: "Нова вікторина",
       newQuizDescription: "Згенерувати нову вікторину за допомогою AI",
       createQuizButton: "Створити вікторину",
       reviewTitle: "Повторення",
-      reviewDescription: "Практикуйте слова, що вже час повторити, та найскладніші для вас слова",
+      reviewDescription:
+        "Практикуйте слова, що вже час повторити, та найскладніші для вас слова",
       startReviewButton: "Почати повторення",
       passiveTitle: "Додати пасивне розпізнавання",
       passiveDescription: "Імпортуйте слова з тексту, який ви вже розумієте",
       passiveButton: "Додати пасивне розпізнавання",
       quizzesCreatedTitle: "Створено вікторин",
-      remainingThisMonth: (count: number) =>
-        `Цього місяця залишилося ${count}`,
+      remainingThisMonth: (count: number) => `Цього місяця залишилося ${count}`,
       unlimited: "Без ліміту",
       dayStreakTitle: "Серія днів",
       consecutiveDays: (count: number) =>
@@ -1650,14 +1647,12 @@ const UK_MESSAGES: AppMessages = {
       enrolledStudents: "під’єднаних студентів",
       viewStudentsButton: "Переглянути студентів",
       quizzesCreatedTitle: "Створено вікторин",
-      remainingThisMonth: (count: number) =>
-        `Цього місяця залишилося ${count}`,
+      remainingThisMonth: (count: number) => `Цього місяця залишилося ${count}`,
       unlimited: "Без ліміту",
     },
     admin: {
       quizzesCreatedTitle: "Створено вікторин",
-      createdThisMonth: (count: number) =>
-        `Цього місяця створено ${count}`,
+      createdThisMonth: (count: number) => `Цього місяця створено ${count}`,
       textRequestsTitle: "Текстові запити",
       trackedInMonth: (month: string) => `відстежено у ${month}`,
       ttsRequestsTitle: "Запити TTS",
@@ -1732,36 +1727,31 @@ const UK_MESSAGES: AppMessages = {
           title: "Створено вікторин",
           description:
             "Ця загальна цифра показує всі вікторини, які будь-коли були створені на платформі, а допоміжний текст нижче - скільки створено цього місяця.",
-          hint:
-            "Відкрийте Аналітику, якщо потрібен розподіл по окремих авторах.",
+          hint: "Відкрийте Аналітику, якщо потрібен розподіл по окремих авторах.",
         },
         textRequests: {
           title: "Текстові запити",
           description:
             "Тут показано відстежені текстові запити за поточний місяць на основі тих самих даних використання Gemini та правил ціноутворення, що й у Billing.",
-          hint:
-            "Відкрийте Billing, щоб переглянути кількість токенів і детальну модель ціноутворення.",
+          hint: "Відкрийте Billing, щоб переглянути кількість токенів і детальну модель ціноутворення.",
         },
         ttsRequests: {
           title: "Запити TTS",
           description:
             "Ця картка показує кількість відстежених запитів text-to-speech за поточний місяць і їхню орієнтовну вартість.",
-          hint:
-            "У Billing видно розподіл між текстовими токенами та токенами аудіовиходу.",
+          hint: "У Billing видно розподіл між текстовими токенами та токенами аудіовиходу.",
         },
         trackedCost: {
           title: "Відстежена вартість",
           description:
             "Тут сумується відстежена вартість текстових запитів і TTS за поточний місяць, щоб ви бачили реальні AI-витрати платформи одним поглядом.",
-          hint:
-            "Сюди входять лише запити, записані в ai_usage_events, а не старі комбіновані лічильники.",
+          hint: "Сюди входять лише запити, записані в ai_usage_events, а не старі комбіновані лічильники.",
         },
         totalUsers: {
           title: "Усього користувачів",
           description:
             "Це поточна кількість зареєстрованих користувачів на платформі.",
-          hint:
-            "На сторінці Користувачі можна перевірити ролі, стан онбордингу та зміни акаунтів.",
+          hint: "На сторінці Користувачі можна перевірити ролі, стан онбордингу та зміни акаунтів.",
         },
       },
     },
@@ -1885,7 +1875,8 @@ const UK_MESSAGES: AppMessages = {
     },
     translationResults: {
       title: "Відповіді на переклад",
-      currentOverall: (score: number) => `Поточна загальна оцінка: ${score}/100`,
+      currentOverall: (score: number) =>
+        `Поточна загальна оцінка: ${score}/100`,
       itemLabel: "Елемент перекладу",
       save: "Зберегти",
       saving: "Збереження...",
@@ -2211,8 +2202,7 @@ const UK_MESSAGES: AppMessages = {
     paidBadge: (price: number) => `$${price}/міс`,
     freePlanDescription:
       "Ви користуєтеся безкоштовним тарифом - усі основні можливості вже доступні.",
-    subscribedDescription: (plan: string) =>
-      `У вас активний тариф ${plan}.`,
+    subscribedDescription: (plan: string) => `У вас активний тариф ${plan}.`,
     usageTitles: {
       aiCalls: "AI-запити",
       quizzesCreated: "Створені вікторини",

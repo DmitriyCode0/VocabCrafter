@@ -327,7 +327,9 @@ const AttemptCard = React.memo(function AttemptCard({
               onGapFillResultSaved={(result) =>
                 onGapFillResultSaved(attempt.id, result)
               }
-              onTimeSpentSaved={(result) => onTimeSpentSaved(attempt.id, result)}
+              onTimeSpentSaved={(result) =>
+                onTimeSpentSaved(attempt.id, result)
+              }
             />
           </div>
         )}

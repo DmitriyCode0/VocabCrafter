@@ -69,21 +69,23 @@ export async function getTutorStudentMonthlyActivity(
   const startDate = addDays(today, -29);
   const endExclusive = addDays(today, 1);
 
-  const [{ data: attemptsResult }, { data: lessonsResult }] = await Promise.all([
-    supabaseAdmin
-      .from("quiz_attempts")
-      .select("completed_at")
-      .eq("student_id", studentId)
-      .gte("completed_at", `${toIsoDate(startDate)}T00:00:00`)
-      .lt("completed_at", `${toIsoDate(endExclusive)}T00:00:00`),
-    supabaseAdmin
-      .from("tutor_student_lessons")
-      .select("lesson_date")
-      .eq("student_id", studentId)
-      .eq("status", "completed")
-      .gte("lesson_date", toIsoDate(startDate))
-      .lte("lesson_date", toIsoDate(today)),
-  ]);
+  const [{ data: attemptsResult }, { data: lessonsResult }] = await Promise.all(
+    [
+      supabaseAdmin
+        .from("quiz_attempts")
+        .select("completed_at")
+        .eq("student_id", studentId)
+        .gte("completed_at", `${toIsoDate(startDate)}T00:00:00`)
+        .lt("completed_at", `${toIsoDate(endExclusive)}T00:00:00`),
+      supabaseAdmin
+        .from("tutor_student_lessons")
+        .select("lesson_date")
+        .eq("student_id", studentId)
+        .eq("status", "completed")
+        .gte("lesson_date", toIsoDate(startDate))
+        .lte("lesson_date", toIsoDate(today)),
+    ],
+  );
 
   const quizCounts = new Map<string, number>();
   const lessonCounts = new Map<string, number>();

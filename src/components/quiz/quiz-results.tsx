@@ -157,7 +157,8 @@ export function QuizResults({
                 <div className="text-sm">
                   <p className="mb-1 font-medium">{result.question}</p>
                   <p>
-                    {messages.quizSession.results.yourAnswer}: <strong>{result.selectedAnswer || "—"}</strong>
+                    {messages.quizSession.results.yourAnswer}:{" "}
+                    <strong>{result.selectedAnswer || "—"}</strong>
                   </p>
                   {!result.isCorrect ? (
                     <p className="text-muted-foreground">

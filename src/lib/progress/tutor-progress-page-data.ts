@@ -49,22 +49,25 @@ export async function getTutorProgressPageData(
   }
 
   const appLanguage = normalizeAppLanguage(profile.app_language);
-  const students = role === "tutor" ? await fetchConnectedStudents(user.id) : [];
+  const students =
+    role === "tutor" ? await fetchConnectedStudents(user.id) : [];
   const activeStudentId =
     role === "tutor"
-      ? students.find((student) => student.id === requestedStudentId)?.id ??
+      ? (students.find((student) => student.id === requestedStudentId)?.id ??
         students[0]?.id ??
-        null
-      : requestedStudentId ?? null;
+        null)
+      : (requestedStudentId ?? null);
   const studentProfile = activeStudentId
     ? role === "tutor"
-      ? students.find((student) => student.id === activeStudentId) ?? null
+      ? (students.find((student) => student.id === activeStudentId) ?? null)
       : await supabase
           .from("profiles")
           .select("id, full_name, email, avatar_url, cefr_level")
           .eq("id", activeStudentId)
           .single()
-          .then((result) => (result.error ? null : (result.data as HistoryStudent)))
+          .then((result) =>
+            result.error ? null : (result.data as HistoryStudent),
+          )
     : null;
 
   return {

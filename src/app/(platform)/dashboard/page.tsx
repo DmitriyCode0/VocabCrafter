@@ -327,21 +327,19 @@ async function TutorDashboard({
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  const [
-    { count: monthlyQuizCount },
-    { data: connections },
-  ] = await Promise.all([
-    supabase
-      .from("quizzes")
-      .select("*", { count: "exact", head: true })
-      .eq("creator_id", userId)
-      .gte("created_at", monthStart.toISOString()),
-    supabaseAdmin
-      .from("tutor_students")
-      .select("student_id")
-      .eq("tutor_id", userId)
-      .eq("status", "active"),
-  ]);
+  const [{ count: monthlyQuizCount }, { data: connections }] =
+    await Promise.all([
+      supabase
+        .from("quizzes")
+        .select("*", { count: "exact", head: true })
+        .eq("creator_id", userId)
+        .gte("created_at", monthStart.toISOString()),
+      supabaseAdmin
+        .from("tutor_students")
+        .select("student_id")
+        .eq("tutor_id", userId)
+        .eq("status", "active"),
+    ]);
 
   const connectedStudentIds = Array.from(
     new Set(
@@ -607,7 +605,8 @@ async function AdminDashboard({
                 {textRequestCount.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                {formatApproxUsd(textCost)} {messages.dashboard.admin.trackedInMonth(monthLabel)}
+                {formatApproxUsd(textCost)}{" "}
+                {messages.dashboard.admin.trackedInMonth(monthLabel)}
               </p>
             </CardContent>
           </Card>
@@ -626,7 +625,8 @@ async function AdminDashboard({
                 {ttsRequestCount.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                {formatApproxUsd(ttsCost)} {messages.dashboard.admin.trackedInMonth(monthLabel)}
+                {formatApproxUsd(ttsCost)}{" "}
+                {messages.dashboard.admin.trackedInMonth(monthLabel)}
               </p>
             </CardContent>
           </Card>

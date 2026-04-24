@@ -133,8 +133,9 @@ function normalizePlanShape(input: {
     monthlyCompletedLessonsTarget: normalizeNullableNumber(
       input.monthly_completed_lessons_target,
     ),
-    monthlyNewMasteryWordsTarget:
-      normalizeNullableNumber(input.monthly_new_mastery_words_target),
+    monthlyNewMasteryWordsTarget: normalizeNullableNumber(
+      input.monthly_new_mastery_words_target,
+    ),
     monthlyAverageScoreTarget: normalizeNullableNumber(
       input.monthly_average_score_target,
     ),
@@ -146,13 +147,13 @@ function normalizePlanShape(input: {
 export function hasConfiguredTutorStudentPlan(plan: TutorStudentPlan) {
   return Boolean(
     plan.planTitle ||
-      plan.goalSummary ||
-      plan.objectives.length > 0 ||
-      plan.grammarTopicKeys.length > 0 ||
-      plan.monthlyQuizTarget != null ||
-      plan.monthlyCompletedLessonsTarget != null ||
-      plan.monthlyNewMasteryWordsTarget != null ||
-      plan.monthlyAverageScoreTarget != null,
+    plan.goalSummary ||
+    plan.objectives.length > 0 ||
+    plan.grammarTopicKeys.length > 0 ||
+    plan.monthlyQuizTarget != null ||
+    plan.monthlyCompletedLessonsTarget != null ||
+    plan.monthlyNewMasteryWordsTarget != null ||
+    plan.monthlyAverageScoreTarget != null,
   );
 }
 
@@ -205,12 +206,12 @@ export async function updateTutorStudentPlan(
           ? undefined
           : normalizeText(parsed.goalSummary),
       objectives:
-        parsed.objectives == null ? undefined : normalizeObjectives(parsed.objectives),
+        parsed.objectives == null
+          ? undefined
+          : normalizeObjectives(parsed.objectives),
       monthly_quiz_target: parsed.monthlyQuizTarget,
-      monthly_completed_lessons_target:
-        parsed.monthlyCompletedLessonsTarget,
-      monthly_new_mastery_words_target:
-        parsed.monthlyNewMasteryWordsTarget,
+      monthly_completed_lessons_target: parsed.monthlyCompletedLessonsTarget,
+      monthly_new_mastery_words_target: parsed.monthlyNewMasteryWordsTarget,
       monthly_average_score_target: parsed.monthlyAverageScoreTarget,
       grammar_topic_keys:
         parsed.grammarTopicKeys == null

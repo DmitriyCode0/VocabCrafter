@@ -81,13 +81,14 @@ export function AttemptDetail({
     typeof attempt.time_spent_seconds === "number"
       ? attempt.time_spent_seconds
       : 0;
-  const timeEditor = canEditTimeSpent && attemptId ? (
-    <EditableAttemptTime
-      attemptId={attemptId}
-      initialTimeSpentSeconds={timeSpentSeconds}
-      onTimeSaved={onTimeSpentSaved}
-    />
-  ) : null;
+  const timeEditor =
+    canEditTimeSpent && attemptId ? (
+      <EditableAttemptTime
+        attemptId={attemptId}
+        initialTimeSpentSeconds={timeSpentSeconds}
+        onTimeSaved={onTimeSpentSaved}
+      />
+    ) : null;
   const detailContent = (() => {
     if (!rawAnswers) {
       return (
@@ -139,7 +140,9 @@ export function AttemptDetail({
     }
 
     if (quizType === "matching") {
-      return <MatchingDetail results={results as unknown as MatchingResult[]} />;
+      return (
+        <MatchingDetail results={results as unknown as MatchingResult[]} />
+      );
     }
 
     return (
@@ -152,7 +155,12 @@ export function AttemptDetail({
     );
   })();
 
-  return <div className="space-y-4">{timeEditor}{detailContent}</div>;
+  return (
+    <div className="space-y-4">
+      {timeEditor}
+      {detailContent}
+    </div>
+  );
 }
 
 function GapFillDetail({ results }: { results: GapFillResult[] }) {

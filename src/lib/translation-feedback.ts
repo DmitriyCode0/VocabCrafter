@@ -8,8 +8,7 @@ export const TRANSLATION_FEEDBACK_KEYS = [
   "naturalness",
 ] as const;
 
-export type TranslationFeedbackKey =
-  (typeof TRANSLATION_FEEDBACK_KEYS)[number];
+export type TranslationFeedbackKey = (typeof TRANSLATION_FEEDBACK_KEYS)[number];
 
 export interface TranslationFeedbackMetric {
   key: TranslationFeedbackKey;
@@ -138,7 +137,10 @@ export function parseTranslationFeedback(
     return [];
   }
 
-  const metricMap = new Map<TranslationFeedbackKey, TranslationFeedbackMetric>();
+  const metricMap = new Map<
+    TranslationFeedbackKey,
+    TranslationFeedbackMetric
+  >();
 
   for (const [index, match] of matches.entries()) {
     const symbol = match[1];
@@ -146,7 +148,8 @@ export function parseTranslationFeedback(
     const startIndex = match.index ?? 0;
     const contentStartIndex = startIndex + match[0].length;
     const contentEndIndex = matches[index + 1]?.index ?? cleanedFeedback.length;
-    const key = LEGACY_LABEL_TO_KEY[normalizeWhitespace(rawLabel).toLowerCase()];
+    const key =
+      LEGACY_LABEL_TO_KEY[normalizeWhitespace(rawLabel).toLowerCase()];
 
     if (!key) {
       continue;

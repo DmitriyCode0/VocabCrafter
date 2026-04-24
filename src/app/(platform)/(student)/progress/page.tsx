@@ -14,11 +14,7 @@ import { StudentProgressInsights } from "@/components/progress/student-progress-
 import { StudentResultsSummary } from "@/components/progress/student-results-summary";
 import { StudentProgressOverviewCards } from "@/components/progress/student-progress-overview-cards";
 import { TutorProgressPageHeader } from "@/components/progress/tutor-progress-page-header";
-import {
-  TrendingUp,
-  BookOpen,
-  PlusCircle,
-} from "lucide-react";
+import { TrendingUp, BookOpen, PlusCircle } from "lucide-react";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAppMessages } from "@/lib/i18n/messages";
 import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";

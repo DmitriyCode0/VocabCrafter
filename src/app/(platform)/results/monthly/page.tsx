@@ -61,7 +61,8 @@ export default async function MonthlyResultsPage({
           <CardContent className="text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <Trophy className="h-4 w-4" />
-              Progress is student-specific, so this page always shows one learner at a time.
+              Progress is student-specific, so this page always shows one
+              learner at a time.
             </div>
           </CardContent>
         </Card>

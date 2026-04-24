@@ -160,7 +160,9 @@ export function EditableTranslationResults({
           {messages.reviewDetail.translationResults.title}
         </h3>
         <Badge variant="outline">
-          {messages.reviewDetail.translationResults.currentOverall(overallScore)}
+          {messages.reviewDetail.translationResults.currentOverall(
+            overallScore,
+          )}
         </Badge>
       </div>
 
@@ -231,7 +233,9 @@ export function EditableTranslationResults({
 
               {result.userTranslation && (
                 <TranslationSection
-                  label={messages.reviewDetail.translationResults.studentResponse}
+                  label={
+                    messages.reviewDetail.translationResults.studentResponse
+                  }
                   tone="student"
                   content={<em>{result.userTranslation}</em>}
                 />
@@ -239,7 +243,9 @@ export function EditableTranslationResults({
 
               {result.referenceTranslation && (
                 <TranslationSection
-                  label={messages.reviewDetail.translationResults.referenceAnswer}
+                  label={
+                    messages.reviewDetail.translationResults.referenceAnswer
+                  }
                   tone="reference"
                   content={<em>{result.referenceTranslation}</em>}
                 />

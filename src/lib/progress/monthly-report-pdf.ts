@@ -3,12 +3,7 @@ import "server-only";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import fontkit from "@pdf-lib/fontkit";
-import {
-  PDFDocument,
-  rgb,
-  type PDFFont,
-  type PDFPage,
-} from "pdf-lib";
+import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import {
   getReportLanguageLabel,
   normalizeReportLanguage,
@@ -278,7 +273,12 @@ function formatMetricProgressValue(
   return `${actualValue} / ${formatter(target)}`;
 }
 
-function wrapLine(text: string, width: number, font: PDFFont, fontSize: number) {
+function wrapLine(
+  text: string,
+  width: number,
+  font: PDFFont,
+  fontSize: number,
+) {
   const words = text.split(/\s+/).filter(Boolean);
 
   if (words.length === 0) {
@@ -355,7 +355,9 @@ export async function buildMonthlyReportPdf({
   const boldFont = await pdf.embedFont(boldFontBytes);
   const italicFont = await pdf.embedFont(italicFontBytes);
   const pages: PDFPage[] = [];
-  const reportLanguage = normalizeReportLanguage(report.goalsSnapshot.reportLanguage);
+  const reportLanguage = normalizeReportLanguage(
+    report.goalsSnapshot.reportLanguage,
+  );
   const copy = PDF_COPY[reportLanguage];
   const monthLabel = formatMonthlyReportMonthLabel(report.reportMonth, locale);
   const publishedAtLabel = new Intl.DateTimeFormat(locale, {
@@ -571,7 +573,10 @@ export async function buildMonthlyReportPdf({
         ),
       },
       { label: copy.activeDays, value: `${report.metricsSnapshot.activeDays}` },
-      { label: copy.practicedWords, value: `${report.metricsSnapshot.practicedWords}` },
+      {
+        label: copy.practicedWords,
+        value: `${report.metricsSnapshot.practicedWords}`,
+      },
       {
         label: copy.averageScore,
         value: formatMetricProgressValue(
@@ -711,11 +716,11 @@ export async function buildMonthlyReportPdf({
   }
 
   drawWrappedText(copy.grammarTopics, PAGE_MARGIN, CONTENT_WIDTH, {
-      font: boldFont,
-      fontSize: 11,
-      color: MUTED_TEXT,
-      afterGap: 2,
-    });
+    font: boldFont,
+    fontSize: 11,
+    color: MUTED_TEXT,
+    afterGap: 2,
+  });
   if (report.goalsSnapshot.grammarTopicKeys.length > 0) {
     drawBulletItems(report.goalsSnapshot.grammarTopicKeys);
   } else {

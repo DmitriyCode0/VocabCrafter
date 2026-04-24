@@ -17,7 +17,10 @@ async function requireTutorAccess(studentId: string) {
 
   if (!user) {
     return {
-      errorResponse: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      errorResponse: NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      ),
     };
   }
 
@@ -36,7 +39,11 @@ async function requireTutorAccess(studentId: string) {
     };
   }
 
-  const hasAccess = await tutorHasStudentAccess(supabaseAdmin, user.id, studentId);
+  const hasAccess = await tutorHasStudentAccess(
+    supabaseAdmin,
+    user.id,
+    studentId,
+  );
 
   if (!hasAccess) {
     return {

@@ -23,7 +23,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { BookOpen, Target, UserPlus, Users, Loader2, Trash2 } from "lucide-react";
+import {
+  BookOpen,
+  Target,
+  UserPlus,
+  Users,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 import { formatAppDate } from "@/lib/dates";
 
 interface TutorProfile {

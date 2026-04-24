@@ -75,7 +75,8 @@ export function StudentResultsSummary({
             </div>
             <p className="text-xs text-muted-foreground">
               {snapshot.overview.totalAttempts} timed activity attempt
-              {snapshot.overview.totalAttempts === 1 ? "" : "s"} saved in the app
+              {snapshot.overview.totalAttempts === 1 ? "" : "s"} saved in the
+              app
             </p>
           </CardContent>
         </Card>
@@ -93,7 +94,8 @@ export function StudentResultsSummary({
             </div>
             <p className="text-xs text-muted-foreground">
               {snapshot.timeMetrics.completedLessons} completed lesson
-              {snapshot.timeMetrics.completedLessons === 1 ? "" : "s"} at 1 hour each
+              {snapshot.timeMetrics.completedLessons === 1 ? "" : "s"} at 1 hour
+              each
             </p>
           </CardContent>
         </Card>
@@ -126,7 +128,8 @@ export function StudentResultsSummary({
           <CardHeader>
             <CardTitle className="text-base">Performance Breakdown</CardTitle>
             <CardDescription>
-              This score blends time, grammar coverage, mastered words, and total tracked vocabulary.
+              This score blends time, grammar coverage, mastered words, and
+              total tracked vocabulary.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -146,10 +149,14 @@ export function StudentResultsSummary({
                 <Target className="mt-0.5 h-4 w-4 text-primary" />
                 <div className="space-y-1">
                   <p className="font-medium text-foreground">
-                    Current target: {snapshot.cefrGuidedHours.currentLevel.level}
+                    Current target:{" "}
+                    {snapshot.cefrGuidedHours.currentLevel.level}
                   </p>
                   <p>
-                    Around {snapshot.cefrGuidedHours.currentLevel.averageHours} guided hours on average, with about {snapshot.cefrGuidedHours.currentLevel.remainingHours} h still to log from the tracked total.
+                    Around {snapshot.cefrGuidedHours.currentLevel.averageHours}{" "}
+                    guided hours on average, with about{" "}
+                    {snapshot.cefrGuidedHours.currentLevel.remainingHours} h
+                    still to log from the tracked total.
                   </p>
                 </div>
               </div>
@@ -161,7 +168,8 @@ export function StudentResultsSummary({
           <CardHeader>
             <CardTitle className="text-base">CEFR Guided Hours</CardTitle>
             <CardDescription>
-              Approximate cumulative guided hours from beginner level based on Cambridge English guidance.
+              Approximate cumulative guided hours from beginner level based on
+              Cambridge English guidance.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -206,7 +214,10 @@ export function StudentResultsSummary({
                 <div className="space-y-1">
                   <p>{snapshot.cefrGuidedHours.source}</p>
                   <p>
-                    Cambridge English also notes that moving from one CEFR band to the next often takes roughly 200 guided hours, but real progress depends on study intensity, previous exposure, and learning outside lessons.
+                    Cambridge English also notes that moving from one CEFR band
+                    to the next often takes roughly 200 guided hours, but real
+                    progress depends on study intensity, previous exposure, and
+                    learning outside lessons.
                   </p>
                 </div>
               </div>

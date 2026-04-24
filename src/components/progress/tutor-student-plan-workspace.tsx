@@ -32,9 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  type ReportLanguage,
-} from "@/lib/progress/monthly-report-language";
+import { type ReportLanguage } from "@/lib/progress/monthly-report-language";
 
 interface TutorStudentPlan {
   planTitle: string | null;
@@ -101,7 +99,9 @@ function parseNullablePercentage(value: string) {
   const parsed = Number(normalized);
 
   if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
-    throw new Error("Average score target must be between 0 and 100 or left empty.");
+    throw new Error(
+      "Average score target must be between 0 and 100 or left empty.",
+    );
   }
 
   return parsed;
@@ -149,7 +149,9 @@ export function TutorStudentPlanWorkspace({
   const [averageScoreTarget, setAverageScoreTarget] = useState(
     plan.monthlyAverageScoreTarget?.toString() ?? "",
   );
-  const [grammarTopicKeys, setGrammarTopicKeys] = useState(plan.grammarTopicKeys);
+  const [grammarTopicKeys, setGrammarTopicKeys] = useState(
+    plan.grammarTopicKeys,
+  );
   const [selectedGrammarTopic, setSelectedGrammarTopic] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const grammarTopicMap = new Map(
@@ -157,7 +159,10 @@ export function TutorStudentPlanWorkspace({
   );
 
   function handleAddGrammarTopic() {
-    if (!selectedGrammarTopic || grammarTopicKeys.includes(selectedGrammarTopic)) {
+    if (
+      !selectedGrammarTopic ||
+      grammarTopicKeys.includes(selectedGrammarTopic)
+    ) {
       return;
     }
 
@@ -166,7 +171,9 @@ export function TutorStudentPlanWorkspace({
   }
 
   function handleRemoveGrammarTopic(topicKey: string) {
-    setGrammarTopicKeys((current) => current.filter((item) => item !== topicKey));
+    setGrammarTopicKeys((current) =>
+      current.filter((item) => item !== topicKey),
+    );
   }
 
   async function handleSavePlan() {
@@ -183,7 +190,8 @@ export function TutorStudentPlanWorkspace({
           monthlyQuizTarget: parseNullableWholeNumber(quizTarget),
           monthlyCompletedLessonsTarget: parseNullableWholeNumber(lessonTarget),
           monthlyNewMasteryWordsTarget: parseNullableWholeNumber(wordTarget),
-          monthlyAverageScoreTarget: parseNullablePercentage(averageScoreTarget),
+          monthlyAverageScoreTarget:
+            parseNullablePercentage(averageScoreTarget),
           grammarTopicKeys,
         }),
       });
@@ -217,8 +225,8 @@ export function TutorStudentPlanWorkspace({
               Learning Plan
             </CardTitle>
             <CardDescription>
-              Define the goals and objectives that monthly reports should pull from
-              automatically.
+              Define the goals and objectives that monthly reports should pull
+              from automatically.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -250,19 +258,28 @@ export function TutorStudentPlanWorkspace({
                 rows={6}
                 value={objectives}
                 onChange={(event) => setObjectives(event.target.value)}
-                placeholder={"Write one objective per line, for example:\nComplete two quiz sessions each week\nReview weak translation answers within 24 hours\nAdd and practice new topic vocabulary after each lesson"}
+                placeholder={
+                  "Write one objective per line, for example:\nComplete two quiz sessions each week\nReview weak translation answers within 24 hours\nAdd and practice new topic vocabulary after each lesson"
+                }
               />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
               <div className="space-y-2">
-                <Label htmlFor="student-plan-grammar-topics">Grammar topics</Label>
+                <Label htmlFor="student-plan-grammar-topics">
+                  Grammar topics
+                </Label>
                 <Select
                   value={selectedGrammarTopic}
                   onValueChange={setSelectedGrammarTopic}
                 >
-                  <SelectTrigger id="student-plan-grammar-topics" className="w-full">
-                    <SelectValue placeholder={`Select ${targetLanguageLabel} grammar focus`} />
+                  <SelectTrigger
+                    id="student-plan-grammar-topics"
+                    className="w-full"
+                  >
+                    <SelectValue
+                      placeholder={`Select ${targetLanguageLabel} grammar focus`}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {availableGrammarTopics.map((topic) => (
@@ -279,7 +296,8 @@ export function TutorStudentPlanWorkspace({
                 variant="outline"
                 onClick={handleAddGrammarTopic}
                 disabled={
-                  !selectedGrammarTopic || grammarTopicKeys.includes(selectedGrammarTopic)
+                  !selectedGrammarTopic ||
+                  grammarTopicKeys.includes(selectedGrammarTopic)
                 }
               >
                 <Plus className="mr-2 h-4 w-4" />
@@ -323,8 +341,8 @@ export function TutorStudentPlanWorkspace({
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                Selected topics are included in the generated monthly report prompt
-                and the saved plan snapshot.
+                Selected topics are included in the generated monthly report
+                prompt and the saved plan snapshot.
               </p>
             </div>
 
@@ -341,7 +359,9 @@ export function TutorStudentPlanWorkspace({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="plan-lesson-target">Monthly lesson target</Label>
+                <Label htmlFor="plan-lesson-target">
+                  Monthly lesson target
+                </Label>
                 <Input
                   id="plan-lesson-target"
                   inputMode="numeric"
@@ -352,7 +372,9 @@ export function TutorStudentPlanWorkspace({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="plan-word-target">Monthly new-word target</Label>
+                <Label htmlFor="plan-word-target">
+                  Monthly new-word target
+                </Label>
                 <Input
                   id="plan-word-target"
                   inputMode="numeric"
@@ -371,7 +393,9 @@ export function TutorStudentPlanWorkspace({
                   inputMode="decimal"
                   placeholder="e.g. 85"
                   value={averageScoreTarget}
-                  onChange={(event) => setAverageScoreTarget(event.target.value)}
+                  onChange={(event) =>
+                    setAverageScoreTarget(event.target.value)
+                  }
                 />
               </div>
             </div>
@@ -399,8 +423,9 @@ export function TutorStudentPlanWorkspace({
               Current Month Context
             </CardTitle>
             <CardDescription>
-              Use {currentMonthLabel} progress to set realistic goals. The reports
-              page snapshots this plan when a monthly report is generated.
+              Use {currentMonthLabel} progress to set realistic goals. The
+              reports page snapshots this plan when a monthly report is
+              generated.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -427,21 +452,33 @@ export function TutorStudentPlanWorkspace({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Completed lessons</p>
-                <p className="text-2xl font-semibold">{metrics.completedLessons}</p>
+                <p className="text-xs text-muted-foreground">
+                  Completed lessons
+                </p>
+                <p className="text-2xl font-semibold">
+                  {metrics.completedLessons}
+                </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
                 <p className="text-xs text-muted-foreground">Words practiced</p>
-                <p className="text-2xl font-semibold">{metrics.practicedWords}</p>
+                <p className="text-2xl font-semibold">
+                  {metrics.practicedWords}
+                </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
                 <p className="text-xs text-muted-foreground">Tracked words</p>
-                <p className="text-2xl font-semibold">{metrics.trackedWordsTotal}</p>
+                <p className="text-2xl font-semibold">
+                  {metrics.trackedWordsTotal}
+                </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Average quiz score</p>
+                <p className="text-xs text-muted-foreground">
+                  Average quiz score
+                </p>
                 <p className="text-2xl font-semibold">
-                  {metrics.averageScore == null ? "n/a" : `${metrics.averageScore}%`}
+                  {metrics.averageScore == null
+                    ? "n/a"
+                    : `${metrics.averageScore}%`}
                 </p>
               </div>
             </div>

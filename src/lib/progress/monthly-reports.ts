@@ -2,10 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import { recordAIUsageEvent } from "@/lib/ai/usage";
-import {
-  GEMINI_MODEL,
-  generateFromGeminiWithUsage,
-} from "@/lib/gemini/client";
+import { GEMINI_MODEL, generateFromGeminiWithUsage } from "@/lib/gemini/client";
 import { getPlan } from "@/lib/plans-server";
 import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 import {
@@ -274,7 +271,9 @@ function buildReportMonthWindow(referenceDate: Date): MonthlyReportMonthWindow {
   };
 }
 
-export function getCurrentMonthlyReportWindow(referenceDate: Date = new Date()) {
+export function getCurrentMonthlyReportWindow(
+  referenceDate: Date = new Date(),
+) {
   return buildReportMonthWindow(referenceDate);
 }
 
@@ -333,38 +332,43 @@ export async function getTutorStudentMonthlyReportMetrics(
   const admin = createAdminClient();
   const window = buildReportMonthWindow(referenceDate);
 
-  const [attemptsResult, lessonsResult, newWordsResult, practicedWordsResult, totalWordsResult] =
-    await Promise.all([
-      admin
-        .from("quiz_attempts")
-        .select("completed_at, score, max_score")
-        .eq("student_id", studentId)
-        .gte("completed_at", `${window.periodStart}T00:00:00.000Z`)
-        .lt("completed_at", `${window.endExclusive}T00:00:00.000Z`),
-      admin
-        .from("tutor_student_lessons")
-        .select("lesson_date, start_time, end_time")
-        .eq("student_id", studentId)
-        .eq("status", "completed")
-        .gte("lesson_date", window.periodStart)
-        .lte("lesson_date", window.periodEnd),
-      admin
-        .from("word_mastery")
-        .select("created_at")
-        .eq("student_id", studentId)
-        .gte("created_at", `${window.periodStart}T00:00:00.000Z`)
-        .lt("created_at", `${window.endExclusive}T00:00:00.000Z`),
-      admin
-        .from("word_mastery")
-        .select("id, last_practiced")
-        .eq("student_id", studentId)
-        .gte("last_practiced", `${window.periodStart}T00:00:00.000Z`)
-        .lt("last_practiced", `${window.endExclusive}T00:00:00.000Z`),
-      admin
-        .from("word_mastery")
-        .select("id", { count: "exact", head: true })
-        .eq("student_id", studentId),
-    ]);
+  const [
+    attemptsResult,
+    lessonsResult,
+    newWordsResult,
+    practicedWordsResult,
+    totalWordsResult,
+  ] = await Promise.all([
+    admin
+      .from("quiz_attempts")
+      .select("completed_at, score, max_score")
+      .eq("student_id", studentId)
+      .gte("completed_at", `${window.periodStart}T00:00:00.000Z`)
+      .lt("completed_at", `${window.endExclusive}T00:00:00.000Z`),
+    admin
+      .from("tutor_student_lessons")
+      .select("lesson_date, start_time, end_time")
+      .eq("student_id", studentId)
+      .eq("status", "completed")
+      .gte("lesson_date", window.periodStart)
+      .lte("lesson_date", window.periodEnd),
+    admin
+      .from("word_mastery")
+      .select("created_at")
+      .eq("student_id", studentId)
+      .gte("created_at", `${window.periodStart}T00:00:00.000Z`)
+      .lt("created_at", `${window.endExclusive}T00:00:00.000Z`),
+    admin
+      .from("word_mastery")
+      .select("id, last_practiced")
+      .eq("student_id", studentId)
+      .gte("last_practiced", `${window.periodStart}T00:00:00.000Z`)
+      .lt("last_practiced", `${window.endExclusive}T00:00:00.000Z`),
+    admin
+      .from("word_mastery")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", studentId),
+  ]);
 
   if (attemptsResult.error) {
     throw attemptsResult.error;
@@ -404,8 +408,7 @@ export async function getTutorStudentMonthlyReportMetrics(
       Number(attempt.max_score) > 0
     ) {
       scoredAttempts += 1;
-      totalScore +=
-        (Number(attempt.score) / Number(attempt.max_score)) * 100;
+      totalScore += (Number(attempt.score) / Number(attempt.max_score)) * 100;
     }
   }
 
@@ -563,7 +566,9 @@ function buildSelectedGrammarTopicLines(
 
     if (coveredTopic) {
       return `- ${coveredTopic.label}: ${coveredTopic.attempts} tracked attempts, average ${
-        coveredTopic.averageScore == null ? "n/a" : `${coveredTopic.averageScore}%`
+        coveredTopic.averageScore == null
+          ? "n/a"
+          : `${coveredTopic.averageScore}%`
       }, current level ${coveredTopic.level}`;
     }
 
@@ -571,9 +576,13 @@ function buildSelectedGrammarTopicLines(
 
     if (masteryTopic) {
       return `- ${masteryTopic.label}: ${
-        masteryTopic.mastered ? "currently marked as mastered" : "not yet mastered"
+        masteryTopic.mastered
+          ? "currently marked as mastered"
+          : "not yet mastered"
       }, ${masteryTopic.attempts} tracked attempts, average ${
-        masteryTopic.averageScore == null ? "n/a" : `${masteryTopic.averageScore}%`
+        masteryTopic.averageScore == null
+          ? "n/a"
+          : `${masteryTopic.averageScore}%`
       }`;
     }
 
@@ -592,7 +601,9 @@ function formatTargetLine(
   actual: number | null,
   target: number | null,
   formatter: (value: number) => string = (value) =>
-    Number.isInteger(value) ? value.toString() : value.toFixed(1).replace(/\.0$/, ""),
+    Number.isInteger(value)
+      ? value.toString()
+      : value.toFixed(1).replace(/\.0$/, ""),
 ) {
   const actualValue = actual == null ? "n/a" : formatter(actual);
 
@@ -690,12 +701,12 @@ function buildMonthlyReportPrompt({
     `- ${formatTargetLine("Average quiz score", metrics.averageScore, goals.monthlyAverageScoreTarget, (value) => `${Number.isInteger(value) ? value.toString() : value.toFixed(1).replace(/\.0$/, "")}%`)}`,
     "",
     "Return JSON with:",
-    '- title: short report title',
-    '- summary: 1 short paragraph overview',
-    '- targetAssessment: 1 short paragraph about target progress',
-    '- highlights: 2 to 5 concise bullet-style sentences',
-    '- focusAreas: 0 to 5 concise bullet-style sentences',
-    '- nextSteps: 2 to 5 concrete next-step sentences',
+    "- title: short report title",
+    "- summary: 1 short paragraph overview",
+    "- targetAssessment: 1 short paragraph about target progress",
+    "- highlights: 2 to 5 concise bullet-style sentences",
+    "- focusAreas: 0 to 5 concise bullet-style sentences",
+    "- nextSteps: 2 to 5 concrete next-step sentences",
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");
@@ -705,7 +716,8 @@ function buildMonthlyReportContent(
   payload: MonthlyReportAiPayload,
   reportLanguage: ReportLanguage,
 ) {
-  const labels = MONTHLY_REPORT_SECTION_LABELS[normalizeReportLanguage(reportLanguage)];
+  const labels =
+    MONTHLY_REPORT_SECTION_LABELS[normalizeReportLanguage(reportLanguage)];
   const sections = [
     `${labels.summary}\n${payload.summary}`,
     `${labels.goalCheck}\n${payload.targetAssessment}`,
@@ -792,24 +804,31 @@ export async function generateTutorStudentMonthlyReport({
   const admin = createAdminClient();
   const monthWindow = buildReportMonthWindow(referenceDate);
 
-  const [planResult, metrics, quota, existingRows, snapshot, tutorProfile, studentProfile] =
-    await Promise.all([
-      getTutorStudentPlan(tutorId, studentId),
-      getTutorStudentMonthlyReportMetrics(studentId, referenceDate),
-      getTutorMonthlyReportQuota(tutorId, referenceDate),
-      listTutorStudentMonthlyReports(tutorId, studentId),
-      getStudentProgressSnapshot(studentId),
-      admin
-        .from("profiles")
-        .select("full_name, email")
-        .eq("id", tutorId)
-        .single(),
-      admin
-        .from("profiles")
-        .select("full_name, email")
-        .eq("id", studentId)
-        .single(),
-    ]);
+  const [
+    planResult,
+    metrics,
+    quota,
+    existingRows,
+    snapshot,
+    tutorProfile,
+    studentProfile,
+  ] = await Promise.all([
+    getTutorStudentPlan(tutorId, studentId),
+    getTutorStudentMonthlyReportMetrics(studentId, referenceDate),
+    getTutorMonthlyReportQuota(tutorId, referenceDate),
+    listTutorStudentMonthlyReports(tutorId, studentId),
+    getStudentProgressSnapshot(studentId),
+    admin
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", tutorId)
+      .single(),
+    admin
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", studentId)
+      .single(),
+  ]);
 
   const goals = planResult.plan;
   const existing = existingRows.find(
@@ -923,7 +942,8 @@ export async function generateTutorStudentMonthlyReport({
       created: !existing,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "AI generation failed";
+    const message =
+      error instanceof Error ? error.message : "AI generation failed";
     const nowIso = new Date().toISOString();
 
     if (!existing) {

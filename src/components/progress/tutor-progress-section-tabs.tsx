@@ -24,7 +24,10 @@ export function TutorProgressSectionTabs({
     <Tabs
       value={currentSection}
       onValueChange={(value) => {
-        if (value === currentSection || (value !== "overall" && value !== "monthly")) {
+        if (
+          value === currentSection ||
+          (value !== "overall" && value !== "monthly")
+        ) {
           return;
         }
 

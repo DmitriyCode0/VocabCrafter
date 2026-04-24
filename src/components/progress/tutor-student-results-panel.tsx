@@ -44,18 +44,25 @@ export function TutorStudentResultsPanel({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight">{studentName}</h2>
-            <Badge variant="outline">{messages.tutorProgressPage.overallTab}</Badge>
+            <Badge variant="outline">
+              {messages.tutorProgressPage.overallTab}
+            </Badge>
             <Badge variant="secondary">
-              {messages.tutorProgressPage.targetLabel(snapshot.profile.cefrLevel)}
+              {messages.tutorProgressPage.targetLabel(
+                snapshot.profile.cefrLevel,
+              )}
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            Read-only progress view combining timed app learning, lessons, vocabulary growth, grammar coverage, and recent results.
+            Read-only progress view combining timed app learning, lessons,
+            vocabulary growth, grammar coverage, and recent results.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">{snapshot.profile.targetLanguageLabel}</Badge>
+          <Badge variant="outline">
+            {snapshot.profile.targetLanguageLabel}
+          </Badge>
           <Badge variant="outline">
             {messages.tutorProgressPage.sourceLabel(
               snapshot.profile.sourceLanguageLabel,
@@ -81,7 +88,8 @@ export function TutorStudentResultsPanel({
           <CardHeader>
             <CardTitle className="text-base">No progress yet</CardTitle>
             <CardDescription>
-              This student has not built enough saved activity or lesson history to populate the progress view.
+              This student has not built enough saved activity or lesson history
+              to populate the progress view.
             </CardDescription>
           </CardHeader>
         </Card>

@@ -256,7 +256,9 @@ export function NavLinks({ role, collapsed = false }: NavLinksProps) {
                     </span>
                   </Link>
                 </TooltipTrigger>
-                {collapsed ? <TooltipContent side="right">{label}</TooltipContent> : null}
+                {collapsed ? (
+                  <TooltipContent side="right">{label}</TooltipContent>
+                ) : null}
               </Tooltip>
             </motion.div>
           );

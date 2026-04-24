@@ -142,7 +142,11 @@ function MonthlyActivityContent({
                   tickMargin={10}
                   minTickGap={18}
                 />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                <YAxis
+                  allowDecimals={false}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <ChartTooltip
                   cursor={false}
                   content={

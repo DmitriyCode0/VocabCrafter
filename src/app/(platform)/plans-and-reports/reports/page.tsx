@@ -160,14 +160,23 @@ export default async function PlansAndReportsReportsPage({
                   <CardHeader className="space-y-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <CardTitle className="text-base">{report.title}</CardTitle>
+                        <CardTitle className="text-base">
+                          {report.title}
+                        </CardTitle>
                         <CardDescription>
-                          {formatMonthlyReportMonthLabel(report.reportMonth, locale)} · {tutorName}
+                          {formatMonthlyReportMonthLabel(
+                            report.reportMonth,
+                            locale,
+                          )}{" "}
+                          · {tutorName}
                         </CardDescription>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Badge variant="secondary">
-                          Report: {getReportLanguageLabel(report.goalsSnapshot.reportLanguage)}
+                          Report:{" "}
+                          {getReportLanguageLabel(
+                            report.goalsSnapshot.reportLanguage,
+                          )}
                         </Badge>
                         <Badge variant="outline">
                           Quizzes: {report.metricsSnapshot.completedQuizzes}
@@ -177,13 +186,15 @@ export default async function PlansAndReportsReportsPage({
                         </Badge>
                         <Badge variant="outline">
                           Lessons: {report.metricsSnapshot.completedLessons}
-                          {report.goalsSnapshot.monthlyCompletedLessonsTarget != null
+                          {report.goalsSnapshot.monthlyCompletedLessonsTarget !=
+                          null
                             ? ` / ${report.goalsSnapshot.monthlyCompletedLessonsTarget}`
                             : ""}
                         </Badge>
                         <Badge variant="outline">
                           New words: {report.metricsSnapshot.newMasteryWords}
-                          {report.goalsSnapshot.monthlyNewMasteryWordsTarget != null
+                          {report.goalsSnapshot.monthlyNewMasteryWordsTarget !=
+                          null
                             ? ` / ${report.goalsSnapshot.monthlyNewMasteryWordsTarget}`
                             : ""}
                         </Badge>
@@ -192,20 +203,27 @@ export default async function PlansAndReportsReportsPage({
                         </Badge>
                         {report.goalsSnapshot.grammarTopicKeys.length > 0 ? (
                           <Badge variant="outline">
-                            Grammar topics: {report.goalsSnapshot.grammarTopicKeys.length}
+                            Grammar topics:{" "}
+                            {report.goalsSnapshot.grammarTopicKeys.length}
                           </Badge>
                         ) : null}
                       </div>
                     </div>
 
                     <p className="text-xs text-muted-foreground">
-                      Published {formatDateForAppLanguage(appLanguage, report.publishedAt || report.generatedAt)}
+                      Published{" "}
+                      {formatDateForAppLanguage(
+                        appLanguage,
+                        report.publishedAt || report.generatedAt,
+                      )}
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="rounded-lg border px-3 py-3">
-                        <p className="text-xs text-muted-foreground">Completed lessons</p>
+                        <p className="text-xs text-muted-foreground">
+                          Completed lessons
+                        </p>
                         <p className="text-xl font-semibold">
                           {formatProgressValue(
                             report.metricsSnapshot.completedLessons,
@@ -214,15 +232,25 @@ export default async function PlansAndReportsReportsPage({
                         </p>
                       </div>
                       <div className="rounded-lg border px-3 py-3">
-                        <p className="text-xs text-muted-foreground">Words practiced</p>
-                        <p className="text-xl font-semibold">{report.metricsSnapshot.practicedWords}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Words practiced
+                        </p>
+                        <p className="text-xl font-semibold">
+                          {report.metricsSnapshot.practicedWords}
+                        </p>
                       </div>
                       <div className="rounded-lg border px-3 py-3">
-                        <p className="text-xs text-muted-foreground">Tracked words</p>
-                        <p className="text-xl font-semibold">{report.metricsSnapshot.trackedWordsTotal}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Tracked words
+                        </p>
+                        <p className="text-xl font-semibold">
+                          {report.metricsSnapshot.trackedWordsTotal}
+                        </p>
                       </div>
                       <div className="rounded-lg border px-3 py-3">
-                        <p className="text-xs text-muted-foreground">Average quiz score</p>
+                        <p className="text-xs text-muted-foreground">
+                          Average quiz score
+                        </p>
                         <p className="text-xl font-semibold">
                           {formatPercentageProgressValue(
                             report.metricsSnapshot.averageScore,
@@ -238,11 +266,13 @@ export default async function PlansAndReportsReportsPage({
                           Grammar focus topics
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {report.goalsSnapshot.grammarTopicKeys.map((topic) => (
-                            <Badge key={topic} variant="outline">
-                              {topic}
-                            </Badge>
-                          ))}
+                          {report.goalsSnapshot.grammarTopicKeys.map(
+                            (topic) => (
+                              <Badge key={topic} variant="outline">
+                                {topic}
+                              </Badge>
+                            ),
+                          )}
                         </div>
                       </div>
                     ) : null}
@@ -365,21 +395,27 @@ export default async function PlansAndReportsReportsPage({
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-2xl font-bold tracking-tight">{studentName}</h2>
+              <h2 className="text-2xl font-bold tracking-tight">
+                {studentName}
+              </h2>
               <Badge variant="outline">
                 {messages.tutorPlansReportsPage.reportsTab}
               </Badge>
               <Badge variant="secondary">{currentMonthLabel}</Badge>
             </div>
             <p className="text-muted-foreground">
-              {messages.tutorPlansReportsPage.reportsPanelDescription(studentName)}
+              {messages.tutorPlansReportsPage.reportsPanelDescription(
+                studentName,
+              )}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             {studentProfile.cefr_level ? (
               <Badge variant="outline">
-                {messages.tutorProgressPage.targetLabel(studentProfile.cefr_level)}
+                {messages.tutorProgressPage.targetLabel(
+                  studentProfile.cefr_level,
+                )}
               </Badge>
             ) : null}
             <Button asChild variant="outline" size="sm">

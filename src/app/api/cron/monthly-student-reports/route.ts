@@ -53,7 +53,11 @@ export async function POST(request: NextRequest) {
       existing: 0,
       quotaBlocked: 0,
       failed: 0,
-      errors: [] as Array<{ tutorId: string; studentId: string; error: string }>,
+      errors: [] as Array<{
+        tutorId: string;
+        studentId: string;
+        error: string;
+      }>,
     };
 
     for (const connection of connections ?? []) {
@@ -75,8 +79,7 @@ export async function POST(request: NextRequest) {
             connection.monthly_completed_lessons_target,
           monthlyNewMasteryWordsTarget:
             connection.monthly_new_mastery_words_target,
-          monthlyAverageScoreTarget:
-            connection.monthly_average_score_target,
+          monthlyAverageScoreTarget: connection.monthly_average_score_target,
         })
       ) {
         continue;
