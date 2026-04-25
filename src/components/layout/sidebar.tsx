@@ -14,7 +14,9 @@ const SIDEBAR_COLLAPSED_EVENT = "vocab-crafter:sidebar-collapsed-change";
 
 function getSidebarCollapsedSnapshot() {
   try {
-    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
+    return (
+      window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true"
+    );
   } catch {
     return false;
   }
@@ -51,10 +53,7 @@ export function Sidebar({ profile }: SidebarProps) {
     const next = !collapsed;
 
     try {
-      window.localStorage.setItem(
-        SIDEBAR_COLLAPSED_STORAGE_KEY,
-        String(next),
-      );
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(next));
       window.dispatchEvent(new Event(SIDEBAR_COLLAPSED_EVENT));
     } catch {
       // Ignore local storage failures and keep the current sidebar state.
