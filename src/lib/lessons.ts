@@ -1,6 +1,8 @@
 export const LESSON_STATUSES = ["planned", "completed", "cancelled"] as const;
 export const LESSON_BALANCE_CURRENCY = "UAH";
 export const LESSON_BALANCE_LOCALE = "uk-UA";
+export const ONE_TIME_LESSON_OPTION_VALUE = "one-time";
+export const ONE_TIME_LESSON_OPTION_LABEL = "one-time";
 
 export type LessonStatus = (typeof LESSON_STATUSES)[number];
 
@@ -19,9 +21,13 @@ export interface MonthlyLessonItem {
   notes: string | null;
   status: LessonStatus;
   priceCents: number;
-  studentId?: string;
+  studentId?: string | null;
   participantName: string;
   participantLabel: string;
+}
+
+export function isOneTimeLessonStudentValue(value?: string | null) {
+  return value === ONE_TIME_LESSON_OPTION_VALUE;
 }
 
 export interface LessonBalanceSummaryItem {

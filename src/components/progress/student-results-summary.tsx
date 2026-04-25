@@ -22,7 +22,11 @@ interface StudentResultsSummaryProps {
 }
 
 function formatHours(value: number) {
-  return `${value.toFixed(value >= 10 ? 0 : 1)} h`;
+  const totalMinutes = Math.round(value * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${hours} h ${minutes} min`;
 }
 
 function formatHourRange(minHours: number, maxHours: number) {

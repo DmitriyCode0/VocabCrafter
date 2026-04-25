@@ -31,7 +31,10 @@ export const monthlyReportGoalsSchema = tutorStudentPlanSchema;
 export const monthlyReportMetricsSchema = z.object({
   activeDays: z.number().int().min(0),
   completedQuizzes: z.number().int().min(0),
+  completedSentenceTranslations: z.number().int().min(0).default(0),
+  completedGapFillExercises: z.number().int().min(0).default(0),
   completedLessons: z.number().int().min(0),
+  appLearningHours: z.number().min(0).nullable().default(null),
   totalHours: z.number().min(0).default(0),
   newMasteryWords: z.number().int().min(0),
   practicedWords: z.number().int().min(0),
@@ -54,14 +57,13 @@ export const monthlyReportGenerationSourceSchema = z.enum([
 export const monthlyReportAiPayloadSchema = z.object({
   title: z.string().trim().min(1).max(120),
   summary: z.string().trim().min(1).max(1200),
-  targetAssessment: z.string().trim().min(1).max(1200),
-  highlights: z.array(z.string().trim().min(1).max(240)).min(2).max(5),
   focusAreas: z.array(z.string().trim().min(1).max(240)).max(5),
   nextSteps: z.array(z.string().trim().min(1).max(240)).min(2).max(5),
 });
 
 export const monthlyReportSettingsInputSchema = z.object({
-  monthlyQuizTarget: nullableWholeNumberSchema,
+  monthlySentenceTranslationTarget: nullableWholeNumberSchema,
+  monthlyGapFillTarget: nullableWholeNumberSchema,
   monthlyCompletedLessonsTarget: nullableWholeNumberSchema,
   monthlyNewMasteryWordsTarget: nullableWholeNumberSchema,
   monthlyAverageScoreTarget: nullablePercentageSchema,
@@ -71,10 +73,17 @@ export const monthlyReportGenerationInputSchema = z.object({
   forceRegenerate: z.boolean().optional().default(false),
 });
 
+const nullableReviewRatingSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(5)
+  .nullable();
+
 export const monthlyReportUpdateInputSchema = z.object({
   title: z.string().trim().min(1).max(120),
   publishedContent: z.string().trim().min(1).max(20_000),
-  tutorAddendum: z.string().trim().max(4_000).nullable().optional(),
+  reviewRating: nullableReviewRatingSchema.optional(),
 });
 
 export type MonthlyReportGoals = TutorStudentPlan;
@@ -121,7 +130,7 @@ export interface StoredMonthlyReport {
   title: string;
   aiDraft: string | null;
   publishedContent: string | null;
-  tutorAddendum: string | null;
+  reviewRating: number | null;
   goalsSnapshot: MonthlyReportGoals;
   metricsSnapshot: MonthlyReportMetrics;
   generationError: string | null;
@@ -135,23 +144,17 @@ const MONTHLY_REPORT_SECTION_LABELS: Record<
   ReportLanguage,
   {
     summary: string;
-    goalCheck: string;
-    highlights: string;
     focusAreas: string;
     nextSteps: string;
   }
 > = {
   en: {
     summary: "Summary",
-    goalCheck: "Goal Check",
-    highlights: "Highlights",
     focusAreas: "Focus Areas",
     nextSteps: "Next Steps",
   },
   uk: {
     summary: "Підсумок",
-    goalCheck: "Перевірка цілей",
-    highlights: "Ключові моменти",
     focusAreas: "Зони уваги",
     nextSteps: "Наступні кроки",
   },
@@ -197,6 +200,14 @@ function roundHours(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+function formatHours(value: number) {
+  const totalMinutes = Math.round(value * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${hours} h ${minutes} min`;
+}
+
 function parseTimeToMinutes(value?: string | null) {
   if (!value || !TIME_PATTERN.test(value)) {
     return null;
@@ -240,7 +251,7 @@ function parseStoredMonthlyReport(row: MonthlyReportRow): StoredMonthlyReport {
     title: row.title,
     aiDraft: row.ai_draft,
     publishedContent: row.published_content,
-    tutorAddendum: row.tutor_addendum,
+    reviewRating: nullableReviewRatingSchema.parse(row.review_rating ?? null),
     goalsSnapshot: monthlyReportGoalsSchema.parse(row.plan_snapshot),
     metricsSnapshot: monthlyReportMetricsSchema.parse(row.metrics_snapshot),
     generationError: row.generation_error,
@@ -313,7 +324,8 @@ export async function updateTutorStudentMonthlyReportSettings(
     objectives: existingPlan.plan.objectives,
     grammarTopicKeys: existingPlan.plan.grammarTopicKeys,
     reportLanguage: existingPlan.plan.reportLanguage,
-    monthlyQuizTarget: parsed.monthlyQuizTarget,
+    monthlySentenceTranslationTarget: parsed.monthlySentenceTranslationTarget,
+    monthlyGapFillTarget: parsed.monthlyGapFillTarget,
     monthlyCompletedLessonsTarget: parsed.monthlyCompletedLessonsTarget,
     monthlyNewMasteryWordsTarget: parsed.monthlyNewMasteryWordsTarget,
     monthlyAverageScoreTarget: parsed.monthlyAverageScoreTarget,
@@ -341,7 +353,7 @@ export async function getTutorStudentMonthlyReportMetrics(
   ] = await Promise.all([
     admin
       .from("quiz_attempts")
-      .select("completed_at, score, max_score")
+      .select("completed_at, score, max_score, time_spent_seconds, quizzes!inner(type)")
       .eq("student_id", studentId)
       .gte("completed_at", `${window.periodStart}T00:00:00.000Z`)
       .lt("completed_at", `${window.endExclusive}T00:00:00.000Z`),
@@ -393,13 +405,30 @@ export async function getTutorStudentMonthlyReportMetrics(
   const activeDays = new Set<string>();
   let scoredAttempts = 0;
   let totalScore = 0;
+  let appLearningSeconds = 0;
   let totalHours = 0;
+  let completedSentenceTranslations = 0;
+  let completedGapFillExercises = 0;
 
   for (const attempt of attemptsResult.data ?? []) {
     const isoDate = attempt.completed_at?.slice(0, 10);
+    const quizType =
+      attempt.quizzes && typeof attempt.quizzes === "object"
+        ? (attempt.quizzes as { type?: string }).type
+        : null;
 
     if (isoDate) {
       activeDays.add(isoDate);
+    }
+
+    appLearningSeconds += Math.max(0, attempt.time_spent_seconds ?? 0);
+
+    if (quizType === "translation") {
+      completedSentenceTranslations += 1;
+    }
+
+    if (quizType === "gap_fill") {
+      completedGapFillExercises += 1;
     }
 
     if (
@@ -431,7 +460,10 @@ export async function getTutorStudentMonthlyReportMetrics(
   return {
     activeDays: activeDays.size,
     completedQuizzes: (attemptsResult.data ?? []).length,
+    completedSentenceTranslations,
+    completedGapFillExercises,
     completedLessons: (lessonsResult.data ?? []).length,
+    appLearningHours: roundHours(appLearningSeconds / 3600),
     totalHours: roundHours(totalHours),
     newMasteryWords: (newWordsResult.data ?? []).length,
     practicedWords: (practicedWordsResult.data ?? []).length,
@@ -680,12 +712,15 @@ function buildMonthlyReportPrompt({
     goals.goalSummary ? `- Plan summary: ${goals.goalSummary}` : null,
     "",
     "This month metrics:",
-    `- Active days: ${metrics.activeDays}`,
+    `- Active days in application: ${metrics.activeDays}`,
     `- Completed quizzes: ${metrics.completedQuizzes}`,
+    `- Completed sentence translation exercises: ${metrics.completedSentenceTranslations}`,
+    `- Completed gap fill exercises: ${metrics.completedGapFillExercises}`,
     `- Completed lessons: ${metrics.completedLessons}`,
+    `- App learning time: ${metrics.appLearningHours == null ? "n/a" : formatHours(metrics.appLearningHours)}`,
     `- New mastery words: ${metrics.newMasteryWords}`,
-    `- Practiced tracked words: ${metrics.practicedWords}`,
-    `- Tracked words total: ${metrics.trackedWordsTotal}`,
+    `- Words reviewed this month: ${metrics.practicedWords}`,
+    `- Words currently in the vocabulary tracker: ${metrics.trackedWordsTotal}`,
     `- ${scoreLine}`,
     "",
     "Current learning plan objectives:",
@@ -695,7 +730,8 @@ function buildMonthlyReportPrompt({
     ...grammarTopicLines,
     "",
     "Targets:",
-    `- ${formatTargetLine("Completed quizzes", metrics.completedQuizzes, goals.monthlyQuizTarget)}`,
+    `- ${formatTargetLine("Completed sentence translation exercises", metrics.completedSentenceTranslations, goals.monthlySentenceTranslationTarget)}`,
+    `- ${formatTargetLine("Completed gap fill exercises", metrics.completedGapFillExercises, goals.monthlyGapFillTarget)}`,
     `- ${formatTargetLine("Completed lessons", metrics.completedLessons, goals.monthlyCompletedLessonsTarget)}`,
     `- ${formatTargetLine("New mastery words", metrics.newMasteryWords, goals.monthlyNewMasteryWordsTarget)}`,
     `- ${formatTargetLine("Average quiz score", metrics.averageScore, goals.monthlyAverageScoreTarget, (value) => `${Number.isInteger(value) ? value.toString() : value.toFixed(1).replace(/\.0$/, "")}%`)}`,
@@ -703,8 +739,6 @@ function buildMonthlyReportPrompt({
     "Return JSON with:",
     "- title: short report title",
     "- summary: 1 short paragraph overview",
-    "- targetAssessment: 1 short paragraph about target progress",
-    "- highlights: 2 to 5 concise bullet-style sentences",
     "- focusAreas: 0 to 5 concise bullet-style sentences",
     "- nextSteps: 2 to 5 concrete next-step sentences",
   ]
@@ -718,11 +752,7 @@ function buildMonthlyReportContent(
 ) {
   const labels =
     MONTHLY_REPORT_SECTION_LABELS[normalizeReportLanguage(reportLanguage)];
-  const sections = [
-    `${labels.summary}\n${payload.summary}`,
-    `${labels.goalCheck}\n${payload.targetAssessment}`,
-    `${labels.highlights}\n${payload.highlights.map((item) => `- ${item}`).join("\n")}`,
-  ];
+  const sections = [`${labels.summary}\n${payload.summary}`];
 
   if (payload.focusAreas.length > 0) {
     sections.push(
@@ -768,7 +798,7 @@ export async function updateTutorStudentMonthlyReport(
     .update({
       title: parsed.title,
       published_content: parsed.publishedContent,
-      tutor_addendum: parsed.tutorAddendum ?? null,
+      review_rating: parsed.reviewRating ?? null,
       status: "published",
       published_at: nowIso,
       updated_at: nowIso,
@@ -784,6 +814,32 @@ export async function updateTutorStudentMonthlyReport(
   }
 
   return parseStoredMonthlyReport(data);
+}
+
+export async function deleteTutorStudentMonthlyReport(
+  tutorId: string,
+  studentId: string,
+  reportId: string,
+) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("tutor_student_monthly_reports")
+    .delete()
+    .eq("id", reportId)
+    .eq("tutor_id", tutorId)
+    .eq("student_id", studentId)
+    .select("id, report_month")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Monthly report not found");
+  }
+
+  return data;
 }
 
 export async function generateTutorStudentMonthlyReport({
@@ -862,6 +918,7 @@ export async function generateTutorStudentMonthlyReport({
       ai_draft: null,
       published_content: null,
       tutor_addendum: null,
+      review_rating: null,
       plan_snapshot: goals,
       metrics_snapshot: metrics,
       generation_error: `Monthly report quota reached (${quota.limit}/month).`,
@@ -927,7 +984,8 @@ export async function generateTutorStudentMonthlyReport({
       title: payload.title,
       ai_draft: content,
       published_content: content,
-      tutor_addendum: existing?.tutorAddendum ?? null,
+      tutor_addendum: null,
+      review_rating: existing?.reviewRating ?? null,
       plan_snapshot: goals,
       metrics_snapshot: metrics,
       generation_error: null,
@@ -960,6 +1018,7 @@ export async function generateTutorStudentMonthlyReport({
         ai_draft: null,
         published_content: null,
         tutor_addendum: null,
+        review_rating: null,
         plan_snapshot: goals,
         metrics_snapshot: metrics,
         generation_error: message,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CreateLessonDialog } from "@/components/lessons/create-lesson-dialog";
 import { DeleteLessonButton } from "@/components/lessons/delete-lesson-button";
 import { EditLessonDialog } from "@/components/lessons/edit-lesson-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +29,7 @@ import {
   type LessonStudentOption,
   type MonthlyLessonItem,
 } from "@/lib/lessons";
-import { CalendarDays, ChevronDown } from "lucide-react";
+import { CalendarDays, ChevronDown, PlusCircle } from "lucide-react";
 
 interface MonthlyLessonsCalendarProps {
   month: Date;
@@ -47,12 +48,23 @@ export function MonthlyLessonsCalendar({
 }: MonthlyLessonsCalendarProps) {
   const [isMonthlyListExpanded, setIsMonthlyListExpanded] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [quickCreateDate, setQuickCreateDate] = useState<string | null>(null);
   const cells = buildLessonMonthCells(month);
   const weekdayLabels = getLessonWeekdayLabels();
   const lessonsByDate = groupLessonsByDate(lessons);
   const selectedDateLessons = selectedDate
     ? (lessonsByDate.get(selectedDate) ?? [])
     : [];
+  const canQuickCreate = canManageLessons;
+  const quickCreateDefaultStudentId = undefined;
+
+  function openQuickCreate(date: string) {
+    if (!canQuickCreate) {
+      return;
+    }
+
+    setQuickCreateDate(date);
+  }
 
   function renderLessonRow(
     lesson: MonthlyLessonItem,
@@ -114,12 +126,12 @@ export function MonthlyLessonsCalendar({
                 {formatLessonCurrency(lesson.priceCents)}
               </Badge>
             ) : null}
-            {showManageActions && lesson.studentId ? (
+            {showManageActions ? (
               <div className="flex items-center gap-1">
                 <EditLessonDialog
                   lesson={{
                     id: lesson.id,
-                    studentId: lesson.studentId,
+                    studentId: lesson.studentId ?? null,
                     title: lesson.title,
                     lessonDate: lesson.lessonDate,
                     startTime: lesson.startTime,
@@ -181,23 +193,27 @@ export function MonthlyLessonsCalendar({
                 {cells.map((cell) => {
                   const dayLessons = lessonsByDate.get(cell.isoDate) ?? [];
                   const isSelected = selectedDate === cell.isoDate;
+                  const isClickable = dayLessons.length > 0 || canQuickCreate;
 
                   return (
                     <div
                       key={cell.isoDate}
                       className={cn(
                         "min-h-36 border-r border-b p-2 align-top",
-                        dayLessons.length > 0 &&
-                          "transition-colors hover:bg-accent/30 cursor-pointer",
+                        isClickable &&
+                          "cursor-pointer transition-colors hover:bg-accent/30",
                         isSelected && "bg-accent/40",
                         !cell.inCurrentMonth &&
                           "bg-muted/20 text-muted-foreground",
                       )}
-                      onClick={
-                        dayLessons.length > 0
-                          ? () => setSelectedDate(cell.isoDate)
-                          : undefined
-                      }
+                      onClick={() => {
+                        if (dayLessons.length > 0) {
+                          setSelectedDate(cell.isoDate);
+                          return;
+                        }
+
+                        openQuickCreate(cell.isoDate);
+                      }}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span
@@ -314,6 +330,15 @@ export function MonthlyLessonsCalendar({
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto px-4 pb-4">
+            {canQuickCreate && selectedDate ? (
+              <div className="mb-4 flex justify-end">
+                <Button type="button" onClick={() => openQuickCreate(selectedDate)}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add lesson on this day
+                </Button>
+              </div>
+            ) : null}
+
             {selectedDateLessons.length === 0 ? (
               <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
                 No lessons found for this day.
@@ -326,6 +351,20 @@ export function MonthlyLessonsCalendar({
           </div>
         </SheetContent>
       </Sheet>
+
+      <CreateLessonDialog
+        key={`${quickCreateDate ?? "none"}-${quickCreateDefaultStudentId ?? "none"}`}
+        students={studentOptions}
+        defaultLessonDate={quickCreateDate ?? undefined}
+        defaultStudentId={quickCreateDefaultStudentId}
+        open={Boolean(quickCreateDate)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setQuickCreateDate(null);
+          }
+        }}
+        showTrigger={false}
+      />
     </div>
   );
 }

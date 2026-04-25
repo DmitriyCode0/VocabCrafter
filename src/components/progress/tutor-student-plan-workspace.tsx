@@ -1,11 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
-  FileText,
   Loader2,
   Plus,
   Save,
@@ -13,7 +11,6 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,7 +35,8 @@ interface TutorStudentPlan {
   planTitle: string | null;
   goalSummary: string | null;
   objectives: string[];
-  monthlyQuizTarget: number | null;
+  monthlySentenceTranslationTarget: number | null;
+  monthlyGapFillTarget: number | null;
   monthlyCompletedLessonsTarget: number | null;
   monthlyNewMasteryWordsTarget: number | null;
   monthlyAverageScoreTarget: number | null;
@@ -55,6 +53,8 @@ interface GrammarTopicOption {
 interface MonthlyReportMetrics {
   activeDays: number;
   completedQuizzes: number;
+  completedSentenceTranslations: number;
+  completedGapFillExercises: number;
   completedLessons: number;
   newMasteryWords: number;
   practicedWords: number;
@@ -68,7 +68,6 @@ interface TutorStudentPlanWorkspaceProps {
   currentMonthLabel: string;
   plan: TutorStudentPlan;
   metrics: MonthlyReportMetrics;
-  reportsHref: string;
   availableGrammarTopics: GrammarTopicOption[];
   targetLanguageLabel: string;
 }
@@ -129,7 +128,6 @@ export function TutorStudentPlanWorkspace({
   currentMonthLabel,
   plan,
   metrics,
-  reportsHref,
   availableGrammarTopics,
   targetLanguageLabel,
 }: TutorStudentPlanWorkspaceProps) {
@@ -137,8 +135,11 @@ export function TutorStudentPlanWorkspace({
   const [planTitle, setPlanTitle] = useState(plan.planTitle ?? "");
   const [goalSummary, setGoalSummary] = useState(plan.goalSummary ?? "");
   const [objectives, setObjectives] = useState(plan.objectives.join("\n"));
-  const [quizTarget, setQuizTarget] = useState(
-    plan.monthlyQuizTarget?.toString() ?? "",
+  const [sentenceTranslationTarget, setSentenceTranslationTarget] = useState(
+    plan.monthlySentenceTranslationTarget?.toString() ?? "",
+  );
+  const [gapFillTarget, setGapFillTarget] = useState(
+    plan.monthlyGapFillTarget?.toString() ?? "",
   );
   const [lessonTarget, setLessonTarget] = useState(
     plan.monthlyCompletedLessonsTarget?.toString() ?? "",
@@ -187,7 +188,10 @@ export function TutorStudentPlanWorkspace({
           planTitle,
           goalSummary,
           objectives: parseObjectives(objectives),
-          monthlyQuizTarget: parseNullableWholeNumber(quizTarget),
+          monthlySentenceTranslationTarget: parseNullableWholeNumber(
+            sentenceTranslationTarget,
+          ),
+          monthlyGapFillTarget: parseNullableWholeNumber(gapFillTarget),
           monthlyCompletedLessonsTarget: parseNullableWholeNumber(lessonTarget),
           monthlyNewMasteryWordsTarget: parseNullableWholeNumber(wordTarget),
           monthlyAverageScoreTarget:
@@ -348,13 +352,30 @@ export function TutorStudentPlanWorkspace({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="plan-quiz-target">Monthly quiz target</Label>
+                <Label htmlFor="plan-sentence-translation-target">
+                  Monthly sentence translation target
+                </Label>
                 <Input
-                  id="plan-quiz-target"
+                  id="plan-sentence-translation-target"
                   inputMode="numeric"
-                  placeholder="e.g. 12"
-                  value={quizTarget}
-                  onChange={(event) => setQuizTarget(event.target.value)}
+                  placeholder="e.g. 8"
+                  value={sentenceTranslationTarget}
+                  onChange={(event) =>
+                    setSentenceTranslationTarget(event.target.value)
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="plan-gap-fill-target">
+                  Monthly gap fill target
+                </Label>
+                <Input
+                  id="plan-gap-fill-target"
+                  inputMode="numeric"
+                  placeholder="e.g. 8"
+                  value={gapFillTarget}
+                  onChange={(event) => setGapFillTarget(event.target.value)}
                 />
               </div>
 
@@ -429,28 +450,49 @@ export function TutorStudentPlanWorkspace({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">Active days: {metrics.activeDays}</Badge>
-              <Badge variant="outline">
-                Quizzes: {metrics.completedQuizzes}
-              </Badge>
-              <Badge variant="outline">
-                Lessons: {metrics.completedLessons}
-              </Badge>
-              <Badge variant="outline">
-                New words: {metrics.newMasteryWords}
-              </Badge>
-              <Badge variant="outline">
-                Avg score: {formatPercentage(metrics.averageScore)}
-              </Badge>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">Active days</p>
+                <p className="text-2xl font-semibold">{metrics.activeDays}</p>
+              </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">Quizzes</p>
+                <p className="text-2xl font-semibold">
+                  {metrics.completedQuizzes}
+                </p>
+              </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">New words</p>
+                <p className="text-2xl font-semibold">
+                  {metrics.newMasteryWords}
+                </p>
+              </div>
               {grammarTopicKeys.length > 0 ? (
-                <Badge variant="outline">
-                  Grammar topics: {grammarTopicKeys.length}
-                </Badge>
+                <div className="rounded-lg border px-3 py-3">
+                  <p className="text-xs text-muted-foreground">
+                    Grammar topics
+                  </p>
+                  <p className="text-2xl font-semibold">
+                    {grammarTopicKeys.length}
+                  </p>
+                </div>
               ) : null}
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Sentence translation exercises
+                </p>
+                <p className="text-2xl font-semibold">
+                  {metrics.completedSentenceTranslations}
+                </p>
+              </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Gap fill exercises
+                </p>
+                <p className="text-2xl font-semibold">
+                  {metrics.completedGapFillExercises}
+                </p>
+              </div>
               <div className="rounded-lg border px-3 py-3">
                 <p className="text-xs text-muted-foreground">
                   Completed lessons
@@ -460,13 +502,17 @@ export function TutorStudentPlanWorkspace({
                 </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Words practiced</p>
+                <p className="text-xs text-muted-foreground">
+                  Words reviewed this month
+                </p>
                 <p className="text-2xl font-semibold">
                   {metrics.practicedWords}
                 </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Tracked words</p>
+                <p className="text-xs text-muted-foreground">
+                  Words in vocabulary tracker
+                </p>
                 <p className="text-2xl font-semibold">
                   {metrics.trackedWordsTotal}
                 </p>
@@ -476,19 +522,10 @@ export function TutorStudentPlanWorkspace({
                   Average quiz score
                 </p>
                 <p className="text-2xl font-semibold">
-                  {metrics.averageScore == null
-                    ? "n/a"
-                    : `${metrics.averageScore}%`}
+                  {formatPercentage(metrics.averageScore)}
                 </p>
               </div>
             </div>
-
-            <Button asChild variant="outline">
-              <Link href={reportsHref}>
-                <FileText className="mr-2 h-4 w-4" />
-                Open Monthly Reports
-              </Link>
-            </Button>
           </CardContent>
         </Card>
       </div>

@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
 import {
+  deleteTutorStudentMonthlyReport,
   monthlyReportUpdateInputSchema,
   updateTutorStudentMonthlyReport,
 } from "@/lib/progress/monthly-reports";
@@ -95,6 +96,43 @@ export async function PATCH(
     console.error("Save monthly report error:", error);
     return NextResponse.json(
       { error: "Failed to save monthly report" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  {
+    params,
+  }: {
+    params: Promise<{ studentId: string; reportId: string }>;
+  },
+) {
+  const { studentId, reportId } = await params;
+  const access = await requireTutorAccess(studentId);
+
+  if ("errorResponse" in access) {
+    return access.errorResponse;
+  }
+
+  try {
+    const deleted = await deleteTutorStudentMonthlyReport(
+      access.user.id,
+      studentId,
+      reportId,
+    );
+
+    return NextResponse.json({ deleted });
+  } catch (error) {
+    console.error("Delete monthly report error:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete monthly report",
+      },
       { status: 500 },
     );
   }

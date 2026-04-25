@@ -45,7 +45,7 @@ interface GoogleCalendarEventResponse {
 interface LessonGoogleCalendarSyncRow {
   id: string;
   tutor_id: string;
-  student_id: string;
+  student_id: string | null;
   title: string | null;
   lesson_date: string;
   start_time: string | null;
@@ -673,12 +673,21 @@ function buildGoogleCalendarEventPayload(lesson: LessonGoogleCalendarSyncRow) {
   const studentName =
     lesson.student_profile?.full_name ||
     lesson.student_profile?.email ||
-    "Student";
+    "One-time";
   const descriptionLines = [
     `Tutor: ${tutorName}`,
-    `Student: ${studentName}`,
+    lesson.student_id ? `Student: ${studentName}` : `Lesson type: ${studentName}`,
     `Status: ${getLessonStatusLabel(lesson.status)}`,
   ];
+
+  const privateProperties: Record<string, string> = {
+    vocabCrafterLessonId: lesson.id,
+    vocabCrafterTutorId: lesson.tutor_id,
+  };
+
+  if (lesson.student_id) {
+    privateProperties.vocabCrafterStudentId = lesson.student_id;
+  }
 
   if (lesson.notes) {
     descriptionLines.push(`Notes: ${lesson.notes}`);
@@ -689,15 +698,13 @@ function buildGoogleCalendarEventPayload(lesson: LessonGoogleCalendarSyncRow) {
   return {
     summary: lesson.title?.trim()
       ? `${getLessonDisplayTitle(lesson.title)} · ${studentName}`
-      : `Lesson with ${studentName}`,
+      : lesson.student_id
+        ? `Lesson with ${studentName}`
+        : "One-time lesson",
     description: descriptionLines.join("\n\n"),
     status: lesson.status === "cancelled" ? "cancelled" : "confirmed",
     extendedProperties: {
-      private: {
-        vocabCrafterLessonId: lesson.id,
-        vocabCrafterTutorId: lesson.tutor_id,
-        vocabCrafterStudentId: lesson.student_id,
-      },
+      private: privateProperties,
     },
     ...buildGoogleCalendarEventTiming(lesson),
   };

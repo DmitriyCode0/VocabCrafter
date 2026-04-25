@@ -1,12 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "motion/react";
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
-import { BarChart3, BookMarked, History } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -23,9 +21,9 @@ import {
 import type { StudentMonthlyActivitySnapshot } from "@/lib/progress/tutor-progress-monthly";
 
 interface TutorStudentMonthlyPerformanceProps {
-  studentId: string;
   studentName: string;
   studentLevel?: string | null;
+  targetLanguageLabel: string;
   trend: StudentMonthlyActivitySnapshot;
 }
 
@@ -210,45 +208,28 @@ export function StudentMonthlyProgressPanel({
 }
 
 export function TutorStudentMonthlyPerformance({
-  studentId,
   studentName,
   studentLevel,
+  targetLanguageLabel,
   trend,
 }: TutorStudentMonthlyPerformanceProps) {
   const { messages } = useAppI18n();
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-2xl font-bold tracking-tight">{studentName}</h2>
-            <Badge variant="outline">{messages.progress.monthlyTab}</Badge>
-            {studentLevel ? (
-              <Badge variant="secondary">
-                {messages.tutorProgressPage.targetLabel(studentLevel)}
-              </Badge>
-            ) : null}
-          </div>
-          <p className="text-muted-foreground">
-            {messages.tutorProgressPage.monthlyPanelDescription(studentName)}
-          </p>
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-2xl font-bold tracking-tight">{studentName}</h2>
+          <Badge variant="outline">{targetLanguageLabel}</Badge>
+          {studentLevel ? (
+            <Badge variant="secondary">
+              {messages.tutorProgressPage.targetLabel(studentLevel)}
+            </Badge>
+          ) : null}
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/students/${studentId}/progress`}>
-              <BookMarked className="mr-2 h-4 w-4" />
-              {messages.tutorProgressPage.openCoachingWorkspace}
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/history?student=${studentId}`}>
-              <History className="mr-2 h-4 w-4" />
-              {messages.tutorProgressPage.openHistory}
-            </Link>
-          </Button>
-        </div>
+        <p className="text-muted-foreground">
+          {messages.tutorProgressPage.monthlyPanelDescription(studentName)}
+        </p>
       </div>
 
       <MonthlyActivityContent trend={trend} />

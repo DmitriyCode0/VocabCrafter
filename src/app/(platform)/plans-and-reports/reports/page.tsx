@@ -1,11 +1,14 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookMarked, Download, FileText, History } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { formatDateForAppLanguage } from "@/lib/i18n/format";
 import { getAppMessages } from "@/lib/i18n/messages";
+import {
+  getLearningLanguageLabel,
+  normalizeLearningLanguage,
+} from "@/lib/languages";
 import { getReportLanguageLabel } from "@/lib/progress/monthly-report-language";
 import {
   formatMonthlyReportMonthLabel,
@@ -73,6 +76,27 @@ function formatPercentageProgressValue(
   }
 
   return `${formatPercentage(actual)} / ${formatPercentage(target)}`;
+}
+
+function formatHours(value: number | null) {
+  if (value == null || !Number.isFinite(value)) {
+    return "n/a";
+  }
+
+  const totalMinutes = Math.round(value * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${hours} h ${minutes} min`;
+}
+
+function formatStarRating(value: number | null) {
+  if (value == null || !Number.isFinite(value) || value < 1) {
+    return "No rating";
+  }
+
+  const rating = Math.max(1, Math.min(5, Math.round(value)));
+  return `${"★".repeat(rating)}${"☆".repeat(5 - rating)}`;
 }
 
 export default async function PlansAndReportsReportsPage({
@@ -180,8 +204,17 @@ export default async function PlansAndReportsReportsPage({
                         </Badge>
                         <Badge variant="outline">
                           Quizzes: {report.metricsSnapshot.completedQuizzes}
-                          {report.goalsSnapshot.monthlyQuizTarget != null
-                            ? ` / ${report.goalsSnapshot.monthlyQuizTarget}`
+                        </Badge>
+                        <Badge variant="outline">
+                          Sentence translations: {report.metricsSnapshot.completedSentenceTranslations}
+                          {report.goalsSnapshot.monthlySentenceTranslationTarget != null
+                            ? ` / ${report.goalsSnapshot.monthlySentenceTranslationTarget}`
+                            : ""}
+                        </Badge>
+                        <Badge variant="outline">
+                          Gap fill: {report.metricsSnapshot.completedGapFillExercises}
+                          {report.goalsSnapshot.monthlyGapFillTarget != null
+                            ? ` / ${report.goalsSnapshot.monthlyGapFillTarget}`
                             : ""}
                         </Badge>
                         <Badge variant="outline">
@@ -199,7 +232,7 @@ export default async function PlansAndReportsReportsPage({
                             : ""}
                         </Badge>
                         <Badge variant="outline">
-                          Active days: {report.metricsSnapshot.activeDays}
+                          Active days in application: {report.metricsSnapshot.activeDays}
                         </Badge>
                         {report.goalsSnapshot.grammarTopicKeys.length > 0 ? (
                           <Badge variant="outline">
@@ -222,6 +255,28 @@ export default async function PlansAndReportsReportsPage({
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="rounded-lg border px-3 py-3">
                         <p className="text-xs text-muted-foreground">
+                          Sentence translation exercises
+                        </p>
+                        <p className="text-xl font-semibold">
+                          {formatProgressValue(
+                            report.metricsSnapshot.completedSentenceTranslations,
+                            report.goalsSnapshot.monthlySentenceTranslationTarget,
+                          )}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border px-3 py-3">
+                        <p className="text-xs text-muted-foreground">
+                          Gap fill exercises
+                        </p>
+                        <p className="text-xl font-semibold">
+                          {formatProgressValue(
+                            report.metricsSnapshot.completedGapFillExercises,
+                            report.goalsSnapshot.monthlyGapFillTarget,
+                          )}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border px-3 py-3">
+                        <p className="text-xs text-muted-foreground">
                           Completed lessons
                         </p>
                         <p className="text-xl font-semibold">
@@ -233,7 +288,15 @@ export default async function PlansAndReportsReportsPage({
                       </div>
                       <div className="rounded-lg border px-3 py-3">
                         <p className="text-xs text-muted-foreground">
-                          Words practiced
+                          App learning time
+                        </p>
+                        <p className="text-xl font-semibold">
+                          {formatHours(report.metricsSnapshot.appLearningHours)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border px-3 py-3">
+                        <p className="text-xs text-muted-foreground">
+                          Words reviewed this month
                         </p>
                         <p className="text-xl font-semibold">
                           {report.metricsSnapshot.practicedWords}
@@ -241,7 +304,7 @@ export default async function PlansAndReportsReportsPage({
                       </div>
                       <div className="rounded-lg border px-3 py-3">
                         <p className="text-xs text-muted-foreground">
-                          Tracked words
+                          Words in vocabulary tracker
                         </p>
                         <p className="text-xl font-semibold">
                           {report.metricsSnapshot.trackedWordsTotal}
@@ -281,13 +344,13 @@ export default async function PlansAndReportsReportsPage({
                       {report.publishedContent}
                     </p>
 
-                    {report.tutorAddendum ? (
+                    {report.reviewRating != null ? (
                       <div className="rounded-lg border bg-muted/40 px-4 py-3">
                         <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          Tutor addendum
+                          Tutor review
                         </p>
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                          {report.tutorAddendum}
+                        <p className="text-lg tracking-[0.2em] text-foreground">
+                          {formatStarRating(report.reviewRating)}
                         </p>
                       </div>
                     ) : null}
@@ -374,68 +437,51 @@ export default async function PlansAndReportsReportsPage({
     currentWindow.reportMonth,
     locale,
   );
+  const admin = createAdminClient();
 
-  const [planRecord, metrics, quota, reports] = await Promise.all([
+  const [studentLanguageResult, planRecord, metrics, quota, reports] =
+    await Promise.all([
+      admin
+        .from("profiles")
+        .select("preferred_language")
+        .eq("id", activeStudentId)
+        .single(),
     getTutorStudentPlan(userId, activeStudentId),
     getTutorStudentMonthlyReportMetrics(activeStudentId),
     getTutorMonthlyReportQuota(userId),
     listTutorStudentMonthlyReports(userId, activeStudentId),
-  ]);
+    ]);
 
   const studentName =
     studentProfile.full_name ||
     studentProfile.email ||
     messages.tutorProgressPage.studentFallback;
+  const targetLanguageLabel = getLearningLanguageLabel(
+    normalizeLearningLanguage(studentLanguageResult.data?.preferred_language),
+  );
 
   return (
     <div className="space-y-6">
       {header}
 
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-2xl font-bold tracking-tight">
-                {studentName}
-              </h2>
-              <Badge variant="outline">
-                {messages.tutorPlansReportsPage.reportsTab}
-              </Badge>
-              <Badge variant="secondary">{currentMonthLabel}</Badge>
-            </div>
-            <p className="text-muted-foreground">
-              {messages.tutorPlansReportsPage.reportsPanelDescription(
-                studentName,
-              )}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-2xl font-bold tracking-tight">{studentName}</h2>
+            <Badge variant="outline">{targetLanguageLabel}</Badge>
             {studentProfile.cefr_level ? (
-              <Badge variant="outline">
+              <Badge variant="secondary">
                 {messages.tutorProgressPage.targetLabel(
                   studentProfile.cefr_level,
                 )}
               </Badge>
             ) : null}
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/results?student=${activeStudentId}`}>
-                {messages.tutorProgressPage.viewProgress}
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/students/${activeStudentId}/progress`}>
-                <BookMarked className="mr-2 h-4 w-4" />
-                {messages.tutorProgressPage.openCoachingWorkspace}
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/history?student=${activeStudentId}`}>
-                <History className="mr-2 h-4 w-4" />
-                {messages.tutorProgressPage.openHistory}
-              </Link>
-            </Button>
           </div>
+          <p className="text-muted-foreground">
+            {messages.tutorPlansReportsPage.reportsPanelDescription(
+              studentName,
+            )}
+          </p>
         </div>
 
         <TutorStudentMonthlyReportsWorkspace
@@ -445,7 +491,6 @@ export default async function PlansAndReportsReportsPage({
           currentReportMonth={currentWindow.reportMonth}
           currentMonthLabel={currentMonthLabel}
           plan={planRecord.plan}
-          planHref={`/plans-and-reports?student=${encodeURIComponent(activeStudentId)}`}
           metrics={metrics}
           quota={quota}
           reports={reports.map((report) => ({
@@ -455,7 +500,7 @@ export default async function PlansAndReportsReportsPage({
             title: report.title,
             generationSource: report.generationSource,
             publishedContent: report.publishedContent,
-            tutorAddendum: report.tutorAddendum,
+            reviewRating: report.reviewRating,
             generationError: report.generationError,
             generatedAt: report.generatedAt,
             publishedAt: report.publishedAt,

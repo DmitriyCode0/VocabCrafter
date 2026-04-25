@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     const { data: connections, error } = await admin
       .from("tutor_students")
       .select(
-        "tutor_id, student_id, plan_title, goal_summary, objectives, monthly_quiz_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language",
+        "tutor_id, student_id, plan_title, goal_summary, objectives, monthly_sentence_translation_target, monthly_gap_fill_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language",
       )
       .eq("status", "active");
 
@@ -75,7 +75,9 @@ export async function POST(request: NextRequest) {
                 (item): item is string => typeof item === "string",
               )
             : [],
-          monthlyQuizTarget: connection.monthly_quiz_target,
+              monthlySentenceTranslationTarget:
+                connection.monthly_sentence_translation_target,
+              monthlyGapFillTarget: connection.monthly_gap_fill_target,
           monthlyCompletedLessonsTarget:
             connection.monthly_completed_lessons_target,
           monthlyNewMasteryWordsTarget:

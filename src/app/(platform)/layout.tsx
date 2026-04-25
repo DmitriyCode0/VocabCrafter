@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { Profile } from "@/types/database";
-import type { Role } from "@/types/roles";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { AppLanguageProvider } from "@/components/providers/app-language-provider";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -44,8 +43,8 @@ export default async function PlatformLayout({
         <Sidebar profile={profile as Profile} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <Header profile={profile as Profile} />
-          <main className="flex-1 overflow-y-auto p-6">
-            <div className="animate-page-enter">{children}</div>
+          <main className="flex-1 overflow-y-auto p-6 animate-page-enter">
+            {children}
           </main>
         </div>
       </div>

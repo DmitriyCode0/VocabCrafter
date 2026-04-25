@@ -5,7 +5,6 @@ import path from "node:path";
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import {
-  getReportLanguageLabel,
   normalizeReportLanguage,
   type ReportLanguage,
 } from "@/lib/progress/monthly-report-language";
@@ -95,19 +94,19 @@ const PDF_COPY: Record<
     published: string;
     planSnapshot: string;
     planTitle: string;
-    goalSummary: string;
     objectives: string;
     grammarTopics: string;
-    reportLanguage: string;
-    targets: string;
     monthlyMetrics: string;
     publishedReport: string;
-    tutorAddendum: string;
+    reviewRating: string;
     noObjectives: string;
     noGrammarTopics: string;
     noPublishedContent: string;
     completedQuizzes: string;
+    sentenceTranslations: string;
+    gapFillExercises: string;
     completedLessons: string;
+    appLearningTime: string;
     newWords: string;
     activeDays: string;
     practicedWords: string;
@@ -130,23 +129,23 @@ const PDF_COPY: Record<
     published: "Published",
     planSnapshot: "Plan Snapshot",
     planTitle: "Plan title",
-    goalSummary: "Goal summary",
     objectives: "Objectives",
     grammarTopics: "Grammar focus topics",
-    reportLanguage: "Report language",
-    targets: "Targets",
     monthlyMetrics: "Monthly Metrics",
     publishedReport: "Published Report",
-    tutorAddendum: "Tutor Addendum",
+    reviewRating: "Tutor Review",
     noObjectives: "No objectives listed.",
     noGrammarTopics: "No grammar topics selected.",
     noPublishedContent: "No published report content available.",
     completedQuizzes: "Completed quizzes",
+    sentenceTranslations: "Sentence translation exercises",
+    gapFillExercises: "Gap fill exercises",
     completedLessons: "Completed lessons",
+    appLearningTime: "App learning time",
     newWords: "New mastery words",
-    activeDays: "Active days",
-    practicedWords: "Words practiced",
-    trackedWords: "Tracked words",
+    activeDays: "Active days in application",
+    practicedWords: "Words reviewed this month",
+    trackedWords: "Words in vocabulary tracker",
     averageScore: "Average quiz score",
     noTarget: "no target set",
     targetVs: "vs target",
@@ -155,8 +154,6 @@ const PDF_COPY: Record<
     below: "below",
     sectionHeadings: [
       "Summary",
-      "Goal Check",
-      "Highlights",
       "Focus Areas",
       "Next Steps",
     ],
@@ -170,23 +167,23 @@ const PDF_COPY: Record<
     published: "Опубліковано",
     planSnapshot: "Знімок плану",
     planTitle: "Назва плану",
-    goalSummary: "Підсумок цілі",
     objectives: "Цілі",
     grammarTopics: "Граматичні теми у фокусі",
-    reportLanguage: "Мова звіту",
-    targets: "Цільові орієнтири",
     monthlyMetrics: "Метрики за місяць",
     publishedReport: "Опублікований звіт",
-    tutorAddendum: "Коментар викладача",
+    reviewRating: "Оцінка викладача",
     noObjectives: "Цілі ще не додані.",
     noGrammarTopics: "Граматичні теми ще не вибрані.",
     noPublishedContent: "Опублікований текст звіту ще відсутній.",
     completedQuizzes: "Завершені вікторини",
+    sentenceTranslations: "Вправи на переклад речень",
+    gapFillExercises: "Вправи на заповнення пропусків",
     completedLessons: "Завершені уроки",
+    appLearningTime: "Час навчання в застосунку",
     newWords: "Нові засвоєні слова",
-    activeDays: "Активні дні",
-    practicedWords: "Практиковані слова",
-    trackedWords: "Відстежувані слова",
+    activeDays: "Активні дні в застосунку",
+    practicedWords: "Слова, повторені цього місяця",
+    trackedWords: "Слова у словниковому трекері",
     averageScore: "Середній бал",
     noTarget: "ціль не задана",
     targetVs: "проти цілі",
@@ -195,8 +192,6 @@ const PDF_COPY: Record<
     below: "нижче",
     sectionHeadings: [
       "Підсумок",
-      "Перевірка цілей",
-      "Ключові моменти",
       "Зони уваги",
       "Наступні кроки",
     ],
@@ -215,35 +210,6 @@ function sanitizeFilenameSegment(value: string) {
   return sanitized || "student";
 }
 
-function formatTargetLine(
-  label: string,
-  actual: number | null,
-  target: number | null,
-  copy: (typeof PDF_COPY)[ReportLanguage],
-  formatter: (value: number) => string = (value) => formatNumber(value, 0),
-) {
-  const actualValue = actual == null ? "n/a" : formatter(actual);
-
-  if (target == null) {
-    return `${label}: ${actualValue} (${copy.noTarget})`;
-  }
-
-  const targetValue = formatter(target);
-
-  if (actual == null) {
-    return `${label}: ${actualValue} ${copy.targetVs} ${targetValue}`;
-  }
-
-  const delta = actual - target;
-
-  if (delta === 0) {
-    return `${label}: ${actualValue} ${copy.targetVs} ${targetValue} (${copy.onTarget})`;
-  }
-
-  const direction = delta > 0 ? copy.above : copy.below;
-  return `${label}: ${actualValue} ${copy.targetVs} ${targetValue} (${formatter(Math.abs(delta))} ${direction})`;
-}
-
 function formatNumber(value: number, maximumFractionDigits = 1) {
   if (Number.isInteger(value)) {
     return value.toString();
@@ -257,6 +223,27 @@ function formatNumber(value: number, maximumFractionDigits = 1) {
 
 function formatPercentage(value: number) {
   return `${formatNumber(value)}%`;
+}
+
+function formatHours(value: number | null) {
+  if (value == null || !Number.isFinite(value)) {
+    return "n/a";
+  }
+
+  const totalMinutes = Math.round(value * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${hours} h ${minutes} min`;
+}
+
+function formatStarRating(value: number | null) {
+  if (value == null || !Number.isFinite(value) || value < 1) {
+    return "No rating";
+  }
+
+  const rating = Math.max(1, Math.min(5, Math.round(value)));
+  return `${"★".repeat(rating)}${"☆".repeat(5 - rating)}`;
 }
 
 function formatMetricProgressValue(
@@ -553,9 +540,20 @@ export async function buildMonthlyReportPdf({
     const metrics = [
       {
         label: copy.completedQuizzes,
+        value: formatNumber(report.metricsSnapshot.completedQuizzes, 0),
+      },
+      {
+        label: copy.sentenceTranslations,
         value: formatMetricProgressValue(
-          report.metricsSnapshot.completedQuizzes,
-          report.goalsSnapshot.monthlyQuizTarget,
+          report.metricsSnapshot.completedSentenceTranslations,
+          report.goalsSnapshot.monthlySentenceTranslationTarget,
+        ),
+      },
+      {
+        label: copy.gapFillExercises,
+        value: formatMetricProgressValue(
+          report.metricsSnapshot.completedGapFillExercises,
+          report.goalsSnapshot.monthlyGapFillTarget,
         ),
       },
       {
@@ -564,6 +562,10 @@ export async function buildMonthlyReportPdf({
           report.metricsSnapshot.completedLessons,
           report.goalsSnapshot.monthlyCompletedLessonsTarget,
         ),
+      },
+      {
+        label: copy.appLearningTime,
+        value: formatHours(report.metricsSnapshot.appLearningHours),
       },
       {
         label: copy.newWords,
@@ -589,8 +591,9 @@ export async function buildMonthlyReportPdf({
     const gap = 12;
     const cardWidth = (CONTENT_WIDTH - gap) / 2;
     const cardHeight = 66;
+    const rows = Math.ceil(metrics.length / 2);
 
-    ensureSpace(cardHeight * 3 + gap * 2 + 6);
+    ensureSpace(cardHeight * rows + gap * Math.max(rows - 1, 0) + 6);
 
     for (const [index, metric] of metrics.entries()) {
       const col = index % 2;
@@ -630,7 +633,7 @@ export async function buildMonthlyReportPdf({
       });
     }
 
-    cursorY -= cardHeight * 3 + gap * 2 + 6;
+    cursorY -= cardHeight * rows + gap * Math.max(rows - 1, 0) + 8;
   }
 
   function drawBulletItems(items: string[]) {
@@ -693,16 +696,6 @@ export async function buildMonthlyReportPdf({
     );
   }
 
-  if (report.goalsSnapshot.goalSummary) {
-    drawWrappedText(copy.goalSummary, PAGE_MARGIN, CONTENT_WIDTH, {
-      font: boldFont,
-      fontSize: 11,
-      color: MUTED_TEXT,
-      afterGap: 2,
-    });
-    drawParagraph(report.goalsSnapshot.goalSummary);
-  }
-
   drawWrappedText(copy.objectives, PAGE_MARGIN, CONTENT_WIDTH, {
     font: boldFont,
     fontSize: 11,
@@ -727,57 +720,15 @@ export async function buildMonthlyReportPdf({
     drawParagraph(copy.noGrammarTopics);
   }
 
-  drawWrappedText(copy.reportLanguage, PAGE_MARGIN, CONTENT_WIDTH, {
-    font: boldFont,
-    fontSize: 11,
-    color: MUTED_TEXT,
-    afterGap: 2,
-  });
-  drawParagraph(getReportLanguageLabel(report.goalsSnapshot.reportLanguage));
-
-  drawWrappedText(copy.targets, PAGE_MARGIN, CONTENT_WIDTH, {
-    font: boldFont,
-    fontSize: 11,
-    color: MUTED_TEXT,
-    afterGap: 2,
-  });
-  drawBulletItems([
-    formatTargetLine(
-      copy.completedQuizzes,
-      report.metricsSnapshot.completedQuizzes,
-      report.goalsSnapshot.monthlyQuizTarget,
-      copy,
-    ),
-    formatTargetLine(
-      copy.completedLessons,
-      report.metricsSnapshot.completedLessons,
-      report.goalsSnapshot.monthlyCompletedLessonsTarget,
-      copy,
-    ),
-    formatTargetLine(
-      copy.newWords,
-      report.metricsSnapshot.newMasteryWords,
-      report.goalsSnapshot.monthlyNewMasteryWordsTarget,
-      copy,
-    ),
-    formatTargetLine(
-      copy.averageScore,
-      report.metricsSnapshot.averageScore,
-      report.goalsSnapshot.monthlyAverageScoreTarget,
-      copy,
-      formatPercentage,
-    ),
-  ]);
-
   drawSectionTitle(copy.monthlyMetrics);
   drawMetricCardGrid();
 
   drawSectionTitle(copy.publishedReport);
   drawParagraph(report.publishedContent || copy.noPublishedContent);
 
-  if (report.tutorAddendum) {
-    drawSectionTitle(copy.tutorAddendum);
-    drawParagraph(report.tutorAddendum, italicFont);
+  if (report.reviewRating != null) {
+    drawSectionTitle(copy.reviewRating);
+    drawParagraph(formatStarRating(report.reviewRating), italicFont);
   }
 
   const pageCount = pages.length;

@@ -68,7 +68,6 @@ export default async function ResultsPage({
         </Card>
       ) : (
         <TutorStudentResultsPanel
-          studentId={activeStudentId}
           studentName={
             studentProfile.full_name ||
             studentProfile.email ||

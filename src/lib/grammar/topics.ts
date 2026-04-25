@@ -325,5 +325,5 @@ export function getTopicsForLevel(
   const targetIndex = LEVEL_ORDER.indexOf(level);
   if (targetIndex === -1) return [];
 
-  return getGrammarTopicCatalog(language).slice(0, targetIndex + 1);
+  return getUniqueGrammarTopicCatalog(language).slice(0, targetIndex + 1);
 }

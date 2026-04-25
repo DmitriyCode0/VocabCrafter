@@ -773,8 +773,11 @@ const EN_MESSAGES = {
       "Review one connected student at a time with the same performance summary used in student progress reporting.",
     monthlyDescription:
       "Compare completed quizzes and lessons for one connected student across the last 30 days.",
+    coachingDescription:
+      "Curate tutor-specific radar adjustments, coaching notes, and progress reviews for one connected student.",
     overallTab: "Overall",
     monthlyTab: "Monthly",
+    coachingTab: "Coaching",
     viewProgress: "View Progress",
     openCoachingWorkspace: "Open Coaching Workspace",
     openHistory: "Open History",
@@ -1911,8 +1914,11 @@ const UK_MESSAGES: AppMessages = {
       "Переглядайте одного під’єднаного студента за раз, використовуючи той самий підсумок успішності, що й у студентському прогресі.",
     monthlyDescription:
       "Порівнюйте завершені вікторини та уроки одного під’єднаного студента за останні 30 днів.",
+    coachingDescription:
+      "Формуйте викладацькі коригування радара, нотатки для коучингу та огляди прогресу для одного під’єднаного студента.",
     overallTab: "Загалом",
     monthlyTab: "Щомісяця",
+    coachingTab: "Коучинг",
     viewProgress: "Переглянути прогрес",
     openCoachingWorkspace: "Відкрити простір коучингу",
     openHistory: "Відкрити історію",

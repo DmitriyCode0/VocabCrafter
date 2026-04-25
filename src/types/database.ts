@@ -222,7 +222,7 @@ export interface Database {
         Row: {
           id: string;
           tutor_id: string;
-          student_id: string;
+          student_id: string | null;
           title: string | null;
           lesson_date: string;
           start_time: string | null;
@@ -236,7 +236,7 @@ export interface Database {
         Insert: {
           id?: string;
           tutor_id: string;
-          student_id: string;
+          student_id?: string | null;
           title?: string | null;
           lesson_date: string;
           start_time?: string | null;
@@ -249,7 +249,7 @@ export interface Database {
         };
         Update: {
           tutor_id?: string;
-          student_id?: string;
+          student_id?: string | null;
           title?: string | null;
           lesson_date?: string;
           start_time?: string | null;
@@ -1012,6 +1012,8 @@ export interface Database {
           grammar_topic_keys: Json;
           report_language: string;
           monthly_quiz_target: number | null;
+          monthly_sentence_translation_target: number | null;
+          monthly_gap_fill_target: number | null;
           monthly_completed_lessons_target: number | null;
           monthly_new_mastery_words_target: number | null;
           monthly_average_score_target: number | null;
@@ -1032,6 +1034,8 @@ export interface Database {
           grammar_topic_keys?: Json;
           report_language?: string;
           monthly_quiz_target?: number | null;
+          monthly_sentence_translation_target?: number | null;
+          monthly_gap_fill_target?: number | null;
           monthly_completed_lessons_target?: number | null;
           monthly_new_mastery_words_target?: number | null;
           monthly_average_score_target?: number | null;
@@ -1051,6 +1055,8 @@ export interface Database {
           grammar_topic_keys?: Json;
           report_language?: string;
           monthly_quiz_target?: number | null;
+          monthly_sentence_translation_target?: number | null;
+          monthly_gap_fill_target?: number | null;
           monthly_completed_lessons_target?: number | null;
           monthly_new_mastery_words_target?: number | null;
           monthly_average_score_target?: number | null;
@@ -1088,6 +1094,7 @@ export interface Database {
           ai_draft: string | null;
           published_content: string | null;
           tutor_addendum: string | null;
+          review_rating: number | null;
           plan_snapshot: Json;
           metrics_snapshot: Json;
           generation_error: string | null;
@@ -1110,6 +1117,7 @@ export interface Database {
           ai_draft?: string | null;
           published_content?: string | null;
           tutor_addendum?: string | null;
+          review_rating?: number | null;
           plan_snapshot?: Json;
           metrics_snapshot?: Json;
           generation_error?: string | null;
@@ -1131,6 +1139,7 @@ export interface Database {
           ai_draft?: string | null;
           published_content?: string | null;
           tutor_addendum?: string | null;
+          review_rating?: number | null;
           plan_snapshot?: Json;
           metrics_snapshot?: Json;
           generation_error?: string | null;

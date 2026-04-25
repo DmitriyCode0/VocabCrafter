@@ -438,7 +438,7 @@ export function StudentsClient({
                     </Button>
                     <Button variant="outline" size="sm" asChild>
                       <Link
-                        href={`/students/${conn.student_id as string}/progress`}
+                        href={`/results/coaching?student=${conn.student_id as string}`}
                       >
                         <BookMarked className="mr-2 h-4 w-4" />
                         Coach

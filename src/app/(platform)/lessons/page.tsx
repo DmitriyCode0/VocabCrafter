@@ -82,7 +82,7 @@ interface CompletedLessonChargeRow {
 
 interface TutorLessonRow {
   id: string;
-  student_id: string;
+  student_id: string | null;
   title: string | null;
   lesson_date: string;
   start_time: string | null;
@@ -135,8 +135,8 @@ function mapTutorLessons(rows: TutorLessonRow[]): MonthlyLessonItem[] {
     priceCents: row.price_cents,
     studentId: row.student_id,
     participantName:
-      row.student_profile?.full_name || row.student_profile?.email || "Student",
-    participantLabel: "Student",
+      row.student_profile?.full_name || row.student_profile?.email || "One-time",
+    participantLabel: row.student_id ? "Student" : "Type",
   }));
 }
 
@@ -487,8 +487,8 @@ async function TutorLessonsView({
           <CardHeader>
             <CardTitle className="text-base">Tutor Lesson Planner</CardTitle>
             <CardDescription>
-              Add lessons for connected students so they appear on both
-              calendars.
+                Add one-time lessons for yourself or lessons for connected
+                students.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -515,8 +515,8 @@ async function TutorLessonsView({
         lessons={lessons}
         emptyMessage={
           connectedStudents.length > 0
-            ? "No lessons scheduled in this month yet. Add one to make it visible to the student."
-            : "Connect a student first, then you can add lessons to the calendar."
+            ? "No lessons scheduled in this month yet. Add a one-time lesson or one for a connected student."
+            : "No lessons scheduled in this month yet. Add a one-time lesson or connect a student."
         }
         canManageLessons
         studentOptions={connectedStudents}

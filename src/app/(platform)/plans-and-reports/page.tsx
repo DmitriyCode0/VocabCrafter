@@ -1,12 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  BookMarked,
   BookOpen,
   FileText,
-  History,
   Target,
-  Trophy,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -142,7 +139,12 @@ export default async function PlansAndReportsPage({
                           {getReportLanguageLabel(entry.plan.reportLanguage)}
                         </Badge>
                         <Badge variant="outline">
-                          Quiz target: {entry.plan.monthlyQuizTarget ?? "n/a"}
+                          Sentence translation target:{" "}
+                          {entry.plan.monthlySentenceTranslationTarget ?? "n/a"}
+                        </Badge>
+                        <Badge variant="outline">
+                          Gap fill target:{" "}
+                          {entry.plan.monthlyGapFillTarget ?? "n/a"}
                         </Badge>
                         <Badge variant="outline">
                           Lesson target:{" "}
@@ -376,51 +378,23 @@ export default async function PlansAndReportsPage({
       {header}
 
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-2xl font-bold tracking-tight">
-                {studentName}
-              </h2>
-              <Badge variant="outline">
-                {messages.tutorPlansReportsPage.plansTab}
-              </Badge>
-              {studentProfileResult.data.cefr_level ? (
-                <Badge variant="secondary">
-                  {messages.tutorProgressPage.targetLabel(
-                    studentProfileResult.data.cefr_level,
-                  )}
-                </Badge>
-              ) : null}
-            </div>
-            <p className="text-muted-foreground">
-              {messages.tutorPlansReportsPage.planPanelDescription(studentName)}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-2xl font-bold tracking-tight">{studentName}</h2>
             <Badge variant="outline">
               {getLearningLanguageLabel(targetLanguage)}
             </Badge>
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/results?student=${activeStudentId}`}>
-                <Trophy className="mr-2 h-4 w-4" />
-                {messages.tutorProgressPage.viewProgress}
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/students/${activeStudentId}/progress`}>
-                <BookMarked className="mr-2 h-4 w-4" />
-                {messages.tutorProgressPage.openCoachingWorkspace}
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/history?student=${activeStudentId}`}>
-                <History className="mr-2 h-4 w-4" />
-                {messages.tutorProgressPage.openHistory}
-              </Link>
-            </Button>
+            {studentProfileResult.data.cefr_level ? (
+              <Badge variant="secondary">
+                {messages.tutorProgressPage.targetLabel(
+                  studentProfileResult.data.cefr_level,
+                )}
+              </Badge>
+            ) : null}
           </div>
+          <p className="text-muted-foreground">
+            {messages.tutorPlansReportsPage.planPanelDescription(studentName)}
+          </p>
         </div>
 
         <TutorStudentPlanWorkspace
@@ -430,7 +404,6 @@ export default async function PlansAndReportsPage({
           currentMonthLabel={currentMonthLabel}
           plan={planRecord.plan}
           metrics={metrics}
-          reportsHref={`/plans-and-reports/reports?student=${encodeURIComponent(activeStudentId)}`}
           availableGrammarTopics={availableGrammarTopics}
           targetLanguageLabel={getLearningLanguageLabel(targetLanguage)}
         />

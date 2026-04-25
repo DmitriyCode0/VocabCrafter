@@ -31,7 +31,8 @@ export const tutorStudentPlanSchema = z.object({
     .nullable(),
   goalSummary: nullableTrimmedText,
   objectives: z.array(z.string().trim().min(1).max(240)).max(10).default([]),
-  monthlyQuizTarget: nullableWholeNumberSchema.default(null),
+  monthlySentenceTranslationTarget: nullableWholeNumberSchema.default(null),
+  monthlyGapFillTarget: nullableWholeNumberSchema.default(null),
   monthlyCompletedLessonsTarget: nullableWholeNumberSchema.default(null),
   monthlyNewMasteryWordsTarget: nullableWholeNumberSchema.default(null),
   monthlyAverageScoreTarget: nullablePercentageSchema.default(null),
@@ -43,7 +44,8 @@ export const tutorStudentPlanInputSchema = z.object({
   planTitle: z.string().trim().max(120).optional(),
   goalSummary: z.string().trim().max(2_000).optional(),
   objectives: z.array(z.string().trim().min(1).max(240)).max(10).optional(),
-  monthlyQuizTarget: nullableWholeNumberSchema.optional(),
+  monthlySentenceTranslationTarget: nullableWholeNumberSchema.optional(),
+  monthlyGapFillTarget: nullableWholeNumberSchema.optional(),
   monthlyCompletedLessonsTarget: nullableWholeNumberSchema.optional(),
   monthlyNewMasteryWordsTarget: nullableWholeNumberSchema.optional(),
   monthlyAverageScoreTarget: nullablePercentageSchema.optional(),
@@ -118,7 +120,8 @@ function normalizePlanShape(input: {
   plan_title?: string | null;
   goal_summary?: string | null;
   objectives?: unknown;
-  monthly_quiz_target?: number | null;
+  monthly_sentence_translation_target?: number | null;
+  monthly_gap_fill_target?: number | null;
   monthly_completed_lessons_target?: number | null;
   monthly_new_mastery_words_target?: number | null;
   monthly_average_score_target?: number | null;
@@ -129,7 +132,12 @@ function normalizePlanShape(input: {
     planTitle: normalizeText(input.plan_title),
     goalSummary: normalizeText(input.goal_summary),
     objectives: normalizeObjectives(input.objectives),
-    monthlyQuizTarget: normalizeNullableNumber(input.monthly_quiz_target),
+    monthlySentenceTranslationTarget: normalizeNullableNumber(
+      input.monthly_sentence_translation_target,
+    ),
+    monthlyGapFillTarget: normalizeNullableNumber(
+      input.monthly_gap_fill_target,
+    ),
     monthlyCompletedLessonsTarget: normalizeNullableNumber(
       input.monthly_completed_lessons_target,
     ),
@@ -150,7 +158,8 @@ export function hasConfiguredTutorStudentPlan(plan: TutorStudentPlan) {
     plan.goalSummary ||
     plan.objectives.length > 0 ||
     plan.grammarTopicKeys.length > 0 ||
-    plan.monthlyQuizTarget != null ||
+    plan.monthlySentenceTranslationTarget != null ||
+    plan.monthlyGapFillTarget != null ||
     plan.monthlyCompletedLessonsTarget != null ||
     plan.monthlyNewMasteryWordsTarget != null ||
     plan.monthlyAverageScoreTarget != null,
@@ -165,7 +174,7 @@ export async function getTutorStudentPlan(
   const { data, error } = await admin
     .from("tutor_students")
     .select(
-      "id, tutor_id, student_id, plan_title, goal_summary, objectives, monthly_quiz_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language, updated_at",
+      "id, tutor_id, student_id, plan_title, goal_summary, objectives, monthly_sentence_translation_target, monthly_gap_fill_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language, updated_at",
     )
     .eq("tutor_id", tutorId)
     .eq("student_id", studentId)
@@ -209,7 +218,9 @@ export async function updateTutorStudentPlan(
         parsed.objectives == null
           ? undefined
           : normalizeObjectives(parsed.objectives),
-      monthly_quiz_target: parsed.monthlyQuizTarget,
+      monthly_sentence_translation_target:
+        parsed.monthlySentenceTranslationTarget,
+      monthly_gap_fill_target: parsed.monthlyGapFillTarget,
       monthly_completed_lessons_target: parsed.monthlyCompletedLessonsTarget,
       monthly_new_mastery_words_target: parsed.monthlyNewMasteryWordsTarget,
       monthly_average_score_target: parsed.monthlyAverageScoreTarget,
@@ -226,7 +237,7 @@ export async function updateTutorStudentPlan(
     .eq("student_id", studentId)
     .eq("status", "active")
     .select(
-      "id, tutor_id, student_id, plan_title, goal_summary, objectives, monthly_quiz_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language, updated_at",
+      "id, tutor_id, student_id, plan_title, goal_summary, objectives, monthly_sentence_translation_target, monthly_gap_fill_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language, updated_at",
     )
     .single();
 
@@ -250,7 +261,7 @@ export async function listStudentTutorPlans(
   const { data, error } = await admin
     .from("tutor_students")
     .select(
-      "id, tutor_id, student_id, plan_title, goal_summary, objectives, monthly_quiz_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language, updated_at, profiles!tutor_students_tutor_id_fkey(id, full_name, email)",
+      "id, tutor_id, student_id, plan_title, goal_summary, objectives, monthly_sentence_translation_target, monthly_gap_fill_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language, updated_at, profiles!tutor_students_tutor_id_fkey(id, full_name, email)",
     )
     .eq("student_id", studentId)
     .eq("status", "active")

@@ -30,6 +30,9 @@ import {
   getLessonDisplayTitle,
   getLessonStatusLabel,
   getSuggestedLessonEndTime,
+  isOneTimeLessonStudentValue,
+  ONE_TIME_LESSON_OPTION_LABEL,
+  ONE_TIME_LESSON_OPTION_VALUE,
   parseLessonCurrencyInput,
   type LessonStatus,
   type LessonStudentOption,
@@ -38,7 +41,7 @@ import {
 interface EditLessonDialogProps {
   lesson: {
     id: string;
-    studentId: string;
+    studentId: string | null;
     title: string | null;
     lessonDate: string;
     startTime: string | null;
@@ -58,13 +61,23 @@ interface LessonMutationResponse {
   };
 }
 
+function getEditableStudentValue(studentId: string | null) {
+  return studentId ?? ONE_TIME_LESSON_OPTION_VALUE;
+}
+
+function normalizeSelectedStudentValue(value: string) {
+  return isOneTimeLessonStudentValue(value) ? null : value;
+}
+
 export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
   const initialSuggestedEndTime = getSuggestedLessonEndTime(lesson.startTime);
   const displayTitle = getLessonDisplayTitle(lesson.title);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [studentId, setStudentId] = useState(lesson.studentId);
+  const [studentId, setStudentId] = useState(
+    getEditableStudentValue(lesson.studentId),
+  );
   const [title, setTitle] = useState(lesson.title ?? "");
   const [lessonDate, setLessonDate] = useState(lesson.lessonDate);
   const [startTime, setStartTime] = useState(lesson.startTime ?? "");
@@ -80,12 +93,15 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
   );
 
   const selectedStudentName = useMemo(
-    () => students.find((student) => student.id === studentId)?.name,
+    () =>
+      isOneTimeLessonStudentValue(studentId)
+        ? ONE_TIME_LESSON_OPTION_LABEL
+        : students.find((student) => student.id === studentId)?.name,
     [studentId, students],
   );
 
   function resetForm() {
-    setStudentId(lesson.studentId);
+    setStudentId(getEditableStudentValue(lesson.studentId));
     setTitle(lesson.title ?? "");
     setLessonDate(lesson.lessonDate);
     setStartTime(lesson.startTime ?? "");
@@ -97,6 +113,21 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
       Boolean(initialSuggestedEndTime) &&
         lesson.endTime === initialSuggestedEndTime,
     );
+  }
+
+  function handleStudentChange(nextStudentId: string) {
+    setStudentId(nextStudentId);
+
+    if (isOneTimeLessonStudentValue(nextStudentId)) {
+      setPriceInput(formatLessonCurrencyInput(0));
+      return;
+    }
+
+    const nextStudent = students.find((student) => student.id === nextStudentId);
+
+    if (nextStudent) {
+      setPriceInput(formatLessonCurrencyInput(nextStudent.lessonPriceCents ?? 0));
+    }
   }
 
   function handleStartTimeChange(nextStartTime: string) {
@@ -119,8 +150,8 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
   }
 
   async function handleSave() {
-    if (!studentId || !lessonDate) {
-      toast.error("Please choose a student and lesson date");
+    if (!lessonDate) {
+      toast.error("Please choose a lesson date");
       return;
     }
 
@@ -138,7 +169,7 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId,
+          studentId: normalizeSelectedStudentValue(studentId),
           title: title.trim() || null,
           lessonDate,
           startTime: startTime || null,
@@ -204,11 +235,14 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Student</Label>
-            <Select value={studentId} onValueChange={setStudentId}>
+            <Select value={studentId} onValueChange={handleStudentChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a student" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={ONE_TIME_LESSON_OPTION_VALUE}>
+                  {ONE_TIME_LESSON_OPTION_LABEL}
+                </SelectItem>
                 {students.map((student) => (
                   <SelectItem key={student.id} value={student.id}>
                     {student.name}

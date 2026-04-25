@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlusCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -29,6 +29,9 @@ import {
   formatLessonCurrencyInput,
   getLessonStatusLabel,
   getSuggestedLessonEndTime,
+  isOneTimeLessonStudentValue,
+  ONE_TIME_LESSON_OPTION_LABEL,
+  ONE_TIME_LESSON_OPTION_VALUE,
   parseLessonCurrencyInput,
   type LessonStatus,
   type LessonStudentOption,
@@ -36,6 +39,11 @@ import {
 
 interface CreateLessonDialogProps {
   students: LessonStudentOption[];
+  defaultLessonDate?: string;
+  defaultStudentId?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
 }
 
 interface LessonMutationResponse {
@@ -54,50 +62,105 @@ function getTodayIsoDate() {
   return `${year}-${month}-${day}`;
 }
 
-export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
+function normalizeSelectedStudentValue(value: string) {
+  return isOneTimeLessonStudentValue(value) ? null : value;
+}
+
+export function CreateLessonDialog({
+  students,
+  defaultLessonDate,
+  defaultStudentId,
+  open,
+  onOpenChange,
+  showTrigger = true,
+}: CreateLessonDialogProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [studentId, setStudentId] = useState("");
+  const [internalOpen, setInternalOpen] = useState(false);
+  const resolvedDefaultLessonDate = defaultLessonDate ?? getTodayIsoDate();
+  const resolvedDefaultStudentId = useMemo(() => {
+    if (defaultStudentId && isOneTimeLessonStudentValue(defaultStudentId)) {
+      return ONE_TIME_LESSON_OPTION_VALUE;
+    }
+
+    if (
+      defaultStudentId &&
+      students.some((student) => student.id === defaultStudentId)
+    ) {
+      return defaultStudentId;
+    }
+
+    return ONE_TIME_LESSON_OPTION_VALUE;
+  }, [defaultStudentId, students]);
+  const resolvedDefaultPriceInput = useMemo(() => {
+    if (isOneTimeLessonStudentValue(resolvedDefaultStudentId)) {
+      return formatLessonCurrencyInput(0);
+    }
+
+    const selectedStudent = students.find(
+      (student) => student.id === resolvedDefaultStudentId,
+    );
+
+    return formatLessonCurrencyInput(selectedStudent?.lessonPriceCents ?? 0);
+  }, [resolvedDefaultStudentId, students]);
+  const isControlled = open !== undefined;
+  const dialogOpen = isControlled ? open : internalOpen;
+  const [studentId, setStudentId] = useState(resolvedDefaultStudentId);
   const [title, setTitle] = useState("");
-  const [lessonDate, setLessonDate] = useState(getTodayIsoDate());
+  const [lessonDate, setLessonDate] = useState(resolvedDefaultLessonDate);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<LessonStatus>("completed");
-  const [priceInput, setPriceInput] = useState("0.00");
+  const [priceInput, setPriceInput] = useState(resolvedDefaultPriceInput);
   const [autoAdjustEndTime, setAutoAdjustEndTime] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const isDisabled = students.length === 0;
+  const isDisabled = false;
   const selectedStudentName = useMemo(
-    () => students.find((student) => student.id === studentId)?.name,
+    () =>
+      isOneTimeLessonStudentValue(studentId)
+        ? ONE_TIME_LESSON_OPTION_LABEL
+        : students.find((student) => student.id === studentId)?.name,
     [studentId, students],
   );
-  const selectedStudent = useMemo(
-    () => students.find((student) => student.id === studentId) ?? null,
-    [studentId, students],
-  );
-
-  useEffect(() => {
-    if (!selectedStudent) {
-      return;
-    }
-
-    setPriceInput(
-      formatLessonCurrencyInput(selectedStudent.lessonPriceCents ?? 0),
-    );
-  }, [selectedStudent]);
 
   function resetForm() {
-    setStudentId("");
+    setStudentId(resolvedDefaultStudentId);
     setTitle("");
-    setLessonDate(getTodayIsoDate());
+    setLessonDate(resolvedDefaultLessonDate);
     setStartTime("");
     setEndTime("");
     setNotes("");
     setStatus("completed");
-    setPriceInput("0.00");
+    setPriceInput(resolvedDefaultPriceInput);
     setAutoAdjustEndTime(true);
+  }
+
+  function handleStudentChange(nextStudentId: string) {
+    setStudentId(nextStudentId);
+
+    if (isOneTimeLessonStudentValue(nextStudentId)) {
+      setPriceInput(formatLessonCurrencyInput(0));
+      return;
+    }
+
+    const nextStudent = students.find((student) => student.id === nextStudentId);
+
+    if (nextStudent) {
+      setPriceInput(formatLessonCurrencyInput(nextStudent.lessonPriceCents ?? 0));
+    }
+  }
+
+  function handleDialogOpenChange(nextOpen: boolean) {
+    if (!isControlled) {
+      setInternalOpen(nextOpen);
+    }
+
+    if (!nextOpen) {
+      resetForm();
+    }
+
+    onOpenChange?.(nextOpen);
   }
 
   function handleStartTimeChange(nextStartTime: string) {
@@ -122,8 +185,8 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!studentId || !lessonDate) {
-      toast.error("Please choose a student and lesson date");
+    if (!lessonDate) {
+      toast.error("Please choose a lesson date");
       return;
     }
 
@@ -141,7 +204,7 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId,
+          studentId: normalizeSelectedStudentValue(studentId),
           title: title.trim() || null,
           lessonDate,
           startTime: startTime || null,
@@ -169,8 +232,7 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
       ) {
         toast.error(data.calendarSync.message);
       }
-      setOpen(false);
-      resetForm();
+      handleDialogOpenChange(false);
       router.refresh();
     } catch (error) {
       toast.error(
@@ -183,37 +245,38 @@ export function CreateLessonDialog({ students }: CreateLessonDialogProps) {
 
   return (
     <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        setOpen(nextOpen);
-        if (!nextOpen) {
-          resetForm();
-        }
-      }}
+      open={dialogOpen}
+      onOpenChange={handleDialogOpenChange}
     >
-      <DialogTrigger asChild>
-        <Button disabled={isDisabled}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add Lesson
-        </Button>
-      </DialogTrigger>
+      {showTrigger ? (
+        <DialogTrigger asChild>
+          <Button disabled={isDisabled}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Lesson
+          </Button>
+        </DialogTrigger>
+      ) : null}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add Lesson</DialogTitle>
           <DialogDescription>
-            Tutors can add lessons for connected students. Students will see the
-            lesson on their monthly calendar.
+            Tutors can add one-time lessons for themselves or lessons for
+            connected students. Connected-student lessons appear on the
+            student&apos;s monthly calendar.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Student</Label>
-            <Select value={studentId} onValueChange={setStudentId}>
+            <Select value={studentId} onValueChange={handleStudentChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a student" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={ONE_TIME_LESSON_OPTION_VALUE}>
+                  {ONE_TIME_LESSON_OPTION_LABEL}
+                </SelectItem>
                 {students.map((student) => (
                   <SelectItem key={student.id} value={student.id}>
                     {student.name}

@@ -24,7 +24,7 @@ const timeSchema = z
 
 const createLessonSchema = z
   .object({
-    studentId: z.string().uuid(),
+    studentId: z.string().uuid().nullable().optional(),
     title: lessonTitleSchema,
     lessonDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     startTime: timeSchema,
@@ -76,27 +76,33 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: connection, error: connectionError } = await supabaseAdmin
-    .from("tutor_students")
-    .select("id, lesson_price_cents")
-    .eq("tutor_id", user.id)
-    .eq("student_id", parsed.data.studentId)
-    .eq("status", "active")
-    .maybeSingle();
+  let connection: { id: string; lesson_price_cents: number } | null = null;
 
-  if (connectionError) {
-    console.error("Lesson connection check error:", connectionError);
-    return NextResponse.json(
-      { error: "Failed to validate tutor/student connection" },
-      { status: 500 },
-    );
-  }
+  if (parsed.data.studentId) {
+    const { data: connectionData, error: connectionError } = await supabaseAdmin
+      .from("tutor_students")
+      .select("id, lesson_price_cents")
+      .eq("tutor_id", user.id)
+      .eq("student_id", parsed.data.studentId)
+      .eq("status", "active")
+      .maybeSingle();
 
-  if (!connection) {
-    return NextResponse.json(
-      { error: "You can only add lessons for connected students" },
-      { status: 403 },
-    );
+    if (connectionError) {
+      console.error("Lesson connection check error:", connectionError);
+      return NextResponse.json(
+        { error: "Failed to validate tutor/student connection" },
+        { status: 500 },
+      );
+    }
+
+    if (!connectionData) {
+      return NextResponse.json(
+        { error: "You can only add lessons for connected students" },
+        { status: 403 },
+      );
+    }
+
+    connection = connectionData;
   }
 
   const nowIso = new Date().toISOString();
@@ -104,14 +110,14 @@ export async function POST(request: NextRequest) {
     .from("tutor_student_lessons")
     .insert({
       tutor_id: user.id,
-      student_id: parsed.data.studentId,
+      student_id: parsed.data.studentId ?? null,
       title: parsed.data.title,
       lesson_date: parsed.data.lessonDate,
       start_time: parsed.data.startTime ?? null,
       end_time: parsed.data.endTime ?? null,
       notes: parsed.data.notes ?? null,
       status: parsed.data.status,
-      price_cents: parsed.data.priceCents ?? connection.lesson_price_cents,
+      price_cents: parsed.data.priceCents ?? connection?.lesson_price_cents ?? 0,
       updated_at: nowIso,
     })
     .select()

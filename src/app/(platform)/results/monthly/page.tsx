@@ -1,5 +1,6 @@
 import { Trophy } from "lucide-react";
 import { getAppMessages } from "@/lib/i18n/messages";
+import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 import { getTutorProgressPageData } from "@/lib/progress/tutor-progress-page-data";
 import { getStudentMonthlyActivity } from "@/lib/progress/tutor-progress-monthly";
 import { ResultsStudentFilter } from "@/components/progress/results-student-filter";
@@ -24,9 +25,12 @@ export default async function MonthlyResultsPage({
   const { role, appLanguage, students, activeStudentId, studentProfile } =
     await getTutorProgressPageData(requestedStudentId);
   const messages = getAppMessages(appLanguage);
-  const trend = activeStudentId
-    ? await getStudentMonthlyActivity(activeStudentId, appLanguage)
-    : null;
+  const [trend, snapshot] = activeStudentId
+    ? await Promise.all([
+        getStudentMonthlyActivity(activeStudentId, appLanguage),
+        getStudentProgressSnapshot(activeStudentId),
+      ])
+    : [null, null];
 
   return (
     <div className="space-y-6">
@@ -68,13 +72,13 @@ export default async function MonthlyResultsPage({
         </Card>
       ) : (
         <TutorStudentMonthlyPerformance
-          studentId={activeStudentId}
           studentName={
             studentProfile.full_name ||
             studentProfile.email ||
             messages.tutorProgressPage.studentFallback
           }
           studentLevel={studentProfile.cefr_level}
+          targetLanguageLabel={snapshot.profile.targetLanguageLabel}
           trend={trend}
         />
       )}

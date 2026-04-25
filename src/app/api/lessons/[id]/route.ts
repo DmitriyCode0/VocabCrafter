@@ -27,7 +27,7 @@ const timeSchema = z
 
 const updateLessonSchema = z
   .object({
-    studentId: z.string().uuid(),
+    studentId: z.string().uuid().nullable().optional(),
     title: lessonTitleSchema,
     lessonDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     startTime: timeSchema,
@@ -154,30 +154,34 @@ export async function PATCH(
   }
 
   try {
-    const connection = await validateConnectedStudent(
-      access.user.id,
-      parsed.data.studentId,
-      access.supabaseAdmin,
-    );
+    let connection: { id: string; lesson_price_cents: number } | null = null;
 
-    if (!connection) {
-      return NextResponse.json(
-        { error: "You can only assign lessons to connected students" },
-        { status: 403 },
+    if (parsed.data.studentId) {
+      connection = await validateConnectedStudent(
+        access.user.id,
+        parsed.data.studentId,
+        access.supabaseAdmin,
       );
+
+      if (!connection) {
+        return NextResponse.json(
+          { error: "You can only assign lessons to connected students" },
+          { status: 403 },
+        );
+      }
     }
 
     const { data, error } = await access.supabaseAdmin
       .from("tutor_student_lessons")
       .update({
-        student_id: parsed.data.studentId,
+        student_id: parsed.data.studentId ?? null,
         title: parsed.data.title,
         lesson_date: parsed.data.lessonDate,
         start_time: parsed.data.startTime ?? null,
         end_time: parsed.data.endTime ?? null,
         notes: parsed.data.notes ?? null,
         status: parsed.data.status,
-        price_cents: parsed.data.priceCents ?? connection.lesson_price_cents,
+        price_cents: parsed.data.priceCents ?? connection?.lesson_price_cents ?? 0,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)

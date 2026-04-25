@@ -1,17 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   Download,
-  ExternalLink,
   FileText,
   Loader2,
   Save,
   Sparkles,
-  Target,
+  Star,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -39,27 +38,28 @@ import {
   type ReportLanguage,
 } from "@/lib/progress/monthly-report-language";
 
-interface MonthlyReportGoals {
-  planTitle: string | null;
-  goalSummary: string | null;
-  objectives: string[];
-  monthlyQuizTarget: number | null;
-  monthlyCompletedLessonsTarget: number | null;
-  monthlyNewMasteryWordsTarget: number | null;
-  monthlyAverageScoreTarget: number | null;
-  grammarTopicKeys: string[];
-  reportLanguage: ReportLanguage;
-}
-
 interface MonthlyReportMetrics {
   activeDays: number;
   completedQuizzes: number;
+  completedSentenceTranslations: number;
+  completedGapFillExercises: number;
   completedLessons: number;
+  appLearningHours: number | null;
   totalHours: number;
   newMasteryWords: number;
   practicedWords: number;
   trackedWordsTotal: number;
   averageScore: number | null;
+}
+
+interface MonthlyReportGoals {
+  grammarTopicKeys: string[];
+  monthlySentenceTranslationTarget: number | null;
+  monthlyGapFillTarget: number | null;
+  monthlyCompletedLessonsTarget: number | null;
+  monthlyNewMasteryWordsTarget: number | null;
+  monthlyAverageScoreTarget: number | null;
+  reportLanguage: ReportLanguage;
 }
 
 interface MonthlyReportQuotaSnapshot {
@@ -78,7 +78,7 @@ interface StoredMonthlyReport {
   title: string;
   generationSource: "manual" | "scheduled";
   publishedContent: string | null;
-  tutorAddendum: string | null;
+  reviewRating: number | null;
   generationError: string | null;
   generatedAt: string;
   publishedAt: string | null;
@@ -91,8 +91,14 @@ interface TutorStudentMonthlyReportsWorkspaceProps {
   studentName: string;
   currentReportMonth: string;
   currentMonthLabel: string;
-  plan: MonthlyReportGoals;
-  planHref: string;
+  plan: {
+    monthlySentenceTranslationTarget: number | null;
+    monthlyGapFillTarget: number | null;
+    monthlyCompletedLessonsTarget: number | null;
+    monthlyNewMasteryWordsTarget: number | null;
+    monthlyAverageScoreTarget: number | null;
+    reportLanguage: ReportLanguage;
+  };
   metrics: MonthlyReportMetrics;
   quota: MonthlyReportQuotaSnapshot;
   reports: StoredMonthlyReport[];
@@ -164,8 +170,25 @@ function formatPercentageProgressValue(
   return `${formatPercentage(actual)} / ${formatPercentage(target)}`;
 }
 
-function formatHours(value: number) {
-  return `${formatNumber(value, 2)} h`;
+function formatHours(value: number | null) {
+  if (value == null || !Number.isFinite(value)) {
+    return "n/a";
+  }
+
+  const totalMinutes = Math.round(value * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${hours} h ${minutes} min`;
+}
+
+function formatStarRating(value: number | null) {
+  if (value == null || !Number.isFinite(value) || value < 1) {
+    return "No rating";
+  }
+
+  const rating = Math.max(1, Math.min(5, Math.round(value)));
+  return `${"★".repeat(rating)}${"☆".repeat(5 - rating)}`;
 }
 
 export function TutorStudentMonthlyReportsWorkspace({
@@ -174,7 +197,6 @@ export function TutorStudentMonthlyReportsWorkspace({
   currentReportMonth,
   currentMonthLabel,
   plan,
-  planHref,
   metrics,
   quota,
   reports,
@@ -182,33 +204,36 @@ export function TutorStudentMonthlyReportsWorkspace({
   const router = useRouter();
   const currentReport =
     reports.find((report) => report.reportMonth === currentReportMonth) ?? null;
-  const previousReports = reports.filter(
-    (report) => report.reportMonth !== currentReportMonth,
-  );
+  const historyReports = reports;
 
   const [reportTitle, setReportTitle] = useState(currentReport?.title ?? "");
   const [publishedContent, setPublishedContent] = useState(
     currentReport?.publishedContent ?? "",
   );
-  const [tutorAddendum, setTutorAddendum] = useState(
-    currentReport?.tutorAddendum ?? "",
+  const [reviewRating, setReviewRating] = useState(
+    currentReport?.reviewRating ?? 0,
   );
+  const [hoveredReviewRating, setHoveredReviewRating] = useState(0);
   const [reportLanguage, setReportLanguage] = useState<ReportLanguage>(
     plan.reportLanguage,
   );
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isSavingReport, setIsSavingReport] = useState(false);
   const [isSavingReportLanguage, setIsSavingReportLanguage] = useState(false);
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     setReportTitle(currentReport?.title ?? "");
     setPublishedContent(currentReport?.publishedContent ?? "");
-    setTutorAddendum(currentReport?.tutorAddendum ?? "");
+    setReviewRating(currentReport?.reviewRating ?? 0);
+    setHoveredReviewRating(0);
   }, [
     currentReport?.id,
     currentReport?.publishedContent,
+    currentReport?.reviewRating,
     currentReport?.title,
-    currentReport?.tutorAddendum,
   ]);
 
   useEffect(() => {
@@ -308,7 +333,7 @@ export function TutorStudentMonthlyReportsWorkspace({
           body: JSON.stringify({
             title: reportTitle,
             publishedContent,
-            tutorAddendum: tutorAddendum.trim() ? tutorAddendum.trim() : null,
+            reviewRating: reviewRating > 0 ? reviewRating : null,
           }),
         },
       );
@@ -332,96 +357,51 @@ export function TutorStudentMonthlyReportsWorkspace({
     }
   }
 
+  async function handleDeleteReport(report: StoredMonthlyReport) {
+    const confirmed = window.confirm(
+      `Delete the ${report.reportMonth} report for ${studentName}? This cannot be undone.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingReportId(report.id);
+
+    try {
+      const response = await fetch(
+        `/api/tutor/students/${studentId}/reports/${report.id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to delete monthly report");
+      }
+
+      toast.success(`Deleted ${report.reportMonth} report`);
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete monthly report",
+      );
+    } finally {
+      setDeletingReportId((current) =>
+        current === report.id ? null : current,
+      );
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Target className="h-5 w-5 text-primary" />
-              Current Plan
-            </CardTitle>
-            <CardDescription>
-              Monthly reports use the student&apos;s plan page as their source
-              of truth. Update goals and objectives there, then generate the
-              report from this page.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {plan.planTitle ? (
-              <div className="space-y-1">
-                <Label>Plan title</Label>
-                <p className="font-medium">{plan.planTitle}</p>
-              </div>
-            ) : null}
-
-            {plan.goalSummary ? (
-              <div className="space-y-1">
-                <Label>Goal summary</Label>
-                <p className="text-sm leading-relaxed">{plan.goalSummary}</p>
-              </div>
-            ) : null}
-
-            <div className="space-y-2">
-              <Label>Objectives</Label>
-              {plan.objectives.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No objectives listed yet.
-                </p>
-              ) : (
-                <ul className="space-y-2 text-sm leading-relaxed">
-                  {plan.objectives.map((objective) => (
-                    <li key={objective} className="flex gap-2">
-                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
-                      <span>{objective}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">
-                Quiz target: {plan.monthlyQuizTarget ?? "n/a"}
-              </Badge>
-              <Badge variant="outline">
-                Lesson target: {plan.monthlyCompletedLessonsTarget ?? "n/a"}
-              </Badge>
-              <Badge variant="outline">
-                New words: {plan.monthlyNewMasteryWordsTarget ?? "n/a"}
-              </Badge>
-              <Badge variant="outline">
-                Avg score target:{" "}
-                {formatPercentage(plan.monthlyAverageScoreTarget)}
-              </Badge>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Grammar topics</Label>
-              {plan.grammarTopicKeys.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No grammar topics selected yet.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {plan.grammarTopicKeys.map((topic) => (
-                    <Badge key={topic} variant="outline">
-                      {topic}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <Button asChild variant="outline">
-              <Link href={planHref}>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Open Plan Page
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-
+      <div>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -450,9 +430,28 @@ export function TutorStudentMonthlyReportsWorkspace({
                   Completed quizzes
                 </p>
                 <p className="text-2xl font-semibold">
+                  {formatNumber(metrics.completedQuizzes, 0)}
+                </p>
+              </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Sentence translation exercises
+                </p>
+                <p className="text-2xl font-semibold">
                   {formatProgressValue(
-                    metrics.completedQuizzes,
-                    plan.monthlyQuizTarget,
+                    metrics.completedSentenceTranslations,
+                    plan.monthlySentenceTranslationTarget,
+                  )}
+                </p>
+              </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Gap fill exercises
+                </p>
+                <p className="text-2xl font-semibold">
+                  {formatProgressValue(
+                    metrics.completedGapFillExercises,
+                    plan.monthlyGapFillTarget,
                   )}
                 </p>
               </div>
@@ -468,9 +467,11 @@ export function TutorStudentMonthlyReportsWorkspace({
                 </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Total hours</p>
+                <p className="text-xs text-muted-foreground">
+                  App learning time
+                </p>
                 <p className="text-2xl font-semibold">
-                  {formatHours(metrics.totalHours)}
+                  {formatHours(metrics.appLearningHours)}
                 </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
@@ -485,11 +486,15 @@ export function TutorStudentMonthlyReportsWorkspace({
                 </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Active days</p>
+                <p className="text-xs text-muted-foreground">
+                  Active days in application
+                </p>
                 <p className="text-2xl font-semibold">{metrics.activeDays}</p>
               </div>
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Words practiced</p>
+                <p className="text-xs text-muted-foreground">
+                  Words reviewed this month
+                </p>
                 <p className="text-2xl font-semibold">
                   {metrics.practicedWords}
                 </p>
@@ -622,29 +627,73 @@ export function TutorStudentMonthlyReportsWorkspace({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="monthly-report-addendum">Tutor addendum</Label>
-                <Textarea
-                  id="monthly-report-addendum"
-                  value={tutorAddendum}
-                  onChange={(event) => setTutorAddendum(event.target.value)}
-                  rows={5}
-                  placeholder="Optional tutor note that appears below the published report..."
-                />
+                <Label>Review rating</Label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() =>
+                          setReviewRating((current) =>
+                            current === star ? 0 : star,
+                          )
+                        }
+                        onMouseEnter={() => setHoveredReviewRating(star)}
+                        onMouseLeave={() => setHoveredReviewRating(0)}
+                        className="p-0.5 transition-colors"
+                        aria-label={`Set report rating to ${star}`}
+                      >
+                        <Star
+                          className={`h-5 w-5 ${
+                            star <= (hoveredReviewRating || reviewRating)
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-muted-foreground/30"
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {formatStarRating(reviewRating > 0 ? reviewRating : null)}
+                  </p>
+                </div>
               </div>
 
-              <Button onClick={handleSaveReport} disabled={isSavingReport}>
-                {isSavingReport ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Published Report
-                  </>
-                )}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={handleSaveReport} disabled={isSavingReport}>
+                  {isSavingReport ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Published Report
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => currentReport && handleDeleteReport(currentReport)}
+                  disabled={deletingReportId === currentReport?.id}
+                >
+                  {deletingReportId === currentReport?.id ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Report
+                    </>
+                  )}
+                </Button>
+              </div>
             </>
           )}
         </CardContent>
@@ -654,17 +703,17 @@ export function TutorStudentMonthlyReportsWorkspace({
         <CardHeader>
           <CardTitle className="text-base">Report History</CardTitle>
           <CardDescription>
-            Previous monthly reports for {studentName}. Published reports are
+            Saved monthly reports for {studentName}. Published reports are
             visible on the student&apos;s Feedback page.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {previousReports.length === 0 ? (
+          {historyReports.length === 0 ? (
             <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-              No earlier monthly reports yet.
+              No monthly reports saved yet.
             </div>
           ) : (
-            previousReports.map((report) => (
+            historyReports.map((report) => (
               <div key={report.id} className="rounded-lg border p-4 space-y-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -674,6 +723,9 @@ export function TutorStudentMonthlyReportsWorkspace({
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {report.reportMonth === currentReportMonth ? (
+                      <Badge variant="secondary">Current month</Badge>
+                    ) : null}
                     <Badge variant={getStatusVariant(report.status)}>
                       {getStatusLabel(report.status)}
                     </Badge>
@@ -685,6 +737,21 @@ export function TutorStudentMonthlyReportsWorkspace({
                         </a>
                       </Button>
                     ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteReport(report)}
+                      disabled={deletingReportId === report.id}
+                    >
+                      {deletingReportId === report.id ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4" />
+                      )}
+                      Delete
+                    </Button>
                   </div>
                 </div>
 
@@ -697,8 +764,17 @@ export function TutorStudentMonthlyReportsWorkspace({
                   </Badge>
                   <Badge variant="outline">
                     Quizzes: {report.metricsSnapshot.completedQuizzes}
-                    {report.goalsSnapshot.monthlyQuizTarget != null
-                      ? ` / ${report.goalsSnapshot.monthlyQuizTarget}`
+                  </Badge>
+                  <Badge variant="outline">
+                    Sentence translations: {report.metricsSnapshot.completedSentenceTranslations}
+                    {report.goalsSnapshot.monthlySentenceTranslationTarget != null
+                      ? ` / ${report.goalsSnapshot.monthlySentenceTranslationTarget}`
+                      : ""}
+                  </Badge>
+                  <Badge variant="outline">
+                    Gap fill: {report.metricsSnapshot.completedGapFillExercises}
+                    {report.goalsSnapshot.monthlyGapFillTarget != null
+                      ? ` / ${report.goalsSnapshot.monthlyGapFillTarget}`
                       : ""}
                   </Badge>
                   <Badge variant="outline">
@@ -721,8 +797,13 @@ export function TutorStudentMonthlyReportsWorkspace({
                     )}
                   </Badge>
                   <Badge variant="outline">
-                    Active days: {report.metricsSnapshot.activeDays}
+                    Active days in application: {report.metricsSnapshot.activeDays}
                   </Badge>
+                  {report.reviewRating != null ? (
+                    <Badge variant="outline">
+                      Review: {formatStarRating(report.reviewRating)}
+                    </Badge>
+                  ) : null}
                   {report.goalsSnapshot.grammarTopicKeys.length > 0 ? (
                     <Badge variant="outline">
                       Grammar topics:{" "}
@@ -730,12 +811,6 @@ export function TutorStudentMonthlyReportsWorkspace({
                     </Badge>
                   ) : null}
                 </div>
-
-                <p className="text-sm whitespace-pre-wrap text-muted-foreground">
-                  {report.publishedContent ||
-                    report.generationError ||
-                    "No published content."}
-                </p>
               </div>
             ))
           )}
