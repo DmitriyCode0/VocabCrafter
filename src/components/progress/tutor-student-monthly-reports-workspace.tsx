@@ -220,9 +220,7 @@ export function TutorStudentMonthlyReportsWorkspace({
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isSavingReport, setIsSavingReport] = useState(false);
   const [isSavingReportLanguage, setIsSavingReportLanguage] = useState(false);
-  const [deletingReportId, setDeletingReportId] = useState<string | null>(
-    null,
-  );
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
 
   useEffect(() => {
     setReportTitle(currentReport?.title ?? "");
@@ -678,7 +676,9 @@ export function TutorStudentMonthlyReportsWorkspace({
                 <Button
                   type="button"
                   variant="destructive"
-                  onClick={() => currentReport && handleDeleteReport(currentReport)}
+                  onClick={() =>
+                    currentReport && handleDeleteReport(currentReport)
+                  }
                   disabled={deletingReportId === currentReport?.id}
                 >
                   {deletingReportId === currentReport?.id ? (
@@ -766,8 +766,10 @@ export function TutorStudentMonthlyReportsWorkspace({
                     Quizzes: {report.metricsSnapshot.completedQuizzes}
                   </Badge>
                   <Badge variant="outline">
-                    Sentence translations: {report.metricsSnapshot.completedSentenceTranslations}
-                    {report.goalsSnapshot.monthlySentenceTranslationTarget != null
+                    Sentence translations:{" "}
+                    {report.metricsSnapshot.completedSentenceTranslations}
+                    {report.goalsSnapshot.monthlySentenceTranslationTarget !=
+                    null
                       ? ` / ${report.goalsSnapshot.monthlySentenceTranslationTarget}`
                       : ""}
                   </Badge>
@@ -797,7 +799,8 @@ export function TutorStudentMonthlyReportsWorkspace({
                     )}
                   </Badge>
                   <Badge variant="outline">
-                    Active days in application: {report.metricsSnapshot.activeDays}
+                    Active days in application:{" "}
+                    {report.metricsSnapshot.activeDays}
                   </Badge>
                   {report.reviewRating != null ? (
                     <Badge variant="outline">

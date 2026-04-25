@@ -332,7 +332,10 @@ export function MonthlyLessonsCalendar({
           <div className="flex-1 overflow-y-auto px-4 pb-4">
             {canQuickCreate && selectedDate ? (
               <div className="mb-4 flex justify-end">
-                <Button type="button" onClick={() => openQuickCreate(selectedDate)}>
+                <Button
+                  type="button"
+                  onClick={() => openQuickCreate(selectedDate)}
+                >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Add lesson on this day
                 </Button>

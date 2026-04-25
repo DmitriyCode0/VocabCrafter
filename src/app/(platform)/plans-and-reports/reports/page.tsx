@@ -206,13 +206,16 @@ export default async function PlansAndReportsReportsPage({
                           Quizzes: {report.metricsSnapshot.completedQuizzes}
                         </Badge>
                         <Badge variant="outline">
-                          Sentence translations: {report.metricsSnapshot.completedSentenceTranslations}
-                          {report.goalsSnapshot.monthlySentenceTranslationTarget != null
+                          Sentence translations:{" "}
+                          {report.metricsSnapshot.completedSentenceTranslations}
+                          {report.goalsSnapshot
+                            .monthlySentenceTranslationTarget != null
                             ? ` / ${report.goalsSnapshot.monthlySentenceTranslationTarget}`
                             : ""}
                         </Badge>
                         <Badge variant="outline">
-                          Gap fill: {report.metricsSnapshot.completedGapFillExercises}
+                          Gap fill:{" "}
+                          {report.metricsSnapshot.completedGapFillExercises}
                           {report.goalsSnapshot.monthlyGapFillTarget != null
                             ? ` / ${report.goalsSnapshot.monthlyGapFillTarget}`
                             : ""}
@@ -232,7 +235,8 @@ export default async function PlansAndReportsReportsPage({
                             : ""}
                         </Badge>
                         <Badge variant="outline">
-                          Active days in application: {report.metricsSnapshot.activeDays}
+                          Active days in application:{" "}
+                          {report.metricsSnapshot.activeDays}
                         </Badge>
                         {report.goalsSnapshot.grammarTopicKeys.length > 0 ? (
                           <Badge variant="outline">
@@ -259,8 +263,10 @@ export default async function PlansAndReportsReportsPage({
                         </p>
                         <p className="text-xl font-semibold">
                           {formatProgressValue(
-                            report.metricsSnapshot.completedSentenceTranslations,
-                            report.goalsSnapshot.monthlySentenceTranslationTarget,
+                            report.metricsSnapshot
+                              .completedSentenceTranslations,
+                            report.goalsSnapshot
+                              .monthlySentenceTranslationTarget,
                           )}
                         </p>
                       </div>
@@ -446,10 +452,10 @@ export default async function PlansAndReportsReportsPage({
         .select("preferred_language")
         .eq("id", activeStudentId)
         .single(),
-    getTutorStudentPlan(userId, activeStudentId),
-    getTutorStudentMonthlyReportMetrics(activeStudentId),
-    getTutorMonthlyReportQuota(userId),
-    listTutorStudentMonthlyReports(userId, activeStudentId),
+      getTutorStudentPlan(userId, activeStudentId),
+      getTutorStudentMonthlyReportMetrics(activeStudentId),
+      getTutorMonthlyReportQuota(userId),
+      listTutorStudentMonthlyReports(userId, activeStudentId),
     ]);
 
   const studentName =

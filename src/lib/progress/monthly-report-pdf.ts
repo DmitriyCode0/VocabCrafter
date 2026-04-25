@@ -152,11 +152,7 @@ const PDF_COPY: Record<
     onTarget: "on target",
     above: "above",
     below: "below",
-    sectionHeadings: [
-      "Summary",
-      "Focus Areas",
-      "Next Steps",
-    ],
+    sectionHeadings: ["Summary", "Focus Areas", "Next Steps"],
   },
   uk: {
     brandTag: "Навчальний прогрес",
@@ -190,11 +186,7 @@ const PDF_COPY: Record<
     onTarget: "у межах цілі",
     above: "вище",
     below: "нижче",
-    sectionHeadings: [
-      "Підсумок",
-      "Зони уваги",
-      "Наступні кроки",
-    ],
+    sectionHeadings: ["Підсумок", "Зони уваги", "Наступні кроки"],
   },
 };
 

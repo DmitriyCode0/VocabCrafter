@@ -1,10 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  BookOpen,
-  FileText,
-  Target,
-} from "lucide-react";
+import { BookOpen, FileText, Target } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getTopicsForLevel } from "@/lib/grammar/topics";

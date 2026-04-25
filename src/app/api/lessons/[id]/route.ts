@@ -181,7 +181,8 @@ export async function PATCH(
         end_time: parsed.data.endTime ?? null,
         notes: parsed.data.notes ?? null,
         status: parsed.data.status,
-        price_cents: parsed.data.priceCents ?? connection?.lesson_price_cents ?? 0,
+        price_cents:
+          parsed.data.priceCents ?? connection?.lesson_price_cents ?? 0,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)

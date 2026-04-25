@@ -135,7 +135,9 @@ function mapTutorLessons(rows: TutorLessonRow[]): MonthlyLessonItem[] {
     priceCents: row.price_cents,
     studentId: row.student_id,
     participantName:
-      row.student_profile?.full_name || row.student_profile?.email || "One-time",
+      row.student_profile?.full_name ||
+      row.student_profile?.email ||
+      "One-time",
     participantLabel: row.student_id ? "Student" : "Type",
   }));
 }
@@ -487,8 +489,8 @@ async function TutorLessonsView({
           <CardHeader>
             <CardTitle className="text-base">Tutor Lesson Planner</CardTitle>
             <CardDescription>
-                Add one-time lessons for yourself or lessons for connected
-                students.
+              Add one-time lessons for yourself or lessons for connected
+              students.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

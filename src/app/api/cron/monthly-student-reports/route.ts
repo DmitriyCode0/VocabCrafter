@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
                 (item): item is string => typeof item === "string",
               )
             : [],
-              monthlySentenceTranslationTarget:
-                connection.monthly_sentence_translation_target,
-              monthlyGapFillTarget: connection.monthly_gap_fill_target,
+          monthlySentenceTranslationTarget:
+            connection.monthly_sentence_translation_target,
+          monthlyGapFillTarget: connection.monthly_gap_fill_target,
           monthlyCompletedLessonsTarget:
             connection.monthly_completed_lessons_target,
           monthlyNewMasteryWordsTarget:

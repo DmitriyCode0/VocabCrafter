@@ -2,14 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CalendarDays,
-  Loader2,
-  Plus,
-  Save,
-  Target,
-  X,
-} from "lucide-react";
+import { CalendarDays, Loader2, Plus, Save, Target, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {

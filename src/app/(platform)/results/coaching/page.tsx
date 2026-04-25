@@ -34,8 +34,14 @@ export default async function CoachingResultsPage({
   searchParams: Promise<{ student?: string }>;
 }) {
   const { student: requestedStudentId } = await searchParams;
-  const { userId, role, appLanguage, students, activeStudentId, studentProfile } =
-    await getTutorProgressPageData(requestedStudentId);
+  const {
+    userId,
+    role,
+    appLanguage,
+    students,
+    activeStudentId,
+    studentProfile,
+  } = await getTutorProgressPageData(requestedStudentId);
   const messages = getAppMessages(appLanguage);
   const headerActions =
     role === "tutor" && students.length > 0 ? (
@@ -112,7 +118,9 @@ export default async function CoachingResultsPage({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight">{studentName}</h2>
-            <Badge variant="outline">{snapshot.profile.targetLanguageLabel}</Badge>
+            <Badge variant="outline">
+              {snapshot.profile.targetLanguageLabel}
+            </Badge>
             <Badge variant="secondary">
               {messages.tutorProgressPage.targetLabel(
                 snapshot.profile.cefrLevel,
@@ -123,7 +131,6 @@ export default async function CoachingResultsPage({
             {messages.tutorProgressPage.description(studentName)}
           </p>
         </div>
-
       </div>
 
       <TutorStudentProgressWorkspace
@@ -161,7 +168,10 @@ export default async function CoachingResultsPage({
               <div className="text-2xl font-bold">
                 {snapshot.overview.avgScore}%
               </div>
-              <Progress value={snapshot.overview.avgScore} className="mt-2 h-2" />
+              <Progress
+                value={snapshot.overview.avgScore}
+                className="mt-2 h-2"
+              />
             </CardContent>
           </Card>
 

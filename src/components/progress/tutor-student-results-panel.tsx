@@ -36,7 +36,9 @@ export function TutorStudentResultsPanel({
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-2xl font-bold tracking-tight">{studentName}</h2>
-          <Badge variant="outline">{snapshot.profile.targetLanguageLabel}</Badge>
+          <Badge variant="outline">
+            {snapshot.profile.targetLanguageLabel}
+          </Badge>
           <Badge variant="secondary">
             {messages.tutorProgressPage.targetLabel(snapshot.profile.cefrLevel)}
           </Badge>

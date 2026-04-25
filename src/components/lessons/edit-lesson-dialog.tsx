@@ -123,10 +123,14 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
       return;
     }
 
-    const nextStudent = students.find((student) => student.id === nextStudentId);
+    const nextStudent = students.find(
+      (student) => student.id === nextStudentId,
+    );
 
     if (nextStudent) {
-      setPriceInput(formatLessonCurrencyInput(nextStudent.lessonPriceCents ?? 0));
+      setPriceInput(
+        formatLessonCurrencyInput(nextStudent.lessonPriceCents ?? 0),
+      );
     }
   }
 

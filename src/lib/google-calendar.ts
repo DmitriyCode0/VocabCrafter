@@ -676,7 +676,9 @@ function buildGoogleCalendarEventPayload(lesson: LessonGoogleCalendarSyncRow) {
     "One-time";
   const descriptionLines = [
     `Tutor: ${tutorName}`,
-    lesson.student_id ? `Student: ${studentName}` : `Lesson type: ${studentName}`,
+    lesson.student_id
+      ? `Student: ${studentName}`
+      : `Lesson type: ${studentName}`,
     `Status: ${getLessonStatusLabel(lesson.status)}`,
   ];
 

@@ -73,12 +73,7 @@ export const monthlyReportGenerationInputSchema = z.object({
   forceRegenerate: z.boolean().optional().default(false),
 });
 
-const nullableReviewRatingSchema = z
-  .number()
-  .int()
-  .min(1)
-  .max(5)
-  .nullable();
+const nullableReviewRatingSchema = z.number().int().min(1).max(5).nullable();
 
 export const monthlyReportUpdateInputSchema = z.object({
   title: z.string().trim().min(1).max(120),
@@ -353,7 +348,9 @@ export async function getTutorStudentMonthlyReportMetrics(
   ] = await Promise.all([
     admin
       .from("quiz_attempts")
-      .select("completed_at, score, max_score, time_spent_seconds, quizzes!inner(type)")
+      .select(
+        "completed_at, score, max_score, time_spent_seconds, quizzes!inner(type)",
+      )
       .eq("student_id", studentId)
       .gte("completed_at", `${window.periodStart}T00:00:00.000Z`)
       .lt("completed_at", `${window.endExclusive}T00:00:00.000Z`),

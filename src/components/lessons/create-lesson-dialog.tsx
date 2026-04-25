@@ -144,10 +144,14 @@ export function CreateLessonDialog({
       return;
     }
 
-    const nextStudent = students.find((student) => student.id === nextStudentId);
+    const nextStudent = students.find(
+      (student) => student.id === nextStudentId,
+    );
 
     if (nextStudent) {
-      setPriceInput(formatLessonCurrencyInput(nextStudent.lessonPriceCents ?? 0));
+      setPriceInput(
+        formatLessonCurrencyInput(nextStudent.lessonPriceCents ?? 0),
+      );
     }
   }
 
@@ -244,10 +248,7 @@ export function CreateLessonDialog({
   }
 
   return (
-    <Dialog
-      open={dialogOpen}
-      onOpenChange={handleDialogOpenChange}
-    >
+    <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
       {showTrigger ? (
         <DialogTrigger asChild>
           <Button disabled={isDisabled}>
