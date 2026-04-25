@@ -92,8 +92,10 @@ export async function GET(
       tutorName,
       locale,
     });
+    const pdfBuffer = new ArrayBuffer(pdfBytes.byteLength);
+    new Uint8Array(pdfBuffer).set(pdfBytes);
 
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${getMonthlyReportPdfFilename(report, studentName)}"`,

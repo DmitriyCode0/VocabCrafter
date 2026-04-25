@@ -30,6 +30,7 @@ interface TutorStudentMonthlyPerformanceProps {
 }
 
 const TOP_SEGMENT_RADIUS = [10, 10, 0, 0] as const;
+const TOP_SEGMENT_CELL_RADIUS = TOP_SEGMENT_RADIUS as unknown as number;
 
 function MetricCard({
   title,
@@ -170,7 +171,7 @@ function MonthlyActivityContent({
                       key={`quizzes-${point.date}`}
                       radius={
                         point.quizzes > 0 && point.lessons === 0
-                          ? TOP_SEGMENT_RADIUS
+                          ? TOP_SEGMENT_CELL_RADIUS
                           : 0
                       }
                     />
@@ -187,7 +188,7 @@ function MonthlyActivityContent({
                   {trend.points.map((point) => (
                     <Cell
                       key={`lessons-${point.date}`}
-                      radius={point.lessons > 0 ? TOP_SEGMENT_RADIUS : 0}
+                      radius={point.lessons > 0 ? TOP_SEGMENT_CELL_RADIUS : 0}
                     />
                   ))}
                 </Bar>

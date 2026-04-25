@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,12 +9,57 @@ import { NavLinks } from "./nav-links";
 import type { Profile } from "@/types/database";
 import type { Role } from "@/types/roles";
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "vocab-crafter.sidebar-collapsed";
+const SIDEBAR_COLLAPSED_EVENT = "vocab-crafter:sidebar-collapsed-change";
+
+function getSidebarCollapsedSnapshot() {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function getSidebarCollapsedServerSnapshot() {
+  return false;
+}
+
+function subscribeToSidebarCollapsed(onStoreChange: () => void) {
+  const handleChange = () => onStoreChange();
+
+  window.addEventListener("storage", handleChange);
+  window.addEventListener(SIDEBAR_COLLAPSED_EVENT, handleChange);
+
+  return () => {
+    window.removeEventListener("storage", handleChange);
+    window.removeEventListener(SIDEBAR_COLLAPSED_EVENT, handleChange);
+  };
+}
+
 interface SidebarProps {
   profile: Profile;
 }
 
 export function Sidebar({ profile }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const collapsed = useSyncExternalStore(
+    subscribeToSidebarCollapsed,
+    getSidebarCollapsedSnapshot,
+    getSidebarCollapsedServerSnapshot,
+  );
+
+  function handleCollapsedChange() {
+    const next = !collapsed;
+
+    try {
+      window.localStorage.setItem(
+        SIDEBAR_COLLAPSED_STORAGE_KEY,
+        String(next),
+      );
+      window.dispatchEvent(new Event(SIDEBAR_COLLAPSED_EVENT));
+    } catch {
+      // Ignore local storage failures and keep the current sidebar state.
+    }
+  }
 
   return (
     <aside
@@ -48,7 +93,7 @@ export function Sidebar({ profile }: SidebarProps) {
           className="h-9 w-9 shrink-0"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!collapsed}
-          onClick={() => setCollapsed((current) => !current)}
+          onClick={handleCollapsedChange}
         >
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />
