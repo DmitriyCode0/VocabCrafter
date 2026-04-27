@@ -190,6 +190,7 @@ export function LessonRoomClient({
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [microphoneEnabled, setMicrophoneEnabled] = useState(false);
   const [remoteParticipantCount, setRemoteParticipantCount] = useState(0);
+  const [remoteVideoTrackCount, setRemoteVideoTrackCount] = useState(0);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [recordingStatus, setRecordingStatus] = useState(initialRecordingStatus);
   const [recordingConsentStatus, setRecordingConsentStatus] = useState(
@@ -197,6 +198,8 @@ export function LessonRoomClient({
   );
   const [isSyncingSession, setIsSyncingSession] = useState(false);
   const [isRecordingActionPending, setIsRecordingActionPending] = useState(false);
+  const [isVideoPlaybackBlocked, setIsVideoPlaybackBlocked] = useState(false);
+  const [hasPausedRemoteVideo, setHasPausedRemoteVideo] = useState(false);
 
   const isConnected = connectionState === ConnectionState.Connected;
 
@@ -343,6 +346,9 @@ export function LessonRoomClient({
       return;
     }
 
+    let nextRemoteVideoTrackCount = 0;
+    let nextHasPausedRemoteVideo = false;
+
     for (const publication of room.localParticipant.videoTrackPublications.values()) {
       const track = publication.track;
 
@@ -369,6 +375,9 @@ export function LessonRoomClient({
           continue;
         }
 
+        nextRemoteVideoTrackCount += 1;
+        nextHasPausedRemoteVideo ||= track.streamState === Track.StreamState.Paused;
+
         const element = track.attach();
         remoteVideoContainer.appendChild(
           createParticipantVideoSlot(participantLabel, element),
@@ -394,7 +403,30 @@ export function LessonRoomClient({
     }
 
     setRemoteParticipantCount(room.remoteParticipants.size);
+    setRemoteVideoTrackCount(nextRemoteVideoTrackCount);
+    setHasPausedRemoteVideo(nextHasPausedRemoteVideo);
+    setIsVideoPlaybackBlocked(!room.canPlaybackVideo);
   }, [clearMediaElements]);
+
+  const resumeRemoteVideo = useCallback(async () => {
+    const room = roomRef.current;
+
+    if (!room) {
+      return;
+    }
+
+    try {
+      await room.startVideo();
+      setIsVideoPlaybackBlocked(!room.canPlaybackVideo);
+      toast.success("Remote video playback resumed");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to resume remote video playback",
+      );
+    }
+  }, []);
 
   async function handleJoin() {
     if (!isConfigured || roomRef.current) {
@@ -404,7 +436,7 @@ export function LessonRoomClient({
     setIsJoining(true);
     setJoinError(null);
 
-    const room = new Room({ adaptiveStream: true, dynacast: true });
+    const room = new Room({ dynacast: true });
     roomRef.current = room;
 
     const syncMedia = () => syncRoomMedia(room);
@@ -417,8 +449,12 @@ export function LessonRoomClient({
     room.on(RoomEvent.ParticipantDisconnected, syncMedia);
     room.on(RoomEvent.TrackSubscribed, syncMedia);
     room.on(RoomEvent.TrackUnsubscribed, syncMedia);
+    room.on(RoomEvent.TrackStreamStateChanged, syncMedia);
     room.on(RoomEvent.LocalTrackPublished, syncMedia);
     room.on(RoomEvent.LocalTrackUnpublished, syncMedia);
+    room.on(RoomEvent.VideoPlaybackStatusChanged, (canPlayback) => {
+      setIsVideoPlaybackBlocked(!canPlayback);
+    });
     room.on(RoomEvent.Disconnected, () => {
       if (roomRef.current === room) {
         roomRef.current = null;
@@ -429,6 +465,9 @@ export function LessonRoomClient({
       setCameraEnabled(false);
       setMicrophoneEnabled(false);
       setRemoteParticipantCount(0);
+      setRemoteVideoTrackCount(0);
+      setHasPausedRemoteVideo(false);
+      setIsVideoPlaybackBlocked(false);
       setConnectionState(ConnectionState.Disconnected);
     });
 
@@ -474,6 +513,7 @@ export function LessonRoomClient({
       }
 
       syncMedia();
+      setIsVideoPlaybackBlocked(!room.canPlaybackVideo);
 
       try {
         await syncSessionState("participant-connected");
@@ -494,6 +534,9 @@ export function LessonRoomClient({
       setCameraEnabled(false);
       setMicrophoneEnabled(false);
       setRemoteParticipantCount(0);
+      setRemoteVideoTrackCount(0);
+      setHasPausedRemoteVideo(false);
+      setIsVideoPlaybackBlocked(false);
       setConnectionState(ConnectionState.Disconnected);
 
       try {
@@ -536,6 +579,9 @@ export function LessonRoomClient({
       setCameraEnabled(false);
       setMicrophoneEnabled(false);
       setRemoteParticipantCount(0);
+      setRemoteVideoTrackCount(0);
+      setHasPausedRemoteVideo(false);
+      setIsVideoPlaybackBlocked(false);
       setConnectionState(ConnectionState.Disconnected);
 
       try {
@@ -682,6 +728,13 @@ export function LessonRoomClient({
                 ref={remoteVideoContainerRef}
                 className="grid min-h-[220px] gap-3"
               />
+              {hasJoined && remoteParticipantCount > 0 && remoteVideoTrackCount === 0 ? (
+                <div className="pointer-events-none absolute inset-3 flex items-center justify-center">
+                  <div className="rounded-2xl border border-dashed bg-background/60 p-6 text-center text-sm text-muted-foreground">
+                    The other participant is connected, but no remote camera track is publishing yet.
+                  </div>
+                </div>
+              ) : null}
               {hasJoined && remoteParticipantCount === 0 ? (
                 <div className="pointer-events-none absolute inset-3 flex items-center justify-center">
                   <div className="rounded-2xl border border-dashed bg-background/60 p-6 text-center text-sm text-muted-foreground">
@@ -690,6 +743,28 @@ export function LessonRoomClient({
                 </div>
               ) : null}
             </div>
+            {isVideoPlaybackBlocked ? (
+              <div className="rounded-2xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-700">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span>
+                    Your browser blocked remote video playback. Resume it to see the student camera.
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void resumeRemoteVideo()}
+                  >
+                    Resume video
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+            {hasPausedRemoteVideo && !isVideoPlaybackBlocked ? (
+              <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                Remote video is currently paused by the media pipeline. Keeping this tab visible and reconnecting the room should restore it.
+              </div>
+            ) : null}
             <div ref={remoteAudioContainerRef} className="hidden" />
           </div>
         </div>
@@ -825,7 +900,7 @@ export function LessonRoomClient({
                       !recordingConfigured ||
                       isRecordingActionPending ||
                       recordingConsentStatus !== "granted" ||
-                      recordingStatus === "processing"
+                      recordingStatus === "recording"
                     }
                   >
                     {isRecordingActionPending ? (

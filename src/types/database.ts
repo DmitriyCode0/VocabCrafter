@@ -462,6 +462,7 @@ export interface Database {
           review_status: string;
           full_text: string | null;
           error_message: string | null;
+          active_evidence_synced_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -474,6 +475,7 @@ export interface Database {
           review_status?: string;
           full_text?: string | null;
           error_message?: string | null;
+          active_evidence_synced_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -486,6 +488,7 @@ export interface Database {
           review_status?: string;
           full_text?: string | null;
           error_message?: string | null;
+          active_evidence_synced_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -712,6 +715,66 @@ export interface Database {
           {
             foreignKeyName: "lesson_google_calendar_events_user_id_fkey";
             columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      active_vocabulary_evidence: {
+        Row: {
+          id: string;
+          student_id: string;
+          library_item_id: string | null;
+          term: string;
+          normalized_term: string;
+          source_type: "lesson_recording" | "manual_list" | "other";
+          source_label: string | null;
+          usage_count: number;
+          first_used_at: string;
+          last_used_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          library_item_id?: string | null;
+          term: string;
+          normalized_term: string;
+          source_type?: "lesson_recording" | "manual_list" | "other";
+          source_label?: string | null;
+          usage_count?: number;
+          first_used_at?: string;
+          last_used_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          library_item_id?: string | null;
+          term?: string;
+          normalized_term?: string;
+          source_type?: "lesson_recording" | "manual_list" | "other";
+          source_label?: string | null;
+          usage_count?: number;
+          first_used_at?: string;
+          last_used_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "active_vocabulary_evidence_library_item_id_fkey";
+            columns: ["library_item_id"];
+            isOneToOne: false;
+            referencedRelation: "passive_vocabulary_library";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "active_vocabulary_evidence_student_id_fkey";
+            columns: ["student_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -1740,6 +1803,8 @@ export type StudentProgressReview =
   Database["public"]["Tables"]["student_progress_reviews"]["Row"];
 export type TutorStudentLesson =
   Database["public"]["Tables"]["tutor_student_lessons"]["Row"];
+export type ActiveVocabularyEvidence =
+  Database["public"]["Tables"]["active_vocabulary_evidence"]["Row"];
 export type LessonRoomSession =
   Database["public"]["Tables"]["lesson_room_sessions"]["Row"];
 export type LessonRoomRecording =

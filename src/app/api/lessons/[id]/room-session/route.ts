@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireLessonRoomParticipantAccess } from "@/lib/lesson-room-access";
+import { reconcileLessonRoomSessionRecordingStatus } from "@/lib/lesson-room-recordings";
 import {
   createLiveKitRoomServiceClient,
   isLiveKitConfigured,
@@ -75,10 +76,16 @@ export async function POST(
   try {
     if (payload.action === "participant-connected") {
       const nowIso = new Date().toISOString();
+      const recordingStatus =
+        await reconcileLessonRoomSessionRecordingStatus(
+          access.session.id,
+          access.session.recording_status,
+        );
       const session = await updateLessonRoomSession(access.session.id, {
         room_status: access.session.room_status === "archived" ? "archived" : "live",
         started_at: access.session.started_at ?? nowIso,
         ended_at: null,
+        recording_status: recordingStatus,
       });
 
       return NextResponse.json({ session, participantCount: 1 });

@@ -1150,12 +1150,17 @@ const EN_MESSAGES = {
         `${formatPluralizedCount("en", totalWords, { one: "word", other: "words" })} · avg level ${avgLevel}`,
       passiveSummary: (passiveEvidenceCount: number, equivalentWords: number) =>
         `${passiveEvidenceCount} passive evidence · ${formatPluralizedCount("en", equivalentWords, { one: "equivalent word", other: "equivalent words" })}`,
-      showWords: "Show words",
-      hideWords: "Hide words",
+      activeSummary: (activeEvidenceCount: number, totalUses: number) =>
+        `${formatPluralizedCount("en", activeEvidenceCount, { one: "active evidence word", other: "active evidence words" })} · ${totalUses} total uses`,
+      showDetails: "Show details",
+      hideDetails: "Hide details",
       noWordsYet: "No words yet",
-      loadingWords: "Loading words...",
+      loadingDetails: "Loading details...",
       retry: "Retry",
       noWordsFound: "No words found.",
+      masteryWordsTitle: "Mastery words",
+      activeEvidenceTitle: "Active evidence",
+      noActiveEvidence: "No active evidence yet.",
       wordsCount: (count: number) =>
         `${count} ${formatPluralizedCount("en", count, { one: "word", other: "words" })}`,
       deleteTitle: "Delete word for student",
@@ -2525,12 +2530,17 @@ const UK_MESSAGES: AppMessages = {
         `${formatPluralizedCount("uk", totalWords, { one: "слово", few: "слова", many: "слів" })} · сер. рівень ${avgLevel}`,
       passiveSummary: (passiveEvidenceCount: number, equivalentWords: number) =>
         `${formatPluralizedCount("uk", passiveEvidenceCount, { one: "пасивне свідчення", few: "пасивні свідчення", many: "пасивних свідчень" })} · ${formatPluralizedCount("uk", equivalentWords, { one: "еквівалентне слово", few: "еквівалентні слова", many: "еквівалентних слів" })}`,
-      showWords: "Показати слова",
-      hideWords: "Сховати слова",
+      activeSummary: (activeEvidenceCount: number, totalUses: number) =>
+        `${formatPluralizedCount("uk", activeEvidenceCount, { one: "слово активного свідчення", few: "слова активного свідчення", many: "слів активного свідчення" })} · ${totalUses} використань`,
+      showDetails: "Показати деталі",
+      hideDetails: "Сховати деталі",
       noWordsYet: "Поки немає слів",
-      loadingWords: "Завантаження слів...",
+      loadingDetails: "Завантаження деталей...",
       retry: "Спробувати ще раз",
       noWordsFound: "Слів не знайдено.",
+      masteryWordsTitle: "Слова засвоєння",
+      activeEvidenceTitle: "Активне свідчення",
+      noActiveEvidence: "Активного свідчення поки немає.",
       wordsCount: (count: number) =>
         `${count} ${formatPluralizedCount("uk", count, { one: "слово", few: "слова", many: "слів" })}`,
       deleteTitle: "Видалити слово для студента",

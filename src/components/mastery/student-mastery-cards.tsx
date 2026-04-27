@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { ChevronDown, Loader2 } from "lucide-react";
+import {
+  ActiveEvidenceList,
+  type ActiveEvidenceListItem,
+} from "@/components/mastery/active-evidence-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -27,6 +31,8 @@ interface StudentMasterySummary {
   levelCounts: number[];
   passiveEvidenceCount: number;
   equivalentWords: number;
+  activeEvidenceCount: number;
+  activeEvidenceTotalUses: number;
 }
 
 interface StudentWord {
@@ -53,6 +59,9 @@ export function StudentMasteryCards({
   const [wordsByStudent, setWordsByStudent] = useState<
     Record<string, StudentWord[]>
   >({});
+  const [activeEvidenceByStudent, setActiveEvidenceByStudent] = useState<
+    Record<string, ActiveEvidenceListItem[]>
+  >({});
   const [loadingByStudent, setLoadingByStudent] = useState<
     Record<string, boolean>
   >({});
@@ -68,7 +77,16 @@ export function StudentMasteryCards({
     messages.tutorMastery.levelLabels.mastered,
   ] as const;
 
-  async function loadWords(studentId: string) {
+  async function loadStudentDetails(
+    studentId: string,
+    {
+      includeWords,
+      includeActiveEvidence,
+    }: {
+      includeWords: boolean;
+      includeActiveEvidence: boolean;
+    },
+  ) {
     setLoadingByStudent((current) => ({ ...current, [studentId]: true }));
     setErrorByStudent((current) => {
       const next = { ...current };
@@ -77,22 +95,50 @@ export function StudentMasteryCards({
     });
 
     try {
-      const response = await fetch(`/api/mastery/students/${studentId}/words`, {
-        cache: "no-store",
-      });
-      const data = (await response.json().catch(() => null)) as {
-        words?: StudentWord[];
-        error?: string;
-      } | null;
+      const [wordsResponse, activeEvidenceResponse] = await Promise.all([
+        includeWords
+          ? fetch(`/api/mastery/students/${studentId}/words`, {
+              cache: "no-store",
+            })
+          : Promise.resolve(null),
+        includeActiveEvidence
+          ? fetch(`/api/mastery/students/${studentId}/active-evidence`, {
+              cache: "no-store",
+            })
+          : Promise.resolve(null),
+      ]);
 
-      if (!response.ok) {
-        throw new Error(data?.error || "Failed to load words");
+      if (wordsResponse) {
+        const data = (await wordsResponse.json().catch(() => null)) as {
+          words?: StudentWord[];
+          error?: string;
+        } | null;
+
+        if (!wordsResponse.ok) {
+          throw new Error(data?.error || "Failed to load words");
+        }
+
+        setWordsByStudent((current) => ({
+          ...current,
+          [studentId]: data?.words ?? [],
+        }));
       }
 
-      setWordsByStudent((current) => ({
-        ...current,
-        [studentId]: data?.words ?? [],
-      }));
+      if (activeEvidenceResponse) {
+        const data = (await activeEvidenceResponse.json().catch(() => null)) as {
+          items?: ActiveEvidenceListItem[];
+          error?: string;
+        } | null;
+
+        if (!activeEvidenceResponse.ok) {
+          throw new Error(data?.error || "Failed to load active evidence");
+        }
+
+        setActiveEvidenceByStudent((current) => ({
+          ...current,
+          [studentId]: data?.items ?? [],
+        }));
+      }
     } catch (error) {
       setErrorByStudent((current) => ({
         ...current,
@@ -104,7 +150,16 @@ export function StudentMasteryCards({
     }
   }
 
-  async function handleToggle(studentId: string, totalWords: number) {
+  async function handleToggle(
+    studentId: string,
+    {
+      totalWords,
+      activeEvidenceCount,
+    }: {
+      totalWords: number;
+      activeEvidenceCount: number;
+    },
+  ) {
     if (expandedStudentId === studentId) {
       setExpandedStudentId(null);
       return;
@@ -113,14 +168,18 @@ export function StudentMasteryCards({
     setExpandedStudentId(studentId);
 
     if (
-      totalWords === 0 ||
-      wordsByStudent[studentId] ||
+      (totalWords === 0 || wordsByStudent[studentId]) &&
+      (activeEvidenceCount === 0 || activeEvidenceByStudent[studentId]) ||
       loadingByStudent[studentId]
     ) {
       return;
     }
 
-    await loadWords(studentId);
+    await loadStudentDetails(studentId, {
+      includeWords: totalWords > 0 && !wordsByStudent[studentId],
+      includeActiveEvidence:
+        activeEvidenceCount > 0 && !activeEvidenceByStudent[studentId],
+    });
   }
 
   if (students.length === 0) {
@@ -137,7 +196,10 @@ export function StudentMasteryCards({
         const isExpanded = expandedStudentId === student.studentId;
         const isLoading = loadingByStudent[student.studentId] === true;
         const words = wordsByStudent[student.studentId] ?? [];
+        const activeEvidence = activeEvidenceByStudent[student.studentId] ?? [];
         const error = errorByStudent[student.studentId];
+        const canExpand =
+          student.totalWords > 0 || student.activeEvidenceCount > 0;
 
         return (
           <div
@@ -159,20 +221,29 @@ export function StudentMasteryCards({
                     student.equivalentWords,
                   )}
                 </p>
+                <p className="text-sm text-muted-foreground">
+                  {messages.tutorMastery.cards.activeSummary(
+                    student.activeEvidenceCount,
+                    student.activeEvidenceTotalUses,
+                  )}
+                </p>
               </div>
 
-              {student.totalWords > 0 ? (
+              {canExpand ? (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() =>
-                    void handleToggle(student.studentId, student.totalWords)
+                    void handleToggle(student.studentId, {
+                      totalWords: student.totalWords,
+                      activeEvidenceCount: student.activeEvidenceCount,
+                    })
                   }
                   aria-expanded={isExpanded}
                 >
                   {isExpanded
-                    ? messages.tutorMastery.cards.hideWords
-                    : messages.tutorMastery.cards.showWords}
+                    ? messages.tutorMastery.cards.hideDetails
+                    : messages.tutorMastery.cards.showDetails}
                   <ChevronDown
                     className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                   />
@@ -224,7 +295,7 @@ export function StudentMasteryCards({
                 {isLoading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    {messages.tutorMastery.cards.loadingWords}
+                    {messages.tutorMastery.cards.loadingDetails}
                   </div>
                 ) : error ? (
                   <div className="flex items-center gap-3 text-sm text-destructive">
@@ -232,45 +303,69 @@ export function StudentMasteryCards({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => void loadWords(student.studentId)}
+                      onClick={() =>
+                        void loadStudentDetails(student.studentId, {
+                          includeWords: student.totalWords > 0,
+                          includeActiveEvidence: student.activeEvidenceCount > 0,
+                        })
+                      }
                     >
                       {messages.tutorMastery.cards.retry}
                     </Button>
                   </div>
-                ) : words.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {messages.tutorMastery.cards.noWordsFound}
-                  </p>
                 ) : (
-                  <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                    {words.map((word) => (
-                      <div
-                        key={word.id}
-                        className="flex items-center justify-between gap-2 rounded border px-2.5 py-1.5 text-sm"
-                      >
-                        <span className="mr-2 truncate">{word.term}</span>
-                        <div className="flex items-center gap-1">
-                          <Badge
-                            variant="outline"
-                            className={`${LEVEL_COLORS[word.mastery_level]} border-0 text-xs shrink-0`}
-                          >
-                            {word.mastery_level}
-                          </Badge>
-                          <EditMasteryWordDialog word={word} />
-                          <DeleteMasteryWordButton
-                            wordId={word.id}
-                            term={word.term}
-                            title={messages.tutorMastery.cards.deleteTitle}
-                            description={messages.tutorMastery.cards.deleteDescription(
-                              word.term,
-                            )}
-                            successMessage={messages.tutorMastery.cards.deleteSuccess(
-                              word.term,
-                            )}
-                          />
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">
+                        {messages.tutorMastery.cards.masteryWordsTitle}
+                      </p>
+                      {words.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          {messages.tutorMastery.cards.noWordsFound}
+                        </p>
+                      ) : (
+                        <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                          {words.map((word) => (
+                            <div
+                              key={word.id}
+                              className="flex items-center justify-between gap-2 rounded border px-2.5 py-1.5 text-sm"
+                            >
+                              <span className="mr-2 truncate">{word.term}</span>
+                              <div className="flex items-center gap-1">
+                                <Badge
+                                  variant="outline"
+                                  className={`${LEVEL_COLORS[word.mastery_level]} border-0 text-xs shrink-0`}
+                                >
+                                  {word.mastery_level}
+                                </Badge>
+                                <EditMasteryWordDialog word={word} />
+                                <DeleteMasteryWordButton
+                                  wordId={word.id}
+                                  term={word.term}
+                                  title={messages.tutorMastery.cards.deleteTitle}
+                                  description={messages.tutorMastery.cards.deleteDescription(
+                                    word.term,
+                                  )}
+                                  successMessage={messages.tutorMastery.cards.deleteSuccess(
+                                    word.term,
+                                  )}
+                                />
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    ))}
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">
+                        {messages.tutorMastery.cards.activeEvidenceTitle}
+                      </p>
+                      <ActiveEvidenceList
+                        items={activeEvidence}
+                        emptyMessage={messages.tutorMastery.cards.noActiveEvidence}
+                      />
+                    </div>
                   </div>
                 )}
               </div>

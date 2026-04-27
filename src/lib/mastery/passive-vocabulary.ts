@@ -289,16 +289,11 @@ export function getPassiveVocabularyLookupCandidates(
 }
 
 export function extractPassiveVocabularyTermsFromText(text: string) {
-  const matches = text.match(PASSIVE_VOCABULARY_WORD_PATTERN) ?? [];
   const uniqueTerms = new Map<string, string>();
 
-  for (const match of matches) {
-    const normalizedTerm = normalizePassiveVocabularyText(match);
-
-    if (!normalizedTerm) {
-      continue;
-    }
-
+  for (const normalizedTerm of extractPassiveVocabularyTermOccurrencesFromText(
+    text,
+  )) {
     if (!uniqueTerms.has(normalizedTerm)) {
       uniqueTerms.set(normalizedTerm, normalizedTerm);
     }
@@ -307,6 +302,23 @@ export function extractPassiveVocabularyTermsFromText(text: string) {
   return Array.from(uniqueTerms.values()).sort((left, right) =>
     left.localeCompare(right, undefined, { sensitivity: "base" }),
   );
+}
+
+export function extractPassiveVocabularyTermOccurrencesFromText(text: string) {
+  const matches = text.match(PASSIVE_VOCABULARY_WORD_PATTERN) ?? [];
+  const occurrences: string[] = [];
+
+  for (const match of matches) {
+    const normalizedTerm = normalizePassiveVocabularyText(match);
+
+    if (!normalizedTerm) {
+      continue;
+    }
+
+    occurrences.push(normalizedTerm);
+  }
+
+  return occurrences;
 }
 
 export function getPassiveVocabularyCompositeKey(

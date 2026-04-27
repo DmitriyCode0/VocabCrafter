@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireLessonRoomParticipantAccess } from "@/lib/lesson-room-access";
 import {
+  getActiveLessonRoomRecording,
+  reconcileLessonRoomSessionRecordingStatus,
+} from "@/lib/lesson-room-recordings";
+import {
   createLiveKitEgressClient,
   createLiveKitRecordingOutput,
   getDefaultLiveKitRecordingOptions,
@@ -9,28 +13,6 @@ import {
   isLiveKitConfigured,
   isLiveKitRecordingConfigured,
 } from "@/lib/livekit";
-import type { Database } from "@/types/database";
-
-type LessonRoomRecordingRow =
-  Database["public"]["Tables"]["lesson_room_recordings"]["Row"];
-
-async function getActiveRecording(sessionId: string) {
-  const supabaseAdmin = createAdminClient();
-  const { data, error } = await supabaseAdmin
-    .from("lesson_room_recordings")
-    .select("*")
-    .eq("session_id", sessionId)
-    .eq("status", "recording")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return data as LessonRoomRecordingRow | null;
-}
 
 export async function POST(
   request: Request,
@@ -69,6 +51,12 @@ export async function POST(
 
   try {
     if (payload.action === "start") {
+      const effectiveRecordingStatus =
+        await reconcileLessonRoomSessionRecordingStatus(
+          access.session.id,
+          access.session.recording_status,
+        );
+
       if (!isLiveKitRecordingConfigured()) {
         return NextResponse.json(
           {
@@ -87,12 +75,14 @@ export async function POST(
         );
       }
 
+      const activeRecording = await getActiveLessonRoomRecording(access.session.id);
+
       if (
-        access.session.recording_status === "recording" ||
-        access.session.recording_status === "processing"
+        effectiveRecordingStatus === "recording" ||
+        activeRecording
       ) {
         return NextResponse.json(
-          { error: "A lesson recording is already active or still processing" },
+          { error: "A lesson recording is already active" },
           { status: 409 },
         );
       }
@@ -177,7 +167,7 @@ export async function POST(
       return NextResponse.json({ session, recording });
     }
 
-    const activeRecording = await getActiveRecording(access.session.id);
+    const activeRecording = await getActiveLessonRoomRecording(access.session.id);
 
     if (!activeRecording) {
       return NextResponse.json(
@@ -221,7 +211,7 @@ export async function POST(
     const { data: session, error: sessionError } = await supabaseAdmin
       .from("lesson_room_sessions")
       .update({
-        recording_status: "processing",
+        recording_status: "completed",
         last_recording_ended_at: endedAtIso,
         updated_at: endedAtIso,
       })

@@ -54,6 +54,12 @@ interface GenerateOptions {
   contents?: Array<
     | { text: string }
     | {
+        fileData: {
+          fileUri: string;
+          mimeType: string;
+        };
+      }
+    | {
         inlineData: {
           mimeType: string;
           data: string;

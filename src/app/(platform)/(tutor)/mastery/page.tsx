@@ -28,6 +28,11 @@ interface PassiveEvidenceSummaryRow {
   student_id: string;
 }
 
+interface ActiveEvidenceSummaryRow {
+  student_id: string;
+  usage_count: number;
+}
+
 interface StudentProfile {
   id: string;
   full_name: string | null;
@@ -147,10 +152,16 @@ export default async function TutorMasteryPage({
     .from("passive_vocabulary_evidence")
     .select("student_id")
     .in("student_id", studentIds);
+  const { data: activeEvidenceRows } = await supabaseAdmin
+    .from("active_vocabulary_evidence")
+    .select("student_id, usage_count")
+    .in("student_id", studentIds);
 
   const visibleMastery = (allMasteryRows ?? []) as MasteryLevelRow[];
   const visiblePassiveEvidence = (passiveEvidenceRows ??
     []) as PassiveEvidenceSummaryRow[];
+  const visibleActiveEvidence = (activeEvidenceRows ??
+    []) as ActiveEvidenceSummaryRow[];
 
   // Group by student for lightweight summary statistics.
   const studentMastery = new Map<string, number[]>();
@@ -176,6 +187,22 @@ export default async function TutorMasteryPage({
     passiveEvidenceCounts.set(
       studentId,
       (passiveEvidenceCounts.get(studentId) ?? 0) + 1,
+    );
+  }
+
+  const activeEvidenceCounts = new Map<string, number>();
+  const activeEvidenceUsageTotals = new Map<string, number>();
+  for (const row of visibleActiveEvidence) {
+    const studentId = row.student_id;
+    if (!studentId) {
+      continue;
+    }
+
+    activeEvidenceCounts.set(studentId, (activeEvidenceCounts.get(studentId) ?? 0) + 1);
+    activeEvidenceUsageTotals.set(
+      studentId,
+      (activeEvidenceUsageTotals.get(studentId) ?? 0) +
+        Math.max(row.usage_count ?? 0, 0),
     );
   }
 
@@ -205,6 +232,8 @@ export default async function TutorMasteryPage({
       levelCounts,
       passiveEvidenceCount: passiveEvidenceCounts.get(sid) ?? 0,
       equivalentWords: passiveEvidenceCounts.get(sid) ?? 0,
+      activeEvidenceCount: activeEvidenceCounts.get(sid) ?? 0,
+      activeEvidenceTotalUses: activeEvidenceUsageTotals.get(sid) ?? 0,
     };
   };
 

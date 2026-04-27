@@ -14,6 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
+import {
+  ActiveEvidenceList,
+  type ActiveEvidenceListItem,
+} from "@/components/mastery/active-evidence-list";
 import { ImportVocabularyCard } from "@/components/mastery/import-vocabulary-card";
 import { formatAppDate } from "@/lib/dates";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
@@ -29,9 +33,11 @@ import {
   normalizeLearningLanguage,
   normalizeSourceLanguage,
 } from "@/lib/languages";
+import { summarizeActiveVocabularyEvidence } from "@/lib/mastery/active-vocabulary-evidence";
 import {
   PASSIVE_EQUIVALENT_WORDS_EXPLANATION,
   summarizePassiveVocabularyEvidence,
+  type PassiveVocabularyPartOfSpeech,
 } from "@/lib/mastery/passive-vocabulary";
 
 export const dynamic = "force-dynamic";
@@ -79,6 +85,20 @@ interface PassiveEvidenceRow {
   last_imported_at: string;
 }
 
+interface ActiveEvidenceQueryRow {
+  id: string;
+  term: string;
+  source_type: "lesson_recording" | "manual_list" | "other";
+  source_label: string | null;
+  usage_count: number;
+  first_used_at: string;
+  last_used_at: string;
+  passive_vocabulary_library: {
+    cefr_level: string | null;
+    part_of_speech: PassiveVocabularyPartOfSpeech | null;
+  } | null;
+}
+
 export default async function VocabularyPage({
   searchParams,
 }: {
@@ -112,6 +132,9 @@ export default async function VocabularyPage({
     dueForReviewResult,
     levelRowsResult,
     wordsResult,
+    activeEvidenceCountResult,
+    activeEvidenceSummaryRowsResult,
+    activeEvidenceRowsResult,
     passiveEvidenceCountResult,
     passiveEvidenceSummaryRowsResult,
   ] = await Promise.all([
@@ -142,6 +165,24 @@ export default async function VocabularyPage({
       .order("last_practiced", { ascending: false })
       .range(from, to),
     supabaseAdmin
+      .from("active_vocabulary_evidence")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", user.id),
+    supabaseAdmin
+      .from("active_vocabulary_evidence")
+      .select(
+        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(cefr_level, part_of_speech)",
+      )
+      .eq("student_id", user.id),
+    supabaseAdmin
+      .from("active_vocabulary_evidence")
+      .select(
+        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(cefr_level, part_of_speech)",
+      )
+      .eq("student_id", user.id)
+      .order("last_used_at", { ascending: false })
+      .range(0, 11),
+    supabaseAdmin
       .from("passive_vocabulary_evidence")
       .select("id", { count: "exact", head: true })
       .eq("student_id", user.id),
@@ -158,6 +199,47 @@ export default async function VocabularyPage({
   const dueForReview = dueForReviewResult.count ?? 0;
   const levelRows = levelRowsResult.data ?? [];
   const visibleWords = (wordsResult.data ?? []) as WordMasteryRow[];
+  const activeEvidenceTotal = activeEvidenceCountResult.count ?? 0;
+  const activeEvidenceSummary = summarizeActiveVocabularyEvidence(
+    ((activeEvidenceSummaryRowsResult.data ?? []) as ActiveEvidenceQueryRow[]).map(
+      (item) => ({
+        id: item.id,
+        term: item.term,
+        source_type: item.source_type,
+        source_label: item.source_label,
+        usage_count: item.usage_count,
+        first_used_at: item.first_used_at,
+        last_used_at: item.last_used_at,
+        library_cefr_level:
+          (item.passive_vocabulary_library?.cefr_level as
+            | "A1"
+            | "A2"
+            | "B1"
+            | "B2"
+            | "C1"
+            | "C2"
+            | null) ?? null,
+        library_part_of_speech:
+          item.passive_vocabulary_library?.part_of_speech ?? null,
+      }),
+    ),
+  );
+  const recentActiveEvidence = (
+    (activeEvidenceRowsResult.data ?? []) as ActiveEvidenceQueryRow[]
+  ).map(
+    (item): ActiveEvidenceListItem => ({
+      id: item.id,
+      term: item.term,
+      source_type: item.source_type,
+      source_label: item.source_label,
+      usage_count: item.usage_count,
+      first_used_at: item.first_used_at,
+      last_used_at: item.last_used_at,
+      library_cefr_level: item.passive_vocabulary_library?.cefr_level ?? null,
+      library_part_of_speech:
+        item.passive_vocabulary_library?.part_of_speech ?? null,
+    }),
+  );
   const passiveEvidenceTotal = passiveEvidenceCountResult.count ?? 0;
   const passiveEvidenceSummary = summarizePassiveVocabularyEvidence(
     ((passiveEvidenceSummaryRowsResult.data ?? []) as PassiveEvidenceRow[]).map(
@@ -264,6 +346,78 @@ export default async function VocabularyPage({
         targetLanguage={targetLanguage}
         sourceLanguage={sourceLanguage}
       />
+
+      <Card id="active-evidence">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Zap className="h-5 w-5 text-primary" />
+            Active Evidence
+          </CardTitle>
+          <CardDescription>
+            Active evidence tracks words you actually used in production. It is
+            separate from mastery and intentionally stores only compact word
+            signals, not full transcripts.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Used Words</CardTitle>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{activeEvidenceTotal}</div>
+            <p className="text-xs text-muted-foreground">
+              unique words tracked from student production
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Uses</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {activeEvidenceSummary.totalUsageCount}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              aggregated production hits across all tracked words
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Stored Per Word</CardTitle>
+            <Star className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              Canonical term, source tag, usage count, and first/last seen
+              timestamps. No raw transcript text is needed for this view.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recent Active Evidence</CardTitle>
+          <CardDescription>
+            Recent student-produced words tracked separately from mastery.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ActiveEvidenceList
+            items={recentActiveEvidence}
+            emptyMessage="No active evidence tracked yet. Once student-produced words are derived from lesson recordings or added manually, they will show up here."
+          />
+        </CardContent>
+      </Card>
 
       <Card id="passive-recognition">
         <CardHeader>

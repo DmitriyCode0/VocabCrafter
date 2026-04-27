@@ -11,6 +11,7 @@ export type AIUsageFeature =
   | "progress_insights"
   | "monthly_report"
   | "passive_vocabulary_enrichment"
+  | "lesson_transcript"
   | "tts";
 
 export type AIUsageRequestType = "text" | "tts";

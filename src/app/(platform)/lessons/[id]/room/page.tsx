@@ -6,6 +6,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { LessonRoomClient } from "@/components/lessons/lesson-room-client";
+import { ManualTranscriptSubmitCard } from "@/components/lessons/manual-transcript-submit-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getLessonRoomAccess } from "@/lib/lesson-room-access";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getLiveKitRecordingConfigurationError,
   getLiveKitServerUrl,
@@ -94,6 +96,54 @@ export default async function LessonRoomPage({
         lesson.student_profile?.email ||
         "One-time lesson"
       : lesson.tutor_profile?.full_name || lesson.tutor_profile?.email || "Tutor";
+  let transcriptToolRecordings: Array<{
+    id: string;
+    createdAt: string;
+    status: string;
+    durationSeconds: number | null;
+    activeEvidenceSyncedAt: string | null;
+  }> = [];
+
+  if (role === "tutor") {
+    const supabaseAdmin = createAdminClient();
+    const [{ data: recordings, error: recordingsError }, { data: transcripts, error: transcriptsError }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("lesson_room_recordings")
+          .select("id, created_at, status, duration_seconds")
+          .eq("lesson_id", id)
+          .order("created_at", { ascending: false })
+          .limit(12),
+        supabaseAdmin
+          .from("lesson_room_transcripts")
+          .select("recording_id, active_evidence_synced_at")
+          .eq("lesson_id", id),
+      ]);
+
+    if (recordingsError) {
+      throw recordingsError;
+    }
+
+    if (transcriptsError) {
+      throw transcriptsError;
+    }
+
+    const syncedByRecordingId = new Map(
+      (transcripts ?? []).map((transcript) => [
+        transcript.recording_id,
+        transcript.active_evidence_synced_at,
+      ]),
+    );
+
+    transcriptToolRecordings = (recordings ?? []).map((recording) => ({
+      id: recording.id,
+      createdAt: recording.created_at,
+      status: recording.status,
+      durationSeconds: recording.duration_seconds,
+      activeEvidenceSyncedAt:
+        syncedByRecordingId.get(recording.id) ?? null,
+    }));
+  }
 
   return (
     <div className="space-y-6">
@@ -186,6 +236,13 @@ export default async function LessonRoomPage({
             </CardContent>
           </Card>
 
+          {role === "tutor" ? (
+            <ManualTranscriptSubmitCard
+              lessonId={id}
+              recordings={transcriptToolRecordings}
+            />
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -210,6 +267,11 @@ export default async function LessonRoomPage({
             <CardContent className="space-y-2 text-sm text-muted-foreground">
               <p>Lesson-derived student speech will flow into active evidence, not directly into mastery.</p>
               <p>Those candidates will appear in the unified vocabulary workspace for review and promotion.</p>
+              <Button asChild variant="outline" size="sm" className="mt-2">
+                <Link href={role === "tutor" ? "/mastery" : "/vocabulary#active-evidence"}>
+                  {role === "tutor" ? "Open student vocabulary evidence" : "Open my active evidence"}
+                </Link>
+              </Button>
             </CardContent>
           </Card>
         </div>
