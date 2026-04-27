@@ -48,6 +48,7 @@ function parseOptionalWholeNumber(value: number | null, label: string) {
 function revalidatePlanPaths() {
   revalidatePath("/plans");
   revalidatePath("/billing");
+  revalidatePath("/billing/plans");
   revalidatePath("/dashboard");
 }
 

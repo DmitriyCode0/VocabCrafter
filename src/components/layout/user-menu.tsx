@@ -1,18 +1,26 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import { createClient } from "@/lib/supabase/client";
+import { APP_LANGUAGES, normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User } from "lucide-react";
+import { Languages, LogOut, Settings, User } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { Profile } from "@/types/database";
 import type { Role } from "@/types/roles";
@@ -26,10 +34,37 @@ export function UserMenu({ profile }: UserMenuProps) {
   const router = useRouter();
   const { messages } = useAppI18n();
   const supabase = createClient();
+  const [isUpdatingLanguage, setIsUpdatingLanguage] = useState(false);
+  const selectedAppLanguage = normalizeAppLanguage(profile.app_language);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push("/login");
+    router.refresh();
+  };
+
+  const handleAppLanguageChange = async (value: string) => {
+    const nextAppLanguage = normalizeAppLanguage(value);
+
+    if (isUpdatingLanguage || nextAppLanguage === selectedAppLanguage) {
+      return;
+    }
+
+    setIsUpdatingLanguage(true);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ app_language: nextAppLanguage })
+      .eq("id", profile.id);
+
+    if (error) {
+      setIsUpdatingLanguage(false);
+      toast.error(messages.userMenu.appLanguageUpdateFailed);
+      return;
+    }
+
+    setIsUpdatingLanguage(false);
+    toast.success(messages.userMenu.appLanguageUpdated);
     router.refresh();
   };
 
@@ -44,7 +79,10 @@ export function UserMenu({ profile }: UserMenuProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted">
+      <DropdownMenuTrigger
+        id="user-menu-trigger"
+        className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted"
+      >
         <Avatar className="h-8 w-8">
           <AvatarImage src={profile.avatar_url ?? undefined} />
           <AvatarFallback>{initials}</AvatarFallback>
@@ -58,7 +96,12 @@ export function UserMenu({ profile }: UserMenuProps) {
           </Badge>
         </div>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent
+        id="user-menu-content"
+        aria-labelledby="user-menu-trigger"
+        align="end"
+        className="w-56"
+      >
         <DropdownMenuLabel>
           <p className="text-sm font-medium">
             {profile.full_name || profile.email}
@@ -74,6 +117,34 @@ export function UserMenu({ profile }: UserMenuProps) {
           <User className="mr-2 h-4 w-4" />
           {messages.userMenu.profile}
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Languages className="mr-2 h-4 w-4" />
+            {messages.userMenu.appLanguage}
+            <span className="ml-auto pr-2 text-xs text-muted-foreground">
+              {isUpdatingLanguage
+                ? messages.common.saving
+                : messages.common.languageNames[selectedAppLanguage]}
+            </span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="w-44">
+            <DropdownMenuRadioGroup
+              value={selectedAppLanguage}
+              onValueChange={handleAppLanguageChange}
+            >
+              {APP_LANGUAGES.map((value) => (
+                <DropdownMenuRadioItem
+                  key={value}
+                  value={value}
+                  disabled={isUpdatingLanguage}
+                >
+                  {messages.common.languageNames[value]}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <div className="flex items-center justify-between px-2 py-1.5">
           <span className="text-sm">{messages.userMenu.theme}</span>

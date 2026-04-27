@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { BookOpen, FileText, Target } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getTopicsForLevel } from "@/lib/grammar/topics";
+import { getGrammarTopicPromptCatalogUpToLevel } from "@/lib/grammar/prompt-overrides";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { formatDateForAppLanguage } from "@/lib/i18n/format";
 import { getAppMessages } from "@/lib/i18n/messages";
@@ -358,13 +358,15 @@ export default async function PlansAndReportsPage({
   const targetLanguage = normalizeLearningLanguage(
     studentProfileResult.data.preferred_language,
   );
-  const availableGrammarTopics = getTopicsForLevel(
-    studentProfileResult.data.cefr_level,
-    targetLanguage,
+  const availableGrammarTopics = (
+    await getGrammarTopicPromptCatalogUpToLevel(
+      targetLanguage,
+      studentProfileResult.data.cefr_level ?? "",
+    )
   ).flatMap(({ level, topics }) =>
-    topics.map((topicKey) => ({
-      topicKey,
-      displayName: topicKey,
+    topics.map((topic) => ({
+      topicKey: topic.topicKey,
+      displayName: topic.displayName,
       level,
     })),
   );

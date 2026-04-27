@@ -132,6 +132,42 @@ export interface Database {
           },
         ];
       };
+      grammar_article_editor_permissions: {
+        Row: {
+          user_id: string;
+          granted_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "grammar_article_editor_permissions_granted_by_fkey";
+            columns: ["granted_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grammar_article_editor_permissions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       student_grammar_topic_mastery: {
         Row: {
           id: string;
@@ -273,6 +309,259 @@ export interface Database {
             columns: ["tutor_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lesson_room_sessions: {
+        Row: {
+          id: string;
+          lesson_id: string;
+          provider: string;
+          provider_room_key: string;
+          room_status: string;
+          recording_consent_status: string;
+          recording_status: string;
+          transcript_status: string;
+          created_by: string | null;
+          started_at: string | null;
+          ended_at: string | null;
+          last_recording_started_at: string | null;
+          last_recording_ended_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          lesson_id: string;
+          provider?: string;
+          provider_room_key: string;
+          room_status?: string;
+          recording_consent_status?: string;
+          recording_status?: string;
+          transcript_status?: string;
+          created_by?: string | null;
+          started_at?: string | null;
+          ended_at?: string | null;
+          last_recording_started_at?: string | null;
+          last_recording_ended_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          lesson_id?: string;
+          provider?: string;
+          provider_room_key?: string;
+          room_status?: string;
+          recording_consent_status?: string;
+          recording_status?: string;
+          transcript_status?: string;
+          created_by?: string | null;
+          started_at?: string | null;
+          ended_at?: string | null;
+          last_recording_started_at?: string | null;
+          last_recording_ended_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lesson_room_sessions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lesson_room_sessions_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_student_lessons";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lesson_room_recordings: {
+        Row: {
+          id: string;
+          session_id: string;
+          lesson_id: string;
+          created_by: string | null;
+          storage_bucket: string | null;
+          storage_path: string | null;
+          provider_recording_id: string | null;
+          status: string;
+          duration_seconds: number | null;
+          consent_snapshot: Json;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          lesson_id: string;
+          created_by?: string | null;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
+          provider_recording_id?: string | null;
+          status?: string;
+          duration_seconds?: number | null;
+          consent_snapshot?: Json;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          lesson_id?: string;
+          created_by?: string | null;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
+          provider_recording_id?: string | null;
+          status?: string;
+          duration_seconds?: number | null;
+          consent_snapshot?: Json;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lesson_room_recordings_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lesson_room_recordings_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_student_lessons";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lesson_room_recordings_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "lesson_room_sessions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lesson_room_transcripts: {
+        Row: {
+          id: string;
+          recording_id: string;
+          lesson_id: string;
+          language_code: string | null;
+          diarization_status: string;
+          review_status: string;
+          full_text: string | null;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          recording_id: string;
+          lesson_id: string;
+          language_code?: string | null;
+          diarization_status?: string;
+          review_status?: string;
+          full_text?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          recording_id?: string;
+          lesson_id?: string;
+          language_code?: string | null;
+          diarization_status?: string;
+          review_status?: string;
+          full_text?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lesson_room_transcripts_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_student_lessons";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lesson_room_transcripts_recording_id_fkey";
+            columns: ["recording_id"];
+            isOneToOne: false;
+            referencedRelation: "lesson_room_recordings";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lesson_room_transcript_segments: {
+        Row: {
+          id: string;
+          transcript_id: string;
+          lesson_id: string;
+          speaker_role: string;
+          speaker_label: string | null;
+          started_at_seconds: number | null;
+          ended_at_seconds: number | null;
+          content: string;
+          confidence: number | null;
+          needs_review: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          transcript_id: string;
+          lesson_id: string;
+          speaker_role?: string;
+          speaker_label?: string | null;
+          started_at_seconds?: number | null;
+          ended_at_seconds?: number | null;
+          content: string;
+          confidence?: number | null;
+          needs_review?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          transcript_id?: string;
+          lesson_id?: string;
+          speaker_role?: string;
+          speaker_label?: string | null;
+          started_at_seconds?: number | null;
+          ended_at_seconds?: number | null;
+          content?: string;
+          confidence?: number | null;
+          needs_review?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lesson_room_transcript_segments_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_student_lessons";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lesson_room_transcript_segments_transcript_id_fkey";
+            columns: ["transcript_id"];
+            isOneToOne: false;
+            referencedRelation: "lesson_room_transcripts";
             referencedColumns: ["id"];
           },
         ];
@@ -605,6 +894,82 @@ export interface Database {
             columns: ["library_item_id"];
             isOneToOne: false;
             referencedRelation: "passive_vocabulary_library";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      passive_vocabulary_library_suggestions: {
+        Row: {
+          id: string;
+          library_item_id: string;
+          proposed_canonical_term: string;
+          proposed_normalized_term: string;
+          proposed_cefr_level: string | null;
+          proposed_part_of_speech: string | null;
+          proposed_attributes: Json;
+          suggestion_note: string | null;
+          review_note: string | null;
+          status: "pending" | "approved" | "rejected";
+          created_by: string;
+          reviewed_by: string | null;
+          created_at: string;
+          updated_at: string;
+          reviewed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          library_item_id: string;
+          proposed_canonical_term: string;
+          proposed_normalized_term: string;
+          proposed_cefr_level?: string | null;
+          proposed_part_of_speech?: string | null;
+          proposed_attributes?: Json;
+          suggestion_note?: string | null;
+          review_note?: string | null;
+          status?: "pending" | "approved" | "rejected";
+          created_by: string;
+          reviewed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          reviewed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          library_item_id?: string;
+          proposed_canonical_term?: string;
+          proposed_normalized_term?: string;
+          proposed_cefr_level?: string | null;
+          proposed_part_of_speech?: string | null;
+          proposed_attributes?: Json;
+          suggestion_note?: string | null;
+          review_note?: string | null;
+          status?: "pending" | "approved" | "rejected";
+          created_by?: string;
+          reviewed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          reviewed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "passive_vocabulary_library_suggestions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "passive_vocabulary_library_suggestions_library_item_id_fkey";
+            columns: ["library_item_id"];
+            isOneToOne: false;
+            referencedRelation: "passive_vocabulary_library";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "passive_vocabulary_library_suggestions_reviewed_by_fkey";
+            columns: ["reviewed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -966,6 +1331,64 @@ export interface Database {
           },
         ];
       };
+      grammar_topic_library_contents: {
+        Row: {
+          topic_key: string;
+          draft_content: Json | null;
+          published_content: Json | null;
+          created_by: string | null;
+          last_draft_saved_by: string | null;
+          last_published_by: string | null;
+          created_at: string;
+          updated_at: string;
+          published_at: string | null;
+        };
+        Insert: {
+          topic_key: string;
+          draft_content?: Json | null;
+          published_content?: Json | null;
+          created_by?: string | null;
+          last_draft_saved_by?: string | null;
+          last_published_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          published_at?: string | null;
+        };
+        Update: {
+          topic_key?: string;
+          draft_content?: Json | null;
+          published_content?: Json | null;
+          created_by?: string | null;
+          last_draft_saved_by?: string | null;
+          last_published_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          published_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "grammar_topic_library_contents_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grammar_topic_library_contents_last_draft_saved_by_fkey";
+            columns: ["last_draft_saved_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grammar_topic_library_contents_last_published_by_fkey";
+            columns: ["last_published_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       word_banks: {
         Row: {
           id: string;
@@ -1304,8 +1727,12 @@ export type Quiz = Database["public"]["Tables"]["quizzes"]["Row"];
 export type QuizAttempt = Database["public"]["Tables"]["quiz_attempts"]["Row"];
 export type Assignment = Database["public"]["Tables"]["assignments"]["Row"];
 export type Feedback = Database["public"]["Tables"]["feedback"]["Row"];
+export type GrammarArticleEditorPermission =
+  Database["public"]["Tables"]["grammar_article_editor_permissions"]["Row"];
 export type GrammarTopicPromptOverride =
   Database["public"]["Tables"]["grammar_topic_prompt_overrides"]["Row"];
+export type GrammarTopicLibraryContent =
+  Database["public"]["Tables"]["grammar_topic_library_contents"]["Row"];
 export type WordBank = Database["public"]["Tables"]["word_banks"]["Row"];
 export type TutorStudent =
   Database["public"]["Tables"]["tutor_students"]["Row"];
@@ -1313,6 +1740,14 @@ export type StudentProgressReview =
   Database["public"]["Tables"]["student_progress_reviews"]["Row"];
 export type TutorStudentLesson =
   Database["public"]["Tables"]["tutor_student_lessons"]["Row"];
+export type LessonRoomSession =
+  Database["public"]["Tables"]["lesson_room_sessions"]["Row"];
+export type LessonRoomRecording =
+  Database["public"]["Tables"]["lesson_room_recordings"]["Row"];
+export type LessonRoomTranscript =
+  Database["public"]["Tables"]["lesson_room_transcripts"]["Row"];
+export type LessonRoomTranscriptSegment =
+  Database["public"]["Tables"]["lesson_room_transcript_segments"]["Row"];
 export type TutorStudentBalanceTransaction =
   Database["public"]["Tables"]["tutor_student_balance_transactions"]["Row"];
 export type TutorStudentMonthlyReport =

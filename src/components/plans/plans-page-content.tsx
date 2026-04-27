@@ -39,6 +39,7 @@ interface PlansPageContentProps {
   currentPlanKey: string | null | undefined;
   plans: PlanDefinition[];
   role: Role;
+  showHeader?: boolean;
 }
 
 interface PlanEditorState {
@@ -115,6 +116,7 @@ export function PlansPageContent({
   currentPlanKey,
   plans,
   role,
+  showHeader = true,
 }: PlansPageContentProps) {
   const { messages } = useAppI18n();
   const router = useRouter();
@@ -230,14 +232,16 @@ export function PlansPageContent({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {messages.plans.title}
-        </h1>
-        <p className="text-muted-foreground">
-          {messages.plans.description}
-        </p>
-      </div>
+      {showHeader ? (
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {messages.plans.title}
+          </h1>
+          <p className="text-muted-foreground">
+            {messages.plans.description}
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         {orderedPlans.map((plan) => {

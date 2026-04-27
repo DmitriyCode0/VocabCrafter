@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import { BillingPageHeader } from "@/components/billing/billing-page-header";
 import {
   Card,
   CardContent,
@@ -10,7 +10,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   CreditCard,
@@ -147,22 +146,15 @@ export default async function BillingPage() {
 
   return (
     <div className="space-y-8">
-      {/* ── Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {messages.billing.title}
-          </h1>
-          <p className="text-muted-foreground">
-            {isSuperadmin
-              ? messages.billing.adminDescription
-              : messages.billing.userDescription}
-          </p>
-        </div>
-        <Button asChild variant="outline" className="w-full sm:w-auto">
-          <Link href="/plans">{messages.billing.openPlans}</Link>
-        </Button>
-      </div>
+      <BillingPageHeader
+        currentSection="usage"
+        title={messages.billing.title}
+        description={
+          isSuperadmin
+            ? messages.billing.adminDescription
+            : messages.billing.userDescription
+        }
+      />
 
       {!isSuperadmin && (
         <Card>

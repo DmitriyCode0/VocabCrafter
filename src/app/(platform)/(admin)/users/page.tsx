@@ -13,7 +13,9 @@ import {
 import { Users, Shield, GraduationCap, BookOpen } from "lucide-react";
 import { getAllowedCefrLevels } from "@/lib/languages";
 import { CefrLevelSelector } from "./cefr-level-selector";
+import { GrammarArticleEditorPermissionToggle } from "./grammar-article-editor-permission-toggle";
 import { RoleSelector } from "./role-selector";
+import { listGrammarArticleEditorPermissionUserIds } from "@/lib/grammar/article-permissions";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { formatDateForAppLanguage } from "@/lib/i18n/format";
 import { getAppMessages } from "@/lib/i18n/messages";
@@ -62,6 +64,8 @@ export default async function UsersPage() {
   };
 
   const currentUserId = user.id;
+  const grammarArticleEditorPermissionUserIds =
+    await listGrammarArticleEditorPermissionUserIds();
 
   // Fetch all users with their stats
   const { data: profiles } = await supabase
@@ -163,6 +167,7 @@ export default async function UsersPage() {
                   <TableHead>{messages.adminUsers.columns.email}</TableHead>
                   <TableHead>{messages.adminUsers.columns.role}</TableHead>
                   <TableHead>{messages.adminUsers.columns.changeRole}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.articleEditor}</TableHead>
                   <TableHead>{messages.adminUsers.columns.cefr}</TableHead>
                   <TableHead>{messages.adminUsers.columns.quizzes}</TableHead>
                   <TableHead>{messages.adminUsers.columns.attempts}</TableHead>
@@ -195,6 +200,18 @@ export default async function UsersPage() {
                           }
                           isSelf={profile.id === currentUserId}
                         />
+                      </TableCell>
+                      <TableCell>
+                        {profile.role === "tutor" ? (
+                          <GrammarArticleEditorPermissionToggle
+                            userId={profile.id}
+                            enabled={grammarArticleEditorPermissionUserIds.has(
+                              profile.id,
+                            )}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {profile.role === "student" ? (

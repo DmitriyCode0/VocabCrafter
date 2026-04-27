@@ -350,3 +350,21 @@ export async function getGrammarTopicPromptCatalog(
     .map((level) => ({ level, topics: grouped.get(level) ?? [] }))
     .filter(({ topics }) => topics.length > 0);
 }
+
+export async function getGrammarTopicPromptCatalogUpToLevel(
+  language: LearningLanguage,
+  level: string,
+): Promise<{ level: string; topics: GrammarTopicPromptConfig[] }[]> {
+  const targetIndex = LEVEL_ORDER.indexOf(level);
+
+  if (targetIndex === -1) {
+    return [];
+  }
+
+  const catalog = await getGrammarTopicPromptCatalog(language);
+
+  return catalog.filter(({ level: catalogLevel }) => {
+    const catalogIndex = LEVEL_ORDER.indexOf(catalogLevel);
+    return catalogIndex !== -1 && catalogIndex <= targetIndex;
+  });
+}

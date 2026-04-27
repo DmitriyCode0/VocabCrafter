@@ -6,19 +6,18 @@ import {
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
   getPassiveVocabularyCompositeKey,
   inferPassiveVocabularyItemType,
+  normalizePassiveVocabularyLibraryAttributes,
   normalizePassiveVocabularyText,
   passiveVocabularyLibraryImportSchema,
   type PassiveVocabularyItemType,
 } from "@/lib/mastery/passive-vocabulary";
-import type {
-  PassiveVocabularyLibraryAdminItem,
-} from "@/lib/mastery/passive-vocabulary-library";
+import type { PassiveVocabularyLibraryAdminItem } from "@/lib/mastery/passive-vocabulary-library";
 import { importPassiveVocabularyLibraryItems as importPassiveVocabularyLibraryBatch } from "@/lib/mastery/passive-vocabulary-library";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
 
-async function requireSuperadmin() {
+async function getCurrentLibraryAccess() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -36,13 +35,35 @@ async function requireSuperadmin() {
     .eq("id", user.id)
     .single();
 
-  if (profileError || profile?.role !== "superadmin") {
+  if (profileError || !profile) {
     return {
       errorResponse: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     };
   }
 
-  return { userId: user.id, adminClient: createAdminClient() };
+  return {
+    userId: user.id,
+    role: profile.role,
+    adminClient: createAdminClient(),
+  };
+}
+
+async function requireSuperadmin() {
+  const access = await getCurrentLibraryAccess();
+
+  if ("errorResponse" in access) {
+    return {
+      errorResponse: access.errorResponse,
+    };
+  }
+
+  if (access.role !== "superadmin") {
+    return {
+      errorResponse: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+    };
+  }
+
+  return { userId: access.userId, adminClient: access.adminClient };
 }
 
 function parsePositiveInt(value: string | null, fallback: number) {
@@ -75,20 +96,22 @@ function toAdminItem(row: {
     cefr_level: row.cefr_level as PassiveVocabularyLibraryAdminItem["cefr_level"],
     part_of_speech:
       row.part_of_speech as PassiveVocabularyLibraryAdminItem["part_of_speech"],
-    attributes:
-      row.attributes && typeof row.attributes === "object" && !Array.isArray(row.attributes)
-        ? (row.attributes as PassiveVocabularyLibraryAdminItem["attributes"])
-        : {},
-    enrichment_status: row.enrichment_status as PassiveVocabularyLibraryAdminItem["enrichment_status"],
+    attributes: normalizePassiveVocabularyLibraryAttributes(row.attributes),
+    enrichment_status:
+      row.enrichment_status as PassiveVocabularyLibraryAdminItem["enrichment_status"],
     enrichment_error: row.enrichment_error,
     updated_at: row.updated_at,
   };
 }
 
 export async function GET(request: NextRequest) {
-  const access = await requireSuperadmin();
+  const access = await getCurrentLibraryAccess();
   if ("errorResponse" in access) {
     return access.errorResponse;
+  }
+
+  if (access.role !== "tutor" && access.role !== "superadmin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const searchParams = request.nextUrl.searchParams;

@@ -9,7 +9,7 @@ import { autoCompleteOverduePlannedLessons } from "@/lib/lessons-server";
 
 interface CompletedPerformanceLessonRow {
   id: string;
-  student_id: string;
+  student_id: string | null;
   lesson_date: string;
   start_time: string | null;
   end_time: string | null;
@@ -22,7 +22,7 @@ interface CompletedPerformanceLessonRow {
 
 interface PerformanceLessonItem {
   id: string;
-  studentId: string;
+  studentId: string | null;
   studentName: string;
   lessonDate: string;
   durationHours: number;
@@ -274,6 +274,12 @@ function mapPerformanceLessons(rows: CompletedPerformanceLessonRow[]) {
   }));
 }
 
+function hasAssignedStudent(
+  lesson: PerformanceLessonItem,
+): lesson is PerformanceLessonItem & { studentId: string } {
+  return typeof lesson.studentId === "string" && lesson.studentId.length > 0;
+}
+
 export default async function LessonsPerformancePage() {
   const { userId, role, appLanguage } = await getLessonsViewerAccess({
     requireTutor: true,
@@ -312,6 +318,7 @@ export default async function LessonsPerformancePage() {
     (lesson) =>
       parseLessonDate(lesson.lessonDate).getTime() >= yearStart.getTime(),
   );
+  const assignedStudentYearLessons = yearLessons.filter(hasAssignedStudent);
   const weeklyTrend = buildWeeklyTrend(completedLessons, today);
   const monthlyTrend = buildMonthlyTrend(completedLessons, today);
   const dailyTrend = buildDailyTrend(completedLessons, today);
@@ -338,7 +345,7 @@ export default async function LessonsPerformancePage() {
     today,
   );
   const topStudents = Array.from(
-    yearLessons.reduce((map, lesson) => {
+    assignedStudentYearLessons.reduce((map, lesson) => {
       const current = map.get(lesson.studentId);
       if (current) {
         current.lessons += 1;
@@ -355,7 +362,10 @@ export default async function LessonsPerformancePage() {
   )
     .map(([, value]) => ({
       ...value,
-      share: yearCount > 0 ? Math.round((value.lessons / yearCount) * 100) : 0,
+      share:
+        assignedStudentYearLessons.length > 0
+          ? Math.round((value.lessons / assignedStudentYearLessons.length) * 100)
+          : 0,
     }))
     .sort(
       (left, right) =>
@@ -381,7 +391,7 @@ export default async function LessonsPerformancePage() {
     },
   );
   const activeStudentsCount = new Set(
-    yearLessons.map((lesson) => lesson.studentId),
+    assignedStudentYearLessons.map((lesson) => lesson.studentId),
   ).size;
   const rollingWeeklyAverage =
     weeklyTrend.length > 0

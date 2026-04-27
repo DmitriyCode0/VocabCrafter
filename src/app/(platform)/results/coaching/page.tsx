@@ -134,6 +134,7 @@ export default async function CoachingResultsPage({
       </div>
 
       <TutorStudentProgressWorkspace
+        key={activeStudentId}
         studentId={activeStudentId}
         studentName={studentName}
         baseAxes={snapshot.axes}

@@ -36,7 +36,6 @@ import type {
   GrammarTopicMasteryItem,
   StudentProgressAxis,
 } from "@/lib/progress/profile-metrics";
-import { getTopicsForLevel } from "@/lib/grammar/topics";
 
 const ESTIMATED_BANDS = ["A0", "A1", "A2", "B1", "B2", "C1"] as const;
 
@@ -169,7 +168,10 @@ function GrammarPlanTopicSelector({
 }: {
   value: string;
   onChange: (topic: string) => void;
-  availableTopics: Array<{ level: string; topics: string[] }>;
+  availableTopics: Array<{
+    level: string;
+    topics: Array<{ topicKey: string; label: string }>;
+  }>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -195,7 +197,11 @@ function GrammarPlanTopicSelector({
     return availableTopics
       .map((group) => ({
         level: group.level,
-        topics: group.topics.filter((t) => t.toLowerCase().includes(query)),
+        topics: group.topics.filter(
+          (topic) =>
+            topic.label.toLowerCase().includes(query) ||
+            topic.topicKey.toLowerCase().includes(query),
+        ),
       }))
       .filter((group) => group.topics.length > 0);
   }, [availableTopics, value]);
@@ -221,15 +227,22 @@ function GrammarPlanTopicSelector({
               </p>
               {group.topics.map((topic) => (
                 <button
-                  key={topic}
+                  key={topic.topicKey}
                   type="button"
                   className="w-full rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent"
                   onClick={() => {
-                    onChange(topic);
+                    onChange(topic.label);
                     setIsOpen(false);
                   }}
                 >
-                  {topic}
+                  <span className="font-medium text-foreground">
+                    {topic.label}
+                  </span>
+                  {topic.label !== topic.topicKey ? (
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      {topic.topicKey}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -299,8 +312,38 @@ export function TutorStudentProgressWorkspace({
 
   const chartData = useMemo(() => buildChartDataFromAxes(axes), [axes]);
   const availableGrammarTopics = useMemo(
-    () => getTopicsForLevel(cefrLevel),
-    [cefrLevel],
+    () => {
+      const grouped = new Map<
+        string,
+        Array<{ topicKey: string; label: string }>
+      >();
+
+      for (const topic of grammarTopics) {
+        const currentLevelTopics = grouped.get(topic.level) ?? [];
+
+        if (
+          currentLevelTopics.some(
+            (existingTopic) => existingTopic.topicKey === topic.topicKey,
+          )
+        ) {
+          continue;
+        }
+
+        currentLevelTopics.push({
+          topicKey: topic.topicKey,
+          label: topic.label,
+        });
+        grouped.set(topic.level, currentLevelTopics);
+      }
+
+      return Array.from(grouped.entries()).map(([level, topics]) => ({
+        level,
+        topics: [...topics].sort((left, right) =>
+          left.label.localeCompare(right.label),
+        ),
+      }));
+    },
+    [grammarTopics],
   );
 
   const isDirty = useMemo(() => {

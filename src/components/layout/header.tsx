@@ -30,14 +30,19 @@ export function Header({ profile }: HeaderProps) {
     <header className="flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
       {/* Mobile sidebar trigger */}
       <Sheet>
-        <SheetTrigger asChild>
+        <SheetTrigger asChild aria-controls="mobile-navigation-sheet">
           <Button variant="ghost" size="icon" className="md:hidden">
             <Menu className="h-5 w-5" />
             <span className="sr-only">{messages.header.toggleMenu}</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0">
-          <SheetTitle className="sr-only">
+        <SheetContent
+          id="mobile-navigation-sheet"
+          aria-labelledby="mobile-navigation-sheet-title"
+          side="left"
+          className="w-64 p-0"
+        >
+          <SheetTitle id="mobile-navigation-sheet-title" className="sr-only">
             {messages.header.navigation}
           </SheetTitle>
           <div className="flex h-16 items-center border-b px-4">

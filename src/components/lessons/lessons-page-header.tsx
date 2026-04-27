@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
-import { LessonsSectionTabs } from "@/components/lessons/lessons-section-tabs";
+import {
+  LessonsSectionTabs,
+  type LessonsSection,
+} from "@/components/lessons/lessons-section-tabs";
 import type { Role } from "@/types/roles";
 
 interface LessonsPageHeaderProps {
   role: Role;
-  currentSection: "schedule" | "performance";
+  currentSection: LessonsSection;
   title?: string;
   description: string;
   actions?: ReactNode;

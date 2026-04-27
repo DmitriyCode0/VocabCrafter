@@ -8,7 +8,7 @@ import {
   type LearningLanguage,
   type SourceLanguage,
 } from "@/lib/languages";
-import { getTopicsForLevel } from "@/lib/grammar/topics";
+import { getGrammarTopicPromptCatalogUpToLevel } from "@/lib/grammar/prompt-overrides";
 import {
   getGrammarTopicDisplayName,
   getPrimaryGrammarTopic,
@@ -395,6 +395,8 @@ export async function getStudentProgressSnapshot(
   const targetLanguage = normalizeLearningLanguage(profile.preferred_language);
   const sourceLanguage = normalizeSourceLanguage(profile.source_language);
   const cefrLevel = normalizeCefrLevel(profile.cefr_level);
+  const availableGrammarTopicCatalog =
+    await getGrammarTopicPromptCatalogUpToLevel(targetLanguage, cefrLevel);
   const attempts = (attemptsResult.data ?? []) as AttemptRow[];
   const words = ((masteryResult.data ?? []) as WordMasteryRow[])
     .map((word) => ({
@@ -556,15 +558,13 @@ export async function getStudentProgressSnapshot(
     .sort((left, right) => right.averageScore - left.averageScore);
 
   // --- Grammar topics ---
-  const availableGrammarTopics = getTopicsForLevel(
-    cefrLevel,
-    targetLanguage,
-  ).flatMap(({ level, topics }) =>
-    topics.map((topicKey) => ({
-      topicKey,
-      label: topicKey,
-      level,
-    })),
+  const availableGrammarTopics = availableGrammarTopicCatalog.flatMap(
+    ({ level, topics }) =>
+      topics.map((topic) => ({
+        topicKey: topic.topicKey,
+        label: topic.displayName,
+        level,
+      })),
   );
   const availableGrammarTopicMap = new Map(
     availableGrammarTopics.map((topic) => [topic.topicKey, topic]),

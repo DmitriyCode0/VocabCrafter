@@ -14,7 +14,6 @@ import {
   MessageSquare,
   BarChart3,
   CreditCard,
-  Crown,
   Settings,
   TrendingUp,
   Zap,
@@ -23,6 +22,7 @@ import {
   UserCheck,
   UserPlus,
   FileText,
+  LibraryBig,
 } from "lucide-react";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import {
@@ -118,12 +118,6 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["tutor"],
   },
   {
-    labelKey: "review",
-    href: "/review",
-    icon: MessageSquare,
-    roles: ["tutor"],
-  },
-  {
     labelKey: "vocabMastery",
     href: "/mastery",
     icon: Brain,
@@ -160,6 +154,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: BookMarked,
     roles: ["student", "tutor", "superadmin"],
   },
+  {
+    labelKey: "library",
+    href: "/library",
+    icon: LibraryBig,
+    roles: ["tutor", "superadmin"],
+  },
   // Admin items
   {
     labelKey: "analytics",
@@ -178,12 +178,6 @@ const NAV_ITEMS: NavItem[] = [
     href: "/grammar-rules",
     icon: FileText,
     roles: ["superadmin"],
-  },
-  {
-    labelKey: "plans",
-    href: "/plans",
-    icon: Crown,
-    roles: ["student", "tutor", "superadmin"],
   },
   {
     labelKey: "billing",
@@ -241,7 +235,6 @@ export function NavLinks({ role, collapsed = false }: NavLinksProps) {
                   <Link
                     href={item.href}
                     data-active={isActive}
-                    aria-label={collapsed ? label : undefined}
                     className={cn(
                       "nav-link-animated flex items-center rounded-lg py-3 text-base transition-[padding,justify-content] duration-200 ease-out",
                       collapsed ? "justify-center px-0" : "gap-4 px-4",

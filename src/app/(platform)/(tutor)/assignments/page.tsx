@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
+import { AssignmentsPageHeader } from "@/components/assignments/assignments-page-header";
 import {
   Card,
   CardContent,
@@ -24,6 +25,7 @@ import {
 import { getAppMessages, type AppMessages } from "@/lib/i18n/messages";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { formatDateForAppLanguage } from "@/lib/i18n/format";
+import type { Role } from "@/types/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +70,7 @@ export default async function AssignmentsPage({
     .eq("id", user.id)
     .single();
 
-  const role = profile?.role ?? "student";
+  const role = (profile?.role ?? "student") as Role;
   const appLanguage = normalizeAppLanguage(profile?.app_language);
   const messages = getAppMessages(appLanguage);
 
@@ -99,17 +101,13 @@ export default async function AssignmentsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {messages.assignments.title}
-          </h1>
-          <p className="text-muted-foreground">
-            {messages.assignments.tutorDescription}
-          </p>
-        </div>
-        <CreateAssignmentDialog />
-      </div>
+      <AssignmentsPageHeader
+        role={role}
+        currentSection="assignments"
+        title={messages.assignments.title}
+        description={messages.assignments.tutorDescription}
+        actions={<CreateAssignmentDialog />}
+      />
 
       {!assignments || assignments.length === 0 ? (
         <Card>

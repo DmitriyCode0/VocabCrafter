@@ -81,11 +81,15 @@ export async function updateSession(request: NextRequest) {
     // Role-based route protection
     if (profile) {
       const adminRoutes = ["/analytics", "/users", "/grammar-rules"];
-      const tutorRoutes = ["/review"];
+      const tutorRoutes = ["/review", "/assignments/review"];
+      const libraryRoutes = ["/library"];
       const isAdminRoute = adminRoutes.some((route) =>
         pathname.startsWith(route),
       );
       const isTutorRoute = tutorRoutes.some((route) =>
+        pathname.startsWith(route),
+      );
+      const isLibraryRoute = libraryRoutes.some((route) =>
         pathname.startsWith(route),
       );
 
@@ -97,6 +101,16 @@ export async function updateSession(request: NextRequest) {
 
       if (
         isTutorRoute &&
+        profile.role !== "tutor" &&
+        profile.role !== "superadmin"
+      ) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/dashboard";
+        return NextResponse.redirect(url);
+      }
+
+      if (
+        isLibraryRoute &&
         profile.role !== "tutor" &&
         profile.role !== "superadmin"
       ) {

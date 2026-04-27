@@ -17,6 +17,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  CustomizableDashboard,
+  DashboardCustomizableItem,
+} from "@/components/dashboard/customizable-dashboard";
 import { StudentOverallPerformanceCard } from "@/components/progress/student-overall-performance-card";
 import Link from "next/link";
 import {
@@ -162,150 +166,188 @@ async function StudentDashboard({
 
   return (
     <div className="space-y-6">
-      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
-        <AnimatedCard>
-          <Card data-tour-id="student-new-quiz">
-            <CardHeader className="flex flex-row items-center gap-2">
-              <PlusCircle className="h-5 w-5 text-primary" />
-              <div>
-                <CardTitle className="text-base">
-                  {messages.dashboard.student.newQuizTitle}
+      <CustomizableDashboard
+        storageKey={`vocab-crafter.dashboard-layout:student:${userId}`}
+        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      >
+        <DashboardCustomizableItem
+          id="new-quiz"
+          title={messages.dashboard.student.newQuizTitle}
+        >
+          <AnimatedCard>
+            <Card data-tour-id="student-new-quiz">
+              <CardHeader className="flex flex-row items-center gap-2">
+                <PlusCircle className="h-5 w-5 text-primary" />
+                <div>
+                  <CardTitle className="text-base">
+                    {messages.dashboard.student.newQuizTitle}
+                  </CardTitle>
+                  <CardDescription>
+                    {messages.dashboard.student.newQuizDescription}
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardFooter className="mt-auto justify-center">
+                <Button asChild className="w-full">
+                  <Link href="/quizzes/new">
+                    {messages.dashboard.student.createQuizButton}
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          </AnimatedCard>
+        </DashboardCustomizableItem>
+
+        <DashboardCustomizableItem
+          id="review-activity"
+          title={messages.dashboard.student.reviewTitle}
+        >
+          <AnimatedCard>
+            <Card data-tour-id="student-review-activity">
+              <CardHeader className="flex flex-row items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                <div>
+                  <CardTitle className="text-base">
+                    {messages.dashboard.student.reviewTitle}
+                  </CardTitle>
+                  <CardDescription>
+                    {messages.dashboard.student.reviewDescription}
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardFooter className="mt-auto justify-center">
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/quizzes/review">
+                    {messages.dashboard.student.startReviewButton}
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          </AnimatedCard>
+        </DashboardCustomizableItem>
+
+        <DashboardCustomizableItem
+          id="passive-recognition"
+          title={messages.dashboard.student.passiveTitle}
+        >
+          <AnimatedCard>
+            <Card data-tour-id="student-passive-recognition">
+              <CardHeader className="flex flex-row items-center gap-2">
+                <BookMarked className="h-5 w-5 text-primary" />
+                <div>
+                  <CardTitle className="text-base">
+                    {messages.dashboard.student.passiveTitle}
+                  </CardTitle>
+                  <CardDescription>
+                    {messages.dashboard.student.passiveDescription}
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardFooter className="mt-auto justify-center">
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/passive-vocabulary">
+                    {messages.dashboard.student.passiveButton}
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          </AnimatedCard>
+        </DashboardCustomizableItem>
+
+        <DashboardCustomizableItem
+          id="quizzes-created"
+          title={messages.dashboard.student.quizzesCreatedTitle}
+        >
+          <AnimatedCard>
+            <Card data-tour-id="student-quizzes-created">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">
+                  {messages.dashboard.student.quizzesCreatedTitle}
                 </CardTitle>
-                <CardDescription>
-                  {messages.dashboard.student.newQuizDescription}
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardFooter className="mt-auto justify-center">
-              <Button asChild className="w-full">
-                <Link href="/quizzes/new">
-                  {messages.dashboard.student.createQuizButton}
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        </AnimatedCard>
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="text-2xl font-bold">
+                  {(monthlyQuizCount ?? 0).toLocaleString()} {" "}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    / {fmtLimit(quizLimit)}
+                  </span>
+                </div>
+                <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full transition-all ${isQuizOver ? "bg-red-500" : isQuizWarning ? "bg-amber-500" : "bg-blue-500"}`}
+                    style={{ width: `${Math.min(quizPercentage, 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {isFinite(quizLimit)
+                    ? messages.dashboard.student.remainingThisMonth(
+                        Math.max(0, quizLimit - (monthlyQuizCount ?? 0)),
+                      )
+                    : messages.dashboard.student.unlimited}
+                </p>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+        </DashboardCustomizableItem>
 
-        <AnimatedCard>
-          <Card data-tour-id="student-review-activity">
-            <CardHeader className="flex flex-row items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              <div>
-                <CardTitle className="text-base">
-                  {messages.dashboard.student.reviewTitle}
+        <DashboardCustomizableItem
+          id="day-streak"
+          title={messages.dashboard.student.dayStreakTitle}
+        >
+          <AnimatedCard>
+            <Card data-tour-id="student-day-streak">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">
+                  {messages.dashboard.student.dayStreakTitle}
                 </CardTitle>
-                <CardDescription>
-                  {messages.dashboard.student.reviewDescription}
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardFooter className="mt-auto justify-center">
-              <Button asChild variant="outline" className="w-full">
-                <Link href="/quizzes/review">
-                  {messages.dashboard.student.startReviewButton}
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        </AnimatedCard>
+                <Flame className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{dayStreak}</div>
+                <p className="text-xs text-muted-foreground">
+                  {messages.dashboard.student.consecutiveDays(dayStreak)}
+                </p>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+        </DashboardCustomizableItem>
 
-        <AnimatedCard>
-          <Card data-tour-id="student-passive-recognition">
-            <CardHeader className="flex flex-row items-center gap-2">
-              <BookMarked className="h-5 w-5 text-primary" />
-              <div>
-                <CardTitle className="text-base">
-                  {messages.dashboard.student.passiveTitle}
+        <DashboardCustomizableItem
+          id="overall-progress"
+          title={messages.nav.progress}
+        >
+          <AnimatedCard>
+            <StudentOverallPerformanceCard
+              snapshot={progressSnapshot}
+              href="/progress#overall-performance"
+              ctaLabel={messages.nav.progress}
+            />
+          </AnimatedCard>
+        </DashboardCustomizableItem>
+
+        <DashboardCustomizableItem
+          id="total-words"
+          title={messages.dashboard.student.totalWordsTitle}
+        >
+          <AnimatedCard>
+            <Card data-tour-id="student-total-words">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">
+                  {messages.dashboard.student.totalWordsTitle}
                 </CardTitle>
-                <CardDescription>
-                  {messages.dashboard.student.passiveDescription}
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardFooter className="mt-auto justify-center">
-              <Button asChild variant="outline" className="w-full">
-                <Link href="/passive-vocabulary">
-                  {messages.dashboard.student.passiveButton}
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <Card data-tour-id="student-quizzes-created">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                {messages.dashboard.student.quizzesCreatedTitle}
-              </CardTitle>
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="text-2xl font-bold">
-                {(monthlyQuizCount ?? 0).toLocaleString()}{" "}
-                <span className="text-sm font-normal text-muted-foreground">
-                  / {fmtLimit(quizLimit)}
-                </span>
-              </div>
-              <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className={`h-full rounded-full transition-all ${isQuizOver ? "bg-red-500" : isQuizWarning ? "bg-amber-500" : "bg-blue-500"}`}
-                  style={{ width: `${Math.min(quizPercentage, 100)}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {isFinite(quizLimit)
-                  ? messages.dashboard.student.remainingThisMonth(
-                      Math.max(0, quizLimit - (monthlyQuizCount ?? 0)),
-                    )
-                  : messages.dashboard.student.unlimited}
-              </p>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <Card data-tour-id="student-day-streak">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                {messages.dashboard.student.dayStreakTitle}
-              </CardTitle>
-              <Flame className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{dayStreak}</div>
-              <p className="text-xs text-muted-foreground">
-                {messages.dashboard.student.consecutiveDays(dayStreak)}
-              </p>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <StudentOverallPerformanceCard
-            snapshot={progressSnapshot}
-            href="/progress#overall-performance"
-            ctaLabel={messages.nav.progress}
-          />
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <Card data-tour-id="student-total-words">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                {messages.dashboard.student.totalWordsTitle}
-              </CardTitle>
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalWordsTracked ?? 0}</div>
-              <p className="text-xs text-muted-foreground">
-                {messages.dashboard.student.totalWordsDescription}
-              </p>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-      </AnimatedDashboard>
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalWordsTracked ?? 0}</div>
+                <p className="text-xs text-muted-foreground">
+                  {messages.dashboard.student.totalWordsDescription}
+                </p>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+        </DashboardCustomizableItem>
+      </CustomizableDashboard>
     </div>
   );
 }
@@ -373,136 +415,164 @@ async function TutorDashboard({
 
   return (
     <div className="space-y-6">
-      <AnimatedDashboard className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <AnimatedCard>
-          <Card data-tour-id="tutor-new-quiz">
-            <CardHeader className="flex flex-row items-center gap-2">
-              <PlusCircle className="h-5 w-5 text-primary" />
-              <div>
-                <CardTitle className="text-base">
-                  {messages.dashboard.tutor.newQuizTitle}
-                </CardTitle>
-                <CardDescription>
-                  {messages.dashboard.tutor.newQuizDescription}
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardFooter className="mt-auto justify-center">
-              <Button asChild className="w-full">
-                <Link href="/quizzes/new">
-                  {messages.dashboard.tutor.createQuizButton}
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <Card data-tour-id="tutor-review">
-            <CardHeader className="flex flex-row items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-primary" />
-              <div>
-                <CardTitle className="text-base">
-                  {messages.dashboard.tutor.reviewTitle}
-                </CardTitle>
-                <CardDescription>
-                  {messages.dashboard.tutor.reviewDescription}
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardFooter className="mt-auto justify-center">
-              <Button asChild variant="outline" className="w-full">
-                <Link href="/review">
-                  {messages.dashboard.tutor.reviewButton}
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <Card data-tour-id="tutor-passive-recognition">
-            <CardHeader className="flex flex-row items-center gap-2">
-              <BookMarked className="h-5 w-5 text-primary" />
-              <div>
-                <CardTitle className="text-base">
-                  {messages.dashboard.tutor.passiveTitle}
-                </CardTitle>
-                <CardDescription>{passiveImportDescription}</CardDescription>
-              </div>
-            </CardHeader>
-            <CardFooter className="mt-auto justify-center">
-              {connectedStudentIds.length > 0 ? (
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={passiveImportHref}>
-                    {passiveImportButtonLabel}
+      <CustomizableDashboard
+        storageKey={`vocab-crafter.dashboard-layout:tutor:${userId}`}
+        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      >
+        <DashboardCustomizableItem
+          id="new-quiz"
+          title={messages.dashboard.tutor.newQuizTitle}
+        >
+          <AnimatedCard>
+            <Card data-tour-id="tutor-new-quiz">
+              <CardHeader className="flex flex-row items-center gap-2">
+                <PlusCircle className="h-5 w-5 text-primary" />
+                <div>
+                  <CardTitle className="text-base">
+                    {messages.dashboard.tutor.newQuizTitle}
+                  </CardTitle>
+                  <CardDescription>
+                    {messages.dashboard.tutor.newQuizDescription}
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardFooter className="mt-auto justify-center">
+                <Button asChild className="w-full">
+                  <Link href="/quizzes/new">
+                    {messages.dashboard.tutor.createQuizButton}
                   </Link>
                 </Button>
-              ) : (
-                <Button variant="outline" className="w-full" disabled>
-                  {passiveImportButtonLabel}
+              </CardFooter>
+            </Card>
+          </AnimatedCard>
+        </DashboardCustomizableItem>
+
+        <DashboardCustomizableItem
+          id="review"
+          title={messages.dashboard.tutor.reviewTitle}
+        >
+          <AnimatedCard>
+            <Card data-tour-id="tutor-review">
+              <CardHeader className="flex flex-row items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                <div>
+                  <CardTitle className="text-base">
+                    {messages.dashboard.tutor.reviewTitle}
+                  </CardTitle>
+                  <CardDescription>
+                    {messages.dashboard.tutor.reviewDescription}
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardFooter className="mt-auto justify-center">
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/assignments/review">
+                    {messages.dashboard.tutor.reviewButton}
+                  </Link>
                 </Button>
-              )}
-            </CardFooter>
-          </Card>
-        </AnimatedCard>
+              </CardFooter>
+            </Card>
+          </AnimatedCard>
+        </DashboardCustomizableItem>
 
-        <AnimatedCard>
-          <Card data-tour-id="tutor-students">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                {messages.dashboard.tutor.studentsTitle}
-              </CardTitle>
-              <GraduationCap className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalStudents}</div>
-              <p className="text-xs text-muted-foreground">
-                {messages.dashboard.tutor.enrolledStudents}
-              </p>
-            </CardContent>
-            <CardFooter className="mt-auto justify-center">
-              <Button asChild variant="outline" className="w-full">
-                <Link href="/students">
-                  {messages.dashboard.tutor.viewStudentsButton}
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        </AnimatedCard>
+        <DashboardCustomizableItem
+          id="passive-vocabulary"
+          title={messages.dashboard.tutor.passiveTitle}
+        >
+          <AnimatedCard>
+            <Card data-tour-id="tutor-passive-recognition">
+              <CardHeader className="flex flex-row items-center gap-2">
+                <BookMarked className="h-5 w-5 text-primary" />
+                <div>
+                  <CardTitle className="text-base">
+                    {messages.dashboard.tutor.passiveTitle}
+                  </CardTitle>
+                  <CardDescription>{passiveImportDescription}</CardDescription>
+                </div>
+              </CardHeader>
+              <CardFooter className="mt-auto justify-center">
+                {connectedStudentIds.length > 0 ? (
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href={passiveImportHref}>
+                      {passiveImportButtonLabel}
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="w-full" disabled>
+                    {passiveImportButtonLabel}
+                  </Button>
+                )}
+              </CardFooter>
+            </Card>
+          </AnimatedCard>
+        </DashboardCustomizableItem>
 
-        <AnimatedCard>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                {messages.dashboard.tutor.quizzesCreatedTitle}
-              </CardTitle>
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="text-2xl font-bold">
-                {(monthlyQuizCount ?? 0).toLocaleString()}{" "}
-                <span className="text-sm font-normal text-muted-foreground">
-                  / {fmtLimit(quizLimit)}
-                </span>
-              </div>
-              <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className={`h-full rounded-full transition-all ${isQuizOver ? "bg-red-500" : isQuizWarning ? "bg-amber-500" : "bg-blue-500"}`}
-                  style={{ width: `${Math.min(quizPercentage, 100)}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {isFinite(quizLimit)
-                  ? messages.dashboard.tutor.remainingThisMonth(
-                      Math.max(0, quizLimit - (monthlyQuizCount ?? 0)),
-                    )
-                  : messages.dashboard.tutor.unlimited}
-              </p>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-      </AnimatedDashboard>
+        <DashboardCustomizableItem
+          id="students"
+          title={messages.dashboard.tutor.studentsTitle}
+        >
+          <AnimatedCard>
+            <Card data-tour-id="tutor-students">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">
+                  {messages.dashboard.tutor.studentsTitle}
+                </CardTitle>
+                <GraduationCap className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalStudents}</div>
+                <p className="text-xs text-muted-foreground">
+                  {messages.dashboard.tutor.enrolledStudents}
+                </p>
+              </CardContent>
+              <CardFooter className="mt-auto justify-center">
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/students">
+                    {messages.dashboard.tutor.viewStudentsButton}
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          </AnimatedCard>
+        </DashboardCustomizableItem>
+
+        <DashboardCustomizableItem
+          id="quizzes-created"
+          title={messages.dashboard.tutor.quizzesCreatedTitle}
+        >
+          <AnimatedCard>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">
+                  {messages.dashboard.tutor.quizzesCreatedTitle}
+                </CardTitle>
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="text-2xl font-bold">
+                  {(monthlyQuizCount ?? 0).toLocaleString()} {" "}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    / {fmtLimit(quizLimit)}
+                  </span>
+                </div>
+                <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full transition-all ${isQuizOver ? "bg-red-500" : isQuizWarning ? "bg-amber-500" : "bg-blue-500"}`}
+                    style={{ width: `${Math.min(quizPercentage, 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {isFinite(quizLimit)
+                    ? messages.dashboard.tutor.remainingThisMonth(
+                        Math.max(0, quizLimit - (monthlyQuizCount ?? 0)),
+                      )
+                    : messages.dashboard.tutor.unlimited}
+                </p>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+        </DashboardCustomizableItem>
+      </CustomizableDashboard>
     </div>
   );
 }
@@ -605,7 +675,7 @@ async function AdminDashboard({
                 {textRequestCount.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                {formatApproxUsd(textCost)}{" "}
+                {formatApproxUsd(textCost)} {" "}
                 {messages.dashboard.admin.trackedInMonth(monthLabel)}
               </p>
             </CardContent>
@@ -625,7 +695,7 @@ async function AdminDashboard({
                 {ttsRequestCount.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                {formatApproxUsd(ttsCost)}{" "}
+                {formatApproxUsd(ttsCost)} {" "}
                 {messages.dashboard.admin.trackedInMonth(monthLabel)}
               </p>
             </CardContent>

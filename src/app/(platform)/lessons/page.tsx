@@ -409,8 +409,6 @@ async function TutorLessonsView({
   const [
     { data: connectionsResult },
     { data: lessonsResult },
-    { data: topUpsResult },
-    { data: completedLessonsResult },
     googleCalendarConnectionResult,
   ] = await Promise.all([
     supabaseAdmin
@@ -430,15 +428,6 @@ async function TutorLessonsView({
       .lte("lesson_date", endIsoDate)
       .order("lesson_date", { ascending: true })
       .order("start_time", { ascending: true }),
-    supabaseAdmin
-      .from("tutor_student_balance_transactions")
-      .select("id, tutor_id, student_id, amount_cents, note, created_at")
-      .eq("tutor_id", userId),
-    supabaseAdmin
-      .from("tutor_student_lessons")
-      .select("id, tutor_id, student_id, title, lesson_date, price_cents")
-      .eq("tutor_id", userId)
-      .eq("status", "completed"),
     getGoogleCalendarConnectionSummary(userId, supabaseAdmin),
   ]);
 
@@ -458,25 +447,6 @@ async function TutorLessonsView({
     );
 
   const lessons = mapTutorLessons((lessonsResult ?? []) as TutorLessonRow[]);
-  const balanceTransactions = (topUpsResult ??
-    []) as LessonBalanceTransactionRow[];
-  const completedLessonCharges = (completedLessonsResult ??
-    []) as CompletedLessonChargeRow[];
-  const lessonBalanceSummaries = buildLessonBalanceSummaries(
-    connectedStudents.map((student) => ({
-      id: student.id,
-      name: student.name,
-      label: "Student",
-      lessonPriceCents: student.lessonPriceCents ?? 0,
-    })),
-    buildTotalsByKey(balanceTransactions, "student_id", "amount_cents"),
-    buildTotalsByKey(completedLessonCharges, "student_id", "price_cents"),
-    buildBalanceHistoryByKey(
-      balanceTransactions,
-      completedLessonCharges,
-      "student_id",
-    ),
-  );
   const googleCalendarConnection = (googleCalendarConnectionResult ??
     null) as GoogleCalendarConnectionStatusRow | null;
   const isGoogleCalendarAvailable = isGoogleCalendarSyncConfigured();
@@ -523,19 +493,6 @@ async function TutorLessonsView({
         canManageLessons
         studentOptions={connectedStudents}
       />
-
-      {lessonBalanceSummaries.length > 0 ? (
-        <div className="space-y-3">
-          <div>
-            <h2 className="text-lg font-semibold">Student Balances</h2>
-            <p className="text-sm text-muted-foreground">
-              Set a lesson price, record top-ups, and track how many lessons
-              each student balance currently covers.
-            </p>
-          </div>
-          <LessonBalanceManager summaries={lessonBalanceSummaries} canManage />
-        </div>
-      ) : null}
     </div>
   );
 }
