@@ -4,7 +4,14 @@ import { z } from "zod";
 import { recordAIUsageEvent } from "@/lib/ai/usage";
 import { GEMINI_MODEL, generateFromGeminiWithUsage } from "@/lib/gemini/client";
 import { getPlan } from "@/lib/plans-server";
-import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
+import {
+  getStudentMonthlyComparisonSnapshot,
+  getStudentProgressSnapshot,
+} from "@/lib/progress/profile-metrics";
+import {
+  parseTutorProgressOverride,
+  progressAxisKeySchema,
+} from "@/lib/progress/contracts";
 import {
   getReportLanguageLocale,
   getReportLanguagePromptName,
@@ -28,6 +35,33 @@ type MonthlyReportRow =
 
 export const monthlyReportGoalsSchema = tutorStudentPlanSchema;
 
+const monthlyReportPentagramAxisSchema = z.object({
+  key: progressAxisKeySchema,
+  label: z.string().trim().min(1),
+  shortLabel: z.string().trim().min(1),
+  score: z.number().int().min(0).max(100),
+  value: z.string().trim().min(1),
+  helper: z.string().trim().min(1),
+  beta: z.boolean().optional(),
+});
+
+const monthlyReportPentagramChartDatumSchema = z.object({
+  axis: z.string().trim().min(1),
+  score: z.number().int().min(0).max(100),
+  fullMark: z.number().int().min(0).default(100),
+});
+
+export const monthlyReportPentagramMonthSchema = z.object({
+  reportMonth: z.string().trim().min(1),
+  axes: z.array(monthlyReportPentagramAxisSchema).max(5).default([]),
+  chartData: z.array(monthlyReportPentagramChartDatumSchema).max(5).default([]),
+});
+
+export const monthlyReportPentagramSnapshotSchema = z.object({
+  currentMonth: monthlyReportPentagramMonthSchema,
+  previousMonth: monthlyReportPentagramMonthSchema,
+});
+
 export const monthlyReportMetricsSchema = z.object({
   activeDays: z.number().int().min(0),
   completedQuizzes: z.number().int().min(0),
@@ -40,6 +74,7 @@ export const monthlyReportMetricsSchema = z.object({
   practicedWords: z.number().int().min(0),
   trackedWordsTotal: z.number().int().min(0),
   averageScore: z.number().min(0).max(100).nullable(),
+  monthlyPentagram: monthlyReportPentagramSnapshotSchema.nullable().default(null),
 });
 
 export const monthlyReportStatusSchema = z.enum([
@@ -83,6 +118,9 @@ export const monthlyReportUpdateInputSchema = z.object({
 
 export type MonthlyReportGoals = TutorStudentPlan;
 export type MonthlyReportMetrics = z.infer<typeof monthlyReportMetricsSchema>;
+export type MonthlyReportPentagramSnapshot = z.infer<
+  typeof monthlyReportPentagramSnapshotSchema
+>;
 export type MonthlyReportStatus = z.infer<typeof monthlyReportStatusSchema>;
 export type MonthlyReportGenerationSource = z.infer<
   typeof monthlyReportGenerationSourceSchema
@@ -335,6 +373,9 @@ export async function updateTutorStudentMonthlyReportSettings(
 export async function getTutorStudentMonthlyReportMetrics(
   studentId: string,
   referenceDate: Date = new Date(),
+  options?: {
+    tutorId?: string | null;
+  },
 ): Promise<MonthlyReportMetrics> {
   const admin = createAdminClient();
   const window = buildReportMonthWindow(referenceDate);
@@ -345,6 +386,7 @@ export async function getTutorStudentMonthlyReportMetrics(
     newWordsResult,
     practicedWordsResult,
     totalWordsResult,
+    overrideResult,
   ] = await Promise.all([
     admin
       .from("quiz_attempts")
@@ -377,6 +419,14 @@ export async function getTutorStudentMonthlyReportMetrics(
       .from("word_mastery")
       .select("id", { count: "exact", head: true })
       .eq("student_id", studentId),
+    options?.tutorId
+      ? admin
+          .from("tutor_student_progress_overrides")
+          .select("monthly_target_overrides")
+          .eq("tutor_id", options.tutorId)
+          .eq("student_id", studentId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   if (attemptsResult.error) {
@@ -397,6 +447,10 @@ export async function getTutorStudentMonthlyReportMetrics(
 
   if (totalWordsResult.error) {
     throw totalWordsResult.error;
+  }
+
+  if (overrideResult.error) {
+    throw overrideResult.error;
   }
 
   const activeDays = new Set<string>();
@@ -454,6 +508,15 @@ export async function getTutorStudentMonthlyReportMetrics(
     }
   }
 
+  const monthlyTargetOverrides = parseTutorProgressOverride(
+    overrideResult.data,
+  ).monthlyTargetOverrides;
+  const monthlyComparison = await getStudentMonthlyComparisonSnapshot(
+    studentId,
+    referenceDate,
+    monthlyTargetOverrides,
+  );
+
   return {
     activeDays: activeDays.size,
     completedQuizzes: (attemptsResult.data ?? []).length,
@@ -467,6 +530,18 @@ export async function getTutorStudentMonthlyReportMetrics(
     trackedWordsTotal: totalWordsResult.count ?? 0,
     averageScore:
       scoredAttempts > 0 ? roundScore(totalScore / scoredAttempts) : null,
+    monthlyPentagram: {
+      currentMonth: {
+        reportMonth: monthlyComparison.currentMonth.window.reportMonth,
+        axes: monthlyComparison.currentMonth.axes,
+        chartData: monthlyComparison.currentMonth.chartData,
+      },
+      previousMonth: {
+        reportMonth: monthlyComparison.previousMonth.window.reportMonth,
+        axes: monthlyComparison.previousMonth.axes,
+        chartData: monthlyComparison.previousMonth.chartData,
+      },
+    },
   };
 }
 
@@ -867,7 +942,7 @@ export async function generateTutorStudentMonthlyReport({
     studentProfile,
   ] = await Promise.all([
     getTutorStudentPlan(tutorId, studentId),
-    getTutorStudentMonthlyReportMetrics(studentId, referenceDate),
+    getTutorStudentMonthlyReportMetrics(studentId, referenceDate, { tutorId }),
     getTutorMonthlyReportQuota(tutorId, referenceDate),
     listTutorStudentMonthlyReports(tutorId, studentId),
     getStudentProgressSnapshot(studentId),

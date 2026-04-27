@@ -247,8 +247,9 @@ export default async function LessonRoomPage({
 
           {role === "tutor" ? (
             <ManualTranscriptSubmitCard
-              lessonId={id}
               recordings={transcriptToolRecordings}
+              transcriptEndpoint={`/api/lessons/${id}/transcript`}
+              transcribeEndpoint={`/api/lessons/${id}/transcribe-recording`}
             />
           ) : null}
 

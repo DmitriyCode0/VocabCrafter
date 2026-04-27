@@ -28,6 +28,7 @@ const BODY_FONT_SIZE = 11;
 const LINE_HEIGHT_MULTIPLIER = 1.45;
 const BRAND_GREEN = rgb(0.2, 0.55, 0.28);
 const BRAND_GREEN_DARK = rgb(0.13, 0.37, 0.19);
+const MONTHLY_COMPARE_GOLD = rgb(0.83, 0.63, 0.09);
 const BRAND_SURFACE = rgb(0.95, 0.97, 0.93);
 const PANEL_FILL = rgb(0.98, 0.96, 0.93);
 const PANEL_BORDER = rgb(0.84, 0.77, 0.67);
@@ -97,6 +98,8 @@ const PDF_COPY: Record<
     objectives: string;
     grammarTopics: string;
     monthlyMetrics: string;
+    monthlyPentagram: string;
+    monthlyPentagramNote: string;
     publishedReport: string;
     reviewRating: string;
     noObjectives: string;
@@ -132,6 +135,9 @@ const PDF_COPY: Record<
     objectives: "Objectives",
     grammarTopics: "Grammar focus topics",
     monthlyMetrics: "Monthly Metrics",
+    monthlyPentagram: "Monthly Pentagram",
+    monthlyPentagramNote:
+      "Current month compared with the previous month using the same snapped report targets.",
     publishedReport: "Published Report",
     reviewRating: "Tutor Review",
     noObjectives: "No objectives listed.",
@@ -166,6 +172,9 @@ const PDF_COPY: Record<
     objectives: "Цілі",
     grammarTopics: "Граматичні теми у фокусі",
     monthlyMetrics: "Метрики за місяць",
+    monthlyPentagram: "Місячна пентаграма",
+    monthlyPentagramNote:
+      "Поточний місяць порівняно з попереднім за тими самими цілями, які були зафіксовані у звіті.",
     publishedReport: "Опублікований звіт",
     reviewRating: "Оцінка викладача",
     noObjectives: "Цілі ще не додані.",
@@ -313,6 +322,21 @@ function wrapLine(
   return lines.length > 0 ? lines : [""];
 }
 
+function getRadarPoint(
+  centerX: number,
+  centerY: number,
+  radius: number,
+  index: number,
+  axisCount: number,
+) {
+  const angle = -Math.PI / 2 + (Math.PI * 2 * index) / axisCount;
+
+  return {
+    x: centerX + Math.cos(angle) * radius,
+    y: centerY + Math.sin(angle) * radius,
+  };
+}
+
 export function getMonthlyReportPdfFilename(
   report: StoredMonthlyReport,
   studentName: string,
@@ -396,6 +420,37 @@ export async function buildMonthlyReportPdf({
     }
 
     cursorY -= afterGap;
+  }
+
+  function drawWrappedTextBlock(
+    text: string,
+    x: number,
+    y: number,
+    width: number,
+    {
+      font = regularFont,
+      fontSize = BODY_FONT_SIZE,
+      color = TEXT_COLOR,
+    }: {
+      font?: PDFFont;
+      fontSize?: number;
+      color?: ReturnType<typeof rgb>;
+    } = {},
+  ) {
+    let nextY = y;
+
+    for (const line of wrapLine(text, width, font, fontSize)) {
+      page.drawText(line, {
+        x,
+        y: nextY,
+        size: fontSize,
+        font,
+        color,
+      });
+      nextY -= lineHeight(fontSize);
+    }
+
+    return nextY;
   }
 
   function drawParagraph(text: string, font: PDFFont = regularFont) {
@@ -628,6 +683,234 @@ export async function buildMonthlyReportPdf({
     cursorY -= cardHeight * rows + gap * Math.max(rows - 1, 0) + 8;
   }
 
+  function drawMonthlyPentagram(
+    pentagram: NonNullable<StoredMonthlyReport["metricsSnapshot"]["monthlyPentagram"]>,
+  ) {
+    const panelHeight = 318;
+    const panelY = cursorY - panelHeight;
+    const chartX = PAGE_MARGIN + 18;
+    const chartWidth = 270;
+    const chartCenterX = chartX + chartWidth / 2;
+    const chartCenterY = panelY + panelHeight / 2 - 6;
+    const chartRadius = 86;
+    const rightX = chartX + chartWidth + 24;
+    const rightWidth = PAGE_MARGIN + CONTENT_WIDTH - rightX - 18;
+    const currentLabel = formatMonthlyReportMonthLabel(
+      pentagram.currentMonth.reportMonth,
+      locale,
+    );
+    const previousLabel = formatMonthlyReportMonthLabel(
+      pentagram.previousMonth.reportMonth,
+      locale,
+    );
+    const axes = pentagram.currentMonth.axes;
+    const axisCount = Math.max(axes.length, pentagram.previousMonth.axes.length, 0);
+
+    ensureSpace(panelHeight + 8);
+
+    page.drawRectangle({
+      x: PAGE_MARGIN,
+      y: panelY,
+      width: CONTENT_WIDTH,
+      height: panelHeight,
+      color: BRAND_SURFACE,
+      borderColor: PANEL_BORDER,
+      borderWidth: 1,
+    });
+
+    if (axisCount > 0) {
+      for (const ratio of [0.2, 0.4, 0.6, 0.8, 1]) {
+        const gridPoints = Array.from({ length: axisCount }, (_, index) =>
+          getRadarPoint(
+            chartCenterX,
+            chartCenterY,
+            chartRadius * ratio,
+            index,
+            axisCount,
+          ),
+        );
+
+        for (let index = 0; index < gridPoints.length; index += 1) {
+          const point = gridPoints[index];
+          const nextPoint = gridPoints[(index + 1) % gridPoints.length];
+
+          page.drawLine({
+            start: point,
+            end: nextPoint,
+            thickness: ratio === 1 ? 1.1 : 0.6,
+            color: PANEL_BORDER,
+          });
+        }
+      }
+
+      for (let index = 0; index < axisCount; index += 1) {
+        page.drawLine({
+          start: { x: chartCenterX, y: chartCenterY },
+          end: getRadarPoint(
+            chartCenterX,
+            chartCenterY,
+            chartRadius,
+            index,
+            axisCount,
+          ),
+          thickness: 0.6,
+          color: PANEL_BORDER,
+        });
+      }
+
+      for (let index = 0; index < axisCount; index += 1) {
+        const label =
+          pentagram.currentMonth.axes[index]?.shortLabel ??
+          pentagram.previousMonth.axes[index]?.shortLabel ??
+          "";
+
+        if (!label) {
+          continue;
+        }
+
+        const labelPoint = getRadarPoint(
+          chartCenterX,
+          chartCenterY,
+          chartRadius + 22,
+          index,
+          axisCount,
+        );
+        const labelWidth = boldFont.widthOfTextAtSize(label, 9);
+
+        page.drawText(label, {
+          x: labelPoint.x - labelWidth / 2,
+          y: labelPoint.y - 4,
+          size: 9,
+          font: boldFont,
+          color: MUTED_TEXT,
+        });
+      }
+
+      const previousPoints = pentagram.previousMonth.chartData.map((item, index) =>
+        getRadarPoint(
+          chartCenterX,
+          chartCenterY,
+          chartRadius * (item.score / 100),
+          index,
+          axisCount,
+        ),
+      );
+      const currentPoints = pentagram.currentMonth.chartData.map((item, index) =>
+        getRadarPoint(
+          chartCenterX,
+          chartCenterY,
+          chartRadius * (item.score / 100),
+          index,
+          axisCount,
+        ),
+      );
+
+      for (let index = 0; index < previousPoints.length; index += 1) {
+        page.drawLine({
+          start: previousPoints[index],
+          end: previousPoints[(index + 1) % previousPoints.length],
+          thickness: 1.8,
+          color: MONTHLY_COMPARE_GOLD,
+        });
+      }
+
+      for (let index = 0; index < currentPoints.length; index += 1) {
+        page.drawLine({
+          start: currentPoints[index],
+          end: currentPoints[(index + 1) % currentPoints.length],
+          thickness: 2.4,
+          color: BRAND_GREEN_DARK,
+        });
+      }
+    }
+
+    let rightY = panelY + panelHeight - 24;
+    rightY =
+      drawWrappedTextBlock(copy.monthlyPentagramNote, rightX, rightY, rightWidth, {
+        fontSize: 10,
+        color: MUTED_TEXT,
+      }) - 10;
+
+    page.drawRectangle({
+      x: rightX,
+      y: rightY - 3,
+      width: 10,
+      height: 10,
+      color: BRAND_GREEN_DARK,
+    });
+    page.drawText(currentLabel, {
+      x: rightX + 16,
+      y: rightY,
+      size: 10,
+      font: boldFont,
+      color: TEXT_COLOR,
+    });
+    rightY -= 18;
+
+    page.drawRectangle({
+      x: rightX,
+      y: rightY - 3,
+      width: 10,
+      height: 10,
+      color: MONTHLY_COMPARE_GOLD,
+    });
+    page.drawText(previousLabel, {
+      x: rightX + 16,
+      y: rightY,
+      size: 10,
+      font: regularFont,
+      color: TEXT_COLOR,
+    });
+    rightY -= 24;
+
+    const previousAxisMap = new Map(
+      pentagram.previousMonth.axes.map((axis) => [axis.key, axis]),
+    );
+
+    for (const axis of pentagram.currentMonth.axes) {
+      const previousAxis = previousAxisMap.get(axis.key);
+
+      page.drawText(axis.label, {
+        x: rightX,
+        y: rightY,
+        size: 10,
+        font: boldFont,
+        color: TEXT_COLOR,
+      });
+
+      const previousScore = `${previousAxis?.score ?? 0}`;
+      const currentScore = `${axis.score}`;
+      const currentWidth = boldFont.widthOfTextAtSize(currentScore, 11);
+      const previousWidth = regularFont.widthOfTextAtSize(previousScore, 10);
+
+      page.drawText(previousScore, {
+        x: rightX + rightWidth - currentWidth - previousWidth - 16,
+        y: rightY,
+        size: 10,
+        font: regularFont,
+        color: MONTHLY_COMPARE_GOLD,
+      });
+      page.drawText("/", {
+        x: rightX + rightWidth - currentWidth - 11,
+        y: rightY,
+        size: 10,
+        font: regularFont,
+        color: MUTED_TEXT,
+      });
+      page.drawText(currentScore, {
+        x: rightX + rightWidth - currentWidth,
+        y: rightY - 1,
+        size: 11,
+        font: boldFont,
+        color: BRAND_GREEN_DARK,
+      });
+
+      rightY -= 20;
+    }
+
+    cursorY = panelY - 10;
+  }
+
   function drawBulletItems(items: string[]) {
     for (const item of items) {
       drawParagraph(`- ${item}`);
@@ -714,6 +997,11 @@ export async function buildMonthlyReportPdf({
 
   drawSectionTitle(copy.monthlyMetrics);
   drawMetricCardGrid();
+
+  if (report.metricsSnapshot.monthlyPentagram) {
+    drawSectionTitle(copy.monthlyPentagram);
+    drawMonthlyPentagram(report.metricsSnapshot.monthlyPentagram);
+  }
 
   drawSectionTitle(copy.publishedReport);
   drawParagraph(report.publishedContent || copy.noPublishedContent);

@@ -35,12 +35,11 @@ export function LessonsPageHeader({
         ) : null}
       </div>
 
-      {role === "tutor" ? (
-        <LessonsSectionTabs
-          currentSection={currentSection}
-          scheduleHref={scheduleHref}
-        />
-      ) : null}
+      <LessonsSectionTabs
+        role={role}
+        currentSection={currentSection}
+        scheduleHref={scheduleHref}
+      />
     </div>
   );
 }

@@ -1,6 +1,12 @@
 import { Trophy } from "lucide-react";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getAppMessages } from "@/lib/i18n/messages";
-import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
+import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
+import {
+  getStudentMonthlyComparisonSnapshot,
+  getStudentProgressSnapshot,
+} from "@/lib/progress/profile-metrics";
+import { parseTutorProgressOverride } from "@/lib/progress/contracts";
 import { getTutorProgressPageData } from "@/lib/progress/tutor-progress-page-data";
 import { getStudentMonthlyActivity } from "@/lib/progress/tutor-progress-monthly";
 import { ResultsStudentFilter } from "@/components/progress/results-student-filter";
@@ -16,21 +22,54 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const APP_LANGUAGE_LOCALES = {
+  en: "en-GB",
+  uk: "uk-UA",
+} as const;
+
+function formatMonthLabel(reportMonth: string, appLanguage: "en" | "uk") {
+  return new Intl.DateTimeFormat(APP_LANGUAGE_LOCALES[appLanguage], {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${reportMonth}T00:00:00.000Z`));
+}
+
 export default async function MonthlyResultsPage({
   searchParams,
 }: {
   searchParams: Promise<{ student?: string }>;
 }) {
   const { student: requestedStudentId } = await searchParams;
-  const { role, appLanguage, students, activeStudentId, studentProfile } =
+  const { userId, role, appLanguage, students, activeStudentId, studentProfile } =
     await getTutorProgressPageData(requestedStudentId);
   const messages = getAppMessages(appLanguage);
-  const [trend, snapshot] = activeStudentId
+  const supabaseAdmin = createAdminClient();
+  const [trend, snapshot, overrideResult] = activeStudentId
     ? await Promise.all([
         getStudentMonthlyActivity(activeStudentId, appLanguage),
         getStudentProgressSnapshot(activeStudentId),
+        supabaseAdmin
+          .from("tutor_student_progress_overrides")
+          .select("monthly_target_overrides")
+          .eq("tutor_id", userId)
+          .eq("student_id", activeStudentId)
+          .maybeSingle(),
       ])
-    : [null, null];
+    : [null, null, null];
+
+  if (overrideResult?.error) {
+    throw overrideResult.error;
+  }
+
+  const currentOverride = parseTutorProgressOverride(overrideResult?.data);
+  const monthlyComparison = activeStudentId
+    ? await getStudentMonthlyComparisonSnapshot(
+        activeStudentId,
+        undefined,
+        currentOverride.monthlyTargetOverrides,
+      )
+    : null;
 
   return (
     <div className="space-y-6">
@@ -71,16 +110,50 @@ export default async function MonthlyResultsPage({
           </CardContent>
         </Card>
       ) : (
-        <TutorStudentMonthlyPerformance
-          studentName={
-            studentProfile.full_name ||
-            studentProfile.email ||
-            messages.tutorProgressPage.studentFallback
-          }
-          studentLevel={studentProfile.cefr_level}
-          targetLanguageLabel={snapshot.profile.targetLanguageLabel}
-          trend={trend}
-        />
+        <div className="space-y-6">
+          {monthlyComparison ? (
+            <StudentSkillRadar
+              axes={monthlyComparison.currentMonth.axes}
+              chartData={monthlyComparison.currentMonth.chartData}
+              cefrLevel={snapshot.profile.cefrLevel}
+              grammarNotice={snapshot.grammar.betaNotice}
+              grammarTopics={snapshot.grammarTopicMastery}
+              title={
+                appLanguage === "uk"
+                  ? "Порівняння прогресу за місяцями"
+                  : "Monthly Progress Comparison"
+              }
+              description={
+                appLanguage === "uk"
+                  ? "Поточний місяць порівняно з попереднім за тими самими п’ятьма осями."
+                  : "Current month compared with the previous month across the same five axes."
+              }
+              comparison={{
+                currentLabel: formatMonthLabel(
+                  monthlyComparison.currentMonth.window.reportMonth,
+                  appLanguage,
+                ),
+                previousLabel: formatMonthLabel(
+                  monthlyComparison.previousMonth.window.reportMonth,
+                  appLanguage,
+                ),
+                previousAxes: monthlyComparison.previousMonth.axes,
+                previousChartData: monthlyComparison.previousMonth.chartData,
+              }}
+            />
+          ) : null}
+
+          <TutorStudentMonthlyPerformance
+            studentName={
+              studentProfile.full_name ||
+              studentProfile.email ||
+              messages.tutorProgressPage.studentFallback
+            }
+            studentLevel={studentProfile.cefr_level}
+            targetLanguageLabel={snapshot.profile.targetLanguageLabel}
+            trend={trend}
+          />
+        </div>
       )}
     </div>
   );

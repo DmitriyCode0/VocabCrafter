@@ -34,9 +34,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   getReportLanguageLabel,
+  getReportLanguageLocale,
   REPORT_LANGUAGE_OPTIONS,
   type ReportLanguage,
 } from "@/lib/progress/monthly-report-language";
+import { MonthlyReportPentagramCard } from "@/components/progress/monthly-report-pentagram-card";
 
 interface MonthlyReportMetrics {
   activeDays: number;
@@ -50,6 +52,52 @@ interface MonthlyReportMetrics {
   practicedWords: number;
   trackedWordsTotal: number;
   averageScore: number | null;
+  monthlyPentagram: {
+    currentMonth: {
+      reportMonth: string;
+      axes: Array<{
+        key:
+          | "active_vocab"
+          | "grammar_variety"
+          | "engagement"
+          | "accuracy"
+          | "passive_vocab";
+        label: string;
+        shortLabel: string;
+        score: number;
+        value: string;
+        helper: string;
+        beta?: boolean;
+      }>;
+      chartData: Array<{
+        axis: string;
+        score: number;
+        fullMark: number;
+      }>;
+    };
+    previousMonth: {
+      reportMonth: string;
+      axes: Array<{
+        key:
+          | "active_vocab"
+          | "grammar_variety"
+          | "engagement"
+          | "accuracy"
+          | "passive_vocab";
+        label: string;
+        shortLabel: string;
+        score: number;
+        value: string;
+        helper: string;
+        beta?: boolean;
+      }>;
+      chartData: Array<{
+        axis: string;
+        score: number;
+        fullMark: number;
+      }>;
+    };
+  } | null;
 }
 
 interface MonthlyReportGoals {
@@ -421,6 +469,24 @@ export function TutorStudentMonthlyReportsWorkspace({
                 </Badge>
               ) : null}
             </div>
+
+            {metrics.monthlyPentagram ? (
+              <MonthlyReportPentagramCard
+                pentagram={metrics.monthlyPentagram}
+                locale={getReportLanguageLocale(reportLanguage)}
+                title={
+                  reportLanguage === "uk"
+                    ? "Місячна пентаграма звіту"
+                    : "Monthly Report Pentagram"
+                }
+                description={
+                  reportLanguage === "uk"
+                    ? "Попередній перегляд пентаграми, яка буде збережена у звіті для цього місяця."
+                    : "Preview of the pentagram that will be snapped into this month’s report."
+                }
+                badgeLabel={currentMonthLabel}
+              />
+            ) : null}
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-lg border px-3 py-3">

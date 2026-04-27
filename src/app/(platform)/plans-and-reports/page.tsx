@@ -323,7 +323,9 @@ export default async function PlansAndReportsPage({
       .eq("id", activeStudentId)
       .single(),
     getTutorStudentPlan(userId, activeStudentId),
-    getTutorStudentMonthlyReportMetrics(activeStudentId),
+    getTutorStudentMonthlyReportMetrics(activeStudentId, undefined, {
+      tutorId: userId,
+    }),
   ]);
 
   if (studentProfileResult.error || !studentProfileResult.data) {

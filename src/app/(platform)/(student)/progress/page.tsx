@@ -17,7 +17,11 @@ import { TutorProgressPageHeader } from "@/components/progress/tutor-progress-pa
 import { TrendingUp, BookOpen, PlusCircle } from "lucide-react";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAppMessages } from "@/lib/i18n/messages";
-import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
+import {
+  applyTutorTimeAdjustmentToSnapshot,
+  getStudentMonthlyComparisonSnapshot,
+  getStudentProgressSnapshot,
+} from "@/lib/progress/profile-metrics";
 import {
   applyTutorAxisOverrides,
   buildChartDataFromAxes,
@@ -27,7 +31,25 @@ import { getPublishedTutorProgressOverride } from "@/lib/progress/published-tuto
 
 export const dynamic = "force-dynamic";
 
-export default async function ProgressPage() {
+const APP_LANGUAGE_LOCALES = {
+  en: "en-GB",
+  uk: "uk-UA",
+} as const;
+
+function formatMonthLabel(reportMonth: string, appLanguage: "en" | "uk") {
+  return new Intl.DateTimeFormat(APP_LANGUAGE_LOCALES[appLanguage], {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${reportMonth}T00:00:00.000Z`));
+}
+
+export default async function ProgressPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const { view } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -51,9 +73,17 @@ export default async function ProgressPage() {
         .maybeSingle(),
       getPublishedTutorProgressOverride(user.id),
     ]);
-  const messages = getAppMessages(
-    normalizeAppLanguage(profileResult.data?.app_language),
-  );
+  const appLanguage = normalizeAppLanguage(profileResult.data?.app_language);
+  const messages = getAppMessages(appLanguage);
+  const chartView = view === "monthly" ? "monthly" : "overall";
+  const monthlyComparison =
+    chartView === "monthly"
+      ? await getStudentMonthlyComparisonSnapshot(
+          user.id,
+          undefined,
+          publishedTutorOverride?.override.monthlyTargetOverrides,
+        )
+      : null;
   const savedInsights = parseProgressInsightsValue(
     savedInsightsResult.data?.insights,
   );
@@ -63,14 +93,20 @@ export default async function ProgressPage() {
         publishedTutorOverride.override.axisOverrides,
       )
     : snapshot.axes;
+  const effectiveSnapshot = publishedTutorOverride
+    ? applyTutorTimeAdjustmentToSnapshot(
+        snapshot,
+        publishedTutorOverride.override.timeAdjustmentHours,
+      )
+    : snapshot;
   const effectiveChartData = buildChartDataFromAxes(effectiveAxes);
   const displayedInsights =
     publishedTutorOverride?.override.insightsOverride ?? savedInsights;
   const hasAnyData =
-    snapshot.overview.totalAttempts > 0 ||
-    snapshot.timeMetrics.completedLessons > 0 ||
-    snapshot.overview.totalWords > 0 ||
-    snapshot.passiveSignals.uniqueItems > 0 ||
+    effectiveSnapshot.overview.totalAttempts > 0 ||
+    effectiveSnapshot.timeMetrics.completedLessons > 0 ||
+    effectiveSnapshot.overview.totalWords > 0 ||
+    effectiveSnapshot.passiveSignals.uniqueItems > 0 ||
     Boolean(publishedTutorOverride);
 
   if (!hasAnyData) {
@@ -121,13 +157,74 @@ export default async function ProgressPage() {
         description={messages.progress.description}
       />
 
+      <div className="flex flex-wrap gap-2">
+        <Button
+          asChild
+          size="sm"
+          variant={chartView === "overall" ? "default" : "outline"}
+        >
+          <Link href="/progress">{appLanguage === "uk" ? "Загалом" : "Overall"}</Link>
+        </Button>
+        <Button
+          asChild
+          size="sm"
+          variant={chartView === "monthly" ? "default" : "outline"}
+        >
+          <Link href="/progress?view=monthly">
+            {appLanguage === "uk" ? "Порівняння місяців" : "Monthly Comparison"}
+          </Link>
+        </Button>
+      </div>
+
+      {chartView === "overall" ? (
+        <StudentResultsSummary snapshot={effectiveSnapshot} />
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <StudentSkillRadar
-          axes={effectiveAxes}
-          chartData={effectiveChartData}
-          cefrLevel={snapshot.profile.cefrLevel}
-          grammarNotice={snapshot.grammar.betaNotice}
-          grammarTopics={snapshot.grammarTopicMastery}
+          axes={
+            chartView === "monthly" && monthlyComparison
+              ? monthlyComparison.currentMonth.axes
+              : effectiveAxes
+          }
+          chartData={
+            chartView === "monthly" && monthlyComparison
+              ? monthlyComparison.currentMonth.chartData
+              : effectiveChartData
+          }
+          cefrLevel={effectiveSnapshot.profile.cefrLevel}
+          grammarNotice={effectiveSnapshot.grammar.betaNotice}
+          grammarTopics={effectiveSnapshot.grammarTopicMastery}
+          title={
+            chartView === "monthly"
+              ? appLanguage === "uk"
+                ? "Профіль прогресу за місяць"
+                : "Monthly Progress Profile"
+              : undefined
+          }
+          description={
+            chartView === "monthly"
+              ? appLanguage === "uk"
+                ? "Порівняння поточного місяця з попереднім за тими самими п’ятьма осями."
+                : "Compare the current month with the previous month across the same five axes."
+              : undefined
+          }
+          comparison={
+            chartView === "monthly" && monthlyComparison
+              ? {
+                  currentLabel: formatMonthLabel(
+                    monthlyComparison.currentMonth.window.reportMonth,
+                    appLanguage,
+                  ),
+                  previousLabel: formatMonthLabel(
+                    monthlyComparison.previousMonth.window.reportMonth,
+                    appLanguage,
+                  ),
+                  previousAxes: monthlyComparison.previousMonth.axes,
+                  previousChartData: monthlyComparison.previousMonth.chartData,
+                }
+              : undefined
+          }
         />
         <StudentProgressInsights
           hasData={hasAnyData}
@@ -139,9 +236,11 @@ export default async function ProgressPage() {
         />
       </div>
 
-      <StudentResultsSummary snapshot={snapshot} />
+      {chartView === "monthly" ? (
+        <StudentResultsSummary snapshot={effectiveSnapshot} />
+      ) : null}
 
-      <StudentProgressOverviewCards snapshot={snapshot} />
+      <StudentProgressOverviewCards snapshot={effectiveSnapshot} />
     </div>
   );
 }

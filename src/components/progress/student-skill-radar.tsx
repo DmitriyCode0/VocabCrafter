@@ -179,6 +179,18 @@ interface StudentSkillRadarProps {
   onUpdateFromBase?: () => void;
   grammarTopics?: GrammarTopicMasteryItem[];
   onGrammarTopicToggle?: (topicKey: string, checked: boolean) => void;
+  title?: string;
+  description?: string;
+  comparison?: {
+    currentLabel: string;
+    previousLabel: string;
+    previousAxes: StudentProgressAxis[];
+    previousChartData: Array<{
+      axis: string;
+      score: number;
+      fullMark: number;
+    }>;
+  };
 }
 
 export function StudentSkillRadar({
@@ -195,16 +207,30 @@ export function StudentSkillRadar({
   onUpdateFromBase,
   grammarTopics,
   onGrammarTopicToggle,
+  title = "Learning Profile",
+  description = "A five-axis view of your current learning experience.",
+  comparison,
 }: StudentSkillRadarProps) {
+  const mergedChartData = comparison
+    ? chartData.map((item) => ({
+        ...item,
+        previous:
+          comparison.previousChartData.find(
+            (previousItem) => previousItem.axis === item.axis,
+          )?.score ?? 0,
+      }))
+    : chartData;
+  const previousAxisMap = comparison
+    ? new Map(comparison.previousAxes.map((axis) => [axis.key, axis]))
+    : null;
+
   return (
     <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-secondary/20">
       <CardHeader className="gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
-            <CardTitle className="text-xl">Learning Profile</CardTitle>
-            <CardDescription>
-              A five-axis view of your current learning experience.
-            </CardDescription>
+            <CardTitle className="text-xl">{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             {editable && (
@@ -260,15 +286,19 @@ export function StudentSkillRadar({
             config={chartConfig}
             className="mx-auto aspect-square h-[360px] w-full max-w-[420px]"
           >
-            <RadarChart data={chartData} outerRadius="68%">
+            <RadarChart data={mergedChartData} outerRadius="68%">
               <ChartTooltip
                 cursor={false}
                 content={
                   <ChartTooltipContent
-                    formatter={(value, _name, item) => (
+                    formatter={(value, name, item) => (
                       <div className="flex min-w-[11rem] items-center justify-between gap-3">
                         <span className="text-muted-foreground">
-                          {String(item?.payload?.axis ?? "Score")}
+                          {comparison
+                            ? name === "previous"
+                              ? comparison.previousLabel
+                              : comparison.currentLabel
+                            : String(item?.payload?.axis ?? "Score")}
                         </span>
                         <span className="font-mono font-semibold text-foreground">
                           {value}/100
@@ -291,6 +321,18 @@ export function StudentSkillRadar({
                 tick={false}
                 axisLine={false}
               />
+              {comparison ? (
+                <Radar
+                  dataKey="previous"
+                  stroke="#d4a017"
+                  fill="#d4a017"
+                  fillOpacity={0.12}
+                  strokeWidth={2}
+                  isAnimationActive
+                  animationDuration={700}
+                  animationEasing="ease-out"
+                />
+              ) : null}
               <Radar
                 dataKey="score"
                 stroke="var(--color-score)"
@@ -303,6 +345,18 @@ export function StudentSkillRadar({
               />
             </RadarChart>
           </ChartContainer>
+          {comparison ? (
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#d4a017]" />
+                <span>{comparison.previousLabel}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-chart-1)]" />
+                <span>{comparison.currentLabel}</span>
+              </div>
+            </div>
+          ) : null}
         </motion.div>
 
         <motion.div
@@ -326,6 +380,11 @@ export function StudentSkillRadar({
               }}
               className="rounded-2xl border bg-background/80 p-4 shadow-sm backdrop-blur-sm"
             >
+              {(() => {
+                const previousAxis = previousAxisMap?.get(axis.key) ?? null;
+                const scoreDelta = previousAxis ? axis.score - previousAxis.score : 0;
+
+                return (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold">{axis.label}</p>
@@ -353,16 +412,30 @@ export function StudentSkillRadar({
                     <span className="text-sm text-muted-foreground">/100</span>
                   </div>
                 ) : (
-                  <p
-                    className={cn(
-                      "text-sm font-semibold",
-                      getScoreTone(axis.score),
-                    )}
-                  >
-                    {axis.score}/100
-                  </p>
+                  <div className="text-right">
+                    <p
+                      className={cn(
+                        "text-sm font-semibold",
+                        getScoreTone(axis.score),
+                      )}
+                    >
+                      {axis.score}/100
+                    </p>
+                    {previousAxis ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        {comparison?.previousLabel}: {previousAxis.score}/100
+                        {scoreDelta === 0
+                          ? ""
+                          : scoreDelta > 0
+                            ? ` (+${scoreDelta})`
+                            : ` (${scoreDelta})`}
+                      </p>
+                    ) : null}
+                  </div>
                 )}
               </div>
+                );
+              })()}
 
               {editable ? (
                 <div className="mt-2 space-y-2">
@@ -394,7 +467,7 @@ export function StudentSkillRadar({
                 </>
               )}
 
-              {axis.key === "grammar_variety" && grammarTopics && (
+              {axis.key === "grammar_variety" && grammarTopics && !comparison && (
                 <GrammarTopicsDropdown
                   topics={grammarTopics}
                   editable={editable}

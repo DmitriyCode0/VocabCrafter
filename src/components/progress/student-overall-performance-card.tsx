@@ -30,28 +30,28 @@ const PERFORMANCE_BAND_COPY: Record<
   strong: {
     label: "Strong",
     description:
-      "Your logged study time, grammar coverage, and vocabulary growth are lining up well with your current CEFR target.",
+      "Your active and passive vocabulary, grammar topics learned, tracked words, and logged study time are lining up well with your current CEFR target.",
     badgeClassName:
       "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300",
   },
   on_track: {
     label: "On Track",
     description:
-      "You are building solid momentum. Keep converting learning hours into mastered words and completed grammar topics.",
+      "You are building solid momentum. Keep turning logged time into stronger active vocabulary, passive recognition, and completed grammar topics.",
     badgeClassName:
       "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300",
   },
   building: {
     label: "Building",
     description:
-      "The foundation is there, but more consistent app time, lesson time, or mastery work is still needed to match your target level.",
+      "The foundation is there, but more consistent time logged and stronger active or passive vocabulary growth are still needed to match your target level.",
     badgeClassName:
       "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300",
   },
   needs_focus: {
     label: "Needs Focus",
     description:
-      "You have started the journey, but the current mix of study time, mastered words, and grammar coverage is still below the pace usually associated with this CEFR target.",
+      "You have started the journey, but active and passive vocabulary growth, grammar topics learned, words added in the app, and logged study time are still below the pace usually associated with this CEFR target.",
     badgeClassName:
       "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300",
   },
@@ -65,6 +65,7 @@ export function StudentOverallPerformanceCard({
 }: StudentOverallPerformanceCardProps) {
   const performanceBand =
     PERFORMANCE_BAND_COPY[snapshot.overallPerformance.band];
+  const showBadge = snapshot.overallPerformance.band !== "needs_focus";
 
   return (
     <Card id={id} className={id ? "scroll-mt-24" : undefined}>
@@ -79,9 +80,11 @@ export function StudentOverallPerformanceCard({
           <div className="text-2xl font-bold">
             {snapshot.overallPerformance.score}/100
           </div>
-          <Badge variant="outline" className={performanceBand.badgeClassName}>
-            {performanceBand.label}
-          </Badge>
+          {showBadge ? (
+            <Badge variant="outline" className={performanceBand.badgeClassName}>
+              {performanceBand.label}
+            </Badge>
+          ) : null}
         </div>
         <Progress value={snapshot.overallPerformance.score} className="h-2" />
         <p className="text-xs text-muted-foreground">

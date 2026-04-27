@@ -1,7 +1,10 @@
 import { Trophy } from "lucide-react";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 import { getAppMessages } from "@/lib/i18n/messages";
 import { getTutorProgressPageData } from "@/lib/progress/tutor-progress-page-data";
+import { parseTutorProgressOverride } from "@/lib/progress/contracts";
+import { applyTutorTimeAdjustmentToSnapshot } from "@/lib/progress/profile-metrics";
 import { ResultsStudentFilter } from "@/components/progress/results-student-filter";
 import { TutorProgressPageHeader } from "@/components/progress/tutor-progress-page-header";
 import { TutorStudentResultsPanel } from "@/components/progress/tutor-student-results-panel";
@@ -21,11 +24,29 @@ export default async function ResultsPage({
   searchParams: Promise<{ student?: string }>;
 }) {
   const { student: requestedStudentId } = await searchParams;
-  const { role, appLanguage, students, activeStudentId, studentProfile } =
+  const { userId, role, appLanguage, students, activeStudentId, studentProfile } =
     await getTutorProgressPageData(requestedStudentId);
   const messages = getAppMessages(appLanguage);
-  const snapshot = activeStudentId
-    ? await getStudentProgressSnapshot(activeStudentId)
+  const supabaseAdmin = createAdminClient();
+  const [snapshot, overrideResult] = activeStudentId
+    ? await Promise.all([
+        getStudentProgressSnapshot(activeStudentId),
+        supabaseAdmin
+          .from("tutor_student_progress_overrides")
+          .select("axis_overrides, insights_override, time_adjustment_hours")
+          .eq("tutor_id", userId)
+          .eq("student_id", activeStudentId)
+          .maybeSingle(),
+      ])
+    : [null, null];
+
+  if (overrideResult?.error) {
+    throw overrideResult.error;
+  }
+
+  const timeOverride = parseTutorProgressOverride(overrideResult?.data);
+  const effectiveSnapshot = snapshot
+    ? applyTutorTimeAdjustmentToSnapshot(snapshot, timeOverride.timeAdjustmentHours)
     : null;
 
   return (
@@ -48,7 +69,7 @@ export default async function ResultsPage({
         }
       />
 
-      {!activeStudentId || !studentProfile || !snapshot ? (
+      {!activeStudentId || !studentProfile || !effectiveSnapshot ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">No student selected</CardTitle>
@@ -68,12 +89,14 @@ export default async function ResultsPage({
         </Card>
       ) : (
         <TutorStudentResultsPanel
+          studentId={activeStudentId}
           studentName={
             studentProfile.full_name ||
             studentProfile.email ||
             messages.tutorProgressPage.studentFallback
           }
-          snapshot={snapshot}
+          snapshot={effectiveSnapshot}
+          initialTimeAdjustmentHours={timeOverride.timeAdjustmentHours}
           appLanguage={appLanguage}
         />
       )}

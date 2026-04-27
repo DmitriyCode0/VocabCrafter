@@ -10,7 +10,10 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAppMessages } from "@/lib/i18n/messages";
 import { parseTutorProgressOverride } from "@/lib/progress/contracts";
-import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
+import {
+  getStudentMonthlyComparisonSnapshot,
+  getStudentProgressSnapshot,
+} from "@/lib/progress/profile-metrics";
 import { getTutorProgressPageData } from "@/lib/progress/tutor-progress-page-data";
 import { ResultsStudentFilter } from "@/components/progress/results-student-filter";
 import { TutorProgressPageHeader } from "@/components/progress/tutor-progress-page-header";
@@ -87,18 +90,27 @@ export default async function CoachingResultsPage({
   const [overrideResult, snapshot] = await Promise.all([
     supabaseAdmin
       .from("tutor_student_progress_overrides")
-      .select("axis_overrides, insights_override")
+      .select("axis_overrides, insights_override, monthly_target_overrides")
       .eq("tutor_id", userId)
       .eq("student_id", activeStudentId)
       .maybeSingle(),
     getStudentProgressSnapshot(activeStudentId),
   ]);
 
+  if (overrideResult.error) {
+    throw overrideResult.error;
+  }
+
   const hasAnyRawData =
     snapshot.overview.totalAttempts > 0 ||
     snapshot.overview.totalWords > 0 ||
     snapshot.passiveSignals.uniqueItems > 0;
   const initialOverride = parseTutorProgressOverride(overrideResult.data);
+  const monthlyComparison = await getStudentMonthlyComparisonSnapshot(
+    activeStudentId,
+    undefined,
+    initialOverride.monthlyTargetOverrides,
+  );
   const studentName =
     studentProfile.full_name ||
     studentProfile.email ||
@@ -143,6 +155,8 @@ export default async function CoachingResultsPage({
         hasData={hasAnyRawData}
         initialOverride={initialOverride}
         grammarTopicMastery={snapshot.grammarTopicMastery}
+        monthlyComparison={monthlyComparison}
+        appLanguage={appLanguage}
       />
 
       {!hasAnyRawData ? (

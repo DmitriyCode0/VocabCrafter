@@ -313,6 +313,329 @@ export interface Database {
           },
         ];
       };
+      tutor_student_classrooms: {
+        Row: {
+          id: string;
+          connection_id: string;
+          provider: string;
+          provider_room_key: string;
+          room_status: string;
+          recording_consent_status: string;
+          recording_status: string;
+          transcript_status: string;
+          created_by: string | null;
+          started_at: string | null;
+          ended_at: string | null;
+          last_recording_started_at: string | null;
+          last_recording_ended_at: string | null;
+          last_activity_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          connection_id: string;
+          provider?: string;
+          provider_room_key: string;
+          room_status?: string;
+          recording_consent_status?: string;
+          recording_status?: string;
+          transcript_status?: string;
+          created_by?: string | null;
+          started_at?: string | null;
+          ended_at?: string | null;
+          last_recording_started_at?: string | null;
+          last_recording_ended_at?: string | null;
+          last_activity_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          connection_id?: string;
+          provider?: string;
+          provider_room_key?: string;
+          room_status?: string;
+          recording_consent_status?: string;
+          recording_status?: string;
+          transcript_status?: string;
+          created_by?: string | null;
+          started_at?: string | null;
+          ended_at?: string | null;
+          last_recording_started_at?: string | null;
+          last_recording_ended_at?: string | null;
+          last_activity_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_classrooms_connection_id_fkey";
+            columns: ["connection_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_students";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_classrooms_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tutor_student_classroom_recordings: {
+        Row: {
+          id: string;
+          classroom_id: string;
+          created_by: string | null;
+          storage_bucket: string | null;
+          storage_path: string | null;
+          provider_recording_id: string | null;
+          status: string;
+          duration_seconds: number | null;
+          consent_snapshot: Json;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          classroom_id: string;
+          created_by?: string | null;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
+          provider_recording_id?: string | null;
+          status?: string;
+          duration_seconds?: number | null;
+          consent_snapshot?: Json;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          classroom_id?: string;
+          created_by?: string | null;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
+          provider_recording_id?: string | null;
+          status?: string;
+          duration_seconds?: number | null;
+          consent_snapshot?: Json;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_classroom_recordings_classroom_id_fkey";
+            columns: ["classroom_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_student_classrooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_classroom_recordings_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tutor_student_classroom_transcripts: {
+        Row: {
+          id: string;
+          recording_id: string;
+          classroom_id: string;
+          language_code: string | null;
+          diarization_status: string;
+          review_status: string;
+          full_text: string | null;
+          error_message: string | null;
+          active_evidence_synced_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          recording_id: string;
+          classroom_id: string;
+          language_code?: string | null;
+          diarization_status?: string;
+          review_status?: string;
+          full_text?: string | null;
+          error_message?: string | null;
+          active_evidence_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          recording_id?: string;
+          classroom_id?: string;
+          language_code?: string | null;
+          diarization_status?: string;
+          review_status?: string;
+          full_text?: string | null;
+          error_message?: string | null;
+          active_evidence_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_classroom_transcripts_classroom_id_fkey";
+            columns: ["classroom_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_student_classrooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_classroom_transcripts_recording_id_fkey";
+            columns: ["recording_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_student_classroom_recordings";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tutor_student_classroom_transcript_segments: {
+        Row: {
+          id: string;
+          transcript_id: string;
+          classroom_id: string;
+          speaker_role: string;
+          speaker_label: string | null;
+          started_at_seconds: number | null;
+          ended_at_seconds: number | null;
+          content: string;
+          confidence: number | null;
+          needs_review: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          transcript_id: string;
+          classroom_id: string;
+          speaker_role?: string;
+          speaker_label?: string | null;
+          started_at_seconds?: number | null;
+          ended_at_seconds?: number | null;
+          content: string;
+          confidence?: number | null;
+          needs_review?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          transcript_id?: string;
+          classroom_id?: string;
+          speaker_role?: string;
+          speaker_label?: string | null;
+          started_at_seconds?: number | null;
+          ended_at_seconds?: number | null;
+          content?: string;
+          confidence?: number | null;
+          needs_review?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_classroom_transcript_segments_classroom_id_fkey";
+            columns: ["classroom_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_student_classrooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_classroom_transcript_segments_transcript_id_fkey";
+            columns: ["transcript_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_student_classroom_transcripts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tutor_student_classroom_session_summaries: {
+        Row: {
+          id: string;
+          classroom_id: string;
+          connection_id: string;
+          created_by: string | null;
+          last_reported_by: string | null;
+          session_started_at: string;
+          session_ended_at: string | null;
+          duration_seconds: number | null;
+          tutor_speaking_seconds: number;
+          student_speaking_seconds: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          classroom_id: string;
+          connection_id: string;
+          created_by?: string | null;
+          last_reported_by?: string | null;
+          session_started_at: string;
+          session_ended_at?: string | null;
+          duration_seconds?: number | null;
+          tutor_speaking_seconds?: number;
+          student_speaking_seconds?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          classroom_id?: string;
+          connection_id?: string;
+          created_by?: string | null;
+          last_reported_by?: string | null;
+          session_started_at?: string;
+          session_ended_at?: string | null;
+          duration_seconds?: number | null;
+          tutor_speaking_seconds?: number;
+          student_speaking_seconds?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_classroom_session_summaries_classroom_id_fkey";
+            columns: ["classroom_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_student_classrooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_classroom_session_summaries_connection_id_fkey";
+            columns: ["connection_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_students";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_classroom_session_summaries_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_classroom_session_summaries_last_reported_by_fkey";
+            columns: ["last_reported_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       lesson_room_sessions: {
         Row: {
           id: string;
@@ -1665,6 +1988,8 @@ export interface Database {
           student_id: string;
           axis_overrides: Json;
           insights_override: Json | null;
+          monthly_target_overrides: Json | null;
+          time_adjustment_hours: number;
           created_at: string;
           updated_at: string;
         };
@@ -1674,6 +1999,8 @@ export interface Database {
           student_id: string;
           axis_overrides?: Json;
           insights_override?: Json | null;
+          monthly_target_overrides?: Json | null;
+          time_adjustment_hours?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -1682,6 +2009,8 @@ export interface Database {
           student_id?: string;
           axis_overrides?: Json;
           insights_override?: Json | null;
+          monthly_target_overrides?: Json | null;
+          time_adjustment_hours?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -1803,6 +2132,16 @@ export type StudentProgressReview =
   Database["public"]["Tables"]["student_progress_reviews"]["Row"];
 export type TutorStudentLesson =
   Database["public"]["Tables"]["tutor_student_lessons"]["Row"];
+export type TutorStudentClassroom =
+  Database["public"]["Tables"]["tutor_student_classrooms"]["Row"];
+export type TutorStudentClassroomRecording =
+  Database["public"]["Tables"]["tutor_student_classroom_recordings"]["Row"];
+export type TutorStudentClassroomSessionSummary =
+  Database["public"]["Tables"]["tutor_student_classroom_session_summaries"]["Row"];
+export type TutorStudentClassroomTranscript =
+  Database["public"]["Tables"]["tutor_student_classroom_transcripts"]["Row"];
+export type TutorStudentClassroomTranscriptSegment =
+  Database["public"]["Tables"]["tutor_student_classroom_transcript_segments"]["Row"];
 export type ActiveVocabularyEvidence =
   Database["public"]["Tables"]["active_vocabulary_evidence"]["Row"];
 export type LessonRoomSession =

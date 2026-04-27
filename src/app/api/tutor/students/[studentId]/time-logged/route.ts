@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
 import {
   EMPTY_TUTOR_PROGRESS_OVERRIDE,
+  hasTutorProgressOverrideContent,
   parseTutorProgressOverride,
-  tutorProgressOverrideSchema,
+  tutorTimeAdjustmentHoursSchema,
 } from "@/lib/progress/contracts";
+import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
+import { createClient } from "@/lib/supabase/server";
+
+const updateTutorTimeLoggedSchema = z.object({
+  timeAdjustmentHours: tutorTimeAdjustmentHoursSchema,
+});
 
 async function requireTutorAccess(studentId: string) {
   const supabase = await createClient();
@@ -43,7 +49,7 @@ async function requireTutorAccess(studentId: string) {
   if (profile.role !== "tutor" && profile.role !== "superadmin") {
     return {
       errorResponse: NextResponse.json(
-        { error: "Only tutors can manage student progress overrides" },
+        { error: "Only tutors can update student time logged" },
         { status: 403 },
       ),
     };
@@ -84,7 +90,7 @@ export async function PATCH(
   }
 
   const body = await request.json().catch(() => null);
-  const parsed = tutorProgressOverrideSchema.safeParse(body);
+  const parsed = updateTutorTimeLoggedSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -93,15 +99,56 @@ export async function PATCH(
     );
   }
 
+  const { data: existingRow, error: existingError } = await access.supabaseAdmin
+    .from("tutor_student_progress_overrides")
+    .select(
+      "axis_overrides, insights_override, monthly_target_overrides, time_adjustment_hours",
+    )
+    .eq("tutor_id", access.user.id)
+    .eq("student_id", studentId)
+    .maybeSingle();
+
+  if (existingError) {
+    console.error("Load tutor time adjustment error:", existingError);
+    return NextResponse.json(
+      { error: "Failed to load existing progress override" },
+      { status: 500 },
+    );
+  }
+
+  const existingOverride = parseTutorProgressOverride(existingRow);
+  const nextOverride = {
+    ...existingOverride,
+    timeAdjustmentHours: parsed.data.timeAdjustmentHours,
+  };
+
+  if (!hasTutorProgressOverrideContent(nextOverride)) {
+    if (existingRow) {
+      const { error: deleteError } = await access.supabaseAdmin
+        .from("tutor_student_progress_overrides")
+        .delete()
+        .eq("tutor_id", access.user.id)
+        .eq("student_id", studentId);
+
+      if (deleteError) {
+        console.error("Delete tutor time adjustment error:", deleteError);
+        return NextResponse.json(
+          { error: "Failed to clear time adjustment" },
+          { status: 500 },
+        );
+      }
+    }
+
+    return NextResponse.json(EMPTY_TUTOR_PROGRESS_OVERRIDE);
+  }
+
   const { data, error } = await access.supabaseAdmin
     .from("tutor_student_progress_overrides")
     .upsert(
       {
         tutor_id: access.user.id,
         student_id: studentId,
-        axis_overrides: parsed.data.axisOverrides,
-        insights_override: parsed.data.insightsOverride,
-        monthly_target_overrides: parsed.data.monthlyTargetOverrides,
+        time_adjustment_hours: parsed.data.timeAdjustmentHours,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "tutor_id,student_id" },
@@ -112,40 +159,12 @@ export async function PATCH(
     .single();
 
   if (error) {
-    console.error("Save tutor progress override error:", error);
+    console.error("Save tutor time adjustment error:", error);
     return NextResponse.json(
-      { error: "Failed to save tutor progress overrides" },
+      { error: "Failed to update time logged" },
       { status: 500 },
     );
   }
 
   return NextResponse.json(parseTutorProgressOverride(data));
-}
-
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ studentId: string }> },
-) {
-  const { studentId } = await params;
-  const access = await requireTutorAccess(studentId);
-
-  if ("errorResponse" in access) {
-    return access.errorResponse;
-  }
-
-  const { error } = await access.supabaseAdmin
-    .from("tutor_student_progress_overrides")
-    .delete()
-    .eq("tutor_id", access.user.id)
-    .eq("student_id", studentId);
-
-  if (error) {
-    console.error("Delete tutor progress override error:", error);
-    return NextResponse.json(
-      { error: "Failed to reset tutor progress overrides" },
-      { status: 500 },
-    );
-  }
-
-  return NextResponse.json(EMPTY_TUTOR_PROGRESS_OVERRIDE);
 }

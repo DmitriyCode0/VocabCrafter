@@ -21,6 +21,7 @@ import {
 import { TutorPlansReportsPageHeader } from "@/components/progress/tutor-plans-reports-page-header";
 import { ResultsStudentFilter } from "@/components/progress/results-student-filter";
 import { TutorStudentMonthlyReportsWorkspace } from "@/components/progress/tutor-student-monthly-reports-workspace";
+import { MonthlyReportPentagramCard } from "@/components/progress/monthly-report-pentagram-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -329,6 +330,23 @@ export default async function PlansAndReportsReportsPage({
                       </div>
                     </div>
 
+                    {report.metricsSnapshot.monthlyPentagram ? (
+                      <MonthlyReportPentagramCard
+                        pentagram={report.metricsSnapshot.monthlyPentagram}
+                        locale={locale}
+                        title={
+                          appLanguage === "uk"
+                            ? "Місячна пентаграма"
+                            : "Monthly Pentagram"
+                        }
+                        description={
+                          appLanguage === "uk"
+                            ? "Поточний місяць порівняно з попереднім за тими самими цілями, які були зафіксовані у звіті."
+                            : "Current month compared with the previous month using the same targets snapped into the report."
+                        }
+                      />
+                    ) : null}
+
                     {report.goalsSnapshot.grammarTopicKeys.length > 0 ? (
                       <div className="space-y-2">
                         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -453,7 +471,9 @@ export default async function PlansAndReportsReportsPage({
         .eq("id", activeStudentId)
         .single(),
       getTutorStudentPlan(userId, activeStudentId),
-      getTutorStudentMonthlyReportMetrics(activeStudentId),
+      getTutorStudentMonthlyReportMetrics(activeStudentId, undefined, {
+        tutorId: userId,
+      }),
       getTutorMonthlyReportQuota(userId),
       listTutorStudentMonthlyReports(userId, activeStudentId),
     ]);

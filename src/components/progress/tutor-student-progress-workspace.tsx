@@ -29,15 +29,28 @@ import {
   EMPTY_TUTOR_PROGRESS_OVERRIDE,
   progressInsightsSchema,
   vocabularyEstimateSchema,
+  type TutorMonthlyProgressTargets,
   type ProgressInsights,
   type TutorProgressOverride,
 } from "@/lib/progress/contracts";
+import {
+  areStudentMonthlyProgressTargetsEqual,
+  buildStudentMonthlyProgressPresentation,
+  getDefaultStudentMonthlyProgressTargets,
+} from "@/lib/progress/monthly-progress-targets";
+import type { AppLanguage } from "@/lib/i18n/app-language";
 import type {
   GrammarTopicMasteryItem,
+  StudentMonthlyComparisonSnapshot,
   StudentProgressAxis,
 } from "@/lib/progress/profile-metrics";
+import type { CEFRLevel } from "@/types/quiz";
 
 const ESTIMATED_BANDS = ["A0", "A1", "A2", "B1", "B2", "C1"] as const;
+const APP_LANGUAGE_LOCALES = {
+  en: "en-GB",
+  uk: "uk-UA",
+} as const;
 
 interface GrammarPlanItem {
   topic: string;
@@ -161,6 +174,14 @@ function getValidationMessage(error: unknown) {
     : "Please fix the tutor coaching fields before saving.";
 }
 
+function formatMonthLabel(reportMonth: string, appLanguage: AppLanguage) {
+  return new Intl.DateTimeFormat(APP_LANGUAGE_LOCALES[appLanguage], {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${reportMonth}T00:00:00.000Z`));
+}
+
 function GrammarPlanTopicSelector({
   value,
   onChange,
@@ -257,11 +278,13 @@ interface TutorStudentProgressWorkspaceProps {
   studentId: string;
   studentName: string;
   baseAxes: StudentProgressAxis[];
-  cefrLevel: string;
+  cefrLevel: CEFRLevel;
   grammarNotice: string;
   hasData: boolean;
   initialOverride?: TutorProgressOverride;
   grammarTopicMastery: GrammarTopicMasteryItem[];
+  monthlyComparison: StudentMonthlyComparisonSnapshot;
+  appLanguage: AppLanguage;
 }
 
 export function TutorStudentProgressWorkspace({
@@ -273,6 +296,8 @@ export function TutorStudentProgressWorkspace({
   hasData,
   initialOverride = EMPTY_TUTOR_PROGRESS_OVERRIDE,
   grammarTopicMastery: initialGrammarTopics,
+  monthlyComparison,
+  appLanguage,
 }: TutorStudentProgressWorkspaceProps) {
   const router = useRouter();
   const [axes, setAxes] = useState(() =>
@@ -285,6 +310,20 @@ export function TutorStudentProgressWorkspace({
   );
   const [grammarTopics, setGrammarTopics] =
     useState<GrammarTopicMasteryItem[]>(initialGrammarTopics);
+  const defaultMonthlyTargets = useMemo(
+    () =>
+      getDefaultStudentMonthlyProgressTargets(
+        cefrLevel,
+        monthlyComparison.currentMonth.window.dayCount,
+      ),
+    [cefrLevel, monthlyComparison.currentMonth.window.dayCount],
+  );
+  const [monthlyTargets, setMonthlyTargets] =
+    useState<TutorMonthlyProgressTargets>(
+      () =>
+        initialOverride.monthlyTargetOverrides ??
+        monthlyComparison.currentMonth.targets,
+    );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRegeneratingPassive, setIsRegeneratingPassive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -307,6 +346,11 @@ export function TutorStudentProgressWorkspace({
       initialOverride.insightsOverride
         ? createDraftFromInsights(initialOverride.insightsOverride)
         : EMPTY_INSIGHT_DRAFT,
+    ),
+  );
+  const savedMonthlyTargetsRef = useRef(
+    JSON.stringify(
+      initialOverride.monthlyTargetOverrides ?? monthlyComparison.currentMonth.targets,
     ),
   );
 
@@ -356,12 +400,14 @@ export function TutorStudentProgressWorkspace({
       })),
     );
     const currentDraft = JSON.stringify(draft);
+    const currentMonthlyTargets = JSON.stringify(monthlyTargets);
 
     return (
       currentAxes !== savedAxesRef.current ||
-      currentDraft !== savedDraftRef.current
+      currentDraft !== savedDraftRef.current ||
+      currentMonthlyTargets !== savedMonthlyTargetsRef.current
     );
-  }, [axes, draft]);
+  }, [axes, draft, monthlyTargets]);
 
   function updateAxis(
     key: StudentProgressAxis["key"],
@@ -403,6 +449,12 @@ export function TutorStudentProgressWorkspace({
       body: JSON.stringify({
         axisOverrides: buildAxisOverridesPayload(),
         insightsOverride,
+        monthlyTargetOverrides: areStudentMonthlyProgressTargetsEqual(
+          monthlyTargets,
+          defaultMonthlyTargets,
+        )
+          ? null
+          : monthlyTargets,
       }),
     });
 
@@ -484,6 +536,9 @@ export function TutorStudentProgressWorkspace({
         ? createDraftFromInsights(savedOverride.insightsOverride)
         : EMPTY_INSIGHT_DRAFT;
       setDraft(nextDraft);
+      const nextMonthlyTargets =
+        savedOverride.monthlyTargetOverrides ?? defaultMonthlyTargets;
+      setMonthlyTargets(nextMonthlyTargets);
 
       savedAxesRef.current = JSON.stringify(
         nextAxes.map((a) => ({
@@ -494,6 +549,7 @@ export function TutorStudentProgressWorkspace({
         })),
       );
       savedDraftRef.current = JSON.stringify(nextDraft);
+      savedMonthlyTargetsRef.current = JSON.stringify(nextMonthlyTargets);
 
       toast.success("Tutor progress customizations saved.");
       router.refresh();
@@ -719,340 +775,547 @@ export function TutorStudentProgressWorkspace({
     }));
   }
 
+  function updateMonthlyTarget(
+    key: keyof TutorMonthlyProgressTargets,
+    value: string,
+  ) {
+    setMonthlyTargets((current) => ({
+      ...current,
+      [key]: Math.max(1, Math.min(10000, Math.round(Number(value) || 0))),
+    }));
+  }
+
+  function resetMonthlyTargets() {
+    setMonthlyTargets(defaultMonthlyTargets);
+    toast.success("Monthly pentagram targets reset to defaults. Save to persist.");
+  }
+
+  const currentMonthPresentation = useMemo(
+    () =>
+      buildStudentMonthlyProgressPresentation({
+        factors: monthlyComparison.currentMonth.factors,
+        targets: monthlyTargets,
+      }),
+    [monthlyComparison.currentMonth.factors, monthlyTargets],
+  );
+  const previousMonthPresentation = useMemo(
+    () =>
+      buildStudentMonthlyProgressPresentation({
+        factors: monthlyComparison.previousMonth.factors,
+        targets: monthlyTargets,
+      }),
+    [monthlyComparison.previousMonth.factors, monthlyTargets],
+  );
+  const currentMonthLabel = formatMonthLabel(
+    monthlyComparison.currentMonth.window.reportMonth,
+    appLanguage,
+  );
+  const previousMonthLabel = formatMonthLabel(
+    monthlyComparison.previousMonth.window.reportMonth,
+    appLanguage,
+  );
+
   const anyBusy =
     isGenerating || isRegeneratingPassive || isSaving || isResetting;
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-      <StudentSkillRadar
-        axes={axes}
-        chartData={chartData}
-        cefrLevel={cefrLevel}
-        grammarNotice={grammarNotice}
-        editable
-        isDirty={isDirty}
-        isSaving={isSaving}
-        isResetting={isResetting}
-        onAxisChange={updateAxis}
-        onSave={handleSaveOverrides}
-        onUpdateFromBase={handleUpdateFromBase}
-        grammarTopics={grammarTopics}
-        onGrammarTopicToggle={handleGrammarTopicToggle}
-      />
+    <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <StudentSkillRadar
+          axes={axes}
+          chartData={chartData}
+          cefrLevel={cefrLevel}
+          grammarNotice={grammarNotice}
+          editable
+          isDirty={isDirty}
+          isSaving={isSaving}
+          isResetting={isResetting}
+          onAxisChange={updateAxis}
+          onSave={handleSaveOverrides}
+          onUpdateFromBase={handleUpdateFromBase}
+          grammarTopics={grammarTopics}
+          onGrammarTopicToggle={handleGrammarTopicToggle}
+        />
 
-      <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-accent/20">
-        <CardHeader className="gap-3">
-          <div className="space-y-2">
-            <CardTitle className="text-xl">Tutor Coaching Layer</CardTitle>
-            <CardDescription>
-              Generate and curate the coaching view for {studentName}. These
-              edits sit on top of the raw computed profile.
-            </CardDescription>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleGenerateInsights}
-              disabled={anyBusy || !hasData}
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Generate Suggestions
-                </>
-              )}
-            </Button>
-
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={handleRegeneratePassiveVocabulary}
-              disabled={anyBusy || !hasData}
-            >
-              {isRegeneratingPassive ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Recalculating...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Regen Passive Vocab
-                </>
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-5">
-          {!hasData && !hasInsightDraftContent(draft) && (
-            <div className="rounded-2xl border border-dashed bg-muted/30 p-5 text-sm text-muted-foreground">
-              This student does not have enough recorded progress yet. You can
-              still shape the radar metrics manually, but AI suggestions need
-              real quiz or vocabulary data first.
+        <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-accent/20">
+          <CardHeader className="gap-3">
+            <div className="space-y-2">
+              <CardTitle className="text-xl">Tutor Coaching Layer</CardTitle>
+              <CardDescription>
+                Generate and curate the coaching view for {studentName}. These
+                edits sit on top of the raw computed profile.
+              </CardDescription>
             </div>
-          )}
 
-          <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">
-                Estimated band
-              </label>
-              <Select
-                value={draft.estimatedBand}
-                onValueChange={(value) =>
-                  setDraft((current) => ({
-                    ...current,
-                    estimatedBand: value as InsightDraft["estimatedBand"],
-                  }))
-                }
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleGenerateInsights}
+                disabled={anyBusy || !hasData}
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ESTIMATED_BANDS.map((band) => (
-                    <SelectItem key={band} value={band}>
-                      {band}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Generate Suggestions
+                  </>
+                )}
+              </Button>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">
-                Summary
-              </label>
-              <Textarea
-                value={draft.summary}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    summary: event.target.value,
-                  }))
-                }
-                className="min-h-24"
-              />
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleRegeneratePassiveVocabulary}
+                disabled={anyBusy || !hasData}
+              >
+                {isRegeneratingPassive ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Recalculating...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Regen Passive Vocab
+                  </>
+                )}
+              </Button>
             </div>
-          </div>
+          </CardHeader>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <p className="text-sm font-semibold">Passive Vocabulary</p>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Low
-                  </label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={draft.passiveLow}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        passiveLow: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    High
-                  </label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={draft.passiveHigh}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        passiveHigh: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-              <div className="mt-3 space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Rationale
-                </label>
-                <Textarea
-                  value={draft.passiveRationale}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      passiveRationale: event.target.value,
-                    }))
-                  }
-                  className="min-h-20"
-                />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <p className="text-sm font-semibold">Active Vocabulary</p>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Low
-                  </label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={draft.activeLow}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        activeLow: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    High
-                  </label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={draft.activeHigh}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        activeHigh: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-              <div className="mt-3 space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Rationale
-                </label>
-                <Textarea
-                  value={draft.activeRationale}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      activeRationale: event.target.value,
-                    }))
-                  }
-                  className="min-h-20"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">
-                Strengths
-              </label>
-              <Textarea
-                value={draft.strengths}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    strengths: event.target.value,
-                  }))
-                }
-                className="min-h-28"
-              />
-              <p className="text-xs text-muted-foreground">
-                One item per line, up to 5.
-              </p>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">
-                Focus Areas
-              </label>
-              <Textarea
-                value={draft.focusAreas}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    focusAreas: event.target.value,
-                  }))
-                }
-                className="min-h-28"
-              />
-              <p className="text-xs text-muted-foreground">
-                One item per line, up to 5.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground">
-                Grammar Plan
-              </label>
-              {draft.grammarPlanItems.length < 6 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={addGrammarPlanItem}
-                  className="h-7 text-xs"
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  Add topic
-                </Button>
-              )}
-            </div>
-
-            {draft.grammarPlanItems.length === 0 && (
-              <div className="rounded-xl border border-dashed bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground">
-                No grammar plan items yet. Add one or generate suggestions.
+          <CardContent className="space-y-5">
+            {!hasData && !hasInsightDraftContent(draft) && (
+              <div className="rounded-2xl border border-dashed bg-muted/30 p-5 text-sm text-muted-foreground">
+                This student does not have enough recorded progress yet. You can
+                still shape the radar metrics manually, but AI suggestions need
+                real quiz or vocabulary data first.
               </div>
             )}
 
-            {draft.grammarPlanItems.map((item, index) => (
-              <div
-                key={index}
-                className="flex gap-2 rounded-xl border bg-muted/20 p-3"
-              >
-                <div className="flex-1 space-y-2">
-                  <GrammarPlanTopicSelector
-                    value={item.topic}
-                    onChange={(topic) =>
-                      updateGrammarPlanItem(index, "topic", topic)
+            <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Estimated band
+                </label>
+                <Select
+                  value={draft.estimatedBand}
+                  onValueChange={(value) =>
+                    setDraft((current) => ({
+                      ...current,
+                      estimatedBand: value as InsightDraft["estimatedBand"],
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ESTIMATED_BANDS.map((band) => (
+                      <SelectItem key={band} value={band}>
+                        {band}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Summary
+                </label>
+                <Textarea
+                  value={draft.summary}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      summary: event.target.value,
+                    }))
+                  }
+                  className="min-h-24"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border bg-muted/20 p-4">
+                <p className="text-sm font-semibold">Passive Vocabulary</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Low
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={draft.passiveLow}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          passiveLow: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      High
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={draft.passiveHigh}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          passiveHigh: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="mt-3 space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Rationale
+                  </label>
+                  <Textarea
+                    value={draft.passiveRationale}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        passiveRationale: event.target.value,
+                      }))
                     }
-                    availableTopics={availableGrammarTopics}
-                  />
-                  <Input
-                    value={item.reason}
-                    onChange={(e) =>
-                      updateGrammarPlanItem(index, "reason", e.target.value)
-                    }
-                    placeholder="Reason for this topic..."
-                    className="h-8 text-sm"
+                    className="min-h-20"
                   />
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeGrammarPlanItem(index)}
-                  className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-destructive"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+
+              <div className="rounded-2xl border bg-muted/20 p-4">
+                <p className="text-sm font-semibold">Active Vocabulary</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Low
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={draft.activeLow}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          activeLow: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      High
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={draft.activeHigh}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          activeHigh: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="mt-3 space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Rationale
+                  </label>
+                  <Textarea
+                    value={draft.activeRationale}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        activeRationale: event.target.value,
+                      }))
+                    }
+                    className="min-h-20"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Strengths
+                </label>
+                <Textarea
+                  value={draft.strengths}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      strengths: event.target.value,
+                    }))
+                  }
+                  className="min-h-28"
+                />
+                <p className="text-xs text-muted-foreground">
+                  One item per line, up to 5.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Focus Areas
+                </label>
+                <Textarea
+                  value={draft.focusAreas}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      focusAreas: event.target.value,
+                    }))
+                  }
+                  className="min-h-28"
+                />
+                <p className="text-xs text-muted-foreground">
+                  One item per line, up to 5.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Grammar Plan
+                </label>
+                {draft.grammarPlanItems.length < 6 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={addGrammarPlanItem}
+                    className="h-7 text-xs"
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Add topic
+                  </Button>
+                )}
+              </div>
+
+              {draft.grammarPlanItems.length === 0 && (
+                <div className="rounded-xl border border-dashed bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground">
+                  No grammar plan items yet. Add one or generate suggestions.
+                </div>
+              )}
+
+              {draft.grammarPlanItems.map((item, index) => (
+                <div
+                  key={index}
+                  className="flex gap-2 rounded-xl border bg-muted/20 p-3"
+                >
+                  <div className="flex-1 space-y-2">
+                    <GrammarPlanTopicSelector
+                      value={item.topic}
+                      onChange={(topic) =>
+                        updateGrammarPlanItem(index, "topic", topic)
+                      }
+                      availableTopics={availableGrammarTopics}
+                    />
+                    <Input
+                      value={item.reason}
+                      onChange={(e) =>
+                        updateGrammarPlanItem(index, "reason", e.target.value)
+                      }
+                      placeholder="Reason for this topic..."
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeGrammarPlanItem(index)}
+                    className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <StudentSkillRadar
+          axes={currentMonthPresentation.axes}
+          chartData={currentMonthPresentation.chartData}
+          cefrLevel={cefrLevel}
+          grammarNotice={grammarNotice}
+          title="Monthly Progress Plan"
+          description="Adjust per-student monthly pentagram targets for transcript usage, practice words, passive growth, engagement, and grammar variety. The same targets are applied to current and previous month for a fair comparison."
+          comparison={{
+            currentLabel: currentMonthLabel,
+            previousLabel: previousMonthLabel,
+            previousAxes: previousMonthPresentation.axes,
+            previousChartData: previousMonthPresentation.chartData,
+          }}
+        />
+
+        <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-secondary/20">
+          <CardHeader className="gap-3">
+            <div className="space-y-2">
+              <CardTitle className="text-xl">Monthly Pentagram Targets</CardTitle>
+              <CardDescription>
+                Set specific monthly goals for {studentName}. These targets feed the monthly pentagram on coaching, tutor monthly results, and the student monthly progress view.
+              </CardDescription>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSaveOverrides}
+                disabled={anyBusy || !isDirty}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Targets"
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={resetMonthlyTargets}
+                disabled={anyBusy}
+              >
+                Reset Targets
+              </Button>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            <div className="rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+              Current month: {currentMonthLabel}. Previous month: {previousMonthLabel}.
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Transcript Target
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={monthlyTargets.transcriptTarget}
+                  onChange={(event) =>
+                    updateMonthlyTarget("transcriptTarget", event.target.value)
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Current: {monthlyComparison.currentMonth.factors.transcriptActiveTerms} terms. Previous: {monthlyComparison.previousMonth.factors.transcriptActiveTerms}.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Practice Words Target
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={monthlyTargets.practiceTarget}
+                  onChange={(event) =>
+                    updateMonthlyTarget("practiceTarget", event.target.value)
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Current: {monthlyComparison.currentMonth.factors.newPracticeWords} words. Previous: {monthlyComparison.previousMonth.factors.newPracticeWords}.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Passive Recognition Target
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={monthlyTargets.passiveTarget}
+                  onChange={(event) =>
+                    updateMonthlyTarget("passiveTarget", event.target.value)
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Current: {monthlyComparison.currentMonth.factors.passiveEquivalentWords} words. Previous: {monthlyComparison.previousMonth.factors.passiveEquivalentWords}.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Active Days Target
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={monthlyTargets.activeDaysTarget}
+                  onChange={(event) =>
+                    updateMonthlyTarget("activeDaysTarget", event.target.value)
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Current: {monthlyComparison.currentMonth.factors.activeDays} days. Previous: {monthlyComparison.previousMonth.factors.activeDays}.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Activity Target
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={monthlyTargets.activityTarget}
+                  onChange={(event) =>
+                    updateMonthlyTarget("activityTarget", event.target.value)
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Current: {monthlyComparison.currentMonth.factors.activityCount} quiz and lesson activities. Previous: {monthlyComparison.previousMonth.factors.activityCount}.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Grammar Topics Target
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={monthlyTargets.grammarTarget}
+                  onChange={(event) =>
+                    updateMonthlyTarget("grammarTarget", event.target.value)
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Current: {monthlyComparison.currentMonth.factors.confidentGrammarTopics} confident topics. Previous: {monthlyComparison.previousMonth.factors.confidentGrammarTopics}. Inventory: {monthlyComparison.currentMonth.factors.availableGrammarTopicCount}.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

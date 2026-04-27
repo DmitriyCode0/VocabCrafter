@@ -26,6 +26,11 @@ interface LiveKitRecordingOutputOptions {
   sessionId: string;
 }
 
+interface LiveKitClassroomRecordingOutputOptions {
+  connectionId: string;
+  classroomId: string;
+}
+
 interface LiveKitRecordingTargetConfig {
   bucket: string;
   region: string;
@@ -187,6 +192,48 @@ export function createLiveKitRecordingOutput({
           metadata: {
             lessonId,
             sessionId,
+          },
+        }),
+      },
+    }),
+  };
+}
+
+export function createLiveKitClassroomRecordingOutput({
+  connectionId,
+  classroomId,
+}: LiveKitClassroomRecordingOutputOptions): EncodedOutputs {
+  const config = getLiveKitRecordingTargetConfig();
+
+  if (!config) {
+    throw new Error(
+      getLiveKitRecordingConfigurationError() ||
+        "LiveKit recording storage is not configured",
+    );
+  }
+
+  const timestamp = new Date().toISOString().replace(/[.:]/g, "-");
+  const prefix = config.filePrefix
+    ? `${config.filePrefix.replace(/^\/+|\/+$/g, "")}/`
+    : "";
+  const filepath = `${prefix}classrooms/${connectionId}/rooms/${classroomId}/recordings/${timestamp}.mp4`;
+
+  return {
+    file: new EncodedFileOutput({
+      fileType: EncodedFileType.MP4,
+      filepath,
+      output: {
+        case: "s3",
+        value: new S3Upload({
+          bucket: config.bucket,
+          region: config.region,
+          endpoint: config.endpoint ?? "",
+          accessKey: config.accessKey,
+          secret: config.secret,
+          forcePathStyle: config.forcePathStyle,
+          metadata: {
+            connectionId,
+            classroomId,
           },
         }),
       },

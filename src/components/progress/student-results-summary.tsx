@@ -33,6 +33,11 @@ function formatHourRange(minHours: number, maxHours: number) {
   return `${minHours}-${maxHours} h`;
 }
 
+function formatSignedHours(value: number) {
+  const formatted = formatHours(Math.abs(value));
+  return value > 0 ? `+${formatted}` : `-${formatted}`;
+}
+
 export function StudentResultsSummary({
   snapshot,
 }: StudentResultsSummaryProps) {
@@ -44,28 +49,65 @@ export function StudentResultsSummary({
       helper: `${formatHours(snapshot.timeMetrics.totalLearningHours)} logged vs about ${snapshot.cefrGuidedHours.currentLevel.averageHours} h often associated with ${snapshot.profile.cefrLevel}`,
     },
     {
+      key: "activeVocab",
+      label: "Active Vocab",
+      value: snapshot.overallPerformance.components.activeVocab,
+      helper: `${snapshot.activeSignals.uniqueItems} unique words from live-lesson speech across ${snapshot.activeSignals.totalUsageCount} recorded uses, plus ${snapshot.overview.masteredWords} words already practiced to mastery levels 4-5`,
+    },
+    {
+      key: "passiveVocab",
+      label: "Passive Vocab",
+      value: snapshot.overallPerformance.components.passiveVocab,
+      helper: `${snapshot.passiveSignals.equivalentWordCount} recognition-weighted words against the ${snapshot.profile.cefrLevel} passive target`,
+    },
+    {
       key: "grammar",
       label: "Grammar Topics Learned",
       value: snapshot.overallPerformance.components.grammar,
       helper: `${snapshot.overview.grammarMasteredCount}/${snapshot.overview.grammarAvailableCount} current-level topics marked as mastered`,
     },
     {
-      key: "knownWords",
-      label: "Words Known",
-      value: snapshot.overallPerformance.components.knownWords,
-      helper: `${snapshot.overview.masteredWords} words at high mastery`,
-    },
-    {
       key: "addedWords",
-      label: "Words Added",
+      label: "Words Added in App",
       value: snapshot.overallPerformance.components.addedWords,
-      helper: `${snapshot.overview.totalWords} total tracked words`,
+      helper: `${snapshot.overview.totalWords} total tracked words, with ${snapshot.overview.masteredWords} already practiced up to mastery levels 4-5`,
     },
   ] as const;
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <StudentOverallPerformanceCard
+          snapshot={snapshot}
+          id="overall-performance"
+        />
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Performance Breakdown</CardTitle>
+            <CardDescription>
+              This score blends active vocab, passive vocab, grammar topics learned,
+              words added in the app, and time logged. Active vocab is based
+              primarily on transcript-derived live-lesson speech, with a smaller
+              boost from words that have reached mastery levels 4 and 5.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {componentRows.map((row) => (
+              <div key={row.key} className="space-y-2">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <div className="font-medium text-foreground">{row.label}</div>
+                  <div className="text-muted-foreground">{row.value}%</div>
+                </div>
+                <Progress value={row.value} className="h-2" />
+                <p className="text-xs text-muted-foreground">{row.helper}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
@@ -118,55 +160,32 @@ export function StudentResultsSummary({
             <p className="text-xs text-muted-foreground">
               Combined app learning and tutor-led lesson time
             </p>
+            {snapshot.timeMetrics.timeAdjustmentHours !== 0 ? (
+              <p className="mt-2 text-xs text-primary">
+                Includes tutor time adjustment of {formatSignedHours(snapshot.timeMetrics.timeAdjustmentHours)}.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
-
-        <StudentOverallPerformanceCard
-          snapshot={snapshot}
-          id="overall-performance"
-        />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Performance Breakdown</CardTitle>
-            <CardDescription>
-              This score blends time, grammar coverage, mastered words, and
-              total tracked vocabulary.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {componentRows.map((row) => (
-              <div key={row.key} className="space-y-2">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <div className="font-medium text-foreground">{row.label}</div>
-                  <div className="text-muted-foreground">{row.value}%</div>
-                </div>
-                <Progress value={row.value} className="h-2" />
-                <p className="text-xs text-muted-foreground">{row.helper}</p>
-              </div>
-            ))}
-
-            <div className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
-              <div className="flex items-start gap-2 text-foreground">
-                <Target className="mt-0.5 h-4 w-4 text-primary" />
-                <div className="space-y-1">
-                  <p className="font-medium text-foreground">
-                    Current target:{" "}
-                    {snapshot.cefrGuidedHours.currentLevel.level}
-                  </p>
-                  <p>
-                    Around {snapshot.cefrGuidedHours.currentLevel.averageHours}{" "}
-                    guided hours on average, with about{" "}
-                    {snapshot.cefrGuidedHours.currentLevel.remainingHours} h
-                    still to log from the tracked total.
-                  </p>
-                </div>
-              </div>
+      <div className="space-y-4">
+        <div className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
+          <div className="flex items-start gap-2 text-foreground">
+            <Target className="mt-0.5 h-4 w-4 text-primary" />
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">
+                Current target: {snapshot.cefrGuidedHours.currentLevel.level}
+              </p>
+              <p>
+                Around {snapshot.cefrGuidedHours.currentLevel.averageHours} guided
+                hours on average, with about{" "}
+                {snapshot.cefrGuidedHours.currentLevel.remainingHours} h still to
+                log from the tracked total.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         <Card>
           <CardHeader>

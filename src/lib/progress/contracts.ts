@@ -56,9 +56,27 @@ export const tutorProgressAxisOverrideSchema = z.object({
   helper: z.string().trim().min(1),
 });
 
+export const tutorTimeAdjustmentHoursSchema = z
+  .number()
+  .finite()
+  .min(-5000)
+  .max(5000)
+  .default(0);
+
+export const tutorMonthlyProgressTargetsSchema = z.object({
+  transcriptTarget: z.number().int().min(1).max(10000),
+  practiceTarget: z.number().int().min(1).max(10000),
+  passiveTarget: z.number().int().min(1).max(10000),
+  activeDaysTarget: z.number().int().min(1).max(366),
+  activityTarget: z.number().int().min(1).max(10000),
+  grammarTarget: z.number().int().min(1).max(10000),
+});
+
 export const tutorProgressOverrideSchema = z.object({
   axisOverrides: z.array(tutorProgressAxisOverrideSchema).max(5).default([]),
   insightsOverride: progressInsightsSchema.nullable().default(null),
+  monthlyTargetOverrides: tutorMonthlyProgressTargetsSchema.nullable().default(null),
+  timeAdjustmentHours: tutorTimeAdjustmentHoursSchema,
 });
 
 export type ProgressAxisKey = z.infer<typeof progressAxisKeySchema>;
@@ -67,11 +85,16 @@ export type EstimatedBand = z.infer<typeof estimatedBandSchema>;
 export type TutorProgressAxisOverride = z.infer<
   typeof tutorProgressAxisOverrideSchema
 >;
+export type TutorMonthlyProgressTargets = z.infer<
+  typeof tutorMonthlyProgressTargetsSchema
+>;
 export type TutorProgressOverride = z.infer<typeof tutorProgressOverrideSchema>;
 
 export const EMPTY_TUTOR_PROGRESS_OVERRIDE: TutorProgressOverride = {
   axisOverrides: [],
   insightsOverride: null,
+  monthlyTargetOverrides: null,
+  timeAdjustmentHours: 0,
 };
 
 export function parseProgressInsightsValue(
@@ -86,6 +109,8 @@ export function parseTutorProgressOverride(
     | {
         axis_overrides?: unknown;
         insights_override?: unknown;
+        monthly_target_overrides?: unknown;
+        time_adjustment_hours?: unknown;
       }
     | null
     | undefined,
@@ -102,7 +127,25 @@ export function parseTutorProgressOverride(
   return {
     axisOverrides: axisOverrides.success ? axisOverrides.data : [],
     insightsOverride: parseProgressInsightsValue(input.insights_override),
+    monthlyTargetOverrides: tutorMonthlyProgressTargetsSchema
+      .nullable()
+      .catch(null)
+      .parse(input.monthly_target_overrides),
+    timeAdjustmentHours: tutorTimeAdjustmentHoursSchema.catch(0).parse(
+      input.time_adjustment_hours,
+    ),
   };
+}
+
+export function hasTutorProgressOverrideContent(
+  override: TutorProgressOverride,
+) {
+  return (
+    override.axisOverrides.length > 0 ||
+    override.insightsOverride !== null ||
+    override.monthlyTargetOverrides !== null ||
+    override.timeAdjustmentHours !== 0
+  );
 }
 
 export function applyTutorAxisOverrides(

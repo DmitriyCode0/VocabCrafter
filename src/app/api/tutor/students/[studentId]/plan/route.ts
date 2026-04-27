@@ -76,7 +76,9 @@ export async function GET(
   try {
     const [plan, metrics] = await Promise.all([
       getTutorStudentPlan(access.user.id, studentId),
-      getTutorStudentMonthlyReportMetrics(studentId),
+      getTutorStudentMonthlyReportMetrics(studentId, undefined, {
+        tutorId: access.user.id,
+      }),
     ]);
 
     return NextResponse.json({ plan, metrics });
@@ -113,7 +115,9 @@ export async function PATCH(
   try {
     const [plan, metrics] = await Promise.all([
       updateTutorStudentPlan(access.user.id, studentId, parsed.data),
-      getTutorStudentMonthlyReportMetrics(studentId),
+      getTutorStudentMonthlyReportMetrics(studentId, undefined, {
+        tutorId: access.user.id,
+      }),
     ]);
 
     return NextResponse.json({ plan, metrics });

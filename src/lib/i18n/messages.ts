@@ -859,11 +859,14 @@ const EN_MESSAGES = {
     title: "Lessons",
     scheduleDescription:
       "View lessons month by month and keep tutor and student sessions in one calendar.",
+    classroomDescription:
+      "Open a dedicated classroom for each active tutor-student connection and use it for ad-hoc live sessions.",
     balanceDescription:
       "Manage student lesson balances, top-ups, and lesson pricing in one place.",
     performanceDescription:
       "Tutor-only teaching analytics based on completed lessons from your schedule.",
     scheduleTab: "Schedule",
+    classroomTab: "Classroom",
     balanceTab: "Balance",
     performanceTab: "Performance",
     tutorOnlyBadge: "Tutor only",
@@ -2243,11 +2246,14 @@ const UK_MESSAGES: AppMessages = {
     title: "Уроки",
     scheduleDescription:
       "Переглядайте уроки помісячно та тримайте заняття викладача й студента в одному календарі.",
+    classroomDescription:
+      "Відкривайте окрему classroom-кімнату для кожного активного підключення викладач-учень і використовуйте її для дзвінків поза розкладом.",
     balanceDescription:
       "Керуйте балансами учнів, поповненнями та вартістю уроків в одному місці.",
     performanceDescription:
       "Аналітика викладання для викладача на основі завершених уроків із вашого розкладу.",
     scheduleTab: "Розклад",
+    classroomTab: "Classroom",
     balanceTab: "Баланс",
     performanceTab: "Ефективність",
     tutorOnlyBadge: "Лише для викладача",

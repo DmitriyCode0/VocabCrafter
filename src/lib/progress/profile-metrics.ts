@@ -10,14 +10,27 @@ import {
 } from "@/lib/languages";
 import { getGrammarTopicPromptCatalogUpToLevel } from "@/lib/grammar/prompt-overrides";
 import {
+  summarizeActiveVocabularyEvidence,
+  type ActiveVocabularyEvidenceRow,
+  type ActiveVocabularySignalSummary,
+} from "@/lib/mastery/active-vocabulary-evidence";
+import {
   getGrammarTopicDisplayName,
   getPrimaryGrammarTopic,
 } from "@/lib/utils";
 import {
+  extractPassiveVocabularyTermOccurrencesFromText,
   normalizePassiveVocabularyLibraryAttributes,
   summarizePassiveVocabularyEvidence,
   type PassiveVocabularyEvidenceRow,
 } from "@/lib/mastery/passive-vocabulary";
+import {
+  buildStudentMonthlyProgressPresentation,
+  resolveStudentMonthlyProgressTargets,
+  type StudentMonthlyProgressFactors,
+  type StudentMonthlyProgressTargetOverrides,
+  type StudentMonthlyProgressTargets,
+} from "@/lib/progress/monthly-progress-targets";
 import type { CEFRLevel } from "@/types/quiz";
 
 const CEFR_LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
@@ -56,6 +69,20 @@ export const ACTIVE_VOCAB_TARGETS: Record<CEFRLevel, number> = {
 };
 
 /**
+ * Live-lesson active evidence observes only the vocabulary we have actually
+ * heard the student produce, so it uses smaller targets than the full CEFR
+ * productive lexicon targets above.
+ */
+const OBSERVED_ACTIVE_VOCAB_TARGETS: Record<CEFRLevel, number> = {
+  A1: 30,
+  A2: 45,
+  B1: 90,
+  B2: 130,
+  C1: 180,
+  C2: 240,
+};
+
+/**
  * Passive vocabulary = words recognized but not necessarily produced
  * (tracked via passive_vocabulary_evidence). Typically ~2x active vocabulary.
  * A1: understand basic phrases, A2: simple texts, B1: standard text,
@@ -78,6 +105,15 @@ const ENGAGEMENT_QUIZ_TARGETS: Record<CEFRLevel, number> = {
   B2: 120,
   C1: 180,
   C2: 250,
+};
+
+const MONTHLY_ACTIVITY_TARGETS: Record<CEFRLevel, number> = {
+  A1: 12,
+  A2: 16,
+  B1: 20,
+  B2: 24,
+  C1: 28,
+  C2: 32,
 };
 
 /**
@@ -131,11 +167,59 @@ interface PassiveEvidenceWithLibraryRow {
   source_label: string | null;
   import_count: number;
   last_imported_at: string;
+  created_at?: string;
   passive_vocabulary_library: {
     cefr_level: string | null;
     part_of_speech: string | null;
     attributes: Record<string, unknown> | null;
   } | null;
+}
+
+interface ActiveEvidenceWithLibraryRow {
+  id: string;
+  term: string;
+  source_type: "lesson_recording" | "manual_list" | "other";
+  source_label: string | null;
+  usage_count: number;
+  first_used_at: string;
+  last_used_at: string;
+  passive_vocabulary_library: {
+    cefr_level: string | null;
+    part_of_speech: string | null;
+    attributes: Record<string, unknown> | null;
+  } | null;
+}
+
+interface MonthlyWordAdditionRow {
+  created_at: string;
+}
+
+interface MonthlyLessonRow {
+  id: string;
+  lesson_date: string;
+  status: string;
+}
+
+interface MonthlyTranscriptRow {
+  id: string;
+  lesson_id: string;
+}
+
+interface MonthlyClassroomRecordingRow {
+  id: string;
+  created_at: string;
+}
+
+interface MonthlyClassroomTranscriptRow {
+  id: string;
+  recording_id: string;
+}
+
+interface MonthlyTranscriptSegmentRow {
+  transcript_id: string;
+  occurred_at: string;
+  speaker_role: string;
+  content: string;
 }
 
 export interface StudentProgressAxis {
@@ -192,6 +276,14 @@ export interface StudentProgressWord {
   lastPracticed: string;
 }
 
+export interface StudentOverallPerformanceComponents {
+  time: number;
+  activeVocab: number;
+  passiveVocab: number;
+  grammar: number;
+  addedWords: number;
+}
+
 export interface StudentProgressSnapshot {
   profile: {
     fullName: string | null;
@@ -225,6 +317,7 @@ export interface StudentProgressSnapshot {
     appLearningHours: number;
     lessonHours: number;
     totalLearningHours: number;
+    timeAdjustmentHours: number;
     completedLessons: number;
   };
   cefrGuidedHours: {
@@ -257,12 +350,7 @@ export interface StudentProgressSnapshot {
   overallPerformance: {
     score: number;
     band: "needs_focus" | "building" | "on_track" | "strong";
-    components: {
-      time: number;
-      grammar: number;
-      knownWords: number;
-      addedWords: number;
-    };
+    components: StudentOverallPerformanceComponents;
   };
   activityStats: StudentProgressActivityStat[];
   recentAttempts: StudentProgressRecentAttempt[];
@@ -300,11 +388,145 @@ export interface StudentProgressSnapshot {
       recognitionWeight: number;
     }>;
   };
+  activeSignals: ActiveVocabularySignalSummary;
   words: StudentProgressWord[];
+}
+
+export interface StudentMonthlyProgressSnapshot {
+  window: {
+    reportMonth: string;
+    periodStart: string;
+    periodEnd: string;
+    endExclusive: string;
+    dayCount: number;
+  };
+  targets: StudentMonthlyProgressTargets;
+  axes: StudentProgressAxis[];
+  chartData: Array<{
+    axis: string;
+    score: number;
+    fullMark: number;
+  }>;
+  factors: StudentMonthlyProgressFactors;
+}
+
+export interface StudentMonthlyComparisonSnapshot {
+  currentMonth: StudentMonthlyProgressSnapshot;
+  previousMonth: StudentMonthlyProgressSnapshot;
+}
+
+interface ProgressMonthWindow {
+  reportMonth: string;
+  periodStart: string;
+  periodEnd: string;
+  endExclusive: string;
+  dayCount: number;
 }
 
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function getOverallPerformanceBand(score: number) {
+  if (score >= 85) {
+    return "strong" as const;
+  }
+
+  if (score >= 70) {
+    return "on_track" as const;
+  }
+
+  if (score >= 50) {
+    return "building" as const;
+  }
+
+  return "needs_focus" as const;
+}
+
+function calculateOverallPerformanceScore(
+  components: StudentOverallPerformanceComponents,
+) {
+  return clampScore(
+    (components.time +
+      components.activeVocab +
+      components.passiveVocab +
+      components.grammar +
+      components.addedWords) /
+      5,
+  );
+}
+
+export function applyTutorTimeAdjustmentToSnapshot(
+  snapshot: StudentProgressSnapshot,
+  timeAdjustmentHours: number,
+): StudentProgressSnapshot {
+  const normalizedTimeAdjustmentHours = Number(
+    (Number.isFinite(timeAdjustmentHours) ? timeAdjustmentHours : 0).toFixed(2),
+  );
+  const baseTotalLearningHoursRaw =
+    snapshot.timeMetrics.appLearningSeconds / 3600 +
+    snapshot.timeMetrics.lessonHours;
+  const adjustedTotalLearningHoursRaw = Math.max(
+    0,
+    baseTotalLearningHoursRaw + normalizedTimeAdjustmentHours,
+  );
+  const timeProgressScore = clampScore(
+    (adjustedTotalLearningHoursRaw /
+      snapshot.cefrGuidedHours.currentLevel.averageHours) *
+      100,
+  );
+  const overallPerformanceComponents: StudentOverallPerformanceComponents = {
+    ...snapshot.overallPerformance.components,
+    time: timeProgressScore,
+  };
+  const overallPerformanceScore = calculateOverallPerformanceScore(
+    overallPerformanceComponents,
+  );
+
+  return {
+    ...snapshot,
+    timeMetrics: {
+      ...snapshot.timeMetrics,
+      totalLearningHours: Number(adjustedTotalLearningHoursRaw.toFixed(1)),
+      timeAdjustmentHours: normalizedTimeAdjustmentHours,
+    },
+    cefrGuidedHours: {
+      ...snapshot.cefrGuidedHours,
+      currentLevel: {
+        ...snapshot.cefrGuidedHours.currentLevel,
+        progressPercent: timeProgressScore,
+        remainingHours: Number(
+          Math.max(
+            0,
+            snapshot.cefrGuidedHours.currentLevel.averageHours -
+              adjustedTotalLearningHoursRaw,
+          ).toFixed(1),
+        ),
+      },
+      nextLevel: snapshot.cefrGuidedHours.nextLevel
+        ? {
+            ...snapshot.cefrGuidedHours.nextLevel,
+            progressPercent: clampScore(
+              (adjustedTotalLearningHoursRaw /
+                snapshot.cefrGuidedHours.nextLevel.averageHours) *
+                100,
+            ),
+            remainingHours: Number(
+              Math.max(
+                0,
+                snapshot.cefrGuidedHours.nextLevel.averageHours -
+                  adjustedTotalLearningHoursRaw,
+              ).toFixed(1),
+            ),
+          }
+        : null,
+    },
+    overallPerformance: {
+      score: overallPerformanceScore,
+      band: getOverallPerformanceBand(overallPerformanceScore),
+      components: overallPerformanceComponents,
+    },
+  };
 }
 
 function normalizeCefrLevel(value?: string | null): CEFRLevel {
@@ -333,6 +555,528 @@ function getScorePercent(attempt: AttemptRow) {
   return Math.round((attempt.score / attempt.max_score) * 100);
 }
 
+function toUtcDateString(date: Date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addUtcDays(date: Date, amount: number) {
+  const next = new Date(date.getTime());
+  next.setUTCDate(next.getUTCDate() + amount);
+  return next;
+}
+
+function buildProgressMonthWindow(referenceDate: Date): ProgressMonthWindow {
+  const monthStart = new Date(
+    Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), 1),
+  );
+  const periodEndDate = new Date(
+    Date.UTC(
+      referenceDate.getUTCFullYear(),
+      referenceDate.getUTCMonth(),
+      referenceDate.getUTCDate(),
+    ),
+  );
+
+  return {
+    reportMonth: toUtcDateString(monthStart),
+    periodStart: toUtcDateString(monthStart),
+    periodEnd: toUtcDateString(periodEndDate),
+    endExclusive: toUtcDateString(addUtcDays(periodEndDate, 1)),
+    dayCount:
+      Math.floor((periodEndDate.getTime() - monthStart.getTime()) / 86_400_000) + 1,
+  };
+}
+
+function getComparablePreviousMonthReferenceDate(referenceDate: Date) {
+  const previousMonthLastDay = new Date(
+    Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), 0),
+  ).getUTCDate();
+
+  return new Date(
+    Date.UTC(
+      referenceDate.getUTCFullYear(),
+      referenceDate.getUTCMonth() - 1,
+      Math.min(referenceDate.getUTCDate(), previousMonthLastDay),
+    ),
+  );
+}
+
+function getIsoDateFromTimestamp(value?: string | null) {
+  return value?.slice(0, 10) ?? null;
+}
+
+function isIsoDateInWindow(
+  isoDate: string | null,
+  window: Pick<ProgressMonthWindow, "periodStart" | "periodEnd">,
+) {
+  return Boolean(
+    isoDate && isoDate >= window.periodStart && isoDate <= window.periodEnd,
+  );
+}
+
+function buildMonthlyChartDataFromAxes(axes: StudentProgressAxis[]) {
+  return axes.map((axis) => ({
+    axis: axis.shortLabel,
+    score: axis.score,
+    fullMark: 100,
+  }));
+}
+
+function mapPassiveEvidenceRows(
+  rows: PassiveEvidenceWithLibraryRow[],
+): PassiveVocabularyEvidenceRow[] {
+  return rows.map(
+    (row): PassiveVocabularyEvidenceRow => ({
+      term: row.term,
+      definition: row.definition,
+      item_type: row.item_type,
+      source_type: row.source_type,
+      source_label: row.source_label,
+      import_count: row.import_count,
+      last_imported_at: row.last_imported_at,
+      library_cefr_level:
+        (row.passive_vocabulary_library?.cefr_level as
+          | PassiveVocabularyEvidenceRow["library_cefr_level"]
+          | null) ?? null,
+      library_part_of_speech:
+        (row.passive_vocabulary_library?.part_of_speech as
+          | PassiveVocabularyEvidenceRow["library_part_of_speech"]
+          | null) ?? null,
+      library_attributes: normalizePassiveVocabularyLibraryAttributes(
+        row.passive_vocabulary_library?.attributes,
+      ),
+    }),
+  );
+}
+
+function mapActiveEvidenceRows(
+  rows: ActiveEvidenceWithLibraryRow[],
+): ActiveVocabularyEvidenceRow[] {
+  return rows.map(
+    (row): ActiveVocabularyEvidenceRow => ({
+      id: row.id,
+      term: row.term,
+      source_type: row.source_type,
+      source_label: row.source_label,
+      usage_count: row.usage_count,
+      first_used_at: row.first_used_at,
+      last_used_at: row.last_used_at,
+      library_cefr_level:
+        (row.passive_vocabulary_library?.cefr_level as
+          | ActiveVocabularyEvidenceRow["library_cefr_level"]
+          | null) ?? null,
+      library_part_of_speech:
+        (row.passive_vocabulary_library?.part_of_speech as
+          | ActiveVocabularyEvidenceRow["library_part_of_speech"]
+          | null) ?? null,
+      library_attributes: normalizePassiveVocabularyLibraryAttributes(
+        row.passive_vocabulary_library?.attributes,
+      ),
+    }),
+  );
+}
+
+function buildStudentMonthlyProgressSnapshot({
+  cefrLevel,
+  availableGrammarTopicCount,
+  attempts,
+  wordAdditions,
+  passiveEvidenceRows,
+  lessons,
+  transcriptSegments,
+  window,
+  monthlyTargetOverrides,
+}: {
+  cefrLevel: CEFRLevel;
+  availableGrammarTopicCount: number;
+  attempts: AttemptRow[];
+  wordAdditions: MonthlyWordAdditionRow[];
+  passiveEvidenceRows: PassiveEvidenceWithLibraryRow[];
+  lessons: MonthlyLessonRow[];
+  transcriptSegments: MonthlyTranscriptSegmentRow[];
+  window: ProgressMonthWindow;
+  monthlyTargetOverrides?: StudentMonthlyProgressTargetOverrides | null;
+}): StudentMonthlyProgressSnapshot {
+  const attemptsInWindow = attempts.filter((attempt) =>
+    isIsoDateInWindow(getIsoDateFromTimestamp(attempt.completed_at), window),
+  );
+  const newWordsInWindow = wordAdditions.filter((word) =>
+    isIsoDateInWindow(getIsoDateFromTimestamp(word.created_at), window),
+  );
+  const passiveEvidenceInWindow = passiveEvidenceRows.filter((row) =>
+    isIsoDateInWindow(getIsoDateFromTimestamp(row.created_at), window),
+  );
+  const lessonsInWindow = lessons.filter((lesson) =>
+    isIsoDateInWindow(lesson.lesson_date, window),
+  );
+  const transcriptSegmentsInWindow = transcriptSegments.filter((segment) =>
+    isIsoDateInWindow(getIsoDateFromTimestamp(segment.occurred_at), window),
+  );
+
+  const activeTerms = transcriptSegmentsInWindow.flatMap((segment) =>
+    extractPassiveVocabularyTermOccurrencesFromText(segment.content),
+  );
+  const transcriptUniqueTerms = new Set(activeTerms).size;
+  const transcriptUsageCount = activeTerms.length;
+  const newPracticeWords = newWordsInWindow.length;
+  const passiveSignals = summarizePassiveVocabularyEvidence(
+    mapPassiveEvidenceRows(passiveEvidenceInWindow),
+    cefrLevel,
+  );
+
+  const accuracyAttempts = attemptsInWindow.filter((attempt) => {
+    const type = attempt.quizzes?.type;
+    return type === "gap_fill" || type === "translation";
+  });
+  const scoredAccuracyAttempts = accuracyAttempts.filter(
+    (attempt) => getScorePercent(attempt) !== null,
+  );
+  const accuracyScore =
+    scoredAccuracyAttempts.length > 0
+      ? clampScore(
+          scoredAccuracyAttempts.reduce(
+            (sum, attempt) => sum + (getScorePercent(attempt) ?? 0),
+            0,
+          ) / scoredAccuracyAttempts.length,
+        )
+      : 0;
+
+  const confidentGrammarTopics = new Set<string>();
+  const practicedGrammarTopics = new Set<string>();
+  for (const attempt of attemptsInWindow) {
+    if (attempt.quizzes?.type !== "translation") {
+      continue;
+    }
+
+    const topicKey = getPrimaryGrammarTopic(attempt.quizzes?.config);
+    if (!topicKey) {
+      continue;
+    }
+
+    practicedGrammarTopics.add(topicKey);
+    const scorePercent = getScorePercent(attempt);
+    if (scorePercent != null && scorePercent >= GRAMMAR_MASTERY_MIN_SCORE) {
+      confidentGrammarTopics.add(topicKey);
+    }
+  }
+
+  const completedLessons = lessonsInWindow.filter(
+    (lesson) => lesson.status === "completed",
+  ).length;
+  const completedQuizzes = attemptsInWindow.length;
+  const activityCount = completedQuizzes + completedLessons;
+  const activityDays = new Set<string>();
+
+  for (const attempt of attemptsInWindow) {
+    const isoDate = getIsoDateFromTimestamp(attempt.completed_at);
+    if (isoDate) {
+      activityDays.add(isoDate);
+    }
+  }
+
+  for (const lesson of lessonsInWindow) {
+    activityDays.add(lesson.lesson_date);
+  }
+
+  for (const word of newWordsInWindow) {
+    const isoDate = getIsoDateFromTimestamp(word.created_at);
+    if (isoDate) {
+      activityDays.add(isoDate);
+    }
+  }
+
+  for (const evidence of passiveEvidenceInWindow) {
+    const isoDate = getIsoDateFromTimestamp(evidence.created_at);
+    if (isoDate) {
+      activityDays.add(isoDate);
+    }
+  }
+
+  const activeDays = activityDays.size;
+  const factors: StudentMonthlyProgressFactors = {
+    transcriptActiveTerms: transcriptUniqueTerms,
+    transcriptUsageCount,
+    newPracticeWords,
+    passiveEquivalentWords: passiveSignals.equivalentWordCount,
+    activeDays,
+    activityCount,
+    completedLessons,
+    completedQuizzes,
+    grammarTopicsPracticed: practicedGrammarTopics.size,
+    confidentGrammarTopics: confidentGrammarTopics.size,
+    accuracyAttemptCount: scoredAccuracyAttempts.length,
+    accuracyScore,
+    availableGrammarTopicCount,
+  };
+  const targets = resolveStudentMonthlyProgressTargets({
+    cefrLevel,
+    dayCount: window.dayCount,
+    overrides: monthlyTargetOverrides,
+  });
+  const presentation = buildStudentMonthlyProgressPresentation({
+    factors,
+    targets,
+  });
+
+  return {
+    window,
+    targets,
+    axes: presentation.axes,
+    chartData: presentation.chartData,
+    factors,
+  };
+}
+
+export async function getStudentMonthlyComparisonSnapshot(
+  userId: string,
+  referenceDate: Date = new Date(),
+  monthlyTargetOverrides?: StudentMonthlyProgressTargetOverrides | null,
+): Promise<StudentMonthlyComparisonSnapshot> {
+  const supabaseAdmin = createAdminClient();
+  const currentWindow = buildProgressMonthWindow(referenceDate);
+  const previousReferenceDate = getComparablePreviousMonthReferenceDate(
+    referenceDate,
+  );
+  const previousWindow = buildProgressMonthWindow(previousReferenceDate);
+
+  const [
+    profileResult,
+    attemptsResult,
+    wordAdditionsResult,
+    passiveEvidenceResult,
+    lessonsResult,
+    classroomsResult,
+  ] =
+    await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("cefr_level, preferred_language")
+        .eq("id", userId)
+        .single(),
+      supabaseAdmin
+        .from("quiz_attempts")
+        .select("score, max_score, completed_at, quizzes(type, config)")
+        .eq("student_id", userId)
+        .gte("completed_at", `${previousWindow.periodStart}T00:00:00.000Z`)
+        .lt("completed_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
+      supabaseAdmin
+        .from("word_mastery")
+        .select("created_at")
+        .eq("student_id", userId)
+        .gte("created_at", `${previousWindow.periodStart}T00:00:00.000Z`)
+        .lt("created_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
+      supabaseAdmin
+        .from("passive_vocabulary_evidence")
+        .select(
+          "term, definition, item_type, source_type, source_label, import_count, last_imported_at, created_at, passive_vocabulary_library(cefr_level, part_of_speech, attributes)",
+        )
+        .eq("student_id", userId)
+        .gte("created_at", `${previousWindow.periodStart}T00:00:00.000Z`)
+        .lt("created_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
+      supabaseAdmin
+        .from("tutor_student_lessons")
+        .select("id, lesson_date, status")
+        .eq("student_id", userId)
+        .gte("lesson_date", previousWindow.periodStart)
+        .lte("lesson_date", currentWindow.periodEnd),
+      supabaseAdmin
+        .from("tutor_student_classrooms")
+        .select("id")
+        .eq("student_id", userId),
+    ]);
+
+  if (profileResult.error || !profileResult.data) {
+    throw new Error("Failed to load student monthly progress profile");
+  }
+
+  const cefrLevel = normalizeCefrLevel(profileResult.data.cefr_level);
+  const targetLanguage = normalizeLearningLanguage(
+    profileResult.data.preferred_language,
+  );
+  const availableGrammarTopicCatalog =
+    await getGrammarTopicPromptCatalogUpToLevel(targetLanguage, cefrLevel);
+  const availableGrammarTopicCount = availableGrammarTopicCatalog.reduce(
+    (sum, group) => sum + group.topics.length,
+    0,
+  );
+  const lessons = (lessonsResult.data ?? []) as MonthlyLessonRow[];
+  const lessonIds = lessons.map((lesson) => lesson.id);
+  const lessonDateById = new Map(
+    lessons.map((lesson) => [lesson.id, lesson.lesson_date]),
+  );
+  const classroomIds = (classroomsResult.data ?? []).map(
+    (classroom) => classroom.id,
+  );
+
+  let transcriptSegments: MonthlyTranscriptSegmentRow[] = [];
+  if (lessonIds.length > 0) {
+    const { data: transcriptsResult, error: transcriptsError } = await supabaseAdmin
+      .from("lesson_room_transcripts")
+      .select("id, lesson_id")
+      .in("lesson_id", lessonIds)
+      .eq("diarization_status", "ready");
+
+    if (transcriptsError) {
+      throw transcriptsError;
+    }
+
+    const transcriptIds = ((transcriptsResult ?? []) as MonthlyTranscriptRow[]).map(
+      (transcript) => transcript.id,
+    );
+
+    if (transcriptIds.length > 0) {
+      const { data: segmentsResult, error: segmentsError } = await supabaseAdmin
+        .from("lesson_room_transcript_segments")
+        .select("transcript_id, lesson_id, speaker_role, content")
+        .in("transcript_id", transcriptIds)
+        .eq("speaker_role", "student");
+
+      if (segmentsError) {
+        throw segmentsError;
+      }
+
+      transcriptSegments = (segmentsResult ?? []).flatMap((segment) => {
+        const occurredAt = lessonDateById.get(segment.lesson_id);
+
+        if (!occurredAt) {
+          return [];
+        }
+
+        return [
+          {
+            transcript_id: segment.transcript_id,
+            occurred_at: occurredAt,
+            speaker_role: segment.speaker_role,
+            content: segment.content,
+          },
+        ];
+      });
+    }
+  }
+
+  if (classroomIds.length > 0) {
+    const { data: classroomRecordingsResult, error: classroomRecordingsError } =
+      await supabaseAdmin
+        .from("tutor_student_classroom_recordings")
+        .select("id, created_at")
+        .in("classroom_id", classroomIds)
+        .gte("created_at", `${previousWindow.periodStart}T00:00:00.000Z`)
+        .lt("created_at", `${currentWindow.endExclusive}T00:00:00.000Z`);
+
+    if (classroomRecordingsError) {
+      throw classroomRecordingsError;
+    }
+
+    const classroomRecordings =
+      (classroomRecordingsResult ?? []) as MonthlyClassroomRecordingRow[];
+    const classroomRecordingIds = classroomRecordings.map(
+      (recording) => recording.id,
+    );
+    const classroomRecordingDateById = new Map(
+      classroomRecordings.map((recording) => [recording.id, recording.created_at]),
+    );
+
+    if (classroomRecordingIds.length > 0) {
+      const {
+        data: classroomTranscriptsResult,
+        error: classroomTranscriptsError,
+      } = await supabaseAdmin
+        .from("tutor_student_classroom_transcripts")
+        .select("id, recording_id")
+        .in("recording_id", classroomRecordingIds)
+        .eq("diarization_status", "ready");
+
+      if (classroomTranscriptsError) {
+        throw classroomTranscriptsError;
+      }
+
+      const classroomTranscripts =
+        (classroomTranscriptsResult ?? []) as MonthlyClassroomTranscriptRow[];
+      const classroomTranscriptIds = classroomTranscripts.map(
+        (transcript) => transcript.id,
+      );
+      const classroomRecordingIdByTranscriptId = new Map(
+        classroomTranscripts.map((transcript) => [
+          transcript.id,
+          transcript.recording_id,
+        ]),
+      );
+
+      if (classroomTranscriptIds.length > 0) {
+        const {
+          data: classroomSegmentsResult,
+          error: classroomSegmentsError,
+        } = await supabaseAdmin
+          .from("tutor_student_classroom_transcript_segments")
+          .select("transcript_id, speaker_role, content")
+          .in("transcript_id", classroomTranscriptIds)
+          .eq("speaker_role", "student");
+
+        if (classroomSegmentsError) {
+          throw classroomSegmentsError;
+        }
+
+        transcriptSegments = transcriptSegments.concat(
+          (classroomSegmentsResult ?? []).flatMap((segment) => {
+            const recordingId = classroomRecordingIdByTranscriptId.get(
+              segment.transcript_id,
+            );
+            const occurredAt = recordingId
+              ? classroomRecordingDateById.get(recordingId)
+              : null;
+
+            if (!occurredAt) {
+              return [];
+            }
+
+            return [
+              {
+                transcript_id: segment.transcript_id,
+                occurred_at: occurredAt,
+                speaker_role: segment.speaker_role,
+                content: segment.content,
+              },
+            ];
+          }),
+        );
+      }
+    }
+  }
+
+  const currentMonth = buildStudentMonthlyProgressSnapshot({
+    cefrLevel,
+    availableGrammarTopicCount,
+    attempts: (attemptsResult.data ?? []) as AttemptRow[],
+    wordAdditions: (wordAdditionsResult.data ?? []) as MonthlyWordAdditionRow[],
+    passiveEvidenceRows:
+      (passiveEvidenceResult.data ?? []) as PassiveEvidenceWithLibraryRow[],
+    lessons,
+    transcriptSegments,
+    window: currentWindow,
+    monthlyTargetOverrides,
+  });
+  const previousMonth = buildStudentMonthlyProgressSnapshot({
+    cefrLevel,
+    availableGrammarTopicCount,
+    attempts: (attemptsResult.data ?? []) as AttemptRow[],
+    wordAdditions: (wordAdditionsResult.data ?? []) as MonthlyWordAdditionRow[],
+    passiveEvidenceRows:
+      (passiveEvidenceResult.data ?? []) as PassiveEvidenceWithLibraryRow[],
+    lessons,
+    transcriptSegments,
+    window: previousWindow,
+    monthlyTargetOverrides,
+  });
+
+  return {
+    currentMonth,
+    previousMonth,
+  };
+}
+
 export async function getStudentProgressSnapshot(
   userId: string,
 ): Promise<StudentProgressSnapshot> {
@@ -344,6 +1088,7 @@ export async function getStudentProgressSnapshot(
     masteryResult,
     quizCountResult,
     passiveEvidenceResult,
+    activeEvidenceResult,
     grammarMasteryResult,
     completedLessonsCountResult,
   ] = await Promise.all([
@@ -376,6 +1121,13 @@ export async function getStudentProgressSnapshot(
       )
       .eq("student_id", userId)
       .order("last_imported_at", { ascending: false }),
+    supabaseAdmin
+      .from("active_vocabulary_evidence")
+      .select(
+        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(cefr_level, part_of_speech, attributes)",
+      )
+      .eq("student_id", userId)
+      .eq("source_type", "lesson_recording"),
     supabaseAdmin
       .from("student_grammar_topic_mastery")
       .select("topic_key, source")
@@ -438,6 +1190,11 @@ export async function getStudentProgressSnapshot(
         row.passive_vocabulary_library?.attributes,
       ),
     }),
+  );
+  const activeSignals = summarizeActiveVocabularyEvidence(
+    mapActiveEvidenceRows(
+      (activeEvidenceResult.data ?? []) as ActiveEvidenceWithLibraryRow[],
+    ),
   );
   const passiveSignals = summarizePassiveVocabularyEvidence(
     passiveEvidenceRows,
@@ -668,10 +1425,17 @@ export async function getStudentProgressSnapshot(
     (topic) => !topicAttemptMap.has(topic.topicKey),
   );
 
-  // --- Axis scores ---
-  const activeVocabScore = clampScore(
-    (totalWords / ACTIVE_VOCAB_TARGETS[cefrLevel]) * 100,
+  const liveLessonActiveVocabScore = clampScore(
+    Math.min(
+      1,
+      activeSignals.uniqueItems / OBSERVED_ACTIVE_VOCAB_TARGETS[cefrLevel],
+    ) *
+      80 +
+      Math.min(1, masteredWords / ACTIVE_VOCAB_TARGETS[cefrLevel]) * 20,
   );
+
+  // --- Axis scores ---
+  const activeVocabScore = liveLessonActiveVocabScore;
   const passiveVocabScore = clampScore(
     (passiveSignals.equivalentWordCount / PASSIVE_VOCAB_TARGETS[cefrLevel]) *
       100,
@@ -683,26 +1447,22 @@ export async function getStudentProgressSnapshot(
   const timeProgressScore = clampScore(
     (totalLearningHoursRaw / currentGuidedHours.averageHours) * 100,
   );
-  const knownWordsScore = clampScore(
-    (masteredWords / ACTIVE_VOCAB_TARGETS[cefrLevel]) * 100,
-  );
+  const activeVocabPerformanceScore = liveLessonActiveVocabScore;
   const addedWordsScore = clampScore(
     (totalWords / ACTIVE_VOCAB_TARGETS[cefrLevel]) * 100,
   );
-  const overallPerformanceScore = clampScore(
-    timeProgressScore * 0.3 +
-      grammarVarietyScore * 0.25 +
-      knownWordsScore * 0.25 +
-      addedWordsScore * 0.2,
+  const overallPerformanceComponents: StudentOverallPerformanceComponents = {
+    time: timeProgressScore,
+    activeVocab: activeVocabPerformanceScore,
+    passiveVocab: passiveVocabScore,
+    grammar: grammarVarietyScore,
+    addedWords: addedWordsScore,
+  };
+  const overallPerformanceScore = calculateOverallPerformanceScore(
+    overallPerformanceComponents,
   );
   const overallPerformanceBand: StudentProgressSnapshot["overallPerformance"]["band"] =
-    overallPerformanceScore >= 85
-      ? "strong"
-      : overallPerformanceScore >= 70
-        ? "on_track"
-        : overallPerformanceScore >= 50
-          ? "building"
-          : "needs_focus";
+    getOverallPerformanceBand(overallPerformanceScore);
 
   const axes: StudentProgressAxis[] = [
     {
@@ -710,8 +1470,8 @@ export async function getStudentProgressSnapshot(
       label: "Active Vocab",
       shortLabel: "Active",
       score: activeVocabScore,
-      value: `${totalWords.toLocaleString()} / ${ACTIVE_VOCAB_TARGETS[cefrLevel].toLocaleString()} words`,
-      helper: `Active vocabulary words tracked in the system. Target for ${cefrLevel}.`,
+      value: `${activeSignals.uniqueItems.toLocaleString()} live-lesson words, ${masteredWords.toLocaleString()} at mastery 4-5`,
+      helper: `Based primarily on unique words actually used in live lessons and synced as active evidence, with a smaller boost from words practiced to mastery levels 4 and 5. ${activeSignals.totalUsageCount.toLocaleString()} total lesson-based uses recorded.`,
       beta: true,
     },
     {
@@ -800,6 +1560,7 @@ export async function getStudentProgressSnapshot(
       appLearningHours: Number(appLearningHoursRaw.toFixed(1)),
       lessonHours,
       totalLearningHours: Number(totalLearningHoursRaw.toFixed(1)),
+      timeAdjustmentHours: 0,
       completedLessons,
     },
     cefrGuidedHours: {
@@ -843,12 +1604,7 @@ export async function getStudentProgressSnapshot(
     overallPerformance: {
       score: overallPerformanceScore,
       band: overallPerformanceBand,
-      components: {
-        time: timeProgressScore,
-        grammar: grammarVarietyScore,
-        knownWords: knownWordsScore,
-        addedWords: addedWordsScore,
-      },
+      components: overallPerformanceComponents,
     },
     activityStats,
     recentAttempts: attempts.slice(0, 10).map((attempt) => ({
@@ -865,6 +1621,7 @@ export async function getStudentProgressSnapshot(
     },
     grammarTopicMastery,
     passiveSignals,
+    activeSignals,
     words,
   };
 }

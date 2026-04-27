@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  EMPTY_TUTOR_PROGRESS_OVERRIDE,
+  hasTutorProgressOverrideContent,
   parseTutorProgressOverride,
   type TutorProgressOverride,
 } from "@/lib/progress/contracts";
@@ -68,7 +68,9 @@ export async function getPublishedTutorProgressOverride(
 
   const { data: overrideRow, error: overrideError } = await supabaseAdmin
     .from("tutor_student_progress_overrides")
-    .select("tutor_id, axis_overrides, insights_override, updated_at")
+    .select(
+      "tutor_id, axis_overrides, insights_override, monthly_target_overrides, time_adjustment_hours, updated_at",
+    )
     .eq("student_id", studentId)
     .in("tutor_id", tutorIds)
     .order("updated_at", { ascending: false })
@@ -84,10 +86,7 @@ export async function getPublishedTutorProgressOverride(
   }
 
   const parsedOverride = parseTutorProgressOverride(overrideRow);
-  const hasContent =
-    parsedOverride.axisOverrides.length > 0 ||
-    parsedOverride.insightsOverride !==
-      EMPTY_TUTOR_PROGRESS_OVERRIDE.insightsOverride;
+  const hasContent = hasTutorProgressOverrideContent(parsedOverride);
 
   if (!hasContent) {
     return null;

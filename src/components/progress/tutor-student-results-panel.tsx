@@ -10,18 +10,23 @@ import { Progress } from "@/components/ui/progress";
 import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
 import { StudentProgressOverviewCards } from "@/components/progress/student-progress-overview-cards";
 import { StudentResultsSummary } from "@/components/progress/student-results-summary";
+import { TutorTimeAdjustmentCard } from "@/components/progress/tutor-time-adjustment-card";
 import { getAppMessages } from "@/lib/i18n/messages";
 import type { StudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 
 interface TutorStudentResultsPanelProps {
+  studentId: string;
   studentName: string;
   snapshot: StudentProgressSnapshot;
+  initialTimeAdjustmentHours: number;
   appLanguage: string;
 }
 
 export function TutorStudentResultsPanel({
+  studentId,
   studentName,
   snapshot,
+  initialTimeAdjustmentHours,
   appLanguage,
 }: TutorStudentResultsPanelProps) {
   const messages = getAppMessages(appLanguage as "en" | "uk");
@@ -29,7 +34,8 @@ export function TutorStudentResultsPanel({
     snapshot.overview.totalAttempts > 0 ||
     snapshot.overview.totalWords > 0 ||
     snapshot.passiveSignals.uniqueItems > 0 ||
-    snapshot.timeMetrics.completedLessons > 0;
+    snapshot.timeMetrics.completedLessons > 0 ||
+    snapshot.timeMetrics.timeAdjustmentHours !== 0;
 
   return (
     <div className="space-y-6">
@@ -44,8 +50,8 @@ export function TutorStudentResultsPanel({
           </Badge>
         </div>
         <p className="text-muted-foreground">
-          Read-only progress view combining timed app learning, lessons,
-          vocabulary growth, and grammar coverage.
+          Progress view combining timed app learning, lessons, vocabulary
+          growth, grammar coverage, and optional tutor time corrections.
         </p>
       </div>
 
@@ -61,6 +67,14 @@ export function TutorStudentResultsPanel({
         </Card>
       ) : (
         <>
+          <StudentResultsSummary snapshot={snapshot} />
+
+          <TutorTimeAdjustmentCard
+            studentId={studentId}
+            initialTimeAdjustmentHours={initialTimeAdjustmentHours}
+            currentTotalLearningHours={snapshot.timeMetrics.totalLearningHours}
+          />
+
           <StudentSkillRadar
             axes={snapshot.axes}
             chartData={snapshot.chartData}
@@ -68,8 +82,6 @@ export function TutorStudentResultsPanel({
             grammarNotice={snapshot.grammar.betaNotice}
             grammarTopics={snapshot.grammarTopicMastery}
           />
-
-          <StudentResultsSummary snapshot={snapshot} />
 
           <StudentProgressOverviewCards snapshot={snapshot} />
 

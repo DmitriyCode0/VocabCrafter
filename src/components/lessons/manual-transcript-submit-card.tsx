@@ -42,8 +42,13 @@ interface ManualTranscriptRecording {
 }
 
 interface ManualTranscriptSubmitCardProps {
-  lessonId: string;
   recordings: ManualTranscriptRecording[];
+  transcriptEndpoint: string;
+  transcribeEndpoint: string;
+  contextLabel?: string;
+  sourceLabelFallback?: string;
+  cardDescription?: string;
+  emptyStateHint?: string;
 }
 
 interface TranscriptSegmentPayload {
@@ -132,8 +137,13 @@ function formatRecordingOption(recording: ManualTranscriptRecording) {
 }
 
 export function ManualTranscriptSubmitCard({
-  lessonId,
   recordings,
+  transcriptEndpoint,
+  transcribeEndpoint,
+  contextLabel = "lesson",
+  sourceLabelFallback,
+  cardDescription,
+  emptyStateHint,
 }: ManualTranscriptSubmitCardProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -173,7 +183,8 @@ export function ManualTranscriptSubmitCard({
     const importedCount = data?.activeEvidence?.importedCount ?? 0;
     const createdCount = data?.activeEvidence?.createdCount ?? 0;
     const updatedCount = data?.activeEvidence?.updatedCount ?? 0;
-    const sourceLabel = data?.sourceLabel || "the selected lesson";
+    const sourceLabel =
+      data?.sourceLabel || sourceLabelFallback || `the selected ${contextLabel}`;
 
     toast.success(
       `${prefix} ${sourceLabel}. Active evidence imported ${importedCount} words, with ${createdCount} new and ${updatedCount} updated.`,
@@ -184,7 +195,7 @@ export function ManualTranscriptSubmitCard({
     event.preventDefault();
 
     if (!selectedRecordingId) {
-      toast.error("Choose a lesson recording first");
+      toast.error(`Choose a ${contextLabel} recording first`);
       return;
     }
 
@@ -198,7 +209,7 @@ export function ManualTranscriptSubmitCard({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/lessons/${lessonId}/transcript`, {
+      const response = await fetch(transcriptEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -215,7 +226,9 @@ export function ManualTranscriptSubmitCard({
         .catch(() => null)) as ManualTranscriptResponse | null;
 
       if (!response.ok) {
-        throw new Error(data?.error || "Failed to save manual transcript");
+        throw new Error(
+          data?.error || `Failed to save ${contextLabel} transcript`,
+        );
       }
 
       showSuccessToast(data ?? {}, "Saved transcript for");
@@ -225,7 +238,7 @@ export function ManualTranscriptSubmitCard({
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to save manual transcript",
+          : `Failed to save ${contextLabel} transcript`,
       );
     } finally {
       setIsSubmitting(false);
@@ -234,31 +247,30 @@ export function ManualTranscriptSubmitCard({
 
   async function handleAutoTranscribe() {
     if (!selectedRecordingId) {
-      toast.error("Choose a lesson recording first");
+      toast.error(`Choose a ${contextLabel} recording first`);
       return;
     }
 
     setIsAutoTranscribing(true);
 
     try {
-      const response = await fetch(
-        `/api/lessons/${lessonId}/transcribe-recording`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recordingId: selectedRecordingId,
-            languageCode: languageCode.trim() || undefined,
-          }),
-        },
-      );
+      const response = await fetch(transcribeEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recordingId: selectedRecordingId,
+          languageCode: languageCode.trim() || undefined,
+        }),
+      });
 
       const data = (await response
         .json()
         .catch(() => null)) as ManualTranscriptResponse | null;
 
       if (!response.ok) {
-        throw new Error(data?.error || "Failed to transcribe lesson recording");
+        throw new Error(
+          data?.error || `Failed to transcribe ${contextLabel} recording`,
+        );
       }
 
       showSuccessToast(data ?? {}, "Transcribed recording for");
@@ -268,7 +280,7 @@ export function ManualTranscriptSubmitCard({
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to transcribe lesson recording",
+          : `Failed to transcribe ${contextLabel} recording`,
       );
     } finally {
       setIsAutoTranscribing(false);
@@ -283,8 +295,8 @@ export function ManualTranscriptSubmitCard({
           Transcript Tools
         </CardTitle>
         <CardDescription>
-          Tutor-only tools for turning lesson recordings into transcripts and
-          active evidence.
+          {cardDescription ||
+            `Tutor-only tools for turning ${contextLabel} recordings into transcripts and active evidence.`}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
@@ -436,8 +448,8 @@ export function ManualTranscriptSubmitCard({
 
         {!hasEligibleRecording ? (
           <p className="text-xs text-amber-600">
-            No eligible recording is available yet. Stop a recording first, or
-            use a lesson recording that has not already synced active evidence.
+            {emptyStateHint ||
+              `No eligible recording is available yet. Stop a recording first, or use a ${contextLabel} recording that has not already synced active evidence.`}
           </p>
         ) : null}
       </CardContent>
