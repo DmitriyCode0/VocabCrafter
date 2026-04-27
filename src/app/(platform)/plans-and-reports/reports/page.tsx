@@ -229,11 +229,17 @@ export default async function PlansAndReportsReportsPage({
                             : ""}
                         </Badge>
                         <Badge variant="outline">
+                          Classroom sessions: {report.metricsSnapshot.classroomSessions}
+                        </Badge>
+                        <Badge variant="outline">
                           New words: {report.metricsSnapshot.newMasteryWords}
                           {report.goalsSnapshot.monthlyNewMasteryWordsTarget !=
                           null
                             ? ` / ${report.goalsSnapshot.monthlyNewMasteryWordsTarget}`
                             : ""}
+                        </Badge>
+                        <Badge variant="outline">
+                          Student speaking share: {formatPercentage(report.metricsSnapshot.studentSpeakingShare)}
                         </Badge>
                         <Badge variant="outline">
                           Active days in application:{" "}
@@ -295,10 +301,42 @@ export default async function PlansAndReportsReportsPage({
                       </div>
                       <div className="rounded-lg border px-3 py-3">
                         <p className="text-xs text-muted-foreground">
+                          Classroom sessions
+                        </p>
+                        <p className="text-xl font-semibold">
+                          {formatNumber(report.metricsSnapshot.classroomSessions, 0)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border px-3 py-3">
+                        <p className="text-xs text-muted-foreground">
+                          Classroom time
+                        </p>
+                        <p className="text-xl font-semibold">
+                          {formatHours(report.metricsSnapshot.classroomHours)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border px-3 py-3">
+                        <p className="text-xs text-muted-foreground">
                           App learning time
                         </p>
                         <p className="text-xl font-semibold">
                           {formatHours(report.metricsSnapshot.appLearningHours)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border px-3 py-3">
+                        <p className="text-xs text-muted-foreground">
+                          Student speaking time
+                        </p>
+                        <p className="text-xl font-semibold">
+                          {formatHours(report.metricsSnapshot.studentSpeakingHours)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border px-3 py-3">
+                        <p className="text-xs text-muted-foreground">
+                          Student speaking share
+                        </p>
+                        <p className="text-xl font-semibold">
+                          {formatPercentage(report.metricsSnapshot.studentSpeakingShare)}
                         </p>
                       </div>
                       <div className="rounded-lg border px-3 py-3">

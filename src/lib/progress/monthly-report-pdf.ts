@@ -109,7 +109,11 @@ const PDF_COPY: Record<
     sentenceTranslations: string;
     gapFillExercises: string;
     completedLessons: string;
+    classroomSessions: string;
+    classroomTime: string;
     appLearningTime: string;
+    studentSpeakingTime: string;
+    studentSpeakingShare: string;
     newWords: string;
     activeDays: string;
     practicedWords: string;
@@ -147,7 +151,11 @@ const PDF_COPY: Record<
     sentenceTranslations: "Sentence translation exercises",
     gapFillExercises: "Gap fill exercises",
     completedLessons: "Completed lessons",
+    classroomSessions: "Classroom sessions",
+    classroomTime: "Classroom time",
     appLearningTime: "App learning time",
+    studentSpeakingTime: "Student speaking time",
+    studentSpeakingShare: "Student speaking share",
     newWords: "New mastery words",
     activeDays: "Active days in application",
     practicedWords: "Words reviewed this month",
@@ -184,7 +192,11 @@ const PDF_COPY: Record<
     sentenceTranslations: "Вправи на переклад речень",
     gapFillExercises: "Вправи на заповнення пропусків",
     completedLessons: "Завершені уроки",
+    classroomSessions: "Сесії в classroom",
+    classroomTime: "Час у classroom",
     appLearningTime: "Час навчання в застосунку",
+    studentSpeakingTime: "Час мовлення студента",
+    studentSpeakingShare: "Частка мовлення студента",
     newWords: "Нові засвоєні слова",
     activeDays: "Активні дні в застосунку",
     practicedWords: "Слова, повторені цього місяця",
@@ -611,8 +623,27 @@ export async function buildMonthlyReportPdf({
         ),
       },
       {
+        label: copy.classroomSessions,
+        value: formatNumber(report.metricsSnapshot.classroomSessions, 0),
+      },
+      {
+        label: copy.classroomTime,
+        value: formatHours(report.metricsSnapshot.classroomHours),
+      },
+      {
         label: copy.appLearningTime,
         value: formatHours(report.metricsSnapshot.appLearningHours),
+      },
+      {
+        label: copy.studentSpeakingTime,
+        value: formatHours(report.metricsSnapshot.studentSpeakingHours),
+      },
+      {
+        label: copy.studentSpeakingShare,
+        value:
+          report.metricsSnapshot.studentSpeakingShare == null
+            ? "n/a"
+            : formatPercentage(report.metricsSnapshot.studentSpeakingShare),
       },
       {
         label: copy.newWords,

@@ -46,7 +46,11 @@ interface MonthlyReportMetrics {
   completedSentenceTranslations: number;
   completedGapFillExercises: number;
   completedLessons: number;
+  classroomSessions: number;
+  classroomHours: number;
   appLearningHours: number | null;
+  studentSpeakingHours: number;
+  studentSpeakingShare: number | null;
   totalHours: number;
   newMasteryWords: number;
   practicedWords: number;
@@ -532,10 +536,40 @@ export function TutorStudentMonthlyReportsWorkspace({
               </div>
               <div className="rounded-lg border px-3 py-3">
                 <p className="text-xs text-muted-foreground">
+                  Classroom sessions
+                </p>
+                <p className="text-2xl font-semibold">
+                  {formatNumber(metrics.classroomSessions, 0)}
+                </p>
+              </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">Classroom time</p>
+                <p className="text-2xl font-semibold">
+                  {formatHours(metrics.classroomHours)}
+                </p>
+              </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">
                   App learning time
                 </p>
                 <p className="text-2xl font-semibold">
                   {formatHours(metrics.appLearningHours)}
+                </p>
+              </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Student speaking time
+                </p>
+                <p className="text-2xl font-semibold">
+                  {formatHours(metrics.studentSpeakingHours)}
+                </p>
+              </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Student speaking share
+                </p>
+                <p className="text-2xl font-semibold">
+                  {formatPercentage(metrics.studentSpeakingShare)}
                 </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
@@ -852,10 +886,16 @@ export function TutorStudentMonthlyReportsWorkspace({
                       : ""}
                   </Badge>
                   <Badge variant="outline">
+                    Classroom sessions: {report.metricsSnapshot.classroomSessions}
+                  </Badge>
+                  <Badge variant="outline">
                     New words: {report.metricsSnapshot.newMasteryWords}
                     {report.goalsSnapshot.monthlyNewMasteryWordsTarget != null
                       ? ` / ${report.goalsSnapshot.monthlyNewMasteryWordsTarget}`
                       : ""}
+                  </Badge>
+                  <Badge variant="outline">
+                    Student speaking share: {formatPercentage(report.metricsSnapshot.studentSpeakingShare)}
                   </Badge>
                   <Badge variant="outline">
                     Avg score:{" "}

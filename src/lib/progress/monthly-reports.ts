@@ -68,7 +68,11 @@ export const monthlyReportMetricsSchema = z.object({
   completedSentenceTranslations: z.number().int().min(0).default(0),
   completedGapFillExercises: z.number().int().min(0).default(0),
   completedLessons: z.number().int().min(0),
+  classroomSessions: z.number().int().min(0).default(0),
+  classroomHours: z.number().min(0).default(0),
   appLearningHours: z.number().min(0).nullable().default(null),
+  studentSpeakingHours: z.number().min(0).default(0),
+  studentSpeakingShare: z.number().min(0).max(100).nullable().default(null),
   totalHours: z.number().min(0).default(0),
   newMasteryWords: z.number().int().min(0),
   practicedWords: z.number().int().min(0),
@@ -386,6 +390,7 @@ export async function getTutorStudentMonthlyReportMetrics(
     newWordsResult,
     practicedWordsResult,
     totalWordsResult,
+    connectionsResult,
     overrideResult,
   ] = await Promise.all([
     admin
@@ -421,6 +426,13 @@ export async function getTutorStudentMonthlyReportMetrics(
       .eq("student_id", studentId),
     options?.tutorId
       ? admin
+          .from("tutor_students")
+          .select("id")
+          .eq("student_id", studentId)
+          .eq("tutor_id", options.tutorId)
+      : admin.from("tutor_students").select("id").eq("student_id", studentId),
+    options?.tutorId
+      ? admin
           .from("tutor_student_progress_overrides")
           .select("monthly_target_overrides")
           .eq("tutor_id", options.tutorId)
@@ -449,8 +461,30 @@ export async function getTutorStudentMonthlyReportMetrics(
     throw totalWordsResult.error;
   }
 
+  if (connectionsResult.error) {
+    throw connectionsResult.error;
+  }
+
   if (overrideResult.error) {
     throw overrideResult.error;
+  }
+
+  const connectionIds = (connectionsResult.data ?? []).map(
+    (connection) => connection.id,
+  );
+  const classroomSessionsResult = connectionIds.length
+    ? await admin
+        .from("tutor_student_classroom_session_summaries")
+        .select(
+          "session_started_at, duration_seconds, tutor_speaking_seconds, student_speaking_seconds",
+        )
+        .in("connection_id", connectionIds)
+        .gte("session_started_at", `${window.periodStart}T00:00:00.000Z`)
+        .lt("session_started_at", `${window.endExclusive}T00:00:00.000Z`)
+    : { data: [], error: null };
+
+  if (classroomSessionsResult.error) {
+    throw classroomSessionsResult.error;
   }
 
   const activeDays = new Set<string>();
@@ -458,6 +492,9 @@ export async function getTutorStudentMonthlyReportMetrics(
   let totalScore = 0;
   let appLearningSeconds = 0;
   let totalHours = 0;
+  let classroomDurationSeconds = 0;
+  let tutorSpeakingSeconds = 0;
+  let studentSpeakingSeconds = 0;
   let completedSentenceTranslations = 0;
   let completedGapFillExercises = 0;
 
@@ -508,6 +545,17 @@ export async function getTutorStudentMonthlyReportMetrics(
     }
   }
 
+  for (const session of classroomSessionsResult.data ?? []) {
+    classroomDurationSeconds += Math.max(0, session.duration_seconds ?? 0);
+    tutorSpeakingSeconds += Math.max(0, session.tutor_speaking_seconds ?? 0);
+    studentSpeakingSeconds += Math.max(
+      0,
+      session.student_speaking_seconds ?? 0,
+    );
+  }
+
+  const totalSpeakingSeconds = tutorSpeakingSeconds + studentSpeakingSeconds;
+
   const monthlyTargetOverrides = parseTutorProgressOverride(
     overrideResult.data,
   ).monthlyTargetOverrides;
@@ -523,7 +571,14 @@ export async function getTutorStudentMonthlyReportMetrics(
     completedSentenceTranslations,
     completedGapFillExercises,
     completedLessons: (lessonsResult.data ?? []).length,
+    classroomSessions: (classroomSessionsResult.data ?? []).length,
+    classroomHours: roundHours(classroomDurationSeconds / 3600),
     appLearningHours: roundHours(appLearningSeconds / 3600),
+    studentSpeakingHours: roundHours(studentSpeakingSeconds / 3600),
+    studentSpeakingShare:
+      totalSpeakingSeconds > 0
+        ? roundScore((studentSpeakingSeconds / totalSpeakingSeconds) * 100)
+        : null,
     totalHours: roundHours(totalHours),
     newMasteryWords: (newWordsResult.data ?? []).length,
     practicedWords: (practicedWordsResult.data ?? []).length,
@@ -789,7 +844,11 @@ function buildMonthlyReportPrompt({
     `- Completed sentence translation exercises: ${metrics.completedSentenceTranslations}`,
     `- Completed gap fill exercises: ${metrics.completedGapFillExercises}`,
     `- Completed lessons: ${metrics.completedLessons}`,
+    `- Classroom sessions: ${metrics.classroomSessions}`,
+    `- Classroom time: ${formatHours(metrics.classroomHours)}`,
     `- App learning time: ${metrics.appLearningHours == null ? "n/a" : formatHours(metrics.appLearningHours)}`,
+    `- Student speaking time in classroom sessions: ${formatHours(metrics.studentSpeakingHours)}`,
+    `- Student speaking share in classroom sessions: ${metrics.studentSpeakingShare == null ? "n/a" : `${metrics.studentSpeakingShare}%`}`,
     `- New mastery words: ${metrics.newMasteryWords}`,
     `- Words reviewed this month: ${metrics.practicedWords}`,
     `- Words currently in the vocabulary tracker: ${metrics.trackedWordsTotal}`,
