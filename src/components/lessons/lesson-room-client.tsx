@@ -9,12 +9,7 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ConnectionState,
-  Room,
-  RoomEvent,
-  Track,
-} from "livekit-client";
+import { ConnectionState, Room, RoomEvent, Track } from "livekit-client";
 import {
   AlertTriangle,
   Loader2,
@@ -192,12 +187,15 @@ export function LessonRoomClient({
   const [remoteParticipantCount, setRemoteParticipantCount] = useState(0);
   const [remoteVideoTrackCount, setRemoteVideoTrackCount] = useState(0);
   const [joinError, setJoinError] = useState<string | null>(null);
-  const [recordingStatus, setRecordingStatus] = useState(initialRecordingStatus);
+  const [recordingStatus, setRecordingStatus] = useState(
+    initialRecordingStatus,
+  );
   const [recordingConsentStatus, setRecordingConsentStatus] = useState(
     initialRecordingConsentStatus,
   );
   const [isSyncingSession, setIsSyncingSession] = useState(false);
-  const [isRecordingActionPending, setIsRecordingActionPending] = useState(false);
+  const [isRecordingActionPending, setIsRecordingActionPending] =
+    useState(false);
   const [isVideoPlaybackBlocked, setIsVideoPlaybackBlocked] = useState(false);
   const [hasPausedRemoteVideo, setHasPausedRemoteVideo] = useState(false);
 
@@ -335,78 +333,88 @@ export function LessonRoomClient({
     clearMediaContainer(remoteAudioContainerRef.current);
   }, []);
 
-  const syncRoomMedia = useCallback((room: Room) => {
-    clearMediaElements();
+  const syncRoomMedia = useCallback(
+    (room: Room) => {
+      clearMediaElements();
 
-    const localVideoContainer = localVideoContainerRef.current;
-    const remoteVideoContainer = remoteVideoContainerRef.current;
-    const remoteAudioContainer = remoteAudioContainerRef.current;
+      const localVideoContainer = localVideoContainerRef.current;
+      const remoteVideoContainer = remoteVideoContainerRef.current;
+      const remoteAudioContainer = remoteAudioContainerRef.current;
 
-    if (!localVideoContainer || !remoteVideoContainer || !remoteAudioContainer) {
-      return;
-    }
-
-    let nextRemoteVideoTrackCount = 0;
-    let nextHasPausedRemoteVideo = false;
-
-    for (const publication of room.localParticipant.videoTrackPublications.values()) {
-      const track = publication.track;
-
-      if (!track || track.kind !== Track.Kind.Video) {
-        continue;
+      if (
+        !localVideoContainer ||
+        !remoteVideoContainer ||
+        !remoteAudioContainer
+      ) {
+        return;
       }
 
-      const element = track.attach();
+      let nextRemoteVideoTrackCount = 0;
+      let nextHasPausedRemoteVideo = false;
 
-      if (element instanceof HTMLVideoElement) {
-        element.muted = true;
-      }
-
-      localVideoContainer.appendChild(createParticipantVideoSlot("You", element));
-    }
-
-    for (const participant of room.remoteParticipants.values()) {
-      const participantLabel = participant.name || participant.identity;
-
-      for (const publication of participant.videoTrackPublications.values()) {
+      for (const publication of room.localParticipant.videoTrackPublications.values()) {
         const track = publication.track;
 
         if (!track || track.kind !== Track.Kind.Video) {
           continue;
         }
 
-        nextRemoteVideoTrackCount += 1;
-        nextHasPausedRemoteVideo ||= track.streamState === Track.StreamState.Paused;
-
         const element = track.attach();
-        remoteVideoContainer.appendChild(
-          createParticipantVideoSlot(participantLabel, element),
+
+        if (element instanceof HTMLVideoElement) {
+          element.muted = true;
+        }
+
+        localVideoContainer.appendChild(
+          createParticipantVideoSlot("You", element),
         );
       }
 
-      for (const publication of participant.audioTrackPublications.values()) {
-        const track = publication.track;
+      for (const participant of room.remoteParticipants.values()) {
+        const participantLabel = participant.name || participant.identity;
 
-        if (!track || track.kind !== Track.Kind.Audio) {
-          continue;
+        for (const publication of participant.videoTrackPublications.values()) {
+          const track = publication.track;
+
+          if (!track || track.kind !== Track.Kind.Video) {
+            continue;
+          }
+
+          nextRemoteVideoTrackCount += 1;
+          nextHasPausedRemoteVideo ||=
+            track.streamState === Track.StreamState.Paused;
+
+          const element = track.attach();
+          remoteVideoContainer.appendChild(
+            createParticipantVideoSlot(participantLabel, element),
+          );
         }
 
-        const element = track.attach();
+        for (const publication of participant.audioTrackPublications.values()) {
+          const track = publication.track;
 
-        if (element instanceof HTMLAudioElement) {
-          element.autoplay = true;
+          if (!track || track.kind !== Track.Kind.Audio) {
+            continue;
+          }
+
+          const element = track.attach();
+
+          if (element instanceof HTMLAudioElement) {
+            element.autoplay = true;
+          }
+
+          element.className = "hidden";
+          remoteAudioContainer.appendChild(element);
         }
-
-        element.className = "hidden";
-        remoteAudioContainer.appendChild(element);
       }
-    }
 
-    setRemoteParticipantCount(room.remoteParticipants.size);
-    setRemoteVideoTrackCount(nextRemoteVideoTrackCount);
-    setHasPausedRemoteVideo(nextHasPausedRemoteVideo);
-    setIsVideoPlaybackBlocked(!room.canPlaybackVideo);
-  }, [clearMediaElements]);
+      setRemoteParticipantCount(room.remoteParticipants.size);
+      setRemoteVideoTrackCount(nextRemoteVideoTrackCount);
+      setHasPausedRemoteVideo(nextHasPausedRemoteVideo);
+      setIsVideoPlaybackBlocked(!room.canPlaybackVideo);
+    },
+    [clearMediaElements],
+  );
 
   const resumeRemoteVideo = useCallback(async () => {
     const room = roomRef.current;
@@ -671,16 +679,22 @@ export function LessonRoomClient({
       <CardContent className="space-y-4">
         {!isConfigured ? (
           <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">LiveKit setup required</p>
+            <p className="font-medium text-foreground">
+              LiveKit setup required
+            </p>
             <p className="mt-2">
-              Configure <span className="font-mono">LIVEKIT_URL</span>, <span className="font-mono">LIVEKIT_API_KEY</span>, and <span className="font-mono">LIVEKIT_API_SECRET</span> to enable in-platform lesson calls.
+              Configure <span className="font-mono">LIVEKIT_URL</span>,{" "}
+              <span className="font-mono">LIVEKIT_API_KEY</span>, and{" "}
+              <span className="font-mono">LIVEKIT_API_SECRET</span> to enable
+              in-platform lesson calls.
             </p>
           </div>
         ) : null}
 
         {serverUrl ? (
           <div className="rounded-2xl border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-            Media server: <span className="font-medium text-foreground">{serverUrl}</span>
+            Media server:{" "}
+            <span className="font-medium text-foreground">{serverUrl}</span>
           </div>
         ) : null}
 
@@ -697,7 +711,9 @@ export function LessonRoomClient({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">Your camera</p>
-              <Badge variant="outline">{cameraEnabled ? "Camera on" : "Camera off"}</Badge>
+              <Badge variant="outline">
+                {cameraEnabled ? "Camera on" : "Camera off"}
+              </Badge>
             </div>
             <div className="relative rounded-2xl border border-dashed bg-muted/20 p-3">
               <div
@@ -728,10 +744,13 @@ export function LessonRoomClient({
                 ref={remoteVideoContainerRef}
                 className="grid min-h-[220px] gap-3"
               />
-              {hasJoined && remoteParticipantCount > 0 && remoteVideoTrackCount === 0 ? (
+              {hasJoined &&
+              remoteParticipantCount > 0 &&
+              remoteVideoTrackCount === 0 ? (
                 <div className="pointer-events-none absolute inset-3 flex items-center justify-center">
                   <div className="rounded-2xl border border-dashed bg-background/60 p-6 text-center text-sm text-muted-foreground">
-                    The other participant is connected, but no remote camera track is publishing yet.
+                    The other participant is connected, but no remote camera
+                    track is publishing yet.
                   </div>
                 </div>
               ) : null}
@@ -747,7 +766,8 @@ export function LessonRoomClient({
               <div className="rounded-2xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-700">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span>
-                    Your browser blocked remote video playback. Resume it to see the student camera.
+                    Your browser blocked remote video playback. Resume it to see
+                    the student camera.
                   </span>
                   <Button
                     type="button"
@@ -762,7 +782,8 @@ export function LessonRoomClient({
             ) : null}
             {hasPausedRemoteVideo && !isVideoPlaybackBlocked ? (
               <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                Remote video is currently paused by the media pipeline. Keeping this tab visible and reconnecting the room should restore it.
+                Remote video is currently paused by the media pipeline. Keeping
+                this tab visible and reconnecting the room should restore it.
               </div>
             ) : null}
             <div ref={remoteAudioContainerRef} className="hidden" />
@@ -830,9 +851,12 @@ export function LessonRoomClient({
         <div className="rounded-2xl border bg-muted/20 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">Recording controls</p>
+              <p className="text-sm font-medium text-foreground">
+                Recording controls
+              </p>
               <p className="text-sm text-muted-foreground">
-                Recording stays tutor-controlled and lesson-bound. Consent is tracked separately from media state.
+                Recording stays tutor-controlled and lesson-bound. Consent is
+                tracked separately from media state.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -841,7 +865,9 @@ export function LessonRoomClient({
                 Consent {getRecordingConsentLabel(recordingConsentStatus)}
               </Badge>
               <Badge
-                variant={recordingStatus === "recording" ? "secondary" : "outline"}
+                variant={
+                  recordingStatus === "recording" ? "secondary" : "outline"
+                }
               >
                 <Radio className="mr-1 h-3.5 w-3.5" />
                 Recording {getRecordingStatusLabel(recordingStatus)}
@@ -919,14 +945,17 @@ export function LessonRoomClient({
               </>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Only tutors can control lesson recordings. You can still see the current consent and recording state here.
+                Only tutors can control lesson recordings. You can still see the
+                current consent and recording state here.
               </p>
             )}
           </div>
 
           {role === "tutor" && !recordingConfigured ? (
             <div className="mt-4 rounded-2xl border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Recording storage setup required</p>
+              <p className="font-medium text-foreground">
+                Recording storage setup required
+              </p>
               <p className="mt-1">
                 {recordingConfigurationError ||
                   "Add the LiveKit egress storage variables to enable server-side lesson recordings."}

@@ -1,20 +1,10 @@
 import Link from "next/link";
-import {
-  CalendarDays,
-  FileText,
-  Mic,
-  ShieldCheck,
-} from "lucide-react";
+import { CalendarDays, FileText, Mic, ShieldCheck } from "lucide-react";
 import { LessonRoomClient } from "@/components/lessons/lesson-room-client";
 import { ManualTranscriptSubmitCard } from "@/components/lessons/manual-transcript-submit-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLessonRoomAccess } from "@/lib/lesson-room-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -95,7 +85,9 @@ export default async function LessonRoomPage({
       ? lesson.student_profile?.full_name ||
         lesson.student_profile?.email ||
         "One-time lesson"
-      : lesson.tutor_profile?.full_name || lesson.tutor_profile?.email || "Tutor";
+      : lesson.tutor_profile?.full_name ||
+        lesson.tutor_profile?.email ||
+        "Tutor";
   let transcriptToolRecordings: Array<{
     id: string;
     createdAt: string;
@@ -106,19 +98,21 @@ export default async function LessonRoomPage({
 
   if (role === "tutor") {
     const supabaseAdmin = createAdminClient();
-    const [{ data: recordings, error: recordingsError }, { data: transcripts, error: transcriptsError }] =
-      await Promise.all([
-        supabaseAdmin
-          .from("lesson_room_recordings")
-          .select("id, created_at, status, duration_seconds")
-          .eq("lesson_id", id)
-          .order("created_at", { ascending: false })
-          .limit(12),
-        supabaseAdmin
-          .from("lesson_room_transcripts")
-          .select("recording_id, active_evidence_synced_at")
-          .eq("lesson_id", id),
-      ]);
+    const [
+      { data: recordings, error: recordingsError },
+      { data: transcripts, error: transcriptsError },
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("lesson_room_recordings")
+        .select("id, created_at, status, duration_seconds")
+        .eq("lesson_id", id)
+        .order("created_at", { ascending: false })
+        .limit(12),
+      supabaseAdmin
+        .from("lesson_room_transcripts")
+        .select("recording_id, active_evidence_synced_at")
+        .eq("lesson_id", id),
+    ]);
 
     if (recordingsError) {
       throw recordingsError;
@@ -140,8 +134,7 @@ export default async function LessonRoomPage({
       createdAt: recording.created_at,
       status: recording.status,
       durationSeconds: recording.duration_seconds,
-      activeEvidenceSyncedAt:
-        syncedByRecordingId.get(recording.id) ?? null,
+      activeEvidenceSyncedAt: syncedByRecordingId.get(recording.id) ?? null,
     }));
   }
 
@@ -155,9 +148,15 @@ export default async function LessonRoomPage({
 
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">{lessonTitle}</h1>
-              <Badge variant="outline">{getLessonStatusLabel(lesson.status)}</Badge>
-              <Badge variant="secondary">{getRoomStatusLabel(session.room_status)}</Badge>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {lessonTitle}
+              </h1>
+              <Badge variant="outline">
+                {getLessonStatusLabel(lesson.status)}
+              </Badge>
+              <Badge variant="secondary">
+                {getRoomStatusLabel(session.room_status)}
+              </Badge>
             </div>
 
             <p className="text-muted-foreground">
@@ -168,9 +167,15 @@ export default async function LessonRoomPage({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">Recording {getRecordingStatusLabel(session.recording_status)}</Badge>
-          <Badge variant="outline">Transcript {getTranscriptStatusLabel(session.transcript_status)}</Badge>
-          <Badge variant="outline">Consent {session.recording_consent_status}</Badge>
+          <Badge variant="outline">
+            Recording {getRecordingStatusLabel(session.recording_status)}
+          </Badge>
+          <Badge variant="outline">
+            Transcript {getTranscriptStatusLabel(session.transcript_status)}
+          </Badge>
+          <Badge variant="outline">
+            Consent {session.recording_consent_status}
+          </Badge>
         </div>
       </div>
 
@@ -204,14 +209,18 @@ export default async function LessonRoomPage({
                 {formatLessonTimeRange(lesson.start_time, lesson.end_time)}
               </p>
               <p>
-                <span className="font-medium">{role === "tutor" ? "Student" : "Tutor"}:</span>{" "}
+                <span className="font-medium">
+                  {role === "tutor" ? "Student" : "Tutor"}:
+                </span>{" "}
                 {participantLabel}
               </p>
               <p>
-                <span className="font-medium">Room key:</span> {session.provider_room_key}
+                <span className="font-medium">Room key:</span>{" "}
+                {session.provider_room_key}
               </p>
               <p>
-                <span className="font-medium">Provider:</span> {session.provider}
+                <span className="font-medium">Provider:</span>{" "}
+                {session.provider}
               </p>
             </CardContent>
           </Card>
@@ -251,9 +260,18 @@ export default async function LessonRoomPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>Room access is tied directly to the lesson participant relationship.</p>
-              <p>Recording consent, recording state, and transcript state are tracked separately.</p>
-              <p>Artifact playback will use private storage and signed access, not public URLs.</p>
+              <p>
+                Room access is tied directly to the lesson participant
+                relationship.
+              </p>
+              <p>
+                Recording consent, recording state, and transcript state are
+                tracked separately.
+              </p>
+              <p>
+                Artifact playback will use private storage and signed access,
+                not public URLs.
+              </p>
             </CardContent>
           </Card>
 
@@ -265,11 +283,25 @@ export default async function LessonRoomPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>Lesson-derived student speech will flow into active evidence, not directly into mastery.</p>
-              <p>Those candidates will appear in the unified vocabulary workspace for review and promotion.</p>
+              <p>
+                Lesson-derived student speech will flow into active evidence,
+                not directly into mastery.
+              </p>
+              <p>
+                Those candidates will appear in the unified vocabulary workspace
+                for review and promotion.
+              </p>
               <Button asChild variant="outline" size="sm" className="mt-2">
-                <Link href={role === "tutor" ? "/mastery" : "/vocabulary#active-evidence"}>
-                  {role === "tutor" ? "Open student vocabulary evidence" : "Open my active evidence"}
+                <Link
+                  href={
+                    role === "tutor"
+                      ? "/mastery"
+                      : "/vocabulary#active-evidence"
+                  }
+                >
+                  {role === "tutor"
+                    ? "Open student vocabulary evidence"
+                    : "Open my active evidence"}
                 </Link>
               </Button>
             </CardContent>

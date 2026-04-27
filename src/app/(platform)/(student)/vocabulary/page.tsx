@@ -201,28 +201,28 @@ export default async function VocabularyPage({
   const visibleWords = (wordsResult.data ?? []) as WordMasteryRow[];
   const activeEvidenceTotal = activeEvidenceCountResult.count ?? 0;
   const activeEvidenceSummary = summarizeActiveVocabularyEvidence(
-    ((activeEvidenceSummaryRowsResult.data ?? []) as ActiveEvidenceQueryRow[]).map(
-      (item) => ({
-        id: item.id,
-        term: item.term,
-        source_type: item.source_type,
-        source_label: item.source_label,
-        usage_count: item.usage_count,
-        first_used_at: item.first_used_at,
-        last_used_at: item.last_used_at,
-        library_cefr_level:
-          (item.passive_vocabulary_library?.cefr_level as
-            | "A1"
-            | "A2"
-            | "B1"
-            | "B2"
-            | "C1"
-            | "C2"
-            | null) ?? null,
-        library_part_of_speech:
-          item.passive_vocabulary_library?.part_of_speech ?? null,
-      }),
-    ),
+    (
+      (activeEvidenceSummaryRowsResult.data ?? []) as ActiveEvidenceQueryRow[]
+    ).map((item) => ({
+      id: item.id,
+      term: item.term,
+      source_type: item.source_type,
+      source_label: item.source_label,
+      usage_count: item.usage_count,
+      first_used_at: item.first_used_at,
+      last_used_at: item.last_used_at,
+      library_cefr_level:
+        (item.passive_vocabulary_library?.cefr_level as
+          | "A1"
+          | "A2"
+          | "B1"
+          | "B2"
+          | "C1"
+          | "C2"
+          | null) ?? null,
+      library_part_of_speech:
+        item.passive_vocabulary_library?.part_of_speech ?? null,
+    })),
   );
   const recentActiveEvidence = (
     (activeEvidenceRowsResult.data ?? []) as ActiveEvidenceQueryRow[]
@@ -392,7 +392,9 @@ export default async function VocabularyPage({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Stored Per Word</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Stored Per Word
+            </CardTitle>
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>

@@ -61,7 +61,10 @@ interface ManualTranscriptResponse {
   error?: string;
 }
 
-const SPEAKER_PREFIXES = new Map<string, TranscriptSegmentPayload["speakerRole"]>([
+const SPEAKER_PREFIXES = new Map<
+  string,
+  TranscriptSegmentPayload["speakerRole"]
+>([
   ["student", "student"],
   ["s", "student"],
   ["tutor", "tutor"],
@@ -207,9 +210,9 @@ export function ManualTranscriptSubmitCard({
         }),
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | ManualTranscriptResponse
-        | null;
+      const data = (await response
+        .json()
+        .catch(() => null)) as ManualTranscriptResponse | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to save manual transcript");
@@ -250,9 +253,9 @@ export function ManualTranscriptSubmitCard({
         },
       );
 
-      const data = (await response.json().catch(() => null)) as
-        | ManualTranscriptResponse
-        | null;
+      const data = (await response
+        .json()
+        .catch(() => null)) as ManualTranscriptResponse | null;
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to transcribe lesson recording");
@@ -286,8 +289,16 @@ export function ManualTranscriptSubmitCard({
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         <p>
-          Paste diarized lines like <span className="font-medium text-foreground">student: I went to the market</span> or
-          <span className="font-medium text-foreground"> tutor: Why did you go?</span>. Lines without a prefix are treated as student speech.
+          Paste diarized lines like{" "}
+          <span className="font-medium text-foreground">
+            student: I went to the market
+          </span>{" "}
+          or
+          <span className="font-medium text-foreground">
+            {" "}
+            tutor: Why did you go?
+          </span>
+          . Lines without a prefix are treated as student speech.
         </p>
         <p>
           You can either paste a reviewed transcript or ask Gemini to transcribe
@@ -297,7 +308,11 @@ export function ManualTranscriptSubmitCard({
 
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm" disabled={!hasEligibleRecording}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!hasEligibleRecording}
+            >
               Open Transcript Tools
             </Button>
           </DialogTrigger>
@@ -330,13 +345,16 @@ export function ManualTranscriptSubmitCard({
                 </Select>
                 {selectedRecording ? (
                   <p className="text-xs text-muted-foreground">
-                    Selected recording from {formatAppDateTime(selectedRecording.createdAt)}.
+                    Selected recording from{" "}
+                    {formatAppDateTime(selectedRecording.createdAt)}.
                   </p>
                 ) : null}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="manual-transcript-language">Language code</Label>
+                <Label htmlFor="manual-transcript-language">
+                  Language code
+                </Label>
                 <Input
                   id="manual-transcript-language"
                   value={languageCode}
@@ -352,7 +370,9 @@ export function ManualTranscriptSubmitCard({
                   id="manual-transcript-text"
                   value={transcriptText}
                   onChange={(event) => setTranscriptText(event.target.value)}
-                  placeholder={"student: I visited my grandmother yesterday\ntutor: What did you cook together?\nstudent: We made soup and bread"}
+                  placeholder={
+                    "student: I visited my grandmother yesterday\ntutor: What did you cook together?\nstudent: We made soup and bread"
+                  }
                   className="min-h-64"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -397,9 +417,7 @@ export function ManualTranscriptSubmitCard({
                 <Button
                   type="submit"
                   disabled={
-                    isSubmitting ||
-                    isAutoTranscribing ||
-                    !hasEligibleRecording
+                    isSubmitting || isAutoTranscribing || !hasEligibleRecording
                   }
                 >
                   {isSubmitting ? (

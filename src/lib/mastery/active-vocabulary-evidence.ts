@@ -125,7 +125,10 @@ export async function upsertActiveVocabularyEvidence({
   });
 
   const canonicalUsageCounts = new Map<string, number>();
-  const canonicalResolutionsByTerm = new Map<string, (typeof resolutions)[number]>();
+  const canonicalResolutionsByTerm = new Map<
+    string,
+    (typeof resolutions)[number]
+  >();
 
   for (const resolution of resolutions) {
     canonicalUsageCounts.set(
@@ -146,10 +149,7 @@ export async function upsertActiveVocabularyEvidence({
     .from("active_vocabulary_evidence")
     .select("id, normalized_term, usage_count, first_used_at, last_used_at")
     .eq("student_id", studentId)
-    .in(
-      "normalized_term",
-      Array.from(canonicalResolutionsByTerm.keys()),
-    );
+    .in("normalized_term", Array.from(canonicalResolutionsByTerm.keys()));
 
   if (existingRowsResult.error) {
     throw new Error("Failed to inspect active vocabulary evidence");
@@ -162,25 +162,26 @@ export async function upsertActiveVocabularyEvidence({
   const nowIso = usedAt ?? new Date().toISOString();
   const rows = Array.from(canonicalResolutionsByTerm.values()).map(
     (resolution) => {
-    const existing = existingRowsByNormalizedTerm.get(
-      resolution.canonicalNormalizedTerm,
-    );
-    const usageDelta = canonicalUsageCounts.get(
-      resolution.canonicalNormalizedTerm,
-    );
+      const existing = existingRowsByNormalizedTerm.get(
+        resolution.canonicalNormalizedTerm,
+      );
+      const usageDelta = canonicalUsageCounts.get(
+        resolution.canonicalNormalizedTerm,
+      );
 
-    return {
-      student_id: studentId,
-      library_item_id: resolution.libraryItemId,
-      term: resolution.canonicalTerm,
-      normalized_term: resolution.canonicalNormalizedTerm,
-      source_type: sourceType,
-      source_label: sourceLabel,
-      usage_count: (existing?.usage_count ?? 0) + Math.max(usageDelta ?? 0, 1),
-      first_used_at: existing?.first_used_at ?? nowIso,
-      last_used_at: nowIso,
-      updated_at: nowIso,
-    };
+      return {
+        student_id: studentId,
+        library_item_id: resolution.libraryItemId,
+        term: resolution.canonicalTerm,
+        normalized_term: resolution.canonicalNormalizedTerm,
+        source_type: sourceType,
+        source_label: sourceLabel,
+        usage_count:
+          (existing?.usage_count ?? 0) + Math.max(usageDelta ?? 0, 1),
+        first_used_at: existing?.first_used_at ?? nowIso,
+        last_used_at: nowIso,
+        updated_at: nowIso,
+      };
     },
   );
 

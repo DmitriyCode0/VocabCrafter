@@ -198,7 +198,10 @@ export default async function TutorMasteryPage({
       continue;
     }
 
-    activeEvidenceCounts.set(studentId, (activeEvidenceCounts.get(studentId) ?? 0) + 1);
+    activeEvidenceCounts.set(
+      studentId,
+      (activeEvidenceCounts.get(studentId) ?? 0) + 1,
+    );
     activeEvidenceUsageTotals.set(
       studentId,
       (activeEvidenceUsageTotals.get(studentId) ?? 0) +

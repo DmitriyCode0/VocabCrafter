@@ -287,7 +287,8 @@ const EN_MESSAGES = {
       loadingItems: "Loading dictionary items...",
       loadingMoreItems: (count: number) =>
         `Loading ${count} more dictionary items...`,
-      requestFailed: "The dictionary request failed. Try the search button again.",
+      requestFailed:
+        "The dictionary request failed. Try the search button again.",
       noFilteredItems:
         "No dictionary items match the current search and CEFR filter.",
       noItems: "No dictionary items yet.",
@@ -1515,7 +1516,11 @@ const UK_MESSAGES: AppMessages = {
     englishTopics: "Англійські теми",
     spanishTopics: "Іспанські теми",
     topicCount: (count: number) =>
-      formatPluralizedCount("uk", count, { one: "тема", few: "теми", many: "тем" }),
+      formatPluralizedCount("uk", count, {
+        one: "тема",
+        few: "теми",
+        many: "тем",
+      }),
     futureDevelopment: "Зарезервовано для майбутньої розробки",
     openArticle: "Відкрити статтю",
     searchTopicsPlaceholder: "Пошук граматичних тем",
@@ -1634,7 +1639,8 @@ const UK_MESSAGES: AppMessages = {
       partOfSpeechLabel: "Частина мови",
       approveAction: "Затвердити",
       rejectAction: "Відхилити",
-      approvedSuggestion: (term: string) => `Пропозицію для ${term} затверджено`,
+      approvedSuggestion: (term: string) =>
+        `Пропозицію для ${term} затверджено`,
       rejectedSuggestion: (term: string) => `Пропозицію для ${term} відхилено`,
       approveSuggestionFailed: "Не вдалося затвердити пропозицію",
       rejectSuggestionFailed: "Не вдалося відхилити пропозицію",
@@ -1669,12 +1675,14 @@ const UK_MESSAGES: AppMessages = {
       reEnrichedSuccess: (term: string) => `Повторно збагатили ${term}`,
       reEnrichedMerged: (term: string) =>
         `Повторно збагатили ${term} і об’єднали з канонічною лемою`,
-      reEnrichFailed: "Не вдалося повторно збагатити елемент пасивного словника",
+      reEnrichFailed:
+        "Не вдалося повторно збагатити елемент пасивного словника",
       bulkRetrySuccess: (count: number) =>
         `Повторно оброблено ${count} ${formatPluralizedCount("uk", count, { one: "елемент", few: "елементи", many: "елементів" })}`,
       bulkRetryPartial: (successCount: number, failureCount: number) =>
         `Повторно оброблено ${successCount} ${formatPluralizedCount("uk", successCount, { one: "елемент", few: "елементи", many: "елементів" })}; ще ${failureCount} потребують перегляду`,
-      bulkRetryFailed: "Жоден із завантажених елементів не вдалося повторно збагатити",
+      bulkRetryFailed:
+        "Жоден із завантажених елементів не вдалося повторно збагатити",
       retryAction: "Повторити",
       endOfList: "Ви дійшли до кінця списку словника.",
       suggestChangeAction: "Запропонувати зміну",
@@ -1684,7 +1692,8 @@ const UK_MESSAGES: AppMessages = {
         "Викладачі можуть пропонувати оновлення до спільного словника. Перш ніж зміна потрапить у живу бібліотеку, її має затвердити суперадміністратор.",
       canonicalTermLabel: "Канонічна форма",
       ukrainianTranslationLabel: "Український переклад",
-      translationPlaceholder: "Додайте стислий український словниковий відповідник",
+      translationPlaceholder:
+        "Додайте стислий український словниковий відповідник",
       cefrLevelLabel: "Рівень CEFR",
       additionalAttributesLabel: "JSON додаткових атрибутів",
       noteLabel: "Чому цю зміну варто затвердити?",
@@ -2498,7 +2507,8 @@ const UK_MESSAGES: AppMessages = {
     cefrUpdateFailed: "Не вдалося оновити рівень CEFR",
     articleEditorGranted: "Доступ до редагування статей надано",
     articleEditorRevoked: "Доступ до редагування статей відкликано",
-    articleEditorUpdateFailed: "Не вдалося оновити доступ до редагування статей",
+    articleEditorUpdateFailed:
+      "Не вдалося оновити доступ до редагування статей",
     articleEditorGrantedLabel: "Надано",
     articleEditorRevokedLabel: "Не надано",
   },

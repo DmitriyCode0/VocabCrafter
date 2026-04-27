@@ -59,15 +59,13 @@ export async function POST(
     return access.errorResponse;
   }
 
-  const payload = (await request.json().catch(() => null)) as
-    | {
-        action?:
-          | "participant-connected"
-          | "participant-disconnected"
-          | "set-consent";
-        consentStatus?: "pending" | "granted" | "declined";
-      }
-    | null;
+  const payload = (await request.json().catch(() => null)) as {
+    action?:
+      | "participant-connected"
+      | "participant-disconnected"
+      | "set-consent";
+    consentStatus?: "pending" | "granted" | "declined";
+  } | null;
 
   if (!payload?.action) {
     return NextResponse.json({ error: "Action is required" }, { status: 400 });
@@ -76,13 +74,13 @@ export async function POST(
   try {
     if (payload.action === "participant-connected") {
       const nowIso = new Date().toISOString();
-      const recordingStatus =
-        await reconcileLessonRoomSessionRecordingStatus(
-          access.session.id,
-          access.session.recording_status,
-        );
+      const recordingStatus = await reconcileLessonRoomSessionRecordingStatus(
+        access.session.id,
+        access.session.recording_status,
+      );
       const session = await updateLessonRoomSession(access.session.id, {
-        room_status: access.session.room_status === "archived" ? "archived" : "live",
+        room_status:
+          access.session.room_status === "archived" ? "archived" : "live",
         started_at: access.session.started_at ?? nowIso,
         ended_at: null,
         recording_status: recordingStatus,

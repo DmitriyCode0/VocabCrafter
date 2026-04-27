@@ -37,7 +37,10 @@ const transcriptResultSchema = z.object({
     .max(5000),
 });
 
-function getRecordingMimeType(path: string | null, blobType: string | undefined) {
+function getRecordingMimeType(
+  path: string | null,
+  blobType: string | undefined,
+) {
   if (blobType) {
     return blobType;
   }
@@ -72,7 +75,9 @@ async function waitForGeminiFileActive(fileName: string) {
 
   while (attemptsRemaining > 0) {
     const file = await getGenAI().files.get({ name: fileName });
-    const state = fileStateSchema.parse(file.state ?? FileState.STATE_UNSPECIFIED);
+    const state = fileStateSchema.parse(
+      file.state ?? FileState.STATE_UNSPECIFIED,
+    );
 
     if (state === FileState.ACTIVE) {
       return file;
@@ -171,14 +176,18 @@ export async function POST(
 
   if (!recording.storage_bucket || !recording.storage_path) {
     return NextResponse.json(
-      { error: "The selected lesson recording does not have a stored media file" },
+      {
+        error:
+          "The selected lesson recording does not have a stored media file",
+      },
       { status: 409 },
     );
   }
 
-  const { data: recordingBlob, error: downloadError } = await supabaseAdmin.storage
-    .from(recording.storage_bucket)
-    .download(recording.storage_path);
+  const { data: recordingBlob, error: downloadError } =
+    await supabaseAdmin.storage
+      .from(recording.storage_bucket)
+      .download(recording.storage_path);
 
   if (downloadError || !recordingBlob) {
     return NextResponse.json(
@@ -218,7 +227,9 @@ export async function POST(
     const readyFile = await waitForGeminiFileActive(uploadedFile.name);
 
     if (!readyFile.uri || !readyFile.mimeType) {
-      throw new Error("Gemini did not return a usable uploaded recording reference");
+      throw new Error(
+        "Gemini did not return a usable uploaded recording reference",
+      );
     }
 
     const contents: Part[] = [
@@ -246,7 +257,9 @@ export async function POST(
       throw new Error("Gemini returned an empty transcription response");
     }
 
-    const transcription = transcriptResultSchema.parse(JSON.parse(responseText));
+    const transcription = transcriptResultSchema.parse(
+      JSON.parse(responseText),
+    );
     const result = await saveLessonTranscriptAndSyncEvidence({
       access,
       recordingId: parsed.data.recordingId,

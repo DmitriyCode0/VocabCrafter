@@ -123,7 +123,7 @@ export async function saveLessonTranscriptAndSyncEvidence({
     fullText?.trim() ||
     (hasSegmentsUpdate
       ? buildLessonTranscriptFullText(normalizedSegments)
-      : existingTranscript?.full_text ?? null);
+      : (existingTranscript?.full_text ?? null));
 
   const transcriptPayload = {
     recording_id: recording.id,
@@ -248,9 +248,8 @@ export async function saveLessonTranscriptAndSyncEvidence({
     transcript = syncedTranscriptResult.data;
   }
 
-  const recordingCompletionState = getRecordingCompletionState(
-    diarizationStatus,
-  );
+  const recordingCompletionState =
+    getRecordingCompletionState(diarizationStatus);
   const { error: recordingUpdateError } = await supabaseAdmin
     .from("lesson_room_recordings")
     .update({

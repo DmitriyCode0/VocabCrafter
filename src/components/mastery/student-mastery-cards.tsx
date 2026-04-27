@@ -125,7 +125,9 @@ export function StudentMasteryCards({
       }
 
       if (activeEvidenceResponse) {
-        const data = (await activeEvidenceResponse.json().catch(() => null)) as {
+        const data = (await activeEvidenceResponse
+          .json()
+          .catch(() => null)) as {
           items?: ActiveEvidenceListItem[];
           error?: string;
         } | null;
@@ -168,8 +170,8 @@ export function StudentMasteryCards({
     setExpandedStudentId(studentId);
 
     if (
-      (totalWords === 0 || wordsByStudent[studentId]) &&
-      (activeEvidenceCount === 0 || activeEvidenceByStudent[studentId]) ||
+      ((totalWords === 0 || wordsByStudent[studentId]) &&
+        (activeEvidenceCount === 0 || activeEvidenceByStudent[studentId])) ||
       loadingByStudent[studentId]
     ) {
       return;
@@ -306,7 +308,8 @@ export function StudentMasteryCards({
                       onClick={() =>
                         void loadStudentDetails(student.studentId, {
                           includeWords: student.totalWords > 0,
-                          includeActiveEvidence: student.activeEvidenceCount > 0,
+                          includeActiveEvidence:
+                            student.activeEvidenceCount > 0,
                         })
                       }
                     >
@@ -342,7 +345,9 @@ export function StudentMasteryCards({
                                 <DeleteMasteryWordButton
                                   wordId={word.id}
                                   term={word.term}
-                                  title={messages.tutorMastery.cards.deleteTitle}
+                                  title={
+                                    messages.tutorMastery.cards.deleteTitle
+                                  }
                                   description={messages.tutorMastery.cards.deleteDescription(
                                     word.term,
                                   )}
@@ -363,7 +368,9 @@ export function StudentMasteryCards({
                       </p>
                       <ActiveEvidenceList
                         items={activeEvidence}
-                        emptyMessage={messages.tutorMastery.cards.noActiveEvidence}
+                        emptyMessage={
+                          messages.tutorMastery.cards.noActiveEvidence
+                        }
                       />
                     </div>
                   </div>

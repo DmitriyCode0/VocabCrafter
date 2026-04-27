@@ -32,9 +32,9 @@ export async function POST(
     );
   }
 
-  const payload = (await request.json().catch(() => null)) as
-    | { action?: "start" | "stop" }
-    | null;
+  const payload = (await request.json().catch(() => null)) as {
+    action?: "start" | "stop";
+  } | null;
 
   if (!payload?.action) {
     return NextResponse.json({ error: "Action is required" }, { status: 400 });
@@ -75,12 +75,11 @@ export async function POST(
         );
       }
 
-      const activeRecording = await getActiveLessonRoomRecording(access.session.id);
+      const activeRecording = await getActiveLessonRoomRecording(
+        access.session.id,
+      );
 
-      if (
-        effectiveRecordingStatus === "recording" ||
-        activeRecording
-      ) {
+      if (effectiveRecordingStatus === "recording" || activeRecording) {
         return NextResponse.json(
           { error: "A lesson recording is already active" },
           { status: 409 },
@@ -100,7 +99,9 @@ export async function POST(
       );
 
       const storageBucket =
-        output.file?.output.case === "s3" ? output.file.output.value.bucket : null;
+        output.file?.output.case === "s3"
+          ? output.file.output.value.bucket
+          : null;
       const storagePath = output.file?.filepath ?? null;
       const { data: recording, error: recordingError } = await supabaseAdmin
         .from("lesson_room_recordings")
@@ -156,7 +157,8 @@ export async function POST(
           .from("lesson_room_recordings")
           .update({
             status: "failed",
-            error_message: "Lesson room session could not be updated after starting recording",
+            error_message:
+              "Lesson room session could not be updated after starting recording",
             updated_at: new Date().toISOString(),
           })
           .eq("id", recording.id);
@@ -167,7 +169,9 @@ export async function POST(
       return NextResponse.json({ session, recording });
     }
 
-    const activeRecording = await getActiveLessonRoomRecording(access.session.id);
+    const activeRecording = await getActiveLessonRoomRecording(
+      access.session.id,
+    );
 
     if (!activeRecording) {
       return NextResponse.json(
@@ -178,7 +182,10 @@ export async function POST(
 
     if (!activeRecording.provider_recording_id) {
       return NextResponse.json(
-        { error: "The active lesson recording is missing a provider recording id" },
+        {
+          error:
+            "The active lesson recording is missing a provider recording id",
+        },
         { status: 409 },
       );
     }
@@ -190,7 +197,8 @@ export async function POST(
     const durationSeconds = Math.max(
       0,
       Math.round(
-        (Date.parse(endedAtIso) - Date.parse(activeRecording.created_at)) / 1000,
+        (Date.parse(endedAtIso) - Date.parse(activeRecording.created_at)) /
+          1000,
       ),
     );
     const { data: recording, error: recordingError } = await supabaseAdmin

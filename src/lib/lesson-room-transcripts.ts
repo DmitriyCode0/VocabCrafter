@@ -21,15 +21,17 @@ export interface LessonTranscriptSegmentInput {
 export function normalizeLessonTranscriptSegments(
   segments: LessonTranscriptSegmentInput[] | undefined,
 ) {
-  return (segments ?? []).map((segment): LessonTranscriptSegmentInput => ({
-    speakerRole: segment.speakerRole,
-    speakerLabel: segment.speakerLabel?.trim() || null,
-    startedAtSeconds: segment.startedAtSeconds ?? null,
-    endedAtSeconds: segment.endedAtSeconds ?? null,
-    content: segment.content.trim(),
-    confidence: segment.confidence ?? null,
-    needsReview: segment.needsReview ?? false,
-  }));
+  return (segments ?? []).map(
+    (segment): LessonTranscriptSegmentInput => ({
+      speakerRole: segment.speakerRole,
+      speakerLabel: segment.speakerLabel?.trim() || null,
+      startedAtSeconds: segment.startedAtSeconds ?? null,
+      endedAtSeconds: segment.endedAtSeconds ?? null,
+      content: segment.content.trim(),
+      confidence: segment.confidence ?? null,
+      needsReview: segment.needsReview ?? false,
+    }),
+  );
 }
 
 export function buildLessonTranscriptFullText(
@@ -62,7 +64,9 @@ export function extractStudentActiveVocabularyTermsFromTranscriptSegments(
       continue;
     }
 
-    terms.push(...extractPassiveVocabularyTermOccurrencesFromText(segment.content));
+    terms.push(
+      ...extractPassiveVocabularyTermOccurrencesFromText(segment.content),
+    );
   }
 
   return terms;

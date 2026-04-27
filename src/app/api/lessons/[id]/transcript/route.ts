@@ -24,7 +24,8 @@ const transcriptSegmentSchema = z
       value.endedAtSeconds == null ||
       value.endedAtSeconds >= value.startedAtSeconds,
     {
-      message: "endedAtSeconds must be greater than or equal to startedAtSeconds",
+      message:
+        "endedAtSeconds must be greater than or equal to startedAtSeconds",
       path: ["endedAtSeconds"],
     },
   );
@@ -74,8 +75,8 @@ export async function POST(
       access,
       recordingId: parsed.data.recordingId,
       languageCode: parsed.data.languageCode ?? null,
-      diarizationStatus:
-        parsed.data.diarizationStatus as LessonTranscriptDiarizationStatus,
+      diarizationStatus: parsed.data
+        .diarizationStatus as LessonTranscriptDiarizationStatus,
       reviewStatus: parsed.data.reviewStatus as LessonTranscriptReviewStatus,
       fullText: parsed.data.fullText ?? null,
       errorMessage: parsed.data.errorMessage ?? null,

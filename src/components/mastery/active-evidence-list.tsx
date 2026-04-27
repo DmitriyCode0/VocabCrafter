@@ -19,7 +19,9 @@ interface ActiveEvidenceListProps {
   emptyMessage: string;
 }
 
-function formatActiveEvidenceSourceType(value: ActiveEvidenceListItem["source_type"]) {
+function formatActiveEvidenceSourceType(
+  value: ActiveEvidenceListItem["source_type"],
+) {
   switch (value) {
     case "lesson_recording":
       return "lesson recording";
@@ -45,7 +47,10 @@ export function ActiveEvidenceList({
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => (
-        <div key={item.id} className="flex flex-col gap-3 rounded-lg border p-3">
+        <div
+          key={item.id}
+          className="flex flex-col gap-3 rounded-lg border p-3"
+        >
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{item.term}</p>
           </div>
@@ -59,7 +64,9 @@ export function ActiveEvidenceList({
             ) : null}
             {item.library_part_of_speech ? (
               <Badge variant="outline">
-                {formatPassiveVocabularyPartOfSpeech(item.library_part_of_speech)}
+                {formatPassiveVocabularyPartOfSpeech(
+                  item.library_part_of_speech,
+                )}
               </Badge>
             ) : null}
           </div>
