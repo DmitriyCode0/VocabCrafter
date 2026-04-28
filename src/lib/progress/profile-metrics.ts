@@ -320,6 +320,12 @@ export interface StudentProgressSnapshot {
     timeAdjustmentHours: number;
     completedLessons: number;
   };
+  classroomMetrics: {
+    classroomSessions: number;
+    classroomHours: number;
+    studentSpeakingHours: number;
+    studentSpeakingShare: number | null;
+  };
   cefrGuidedHours: {
     source: string;
     levels: Array<{
@@ -425,6 +431,10 @@ interface ProgressMonthWindow {
 
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function roundMetric(value: number, fractionDigits = 1) {
+  return Number(value.toFixed(fractionDigits));
 }
 
 function getOverallPerformanceBand(score: number) {
@@ -1079,6 +1089,9 @@ export async function getStudentMonthlyComparisonSnapshot(
 
 export async function getStudentProgressSnapshot(
   userId: string,
+  options?: {
+    tutorId?: string | null;
+  },
 ): Promise<StudentProgressSnapshot> {
   const supabaseAdmin = createAdminClient();
 
@@ -1091,6 +1104,7 @@ export async function getStudentProgressSnapshot(
     activeEvidenceResult,
     grammarMasteryResult,
     completedLessonsCountResult,
+    connectionIdsResult,
   ] = await Promise.all([
     supabaseAdmin
       .from("profiles")
@@ -1137,10 +1151,40 @@ export async function getStudentProgressSnapshot(
       .select("id", { count: "exact", head: true })
       .eq("student_id", userId)
       .eq("status", "completed"),
+    options?.tutorId
+      ? supabaseAdmin
+          .from("tutor_students")
+          .select("id")
+          .eq("student_id", userId)
+          .eq("tutor_id", options.tutorId)
+      : supabaseAdmin
+          .from("tutor_students")
+          .select("id")
+          .eq("student_id", userId),
   ]);
 
   if (profileResult.error || !profileResult.data) {
     throw new Error("Failed to load student progress profile");
+  }
+
+  if (connectionIdsResult.error) {
+    throw connectionIdsResult.error;
+  }
+
+  const connectionIds = (connectionIdsResult.data ?? []).map(
+    (connection) => connection.id,
+  );
+  const classroomSessionSummariesResult = connectionIds.length
+    ? await supabaseAdmin
+        .from("tutor_student_classroom_session_summaries")
+        .select(
+          "duration_seconds, tutor_speaking_seconds, student_speaking_seconds",
+        )
+        .in("connection_id", connectionIds)
+    : { data: [], error: null };
+
+  if (classroomSessionSummariesResult.error) {
+    throw classroomSessionSummariesResult.error;
   }
 
   const profile = profileResult.data;
@@ -1200,6 +1244,27 @@ export async function getStudentProgressSnapshot(
     passiveEvidenceRows,
     cefrLevel,
   );
+  const classroomSessions =
+    classroomSessionSummariesResult.data as Array<{
+      duration_seconds: number | null;
+      tutor_speaking_seconds: number;
+      student_speaking_seconds: number;
+    }>;
+  const classroomDurationSeconds = classroomSessions.reduce(
+    (total, session) => total + Math.max(0, session.duration_seconds ?? 0),
+    0,
+  );
+  const classroomStudentSpeakingSeconds = classroomSessions.reduce(
+    (total, session) =>
+      total + Math.max(0, session.student_speaking_seconds ?? 0),
+    0,
+  );
+  const classroomTutorSpeakingSeconds = classroomSessions.reduce(
+    (total, session) => total + Math.max(0, session.tutor_speaking_seconds ?? 0),
+    0,
+  );
+  const classroomTotalSpeakingSeconds =
+    classroomStudentSpeakingSeconds + classroomTutorSpeakingSeconds;
   const completedLessons = completedLessonsCountResult.count ?? 0;
   const appLearningSeconds = attempts.reduce(
     (total, attempt) => total + (attempt.time_spent_seconds ?? 0),
@@ -1557,11 +1622,23 @@ export async function getStudentProgressSnapshot(
     },
     timeMetrics: {
       appLearningSeconds,
-      appLearningHours: Number(appLearningHoursRaw.toFixed(1)),
+      appLearningHours: roundMetric(appLearningHoursRaw),
       lessonHours,
-      totalLearningHours: Number(totalLearningHoursRaw.toFixed(1)),
+      totalLearningHours: roundMetric(totalLearningHoursRaw),
       timeAdjustmentHours: 0,
       completedLessons,
+    },
+    classroomMetrics: {
+      classroomSessions: classroomSessions.length,
+      classroomHours: roundMetric(classroomDurationSeconds / 3600),
+      studentSpeakingHours: roundMetric(classroomStudentSpeakingSeconds / 3600),
+      studentSpeakingShare:
+        classroomTotalSpeakingSeconds > 0
+          ? roundMetric(
+              (classroomStudentSpeakingSeconds / classroomTotalSpeakingSeconds) *
+                100,
+            )
+          : null,
     },
     cefrGuidedHours: {
       source:

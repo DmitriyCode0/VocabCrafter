@@ -31,6 +31,12 @@ interface LiveKitClassroomRecordingOutputOptions {
   classroomId: string;
 }
 
+interface LiveKitParticipantTrackLookupOptions {
+  roomName: string;
+  participantIdentity: string;
+  source?: TrackSource;
+}
+
 interface LiveKitRecordingTargetConfig {
   bucket: string;
   region: string;
@@ -174,11 +180,11 @@ export function createLiveKitRecordingOutput({
   const prefix = config.filePrefix
     ? `${config.filePrefix.replace(/^\/+|\/+$/g, "")}/`
     : "";
-  const filepath = `${prefix}lessons/${lessonId}/sessions/${sessionId}/recordings/${timestamp}.mp4`;
+  const filepath = `${prefix}lessons/${lessonId}/sessions/${sessionId}/recordings/${timestamp}.mp3`;
 
   return {
     file: new EncodedFileOutput({
-      fileType: EncodedFileType.MP4,
+      fileType: EncodedFileType.MP3,
       filepath,
       output: {
         case: "s3",
@@ -216,11 +222,11 @@ export function createLiveKitClassroomRecordingOutput({
   const prefix = config.filePrefix
     ? `${config.filePrefix.replace(/^\/+|\/+$/g, "")}/`
     : "";
-  const filepath = `${prefix}classrooms/${connectionId}/rooms/${classroomId}/recordings/${timestamp}.mp4`;
+  const filepath = `${prefix}classrooms/${connectionId}/rooms/${classroomId}/recordings/${timestamp}.mp3`;
 
   return {
     file: new EncodedFileOutput({
-      fileType: EncodedFileType.MP4,
+      fileType: EncodedFileType.MP3,
       filepath,
       output: {
         case: "s3",
@@ -238,6 +244,32 @@ export function createLiveKitClassroomRecordingOutput({
         }),
       },
     }),
+  };
+}
+
+export async function getLiveKitPublishedParticipantTrack({
+  roomName,
+  participantIdentity,
+  source = TrackSource.MICROPHONE,
+}: LiveKitParticipantTrackLookupOptions) {
+  const roomServiceClient = createLiveKitRoomServiceClient();
+  const participants = await roomServiceClient.listParticipants(roomName);
+  const participant =
+    participants.find((item) => item.identity === participantIdentity) ?? null;
+
+  if (!participant) {
+    return null;
+  }
+
+  const track =
+    participant.tracks.find(
+      (publishedTrack) =>
+        publishedTrack.source === source && publishedTrack.sid.length > 0,
+    ) ?? null;
+
+  return {
+    participant,
+    track,
   };
 }
 

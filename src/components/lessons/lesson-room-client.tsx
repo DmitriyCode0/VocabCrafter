@@ -32,6 +32,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import type { Role } from "@/types/roles";
 
 interface LessonRoomJoinPayload {
@@ -133,23 +134,6 @@ function createParticipantVideoSlot(label: string, element: HTMLMediaElement) {
   return wrapper;
 }
 
-function getRecordingStatusLabel(status: string) {
-  switch (status) {
-    case "ready":
-      return "Ready";
-    case "recording":
-      return "Recording";
-    case "processing":
-      return "Processing";
-    case "completed":
-      return "Completed";
-    case "failed":
-      return "Failed";
-    default:
-      return "Idle";
-  }
-}
-
 function getRecordingConsentLabel(status: string) {
   switch (status) {
     case "granted":
@@ -158,6 +142,55 @@ function getRecordingConsentLabel(status: string) {
       return "Declined";
     default:
       return "Pending";
+  }
+}
+
+// Audio notification functions
+function playJoinSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioContext = new AudioContextClass();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  } catch (error) {
+    // Silently fail if audio context is not available
+    console.warn("Could not play join sound:", error);
+  }
+}
+
+function playLeaveSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioContext = new AudioContextClass();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.1);
+
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  } catch (error) {
+    // Silently fail if audio context is not available
+    console.warn("Could not play leave sound:", error);
   }
 }
 
@@ -200,6 +233,15 @@ export function LessonRoomClient({
   const [hasPausedRemoteVideo, setHasPausedRemoteVideo] = useState(false);
 
   const isConnected = connectionState === ConnectionState.Connected;
+  const startRecordingDisabledReason = !hasJoined
+    ? "Join the lesson room first"
+    : remoteParticipantCount === 0
+      ? "The student must join before recording can start"
+      : !recordingConfigured
+        ? "Recording storage setup is required"
+        : recordingConsentStatus !== "granted"
+          ? "Grant recording consent first"
+          : null;
 
   useEffect(() => {
     setRecordingStatus(initialRecordingStatus);
@@ -453,8 +495,20 @@ export function LessonRoomClient({
       setConnectionState(state);
     });
     room.on(RoomEvent.Connected, syncMedia);
-    room.on(RoomEvent.ParticipantConnected, syncMedia);
-    room.on(RoomEvent.ParticipantDisconnected, syncMedia);
+    room.on(RoomEvent.ParticipantConnected, (participant) => {
+      syncMedia();
+      // Only play sound for remote participants (not ourselves)
+      if (participant.identity !== room.localParticipant.identity) {
+        playJoinSound();
+      }
+    });
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      syncMedia();
+      // Only play sound for remote participants (not ourselves)
+      if (participant.identity !== room.localParticipant.identity) {
+        playLeaveSound();
+      }
+    });
     room.on(RoomEvent.TrackSubscribed, syncMedia);
     room.on(RoomEvent.TrackUnsubscribed, syncMedia);
     room.on(RoomEvent.TrackStreamStateChanged, syncMedia);
@@ -656,8 +710,9 @@ export function LessonRoomClient({
   }, [isConnected, joinError]);
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader>
+    <>
+      <Card className="overflow-hidden">
+        <CardHeader>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -676,7 +731,7 @@ export function LessonRoomClient({
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+        <CardContent className="space-y-4">
         {!isConfigured ? (
           <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
             <p className="font-medium text-foreground">
@@ -810,39 +865,83 @@ export function LessonRoomClient({
             </Button>
           ) : (
             <>
-              <Button variant="outline" onClick={() => void toggleCamera()}>
+              <Button
+                variant="outline"
+                className="size-[3.75rem]"
+                onClick={() => void toggleCamera()}
+                aria-label={cameraEnabled ? "Turn camera off" : "Turn camera on"}
+                title={cameraEnabled ? "Turn camera off" : "Turn camera on"}
+              >
                 {cameraEnabled ? (
-                  <>
-                    <VideoOff className="mr-2 h-4 w-4" />
-                    Turn camera off
-                  </>
+                  <Video className="h-6 w-6 text-emerald-600" />
                 ) : (
-                  <>
-                    <Video className="mr-2 h-4 w-4" />
-                    Turn camera on
-                  </>
-                )}
-              </Button>
-              <Button variant="outline" onClick={() => void toggleMicrophone()}>
-                {microphoneEnabled ? (
-                  <>
-                    <MicOff className="mr-2 h-4 w-4" />
-                    Mute microphone
-                  </>
-                ) : (
-                  <>
-                    <Mic className="mr-2 h-4 w-4" />
-                    Unmute microphone
-                  </>
+                  <VideoOff className="h-6 w-6 text-red-600" />
                 )}
               </Button>
               <Button
+                variant="outline"
+                className="size-[3.75rem]"
+                onClick={() => void toggleMicrophone()}
+                aria-label={
+                  microphoneEnabled ? "Mute microphone" : "Unmute microphone"
+                }
+                title={
+                  microphoneEnabled ? "Mute microphone" : "Unmute microphone"
+                }
+              >
+                {microphoneEnabled ? (
+                  <Mic className="h-6 w-6 text-emerald-600" />
+                ) : (
+                  <MicOff className="h-6 w-6 text-red-600" />
+                )}
+              </Button>
+              {role === "tutor" ? (
+                recordingStatus === "recording" ? (
+                  <Button
+                    variant="destructive"
+                    className="size-[3.75rem]"
+                    onClick={() => void updateRecording("stop")}
+                    disabled={isRecordingActionPending}
+                    aria-label="Stop recording"
+                    title="Stop recording"
+                  >
+                    {isRecordingActionPending ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      <Radio className="h-6 w-6" />
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="size-[3.75rem]"
+                    onClick={() => void updateRecording("start")}
+                    disabled={
+                      isRecordingActionPending ||
+                      startRecordingDisabledReason !== null
+                    }
+                    aria-label={
+                      startRecordingDisabledReason ?? "Start recording"
+                    }
+                    title={startRecordingDisabledReason ?? "Start recording"}
+                  >
+                    {isRecordingActionPending ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      <Radio className="h-6 w-6" />
+                    )}
+                  </Button>
+                )
+              ) : null}
+              <Button
                 variant="destructive"
+                className="size-[3.75rem]"
                 onClick={() => void handleDisconnect()}
                 disabled={isSyncingSession || isRecordingActionPending}
+                aria-label="Leave room"
+                title="Leave room"
               >
-                <PhoneOff className="mr-2 h-4 w-4" />
-                Leave room
+                <PhoneOff className="h-6 w-6" />
               </Button>
             </>
           )}
@@ -858,97 +957,14 @@ export function LessonRoomClient({
                 Recording stays tutor-controlled and lesson-bound. Consent is
                 tracked separately from media state.
               </p>
+              {role === "tutor" &&
+              recordingStatus !== "recording" &&
+              startRecordingDisabledReason ? (
+                <p className="text-sm text-muted-foreground">
+                  {startRecordingDisabledReason}.
+                </p>
+              ) : null}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">
-                <ShieldCheck className="mr-1 h-3.5 w-3.5" />
-                Consent {getRecordingConsentLabel(recordingConsentStatus)}
-              </Badge>
-              <Badge
-                variant={
-                  recordingStatus === "recording" ? "secondary" : "outline"
-                }
-              >
-                <Radio className="mr-1 h-3.5 w-3.5" />
-                Recording {getRecordingStatusLabel(recordingStatus)}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {role === "tutor" ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => void updateConsent("granted")}
-                  disabled={
-                    isSyncingSession ||
-                    isRecordingActionPending ||
-                    recordingConsentStatus === "granted"
-                  }
-                >
-                  Confirm recording consent
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => void updateConsent("declined")}
-                  disabled={
-                    isSyncingSession ||
-                    isRecordingActionPending ||
-                    recordingConsentStatus === "declined"
-                  }
-                >
-                  Mark consent declined
-                </Button>
-                {recordingStatus === "recording" ? (
-                  <Button
-                    variant="destructive"
-                    onClick={() => void updateRecording("stop")}
-                    disabled={isRecordingActionPending}
-                  >
-                    {isRecordingActionPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Stopping recording...
-                      </>
-                    ) : (
-                      <>
-                        <Radio className="mr-2 h-4 w-4" />
-                        Stop recording
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => void updateRecording("start")}
-                    disabled={
-                      !hasJoined ||
-                      !recordingConfigured ||
-                      isRecordingActionPending ||
-                      recordingConsentStatus !== "granted" ||
-                      recordingStatus === "recording"
-                    }
-                  >
-                    {isRecordingActionPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Starting recording...
-                      </>
-                    ) : (
-                      <>
-                        <Radio className="mr-2 h-4 w-4" />
-                        Start recording
-                      </>
-                    )}
-                  </Button>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Only tutors can control lesson recordings. You can still see the
-                current consent and recording state here.
-              </p>
-            )}
           </div>
 
           {role === "tutor" && !recordingConfigured ? (
@@ -964,12 +980,54 @@ export function LessonRoomClient({
           ) : null}
         </div>
 
-        <div className="rounded-2xl border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-          {role === "tutor"
-            ? "Tutor participants currently receive room-admin grants for moderation and recording control inside the linked lesson room."
-            : "Student participants receive lesson-bound room access only and can publish their own media inside the linked lesson room."}
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {role === "tutor" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              Recording consent
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>
+              Turn this on after the student confirms consent for lesson
+              recording.
+            </p>
+            <p>
+              If consent is off, recording stays unavailable until you enable
+              it again.
+            </p>
+            <div className="flex flex-col gap-3 rounded-2xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <p className="font-medium text-foreground">
+                  Status: {getRecordingConsentLabel(recordingConsentStatus)}
+                </p>
+                <p>
+                  Use the toggle to grant or revoke recording permission.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 self-start sm:self-center">
+                <span className="text-sm text-muted-foreground">
+                  {recordingConsentStatus === "granted"
+                    ? "Granted"
+                    : "Not granted"}
+                </span>
+                <Switch
+                  checked={recordingConsentStatus === "granted"}
+                  onCheckedChange={(checked) => {
+                    void updateConsent(checked ? "granted" : "declined");
+                  }}
+                  disabled={isSyncingSession || isRecordingActionPending}
+                  aria-label="Toggle recording consent"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+    </>
   );
 }

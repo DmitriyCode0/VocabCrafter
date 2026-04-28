@@ -1,15 +1,13 @@
 import Link from "next/link";
 import {
   CalendarDays,
-  FileText,
+  Download,
   ShieldCheck,
   Sparkles,
   Users,
-  Video,
 } from "lucide-react";
 import { ClassroomConnectionPicker } from "@/components/lessons/classroom-connection-picker";
 import { ClassroomRoomClient } from "@/components/lessons/classroom-room-client";
-import { ManualTranscriptSubmitCard } from "@/components/lessons/manual-transcript-submit-card";
 import { LessonsPageHeader } from "@/components/lessons/lessons-page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,30 +65,6 @@ function getRecordingStatusLabel(status: string) {
   }
 }
 
-function getTranscriptStatusLabel(status: string) {
-  switch (status) {
-    case "processing":
-      return "Processing";
-    case "ready":
-      return "Ready";
-    case "failed":
-      return "Failed";
-    default:
-      return "Idle";
-  }
-}
-
-function getConsentStatusLabel(status: string) {
-  switch (status) {
-    case "granted":
-      return "Granted";
-    case "declined":
-      return "Declined";
-    default:
-      return "Pending";
-  }
-}
-
 function formatConnectedAt(value: string | null, appLanguage: "en" | "uk") {
   if (!value) {
     return appLanguage === "uk" ? "Нещодавно" : "Recently";
@@ -125,6 +99,34 @@ function formatDurationLabel(seconds: number | null, appLanguage: "en" | "uk") {
   return appLanguage === "uk"
     ? `${minutes} хв ${remainingSeconds.toString().padStart(2, "0")} с`
     : `${minutes}m ${remainingSeconds.toString().padStart(2, "0")}s`;
+}
+
+function getRecordingDownloadHint(
+  status: string,
+  hasStoredMedia: boolean,
+  appLanguage: "en" | "uk",
+) {
+  if (status === "recording") {
+    return appLanguage === "uk"
+      ? "Завантаження стане доступним після зупинки активного запису."
+      : "Download becomes available after the active recording is stopped.";
+  }
+
+  if (status === "failed") {
+    return appLanguage === "uk"
+      ? "Цей запис не вдалося підготувати для завантаження."
+      : "This recording could not be finalized for download.";
+  }
+
+  if (!hasStoredMedia) {
+    return appLanguage === "uk"
+      ? "Медіафайл ще фіналізується у приватному сховищі."
+      : "The media file is still being finalized in private storage.";
+  }
+
+  return appLanguage === "uk"
+    ? "Файл запису ще обробляється."
+    : "The recording file is still being processed.";
 }
 
 function getSpeakingShareLabel(
@@ -167,12 +169,12 @@ export default async function ClassroomPage({
   const participantName = selectedConnection
     ? getClassroomParticipantName(role, selectedConnection)
     : null;
-  let transcriptToolRecordings: Array<{
+  let classroomRecordings: Array<{
     id: string;
     createdAt: string;
     status: string;
     durationSeconds: number | null;
-    activeEvidenceSyncedAt: string | null;
+    hasStoredMedia: boolean;
   }> = [];
   let sessionSummaries: Array<{
     id: string;
@@ -183,52 +185,34 @@ export default async function ClassroomPage({
     studentSpeakingSeconds: number;
   }> = [];
 
-  if (role === "tutor" && access) {
+  if (access) {
     const supabaseAdmin = createAdminClient();
     const [
       { data: recordings, error: recordingsError },
-      { data: transcripts, error: transcriptsError },
+      recentSummaries,
     ] = await Promise.all([
       supabaseAdmin
         .from("tutor_student_classroom_recordings")
-        .select("id, created_at, status, duration_seconds")
+        .select(
+          "id, created_at, status, duration_seconds, storage_bucket, storage_path",
+        )
         .eq("classroom_id", access.classroom.id)
         .order("created_at", { ascending: false })
         .limit(12),
-      supabaseAdmin
-        .from("tutor_student_classroom_transcripts")
-        .select("recording_id, active_evidence_synced_at")
-        .eq("classroom_id", access.classroom.id),
+      listTutorStudentClassroomSessionSummaries(access.classroom.id),
     ]);
 
     if (recordingsError) {
       throw recordingsError;
     }
 
-    if (transcriptsError) {
-      throw transcriptsError;
-    }
-
-    const syncedByRecordingId = new Map(
-      (transcripts ?? []).map((transcript) => [
-        transcript.recording_id,
-        transcript.active_evidence_synced_at,
-      ]),
-    );
-
-    transcriptToolRecordings = (recordings ?? []).map((recording) => ({
+    classroomRecordings = (recordings ?? []).map((recording) => ({
       id: recording.id,
       createdAt: recording.created_at,
       status: recording.status,
       durationSeconds: recording.duration_seconds,
-      activeEvidenceSyncedAt: syncedByRecordingId.get(recording.id) ?? null,
+      hasStoredMedia: Boolean(recording.storage_bucket && recording.storage_path),
     }));
-  }
-
-  if (access) {
-    const recentSummaries = await listTutorStudentClassroomSessionSummaries(
-      access.classroom.id,
-    );
 
     sessionSummaries = recentSummaries
       .filter((summary) => summary.session_ended_at)
@@ -322,33 +306,9 @@ export default async function ClassroomPage({
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">
-                Recording {getRecordingStatusLabel(access.classroom.recording_status)}
-              </Badge>
-              <Badge variant="outline">
-                Transcript {getTranscriptStatusLabel(access.classroom.transcript_status)}
-              </Badge>
-              <Badge variant="outline">
-                Consent {getConsentStatusLabel(access.classroom.recording_consent_status)}
-              </Badge>
-              <Badge variant="outline">
-                {role === "tutor"
-                  ? appLanguage === "uk"
-                    ? "Учень"
-                    : "Student" 
-                  : appLanguage === "uk"
-                    ? "Викладач"
-                    : "Tutor"}
-                : {participantName}
-              </Badge>
-              <Badge variant="outline">
-                {appLanguage === "uk" ? "Підключено" : "Connected"} {formatConnectedAt(selectedConnection.connectedAt, appLanguage)}
-              </Badge>
-            </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+          <div className="space-y-4">
             <ClassroomRoomClient
               connectionId={selectedConnection.id}
               role={role}
@@ -361,7 +321,7 @@ export default async function ClassroomPage({
               recordingConfigurationError={liveKitRecordingConfigurationError}
             />
 
-            <div className="space-y-4">
+            <div className="grid gap-4 xl:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -421,35 +381,83 @@ export default async function ClassroomPage({
                 </CardContent>
               </Card>
 
-              {role === "tutor" ? (
-                <ManualTranscriptSubmitCard
-                  recordings={transcriptToolRecordings}
-                  transcriptEndpoint={`/api/classroom/${selectedConnection.id}/transcript`}
-                  transcribeEndpoint={`/api/classroom/${selectedConnection.id}/transcribe-recording`}
-                  contextLabel="classroom"
-                  sourceLabelFallback="the selected classroom"
-                  cardDescription="Tutor-only tools for turning classroom recordings into transcripts and active evidence."
-                  emptyStateHint="No eligible classroom recording is available yet. Stop a classroom recording first, or use one that has not already synced active evidence."
-                />
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <FileText className="h-5 w-5 text-primary" />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Download className="h-5 w-5 text-primary" />
+                    {appLanguage === "uk"
+                      ? "Аудіокліпи студента"
+                      : "Student Audio Clips"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {classroomRecordings.length === 0 ? (
+                    <p className="text-muted-foreground">
                       {appLanguage === "uk"
-                        ? "Транскрипція classroom"
-                        : "Classroom transcripts"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm text-muted-foreground">
-                    <p>
-                      {appLanguage === "uk"
-                        ? "Викладач керує записом і транскрипцією, а student-only сегменти з classroom автоматично йдуть в active vocabulary."
-                        : "Tutors control recording and transcription here, and student-only classroom transcript segments now sync into active vocabulary."}
+                        ? "Збережені аудіокліпи студента з’являться тут після старту й зупинки запису у classroom."
+                        : "Saved student audio clips will appear here after classroom recording has been started and stopped."}
                     </p>
-                  </CardContent>
-                </Card>
-              )}
+                  ) : (
+                    classroomRecordings.map((recording) => {
+                      const canDownload =
+                        recording.hasStoredMedia &&
+                        recording.status !== "recording" &&
+                        recording.status !== "failed";
+
+                      return (
+                        <div
+                          key={recording.id}
+                          className="rounded-2xl border bg-muted/20 p-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="space-y-1">
+                              <p className="font-medium text-foreground">
+                                {formatSessionDateTime(
+                                  recording.createdAt,
+                                  appLanguage,
+                                )}
+                              </p>
+                              <p className="text-muted-foreground">
+                                {formatDurationLabel(
+                                  recording.durationSeconds,
+                                  appLanguage,
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline">
+                                {getRecordingStatusLabel(recording.status)}
+                              </Badge>
+                              {canDownload ? (
+                                <Button asChild size="sm" variant="outline">
+                                  <a
+                                    href={`/api/classroom/${selectedConnection.id}/recordings/${recording.id}/download`}
+                                  >
+                                    {appLanguage === "uk"
+                                      ? "Завантажити"
+                                      : "Download"}
+                                  </a>
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {!canDownload ? (
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              {getRecordingDownloadHint(
+                                recording.status,
+                                recording.hasStoredMedia,
+                                appLanguage,
+                              )}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })
+                  )}
+                </CardContent>
+              </Card>
 
               <Card>
                 <CardHeader>

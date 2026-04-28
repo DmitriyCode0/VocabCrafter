@@ -7,12 +7,16 @@ import {
 } from "@/lib/lesson-room-recordings";
 import {
   createLiveKitEgressClient,
+  getLiveKitPublishedParticipantTrack,
   createLiveKitRecordingOutput,
-  getDefaultLiveKitRecordingOptions,
   getLiveKitRecordingConfigurationError,
   isLiveKitConfigured,
   isLiveKitRecordingConfigured,
 } from "@/lib/livekit";
+
+function buildStudentParticipantIdentity(lessonId: string, studentId: string) {
+  return `lesson:${lessonId}:student:${studentId}`;
+}
 
 export async function POST(
   request: Request,
@@ -86,16 +90,41 @@ export async function POST(
         );
       }
 
+      if (!access.lesson.student_id) {
+        return NextResponse.json(
+          { error: "The lesson is missing a linked student" },
+          { status: 409 },
+        );
+      }
+
+      const studentParticipantIdentity = buildStudentParticipantIdentity(
+        id,
+        access.lesson.student_id,
+      );
+      const studentParticipant = await getLiveKitPublishedParticipantTrack({
+        roomName: access.session.provider_room_key,
+        participantIdentity: studentParticipantIdentity,
+      });
+
+      if (!studentParticipant?.participant) {
+        return NextResponse.json(
+          {
+            error: "The student must be connected before recording can start",
+          },
+          { status: 409 },
+        );
+      }
+
       const output = createLiveKitRecordingOutput({
         lessonId: id,
         sessionId: access.session.id,
       });
       const nowIso = new Date().toISOString();
       const egressClient = createLiveKitEgressClient();
-      const egressInfo = await egressClient.startRoomCompositeEgress(
+      const egressInfo = await egressClient.startParticipantEgress(
         access.session.provider_room_key,
+        studentParticipantIdentity,
         output,
-        getDefaultLiveKitRecordingOptions(),
       );
 
       const storageBucket =

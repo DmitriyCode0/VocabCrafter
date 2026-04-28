@@ -1035,6 +1035,18 @@ const EN_MESSAGES = {
         other: "mastered words",
       }),
     grammarTopics: "Grammar Topics",
+    classroomSessions: "Classroom Sessions",
+    classroomSessionsDescription:
+      "persisted classroom call summaries linked to this student",
+    classroomTime: "Classroom Time",
+    classroomTimeDescription:
+      "total recorded duration across saved classroom sessions",
+    studentSpeakingTime: "Student Speaking Time",
+    studentSpeakingTimeDescription:
+      "student talk time captured from classroom speaking summaries",
+    studentSpeakingShare: "Student Speaking Share",
+    studentSpeakingShareDescription:
+      "student share of recorded tutor vs student speaking time",
     passiveEvidence: "Passive Evidence",
     passiveEvidenceDescription: "words and phrases tracked as recognition only",
     equivalentWords: "Equivalent Words",
@@ -2425,6 +2437,18 @@ const UK_MESSAGES: AppMessages = {
         many: "засвоєних слів",
       }),
     grammarTopics: "Граматичні теми",
+    classroomSessions: "Classroom-сесії",
+    classroomSessionsDescription:
+      "збережені підсумки classroom-дзвінків, пов’язані з цим студентом",
+    classroomTime: "Час у classroom",
+    classroomTimeDescription:
+      "загальна зафіксована тривалість усіх збережених classroom-сесій",
+    studentSpeakingTime: "Час мовлення студента",
+    studentSpeakingTimeDescription:
+      "час мовлення студента, збережений у підсумках classroom-сесій",
+    studentSpeakingShare: "Частка мовлення студента",
+    studentSpeakingShareDescription:
+      "частка студента в зафіксованому балансі мовлення викладача й студента",
     passiveEvidence: "Пасивне свідчення",
     passiveEvidenceDescription:
       "слів і фраз, що відстежуються лише як розпізнавання",

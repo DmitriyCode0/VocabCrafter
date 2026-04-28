@@ -2,7 +2,9 @@ import Link from "next/link";
 import {
   BookMarked,
   BookOpen,
+  Clock3,
   Flame,
+  Mic,
   Target,
   TrendingUp,
   Trophy,
@@ -30,6 +32,22 @@ import {
 import { Progress } from "@/components/ui/progress";
 
 export const dynamic = "force-dynamic";
+
+function formatHours(value: number) {
+  const totalMinutes = Math.round(value * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${hours} h ${minutes} min`;
+}
+
+function formatPercentage(value: number | null) {
+  if (value == null || !Number.isFinite(value)) {
+    return "n/a";
+  }
+
+  return `${value}%`;
+}
 
 export default async function CoachingResultsPage({
   searchParams,
@@ -94,7 +112,9 @@ export default async function CoachingResultsPage({
       .eq("tutor_id", userId)
       .eq("student_id", activeStudentId)
       .maybeSingle(),
-    getStudentProgressSnapshot(activeStudentId),
+    getStudentProgressSnapshot(activeStudentId, {
+      tutorId: role === "tutor" ? userId : null,
+    }),
   ]);
 
   if (overrideResult.error) {
@@ -273,6 +293,76 @@ export default async function CoachingResultsPage({
           </Card>
         </div>
       )}
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              {messages.tutorProgressPage.classroomSessions}
+            </CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {snapshot.classroomMetrics.classroomSessions}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {messages.tutorProgressPage.classroomSessionsDescription}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              {messages.tutorProgressPage.classroomTime}
+            </CardTitle>
+            <Clock3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatHours(snapshot.classroomMetrics.classroomHours)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {messages.tutorProgressPage.classroomTimeDescription}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              {messages.tutorProgressPage.studentSpeakingTime}
+            </CardTitle>
+            <Mic className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatHours(snapshot.classroomMetrics.studentSpeakingHours)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {messages.tutorProgressPage.studentSpeakingTimeDescription}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              {messages.tutorProgressPage.studentSpeakingShare}
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatPercentage(snapshot.classroomMetrics.studentSpeakingShare)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {messages.tutorProgressPage.studentSpeakingShareDescription}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>

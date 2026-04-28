@@ -1,10 +1,16 @@
 import Link from "next/link";
-import { CalendarDays, FileText, Mic, ShieldCheck } from "lucide-react";
+import {
+  CalendarDays,
+  Download,
+  FileText,
+  Mic,
+  ShieldCheck,
+} from "lucide-react";
 import { LessonRoomClient } from "@/components/lessons/lesson-room-client";
-import { ManualTranscriptSubmitCard } from "@/components/lessons/manual-transcript-submit-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatAppDateTime } from "@/lib/dates";
 import { getLessonRoomAccess } from "@/lib/lesson-room-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -54,17 +60,19 @@ function getRecordingStatusLabel(status: string) {
   }
 }
 
-function getTranscriptStatusLabel(status: string) {
-  switch (status) {
-    case "processing":
-      return "Processing";
-    case "ready":
-      return "Ready";
-    case "failed":
-      return "Failed";
-    default:
-      return "Idle";
+function formatRecordingDurationLabel(seconds: number | null) {
+  if (typeof seconds !== "number" || seconds <= 0) {
+    return "Duration pending";
   }
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  if (minutes === 0) {
+    return `${remainingSeconds}s`;
+  }
+
+  return `${minutes}m ${remainingSeconds.toString().padStart(2, "0")}s`;
 }
 
 export default async function LessonRoomPage({
@@ -88,55 +96,33 @@ export default async function LessonRoomPage({
       : lesson.tutor_profile?.full_name ||
         lesson.tutor_profile?.email ||
         "Tutor";
-  let transcriptToolRecordings: Array<{
+  let lessonRecordings: Array<{
     id: string;
     createdAt: string;
     status: string;
     durationSeconds: number | null;
-    activeEvidenceSyncedAt: string | null;
+    hasStoredMedia: boolean;
   }> = [];
 
-  if (role === "tutor") {
-    const supabaseAdmin = createAdminClient();
-    const [
-      { data: recordings, error: recordingsError },
-      { data: transcripts, error: transcriptsError },
-    ] = await Promise.all([
-      supabaseAdmin
-        .from("lesson_room_recordings")
-        .select("id, created_at, status, duration_seconds")
-        .eq("lesson_id", id)
-        .order("created_at", { ascending: false })
-        .limit(12),
-      supabaseAdmin
-        .from("lesson_room_transcripts")
-        .select("recording_id, active_evidence_synced_at")
-        .eq("lesson_id", id),
-    ]);
+  const supabaseAdmin = createAdminClient();
+  const { data: recordings, error: recordingsError } = await supabaseAdmin
+    .from("lesson_room_recordings")
+    .select("id, created_at, status, duration_seconds, storage_bucket, storage_path")
+    .eq("lesson_id", id)
+    .order("created_at", { ascending: false })
+    .limit(12);
 
-    if (recordingsError) {
-      throw recordingsError;
-    }
-
-    if (transcriptsError) {
-      throw transcriptsError;
-    }
-
-    const syncedByRecordingId = new Map(
-      (transcripts ?? []).map((transcript) => [
-        transcript.recording_id,
-        transcript.active_evidence_synced_at,
-      ]),
-    );
-
-    transcriptToolRecordings = (recordings ?? []).map((recording) => ({
-      id: recording.id,
-      createdAt: recording.created_at,
-      status: recording.status,
-      durationSeconds: recording.duration_seconds,
-      activeEvidenceSyncedAt: syncedByRecordingId.get(recording.id) ?? null,
-    }));
+  if (recordingsError) {
+    throw recordingsError;
   }
+
+  lessonRecordings = (recordings ?? []).map((recording) => ({
+    id: recording.id,
+    createdAt: recording.created_at,
+    status: recording.status,
+    durationSeconds: recording.duration_seconds,
+    hasStoredMedia: Boolean(recording.storage_bucket && recording.storage_path),
+  }));
 
   return (
     <div className="space-y-6">
@@ -171,15 +157,12 @@ export default async function LessonRoomPage({
             Recording {getRecordingStatusLabel(session.recording_status)}
           </Badge>
           <Badge variant="outline">
-            Transcript {getTranscriptStatusLabel(session.transcript_status)}
-          </Badge>
-          <Badge variant="outline">
             Consent {session.recording_consent_status}
           </Badge>
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+      <div className="space-y-4">
         <LessonRoomClient
           lessonId={id}
           role={role}
@@ -191,7 +174,7 @@ export default async function LessonRoomPage({
           recordingConfigurationError={liveKitRecordingConfigurationError}
         />
 
-        <div className="space-y-4">
+        <div className="grid gap-4 xl:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -229,29 +212,93 @@ export default async function LessonRoomPage({
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Mic className="h-5 w-5 text-primary" />
-                Recording Pipeline
+                Student Audio Capture
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>Recording status is persisted on the room session now.</p>
               <p>
-                Tutors can now confirm consent and control server-side recording
-                from the connected room.
+                Tutors can confirm consent and capture a downloadable
+                student-only audio clip from the lesson room.
               </p>
               <p>
-                Transcript processing will attach to lesson artifacts after the
-                recording upload finishes.
+                Recording starts only when the student is connected with a
+                published microphone track.
+              </p>
+              <p>
+                Stopping the recording finalizes an MP3 file in private storage
+                for later download.
               </p>
             </CardContent>
           </Card>
 
-          {role === "tutor" ? (
-            <ManualTranscriptSubmitCard
-              recordings={transcriptToolRecordings}
-              transcriptEndpoint={`/api/lessons/${id}/transcript`}
-              transcribeEndpoint={`/api/lessons/${id}/transcribe-recording`}
-            />
-          ) : null}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Download className="h-5 w-5 text-primary" />
+                Student Audio Clips
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {lessonRecordings.length === 0 ? (
+                <p className="text-muted-foreground">
+                  Saved student audio clips will appear here once recording has
+                  been started and stopped from the lesson room.
+                </p>
+              ) : (
+                lessonRecordings.map((recording) => {
+                  const canDownload =
+                    recording.hasStoredMedia &&
+                    recording.status !== "recording" &&
+                    recording.status !== "failed";
+
+                  return (
+                    <div
+                      key={recording.id}
+                      className="rounded-2xl border bg-muted/20 p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">
+                            {formatAppDateTime(recording.createdAt)}
+                          </p>
+                          <p className="text-muted-foreground">
+                            {formatRecordingDurationLabel(
+                              recording.durationSeconds,
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">
+                            {getRecordingStatusLabel(recording.status)}
+                          </Badge>
+                          {canDownload ? (
+                            <Button asChild size="sm" variant="outline">
+                              <a
+                                href={`/api/lessons/${id}/recordings/${recording.id}/download`}
+                              >
+                                Download
+                              </a>
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {!canDownload ? (
+                        <p className="mt-3 text-xs text-muted-foreground">
+                          {recording.status === "recording"
+                            ? "Download becomes available after the active recording is stopped."
+                            : recording.status === "failed"
+                              ? "This recording could not be finalized for download."
+                              : "The audio file is still being finalized in private storage."}
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

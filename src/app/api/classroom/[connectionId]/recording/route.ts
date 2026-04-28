@@ -8,11 +8,15 @@ import {
 import {
   createLiveKitClassroomRecordingOutput,
   createLiveKitEgressClient,
-  getDefaultLiveKitRecordingOptions,
+  getLiveKitPublishedParticipantTrack,
   getLiveKitRecordingConfigurationError,
   isLiveKitConfigured,
   isLiveKitRecordingConfigured,
 } from "@/lib/livekit";
+
+function buildStudentParticipantIdentity(connectionId: string, studentId: string) {
+  return `classroom:${connectionId}:student:${studentId}`;
+}
 
 export async function POST(
   request: Request,
@@ -86,16 +90,34 @@ export async function POST(
         );
       }
 
+      const studentParticipantIdentity = buildStudentParticipantIdentity(
+        connectionId,
+        access.connection.student_id,
+      );
+      const studentParticipant = await getLiveKitPublishedParticipantTrack({
+        roomName: access.classroom.provider_room_key,
+        participantIdentity: studentParticipantIdentity,
+      });
+
+      if (!studentParticipant?.participant) {
+        return NextResponse.json(
+          {
+            error: "The student must be connected before recording can start",
+          },
+          { status: 409 },
+        );
+      }
+
       const output = createLiveKitClassroomRecordingOutput({
         connectionId,
         classroomId: access.classroom.id,
       });
       const nowIso = new Date().toISOString();
       const egressClient = createLiveKitEgressClient();
-      const egressInfo = await egressClient.startRoomCompositeEgress(
+      const egressInfo = await egressClient.startParticipantEgress(
         access.classroom.provider_room_key,
+        studentParticipantIdentity,
         output,
-        getDefaultLiveKitRecordingOptions(),
       );
 
       const storageBucket =

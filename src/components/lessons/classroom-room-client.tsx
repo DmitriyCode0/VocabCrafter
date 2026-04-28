@@ -16,6 +16,7 @@ import {
   Mic,
   MicOff,
   Monitor,
+  PictureInPicture2,
   PhoneOff,
   Radio,
   ShieldCheck,
@@ -33,6 +34,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import type { Role } from "@/types/roles";
 
 interface ClassroomJoinPayload {
@@ -82,6 +84,15 @@ interface ClassroomRecordingPayload {
     status: string;
     storage_path: string | null;
   };
+}
+
+type PiPParticipantType = "local" | "remote";
+type PiPTrackKind = "camera" | "screen";
+
+interface PiPVideoTile {
+  label: string;
+  video: HTMLVideoElement | null;
+  placeholder: string;
 }
 
 function getConnectionStateLabel(state: ConnectionState) {
@@ -140,6 +151,55 @@ function getRecordingConsentLabel(status: string) {
   }
 }
 
+// Audio notification functions
+function playJoinSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioContext = new AudioContextClass();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  } catch (error) {
+    // Silently fail if audio context is not available
+    console.warn("Could not play join sound:", error);
+  }
+}
+
+function playLeaveSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioContext = new AudioContextClass();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.1);
+
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  } catch (error) {
+    // Silently fail if audio context is not available
+    console.warn("Could not play leave sound:", error);
+  }
+}
+
 function formatSpeakingDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -169,12 +229,23 @@ function clearMediaContainer(container: HTMLDivElement | null) {
   container.innerHTML = "";
 }
 
-function createParticipantVideoSlot(label: string, element: HTMLMediaElement) {
+function createParticipantVideoSlot(
+  label: string,
+  element: HTMLMediaElement,
+  participantType: PiPParticipantType,
+  trackKind: PiPTrackKind,
+) {
   const wrapper = document.createElement("div");
   wrapper.className =
     "relative aspect-video overflow-hidden rounded-2xl border bg-black/95";
 
   element.className = "h-full w-full object-cover";
+
+  if (element instanceof HTMLVideoElement) {
+    element.dataset.pipLabel = label;
+    element.dataset.pipParticipantType = participantType;
+    element.dataset.pipTrackKind = trackKind;
+  }
 
   if (element instanceof HTMLVideoElement) {
     element.autoplay = true;
@@ -190,6 +261,102 @@ function createParticipantVideoSlot(label: string, element: HTMLMediaElement) {
   wrapper.appendChild(badge);
 
   return wrapper;
+}
+
+function getPiPVideoElements(container: HTMLDivElement | null) {
+  return Array.from(container?.querySelectorAll("video") ?? []).filter(
+    (element): element is HTMLVideoElement => element instanceof HTMLVideoElement,
+  );
+}
+
+function getPiPVideoByKind(
+  videos: HTMLVideoElement[],
+  trackKind: PiPTrackKind,
+) {
+  return (
+    videos.find((video) => video.dataset.pipTrackKind === trackKind) ?? null
+  );
+}
+
+function drawPiPVideoFrame(
+  context: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const sourceWidth = video.videoWidth;
+  const sourceHeight = video.videoHeight;
+
+  if (sourceWidth <= 0 || sourceHeight <= 0) {
+    return false;
+  }
+
+  const sourceAspectRatio = sourceWidth / sourceHeight;
+  const targetAspectRatio = width / height;
+
+  let cropWidth = sourceWidth;
+  let cropHeight = sourceHeight;
+  let cropX = 0;
+  let cropY = 0;
+
+  if (sourceAspectRatio > targetAspectRatio) {
+    cropWidth = sourceHeight * targetAspectRatio;
+    cropX = (sourceWidth - cropWidth) / 2;
+  } else {
+    cropHeight = sourceWidth / targetAspectRatio;
+    cropY = (sourceHeight - cropHeight) / 2;
+  }
+
+  context.drawImage(
+    video,
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
+    x,
+    y,
+    width,
+    height,
+  );
+
+  return true;
+}
+
+function drawPiPTile(
+  context: CanvasRenderingContext2D,
+  tile: PiPVideoTile,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  context.fillStyle = "#111111";
+  context.fillRect(x, y, width, height);
+
+  const canDrawVideo =
+    tile.video && tile.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+
+  if (tile.video && canDrawVideo) {
+    drawPiPVideoFrame(context, tile.video, x, y, width, height);
+  } else {
+    context.fillStyle = "#202020";
+    context.fillRect(x, y, width, height);
+    context.fillStyle = "rgba(255, 255, 255, 0.7)";
+    context.font = "500 28px sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(tile.placeholder, x + width / 2, y + height / 2);
+  }
+
+  context.fillStyle = "rgba(0, 0, 0, 0.72)";
+  context.fillRect(x + 24, y + 24, Math.max(160, tile.label.length * 16), 52);
+  context.fillStyle = "#ffffff";
+  context.font = "600 28px sans-serif";
+  context.textAlign = "left";
+  context.textBaseline = "middle";
+  context.fillText(tile.label, x + 40, y + 50);
 }
 
 function getTrackLabel(
@@ -221,6 +388,10 @@ export function ClassroomRoomClient({
   const localVideoContainerRef = useRef<HTMLDivElement | null>(null);
   const remoteVideoContainerRef = useRef<HTMLDivElement | null>(null);
   const remoteAudioContainerRef = useRef<HTMLDivElement | null>(null);
+  const pictureInPictureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const pictureInPictureVideoRef = useRef<HTMLVideoElement | null>(null);
+  const pictureInPictureFrameRef = useRef<number | null>(null);
+  const pictureInPictureStreamRef = useRef<MediaStream | null>(null);
   const [, startRefreshTransition] = useTransition();
   const [connectionState, setConnectionState] = useState<ConnectionState>(
     ConnectionState.Disconnected,
@@ -263,6 +434,15 @@ export function ClassroomRoomClient({
       : 0;
   const remoteSpeakingShare =
     totalSpeakingSeconds > 0 ? 100 - localSpeakingShare : 0;
+  const startRecordingDisabledReason = !hasJoined
+    ? "Join the classroom first"
+    : remoteParticipantCount === 0
+      ? "The student must join before recording can start"
+      : !recordingConfigured
+        ? "Recording storage setup is required"
+        : recordingConsentStatus !== "granted"
+          ? "Grant recording consent first"
+          : null;
 
   useEffect(() => {
     setRoomStatus(initialRoomStatus);
@@ -446,6 +626,118 @@ export function ClassroomRoomClient({
     setSpeakingTotals(nextTotals);
   }, []);
 
+  const stopPictureInPictureRenderer = useCallback(() => {
+    if (pictureInPictureFrameRef.current !== null) {
+      window.cancelAnimationFrame(pictureInPictureFrameRef.current);
+      pictureInPictureFrameRef.current = null;
+    }
+
+    pictureInPictureCanvasRef.current = null;
+
+    if (pictureInPictureStreamRef.current) {
+      for (const track of pictureInPictureStreamRef.current.getTracks()) {
+        track.stop();
+      }
+
+      pictureInPictureStreamRef.current = null;
+    }
+
+    if (pictureInPictureVideoRef.current) {
+      pictureInPictureVideoRef.current.srcObject = null;
+      pictureInPictureVideoRef.current.remove();
+      pictureInPictureVideoRef.current = null;
+    }
+
+    setPictureInPictureActive(false);
+  }, []);
+
+  const closePictureInPicture = useCallback(async () => {
+    if (
+      typeof document !== "undefined" &&
+      pictureInPictureVideoRef.current &&
+      document.pictureInPictureElement === pictureInPictureVideoRef.current
+    ) {
+      try {
+        await document.exitPictureInPicture();
+      } catch {
+        // Ignore exit failures and continue local cleanup.
+      }
+    }
+
+    stopPictureInPictureRenderer();
+  }, [stopPictureInPictureRenderer]);
+
+  const getPictureInPictureTiles = useCallback(() => {
+    const localVideos = getPiPVideoElements(localVideoContainerRef.current);
+    const remoteVideos = getPiPVideoElements(remoteVideoContainerRef.current);
+    const localCameraVideo = getPiPVideoByKind(localVideos, "camera");
+    const remoteCameraVideo = getPiPVideoByKind(remoteVideos, "camera");
+    const screenShareVideos = [...localVideos, ...remoteVideos].filter(
+      (video) => video.dataset.pipTrackKind === "screen",
+    );
+    const remoteParticipantLabel = role === "tutor" ? "Student" : "Tutor";
+
+    return [
+      {
+        label: localCameraVideo?.dataset.pipLabel || "You",
+        video: localCameraVideo,
+        placeholder: "Your camera is off",
+      },
+      {
+        label: remoteCameraVideo?.dataset.pipLabel || remoteParticipantLabel,
+        video: remoteCameraVideo,
+        placeholder:
+          remoteParticipantCount > 0
+            ? `${remoteParticipantLabel} camera is off`
+            : `Waiting for ${remoteParticipantLabel.toLowerCase()}`,
+      },
+      ...screenShareVideos.map((video) => ({
+        label: video.dataset.pipLabel || "Screen share",
+        video,
+        placeholder: "Screen share is unavailable",
+      })),
+    ] satisfies PiPVideoTile[];
+  }, [remoteParticipantCount, role]);
+
+  const renderPictureInPictureFrame = useCallback(() => {
+    const canvas = pictureInPictureCanvasRef.current;
+
+    if (!canvas) {
+      return;
+    }
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      return;
+    }
+
+    const tiles = getPictureInPictureTiles();
+    const tileWidth = 960;
+    const tileHeight = 540;
+    const gap = 16;
+    const padding = 16;
+    const canvasWidth = tileWidth + padding * 2;
+    const canvasHeight = padding * 2 + tiles.length * tileHeight + (tiles.length - 1) * gap;
+
+    if (canvas.width !== canvasWidth || canvas.height !== canvasHeight) {
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+    }
+
+    context.fillStyle = "#0b0b0c";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    tiles.forEach((tile, index) => {
+      const y = padding + index * (tileHeight + gap);
+      drawPiPTile(context, tile, padding, y, tileWidth, tileHeight);
+    });
+
+    pictureInPictureFrameRef.current = window.requestAnimationFrame(
+      renderPictureInPictureFrame,
+    );
+  }, [getPictureInPictureTiles]);
+
   const syncRoomMedia = useCallback(
     (room: Room) => {
       clearMediaElements();
@@ -485,6 +777,8 @@ export function ClassroomRoomClient({
           createParticipantVideoSlot(
             getTrackLabel("You", publication.source),
             element,
+            "local",
+            publication.source === Track.Source.ScreenShare ? "screen" : "camera",
           ),
         );
       }
@@ -508,6 +802,8 @@ export function ClassroomRoomClient({
             createParticipantVideoSlot(
               getTrackLabel(participantLabel, publication.source),
               element,
+              "remote",
+              publication.source === Track.Source.ScreenShare ? "screen" : "camera",
             ),
           );
         }
@@ -551,30 +847,49 @@ export function ClassroomRoomClient({
 
     try {
       if (document.pictureInPictureElement instanceof HTMLVideoElement) {
-        await document.exitPictureInPicture();
-        setPictureInPictureActive(false);
+        await closePictureInPicture();
         return;
       }
 
-      const targetVideo =
-        remoteVideoContainerRef.current?.querySelector("video") ||
-        localVideoContainerRef.current?.querySelector("video");
+      const tiles = getPictureInPictureTiles();
 
-      if (!(targetVideo instanceof HTMLVideoElement)) {
-        toast.error("Join the classroom and publish a video first");
+      if (!tiles.some((tile) => tile.video)) {
+        toast.error("Join the classroom and publish a camera or screen share first");
         return;
       }
 
-      await targetVideo.requestPictureInPicture();
+      const canvas = document.createElement("canvas");
+      const stream = canvas.captureStream(12);
+      const video = document.createElement("video");
+      video.autoplay = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.srcObject = stream;
+      video.style.position = "fixed";
+      video.style.left = "-9999px";
+      video.style.top = "-9999px";
+      document.body.appendChild(video);
+
+      pictureInPictureCanvasRef.current = canvas;
+      pictureInPictureStreamRef.current = stream;
+      pictureInPictureVideoRef.current = video;
+
+      renderPictureInPictureFrame();
+      await video.play();
+      video.addEventListener("leavepictureinpicture", stopPictureInPictureRenderer, {
+        once: true,
+      });
+      await video.requestPictureInPicture();
       setPictureInPictureActive(true);
     } catch (error) {
+      stopPictureInPictureRenderer();
       toast.error(
         error instanceof Error
           ? error.message
           : "Failed to toggle picture-in-picture",
       );
     }
-  }, []);
+  }, [closePictureInPicture, getPictureInPictureTiles, renderPictureInPictureFrame, stopPictureInPictureRenderer]);
 
   const resumeRemoteVideo = useCallback(async () => {
     const room = roomRef.current;
@@ -613,8 +928,20 @@ export function ClassroomRoomClient({
       setConnectionState(state);
     });
     room.on(RoomEvent.Connected, syncMedia);
-    room.on(RoomEvent.ParticipantConnected, syncMedia);
-    room.on(RoomEvent.ParticipantDisconnected, syncMedia);
+    room.on(RoomEvent.ParticipantConnected, (participant) => {
+      syncMedia();
+      // Only play sound for remote participants (not ourselves)
+      if (participant.identity !== room.localParticipant.identity) {
+        playJoinSound();
+      }
+    });
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      syncMedia();
+      // Only play sound for remote participants (not ourselves)
+      if (participant.identity !== room.localParticipant.identity) {
+        playLeaveSound();
+      }
+    });
     room.on(RoomEvent.TrackSubscribed, syncMedia);
     room.on(RoomEvent.TrackUnsubscribed, syncMedia);
     room.on(RoomEvent.TrackStreamStateChanged, syncMedia);
@@ -633,7 +960,7 @@ export function ClassroomRoomClient({
       setCameraEnabled(false);
       setMicrophoneEnabled(false);
       setScreenShareEnabled(false);
-      setPictureInPictureActive(false);
+      void closePictureInPicture();
       resetSpeakingTimer();
       setRemoteParticipantCount(0);
       setRemoteVideoTrackCount(0);
@@ -705,7 +1032,7 @@ export function ClassroomRoomClient({
       setCameraEnabled(false);
       setMicrophoneEnabled(false);
       setScreenShareEnabled(false);
-      setPictureInPictureActive(false);
+      void closePictureInPicture();
       resetSpeakingTimer();
       setRemoteParticipantCount(0);
       setRemoteVideoTrackCount(0);
@@ -752,7 +1079,7 @@ export function ClassroomRoomClient({
       setCameraEnabled(false);
       setMicrophoneEnabled(false);
       setScreenShareEnabled(false);
-      setPictureInPictureActive(false);
+      void closePictureInPicture();
       resetSpeakingTimer();
       setRemoteParticipantCount(0);
       setRemoteVideoTrackCount(0);
@@ -875,10 +1202,11 @@ export function ClassroomRoomClient({
         void room.disconnect(true);
       }
 
+      void closePictureInPicture();
       clearMediaElements();
       resetSpeakingTimer();
     };
-  }, [clearMediaElements, resetSpeakingTimer]);
+  }, [clearMediaElements, closePictureInPicture, resetSpeakingTimer]);
 
   const statusTone = useMemo(() => {
     if (isConnected) {
@@ -893,8 +1221,9 @@ export function ClassroomRoomClient({
   }, [isConnected, joinError]);
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader>
+    <>
+      <Card className="overflow-hidden">
+        <CardHeader>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -913,18 +1242,11 @@ export function ClassroomRoomClient({
               {getConnectionStateLabel(connectionState)}
             </Badge>
             <Badge variant="outline">{getRoomStatusLabel(roomStatus)}</Badge>
-            <Badge
-              variant={
-                recordingStatus === "recording" ? "secondary" : "outline"
-              }
-            >
-              <Radio className="mr-1 h-3.5 w-3.5" />
-              {getRecordingStatusLabel(recordingStatus)}
-            </Badge>
+
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+        <CardContent className="space-y-4">
         {!isConfigured ? (
           <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
             <p className="font-medium text-foreground">LiveKit setup required</p>
@@ -956,9 +1278,6 @@ export function ClassroomRoomClient({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">Your camera</p>
-              <Badge variant="outline">
-                {cameraEnabled ? "Camera on" : "Camera off"}
-              </Badge>
             </div>
             <div className="relative rounded-2xl border border-dashed bg-muted/20 p-3">
               <div
@@ -1055,50 +1374,104 @@ export function ClassroomRoomClient({
             </Button>
           ) : (
             <>
-              <Button variant="outline" onClick={() => void toggleCamera()}>
+              <Button
+                variant="outline"
+                className="size-[3.75rem]"
+                onClick={() => void toggleCamera()}
+                aria-label={cameraEnabled ? "Turn camera off" : "Turn camera on"}
+                title={cameraEnabled ? "Turn camera off" : "Turn camera on"}
+              >
                 {cameraEnabled ? (
-                  <>
-                    <VideoOff className="mr-2 h-4 w-4" />
-                    Turn camera off
-                  </>
+                  <Video className="h-6 w-6 text-emerald-600" />
                 ) : (
-                  <>
-                    <Video className="mr-2 h-4 w-4" />
-                    Turn camera on
-                  </>
+                  <VideoOff className="h-6 w-6 text-red-600" />
                 )}
-              </Button>
-              <Button variant="outline" onClick={() => void toggleMicrophone()}>
-                {microphoneEnabled ? (
-                  <>
-                    <MicOff className="mr-2 h-4 w-4" />
-                    Mute microphone
-                  </>
-                ) : (
-                  <>
-                    <Mic className="mr-2 h-4 w-4" />
-                    Unmute microphone
-                  </>
-                )}
-              </Button>
-              <Button variant="outline" onClick={() => void toggleScreenShare()}>
-                <Monitor className="mr-2 h-4 w-4" />
-                {screenShareEnabled ? "Stop sharing" : "Share screen"}
               </Button>
               <Button
                 variant="outline"
-                onClick={() => void togglePictureInPicture()}
-                disabled={!pictureInPictureSupported || !hasJoined}
+                className="size-[3.75rem]"
+                onClick={() => void toggleMicrophone()}
+                aria-label={
+                  microphoneEnabled ? "Mute microphone" : "Unmute microphone"
+                }
+                title={
+                  microphoneEnabled ? "Mute microphone" : "Unmute microphone"
+                }
               >
-                {pictureInPictureActive ? "Exit PiP" : "Open PiP"}
+                {microphoneEnabled ? (
+                  <Mic className="h-6 w-6 text-emerald-600" />
+                ) : (
+                  <MicOff className="h-6 w-6 text-red-600" />
+                )}
               </Button>
               <Button
+                variant="outline"
+                className="size-[3.75rem]"
+                onClick={() => void toggleScreenShare()}
+                aria-label={screenShareEnabled ? "Stop sharing" : "Share screen"}
+                title={screenShareEnabled ? "Stop sharing" : "Share screen"}
+              >
+                <Monitor
+                  className={`h-6 w-6 ${screenShareEnabled ? "text-emerald-600" : ""}`}
+                />
+              </Button>
+              <Button
+                variant="outline"
+                className="size-[3.75rem]"
+                onClick={() => void togglePictureInPicture()}
+                disabled={!pictureInPictureSupported || !hasJoined}
+                aria-label={pictureInPictureActive ? "Exit PiP" : "Open PiP"}
+                title={pictureInPictureActive ? "Exit PiP" : "Open PiP"}
+              >
+                <PictureInPicture2 className="h-6 w-6" />
+              </Button>
+              {role === "tutor" ? (
+                recordingStatus === "recording" ? (
+                  <Button
+                    variant="destructive"
+                    className="size-[3.75rem]"
+                    onClick={() => void updateRecording("stop")}
+                    disabled={isRecordingActionPending}
+                    aria-label="Stop recording"
+                    title="Stop recording"
+                  >
+                    {isRecordingActionPending ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      <Radio className="h-6 w-6" />
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="size-[3.75rem]"
+                    onClick={() => void updateRecording("start")}
+                    disabled={
+                      isRecordingActionPending ||
+                      startRecordingDisabledReason !== null
+                    }
+                    aria-label={
+                      startRecordingDisabledReason ?? "Start recording"
+                    }
+                    title={startRecordingDisabledReason ?? "Start recording"}
+                  >
+                    {isRecordingActionPending ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      <Radio className="h-6 w-6" />
+                    )}
+                  </Button>
+                )
+              ) : null}
+              <Button
                 variant="destructive"
+                className="size-[3.75rem]"
                 onClick={() => void handleDisconnect()}
                 disabled={isSyncingSession || isRecordingActionPending}
+                aria-label="Leave classroom"
+                title="Leave classroom"
               >
-                <PhoneOff className="mr-2 h-4 w-4" />
-                Leave classroom
+                <PhoneOff className="h-6 w-6" />
               </Button>
             </>
           )}
@@ -1152,12 +1525,15 @@ export function ClassroomRoomClient({
                   Screen sharing is live in this classroom session.
                 </p>
               ) : null}
+              {role === "tutor" &&
+              recordingStatus !== "recording" &&
+              startRecordingDisabledReason ? (
+                <p className="text-sm text-muted-foreground">
+                  {startRecordingDisabledReason}.
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">
-                <ShieldCheck className="mr-1 h-3.5 w-3.5" />
-                Consent {getRecordingConsentLabel(recordingConsentStatus)}
-              </Badge>
               <Badge
                 variant={
                   recordingStatus === "recording" ? "secondary" : "outline"
@@ -1167,82 +1543,6 @@ export function ClassroomRoomClient({
                 Recording {getRecordingStatusLabel(recordingStatus)}
               </Badge>
             </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {role === "tutor" ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => void updateConsent("granted")}
-                  disabled={
-                    isSyncingSession ||
-                    isRecordingActionPending ||
-                    recordingConsentStatus === "granted"
-                  }
-                >
-                  Confirm recording consent
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => void updateConsent("declined")}
-                  disabled={
-                    isSyncingSession ||
-                    isRecordingActionPending ||
-                    recordingConsentStatus === "declined"
-                  }
-                >
-                  Mark consent declined
-                </Button>
-                {recordingStatus === "recording" ? (
-                  <Button
-                    variant="destructive"
-                    onClick={() => void updateRecording("stop")}
-                    disabled={isRecordingActionPending}
-                  >
-                    {isRecordingActionPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Stopping recording...
-                      </>
-                    ) : (
-                      <>
-                        <Radio className="mr-2 h-4 w-4" />
-                        Stop recording
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => void updateRecording("start")}
-                    disabled={
-                      !hasJoined ||
-                      !recordingConfigured ||
-                      isRecordingActionPending ||
-                      recordingConsentStatus !== "granted" ||
-                      recordingStatus === "recording"
-                    }
-                  >
-                    {isRecordingActionPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Starting recording...
-                      </>
-                    ) : (
-                      <>
-                        <Radio className="mr-2 h-4 w-4" />
-                        Start recording
-                      </>
-                    )}
-                  </Button>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Only tutors can control classroom recordings. You can still see
-                the current consent and recording state here.
-              </p>
-            )}
           </div>
 
           {role === "tutor" && !recordingConfigured ? (
@@ -1258,12 +1558,54 @@ export function ClassroomRoomClient({
           ) : null}
         </div>
 
-        <div className="rounded-2xl border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-          {role === "tutor"
-            ? "Tutor participants currently receive room-admin grants for moderation and recording control inside the connection classroom."
-            : "Student participants receive classroom access only for their linked tutor connection and can publish their own media in the room."}
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {role === "tutor" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              Recording consent
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>
+              Turn this on after the student confirms consent for classroom
+              recording.
+            </p>
+            <p>
+              If consent is off, recording stays unavailable until you enable
+              it again.
+            </p>
+            <div className="flex flex-col gap-3 rounded-2xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <p className="font-medium text-foreground">
+                  Status: {getRecordingConsentLabel(recordingConsentStatus)}
+                </p>
+                <p>
+                  Use the toggle to grant or revoke recording permission.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 self-start sm:self-center">
+                <span className="text-sm text-muted-foreground">
+                  {recordingConsentStatus === "granted"
+                    ? "Granted"
+                    : "Not granted"}
+                </span>
+                <Switch
+                  checked={recordingConsentStatus === "granted"}
+                  onCheckedChange={(checked) => {
+                    void updateConsent(checked ? "granted" : "declined");
+                  }}
+                  disabled={isSyncingSession || isRecordingActionPending}
+                  aria-label="Toggle recording consent"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+    </>
   );
 }
