@@ -666,8 +666,8 @@ export function LessonRoomClient({
                   </p>
                   <p className="text-sm text-white/65">
                     Join the lesson room to launch the new LiveKit meeting
-                    layout with built-in device controls and the existing
-                    lesson recording workflow.
+                    layout with built-in device controls and the existing lesson
+                    recording workflow.
                   </p>
                 </div>
               </div>
@@ -718,9 +718,7 @@ export function LessonRoomClient({
                     <Mic className="h-4 w-4" />
                     Student mic tracks
                   </span>
-                  <Badge variant="outline">
-                    {remoteMicrophoneTrackCount}
-                  </Badge>
+                  <Badge variant="outline">{remoteMicrophoneTrackCount}</Badge>
                 </div>
                 <p className="text-muted-foreground">
                   Recording becomes available only when the student publishes a
@@ -756,7 +754,9 @@ export function LessonRoomClient({
             </div>
           ) : null}
 
-          {hasJoined && remoteParticipantCount > 0 && remoteVideoTrackCount === 0 ? (
+          {hasJoined &&
+          remoteParticipantCount > 0 &&
+          remoteVideoTrackCount === 0 ? (
             <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
               The other participant is connected, but no remote camera track is
               publishing yet.
@@ -883,8 +883,8 @@ export function LessonRoomClient({
               recording.
             </p>
             <p>
-              If consent is off, recording stays unavailable until you enable
-              it again.
+              If consent is off, recording stays unavailable until you enable it
+              again.
             </p>
             <div className="flex flex-col gap-3 rounded-2xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1">

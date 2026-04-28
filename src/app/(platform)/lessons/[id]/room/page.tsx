@@ -107,7 +107,9 @@ export default async function LessonRoomPage({
   const supabaseAdmin = createAdminClient();
   const { data: recordings, error: recordingsError } = await supabaseAdmin
     .from("lesson_room_recordings")
-    .select("id, created_at, status, duration_seconds, storage_bucket, storage_path")
+    .select(
+      "id, created_at, status, duration_seconds, storage_bucket, storage_path",
+    )
     .eq("lesson_id", id)
     .order("created_at", { ascending: false })
     .limit(12);
@@ -241,8 +243,8 @@ export default async function LessonRoomPage({
             <CardContent className="space-y-3 text-sm">
               {lessonRecordings.length === 0 ? (
                 <p className="text-muted-foreground">
-                  Saved student audio recordings will appear here once
-                  recording has been started and stopped from the lesson room.
+                  Saved student audio recordings will appear here once recording
+                  has been started and stopped from the lesson room.
                 </p>
               ) : (
                 lessonRecordings.map((recording) => {

@@ -187,20 +187,18 @@ export default async function ClassroomPage({
 
   if (access) {
     const supabaseAdmin = createAdminClient();
-    const [
-      { data: recordings, error: recordingsError },
-      recentSummaries,
-    ] = await Promise.all([
-      supabaseAdmin
-        .from("tutor_student_classroom_recordings")
-        .select(
-          "id, created_at, status, duration_seconds, storage_bucket, storage_path",
-        )
-        .eq("classroom_id", access.classroom.id)
-        .order("created_at", { ascending: false })
-        .limit(12),
-      listTutorStudentClassroomSessionSummaries(access.classroom.id),
-    ]);
+    const [{ data: recordings, error: recordingsError }, recentSummaries] =
+      await Promise.all([
+        supabaseAdmin
+          .from("tutor_student_classroom_recordings")
+          .select(
+            "id, created_at, status, duration_seconds, storage_bucket, storage_path",
+          )
+          .eq("classroom_id", access.classroom.id)
+          .order("created_at", { ascending: false })
+          .limit(12),
+        listTutorStudentClassroomSessionSummaries(access.classroom.id),
+      ]);
 
     if (recordingsError) {
       throw recordingsError;
@@ -211,7 +209,9 @@ export default async function ClassroomPage({
       createdAt: recording.created_at,
       status: recording.status,
       durationSeconds: recording.duration_seconds,
-      hasStoredMedia: Boolean(recording.storage_bucket && recording.storage_path),
+      hasStoredMedia: Boolean(
+        recording.storage_bucket && recording.storage_path,
+      ),
     }));
 
     sessionSummaries = recentSummaries
@@ -305,7 +305,6 @@ export default async function ClassroomPage({
                   : "This classroom is tied to the active tutor-student connection and can be used for ad-hoc sessions outside the lesson calendar."}
               </p>
             </div>
-
           </div>
 
           <div className="space-y-4">
@@ -316,7 +315,9 @@ export default async function ClassroomPage({
               serverUrl={liveKitServerUrl}
               initialRoomStatus={access.classroom.room_status}
               initialRecordingStatus={access.classroom.recording_status}
-              initialRecordingConsentStatus={access.classroom.recording_consent_status}
+              initialRecordingConsentStatus={
+                access.classroom.recording_consent_status
+              }
               recordingConfigured={liveKitRecordingConfigured}
               recordingConfigurationError={liveKitRecordingConfigurationError}
             />
@@ -326,7 +327,9 @@ export default async function ClassroomPage({
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
                     <Users className="h-5 w-5 text-primary" />
-                    {appLanguage === "uk" ? "Контекст кімнати" : "Classroom Context"}
+                    {appLanguage === "uk"
+                      ? "Контекст кімнати"
+                      : "Classroom Context"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
@@ -355,7 +358,10 @@ export default async function ClassroomPage({
                     <span className="font-medium">
                       {appLanguage === "uk" ? "Підключення" : "Connected"}:
                     </span>{" "}
-                    {formatConnectedAt(selectedConnection.connectedAt, appLanguage)}
+                    {formatConnectedAt(
+                      selectedConnection.connectedAt,
+                      appLanguage,
+                    )}
                   </p>
                 </CardContent>
               </Card>
@@ -463,7 +469,9 @@ export default async function ClassroomPage({
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
                     <Sparkles className="h-5 w-5 text-primary" />
-                    {appLanguage === "uk" ? "Інструменти classroom" : "Classroom Toolkit"}
+                    {appLanguage === "uk"
+                      ? "Інструменти classroom"
+                      : "Classroom Toolkit"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
@@ -525,13 +533,21 @@ export default async function ClassroomPage({
                             <div>
                               <p className="text-muted-foreground">Tutor</p>
                               <p className="font-medium text-foreground">
-                                {tutorShare}% • {formatDurationLabel(summary.tutorSpeakingSeconds, appLanguage)}
+                                {tutorShare}% •{" "}
+                                {formatDurationLabel(
+                                  summary.tutorSpeakingSeconds,
+                                  appLanguage,
+                                )}
                               </p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Student</p>
                               <p className="font-medium text-foreground">
-                                {studentShare}% • {formatDurationLabel(summary.studentSpeakingSeconds, appLanguage)}
+                                {studentShare}% •{" "}
+                                {formatDurationLabel(
+                                  summary.studentSpeakingSeconds,
+                                  appLanguage,
+                                )}
                               </p>
                             </div>
                           </div>

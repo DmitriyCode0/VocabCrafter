@@ -133,7 +133,8 @@ export async function POST(
   { params }: { params: Promise<{ connectionId: string }> },
 ) {
   const { connectionId } = await params;
-  const access = await requireTutorStudentClassroomParticipantAccess(connectionId);
+  const access =
+    await requireTutorStudentClassroomParticipantAccess(connectionId);
 
   if ("errorResponse" in access) {
     return access.errorResponse;
@@ -261,7 +262,9 @@ export async function POST(
       throw new Error("Gemini returned an empty transcription response");
     }
 
-    const transcription = transcriptResultSchema.parse(JSON.parse(responseText));
+    const transcription = transcriptResultSchema.parse(
+      JSON.parse(responseText),
+    );
     const result = await saveClassroomTranscriptAndSyncEvidence({
       access,
       recordingId: parsed.data.recordingId,

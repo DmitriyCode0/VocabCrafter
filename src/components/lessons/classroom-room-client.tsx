@@ -153,7 +153,10 @@ function getRecordingConsentLabel(status: string) {
 // Audio notification functions
 function playJoinSound() {
   try {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext;
     const audioContext = new AudioContextClass();
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -165,7 +168,10 @@ function playJoinSound() {
     oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
 
     gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.01,
+      audioContext.currentTime + 0.3,
+    );
 
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.3);
@@ -177,7 +183,10 @@ function playJoinSound() {
 
 function playLeaveSound() {
   try {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext;
     const audioContext = new AudioContextClass();
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -189,7 +198,10 @@ function playLeaveSound() {
     oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.1);
 
     gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.01,
+      audioContext.currentTime + 0.3,
+    );
 
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.3);
@@ -213,7 +225,9 @@ function formatSpeakingDuration(totalSeconds: number) {
 function getPiPTrackElements(container: HTMLDivElement | null) {
   return Array.from(
     container?.querySelectorAll("[data-pip-track-kind]") ?? [],
-  ).filter((element): element is HTMLDivElement => element instanceof HTMLDivElement);
+  ).filter(
+    (element): element is HTMLDivElement => element instanceof HTMLDivElement,
+  );
 }
 
 function getPiPTrackElement(
@@ -386,11 +400,11 @@ export function ClassroomRoomClient({
       ? "The student must join before recording can start"
       : remoteMicrophoneTrackCount === 0
         ? "The student must join with microphone enabled before recording can start"
-      : !recordingConfigured
-        ? "Recording storage setup is required"
-        : recordingConsentStatus !== "granted"
-          ? "Grant recording consent first"
-          : null;
+        : !recordingConfigured
+          ? "Recording storage setup is required"
+          : recordingConsentStatus !== "granted"
+            ? "Grant recording consent first"
+            : null;
 
   useEffect(() => {
     setRoomStatus(initialRoomStatus);
@@ -611,7 +625,11 @@ export function ClassroomRoomClient({
 
   const getPictureInPictureTiles = useCallback(() => {
     const trackElements = getPiPTrackElements(meetStageRef.current);
-    const localCameraTrack = getPiPTrackElement(trackElements, "local", "camera");
+    const localCameraTrack = getPiPTrackElement(
+      trackElements,
+      "local",
+      "camera",
+    );
     const remoteCameraTrack = getPiPTrackElement(
       trackElements,
       "remote",
@@ -663,7 +681,8 @@ export function ClassroomRoomClient({
     const gap = 16;
     const padding = 16;
     const canvasWidth = tileWidth + padding * 2;
-    const canvasHeight = padding * 2 + tiles.length * tileHeight + (tiles.length - 1) * gap;
+    const canvasHeight =
+      padding * 2 + tiles.length * tileHeight + (tiles.length - 1) * gap;
 
     if (canvas.width !== canvasWidth || canvas.height !== canvasHeight) {
       canvas.width = canvasWidth;
@@ -683,54 +702,51 @@ export function ClassroomRoomClient({
     );
   }, [getPictureInPictureTiles]);
 
-  const syncRoomState = useCallback(
-    (room: Room) => {
-      let nextRemoteMicrophoneTrackCount = 0;
-      let nextRemoteVideoTrackCount = 0;
-      let nextHasPausedRemoteVideo = false;
+  const syncRoomState = useCallback((room: Room) => {
+    let nextRemoteMicrophoneTrackCount = 0;
+    let nextRemoteVideoTrackCount = 0;
+    let nextHasPausedRemoteVideo = false;
 
-      for (const participant of room.remoteParticipants.values()) {
-        for (const publication of participant.videoTrackPublications.values()) {
-          const track = publication.track;
+    for (const participant of room.remoteParticipants.values()) {
+      for (const publication of participant.videoTrackPublications.values()) {
+        const track = publication.track;
 
-          if (!track || track.kind !== Track.Kind.Video) {
-            continue;
-          }
-
-          nextRemoteVideoTrackCount += 1;
-          nextHasPausedRemoteVideo ||=
-            track.streamState === Track.StreamState.Paused;
+        if (!track || track.kind !== Track.Kind.Video) {
+          continue;
         }
 
-        for (const publication of participant.audioTrackPublications.values()) {
-          const track = publication.track;
+        nextRemoteVideoTrackCount += 1;
+        nextHasPausedRemoteVideo ||=
+          track.streamState === Track.StreamState.Paused;
+      }
 
-          if (!track || track.kind !== Track.Kind.Audio) {
-            continue;
-          }
+      for (const publication of participant.audioTrackPublications.values()) {
+        const track = publication.track;
 
-          if (publication.source === Track.Source.Microphone) {
-            nextRemoteMicrophoneTrackCount += 1;
-          }
+        if (!track || track.kind !== Track.Kind.Audio) {
+          continue;
+        }
+
+        if (publication.source === Track.Source.Microphone) {
+          nextRemoteMicrophoneTrackCount += 1;
         }
       }
+    }
 
-      setCameraEnabled(room.localParticipant.isCameraEnabled);
-      setMicrophoneEnabled(room.localParticipant.isMicrophoneEnabled);
-      setRemoteParticipantCount(room.remoteParticipants.size);
-      setRemoteMicrophoneTrackCount(nextRemoteMicrophoneTrackCount);
-      setRemoteVideoTrackCount(nextRemoteVideoTrackCount);
-      setScreenShareEnabled(room.localParticipant.isScreenShareEnabled);
-      setHasPausedRemoteVideo(nextHasPausedRemoteVideo);
-      setIsVideoPlaybackBlocked(!room.canPlaybackVideo);
-      if (typeof document !== "undefined") {
-        setPictureInPictureActive(
-          document.pictureInPictureElement instanceof HTMLVideoElement,
-        );
-      }
-    },
-    [],
-  );
+    setCameraEnabled(room.localParticipant.isCameraEnabled);
+    setMicrophoneEnabled(room.localParticipant.isMicrophoneEnabled);
+    setRemoteParticipantCount(room.remoteParticipants.size);
+    setRemoteMicrophoneTrackCount(nextRemoteMicrophoneTrackCount);
+    setRemoteVideoTrackCount(nextRemoteVideoTrackCount);
+    setScreenShareEnabled(room.localParticipant.isScreenShareEnabled);
+    setHasPausedRemoteVideo(nextHasPausedRemoteVideo);
+    setIsVideoPlaybackBlocked(!room.canPlaybackVideo);
+    if (typeof document !== "undefined") {
+      setPictureInPictureActive(
+        document.pictureInPictureElement instanceof HTMLVideoElement,
+      );
+    }
+  }, []);
 
   const togglePictureInPicture = useCallback(async () => {
     if (typeof document === "undefined") {
@@ -746,7 +762,9 @@ export function ClassroomRoomClient({
       const tiles = getPictureInPictureTiles();
 
       if (!tiles.some((tile) => tile.video)) {
-        toast.error("Join the classroom and publish a camera or screen share first");
+        toast.error(
+          "Join the classroom and publish a camera or screen share first",
+        );
         return;
       }
 
@@ -768,9 +786,13 @@ export function ClassroomRoomClient({
 
       renderPictureInPictureFrame();
       await video.play();
-      video.addEventListener("leavepictureinpicture", stopPictureInPictureRenderer, {
-        once: true,
-      });
+      video.addEventListener(
+        "leavepictureinpicture",
+        stopPictureInPictureRenderer,
+        {
+          once: true,
+        },
+      );
       await video.requestPictureInPicture();
       setPictureInPictureActive(true);
     } catch (error) {
@@ -781,7 +803,12 @@ export function ClassroomRoomClient({
           : "Failed to toggle picture-in-picture",
       );
     }
-  }, [closePictureInPicture, getPictureInPictureTiles, renderPictureInPictureFrame, stopPictureInPictureRenderer]);
+  }, [
+    closePictureInPicture,
+    getPictureInPictureTiles,
+    renderPictureInPictureFrame,
+    stopPictureInPictureRenderer,
+  ]);
 
   const resumeRemoteVideo = useCallback(async () => {
     const room = roomRef.current;
@@ -862,10 +889,13 @@ export function ClassroomRoomClient({
     });
 
     try {
-      const response = await fetch(`/api/classroom/${connectionId}/room-token`, {
-        method: "POST",
-        cache: "no-store",
-      });
+      const response = await fetch(
+        `/api/classroom/${connectionId}/room-token`,
+        {
+          method: "POST",
+          cache: "no-store",
+        },
+      );
 
       const data = (await response.json().catch(() => null)) as
         | ClassroomJoinPayload
@@ -1062,351 +1092,358 @@ export function ClassroomRoomClient({
     <>
       <Card className="overflow-hidden">
         <CardHeader>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Video className="h-5 w-5 text-primary" />
-              Connection Classroom
-            </CardTitle>
-            <CardDescription>
-              {isConfigured
-                ? "Join the persistent classroom for this tutor-student connection. Recording consent and server-side classroom recordings are managed directly here now."
-                : "LiveKit is not configured yet, so the classroom cannot connect to realtime media yet."}
-            </CardDescription>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={statusTone}>
-              {getConnectionStateLabel(connectionState)}
-            </Badge>
-            <Badge variant="outline">{getRoomStatusLabel(roomStatus)}</Badge>
-
-          </div>
-        </div>
-      </CardHeader>
-        <CardContent className="space-y-4">
-        {!isConfigured ? (
-          <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">LiveKit setup required</p>
-            <p className="mt-2">
-              Configure <span className="font-mono">LIVEKIT_URL</span>,{" "}
-              <span className="font-mono">LIVEKIT_API_KEY</span>, and{" "}
-              <span className="font-mono">LIVEKIT_API_SECRET</span> to enable
-              classroom calls.
-            </p>
-          </div>
-        ) : null}
-
-        {serverUrl ? (
-          <div className="rounded-2xl border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-            Media server: <span className="font-medium text-foreground">{serverUrl}</span>
-          </div>
-        ) : null}
-
-        {joinError ? (
-          <div className="rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{joinError}</span>
-            </div>
-          </div>
-        ) : null}
-
-        {hasJoined && roomRef.current ? (
-          <LiveKitMeetStage
-            room={roomRef.current}
-            allowScreenShare
-            stageRef={meetStageRef}
-          />
-        ) : (
-          <div
-            data-lk-theme="default"
-            className="lk-room-container overflow-hidden rounded-[2rem] border border-border/60 bg-[radial-gradient(circle_at_top,_rgba(74,222,128,0.1),_transparent_35%),linear-gradient(180deg,_rgba(10,15,12,0.92),_rgba(3,7,4,0.98))] p-6 text-white shadow-[0_36px_120px_-48px_rgba(0,0,0,0.85)]"
-          >
-            <div className="flex min-h-[420px] items-center justify-center rounded-[1.75rem] border border-dashed border-white/10 bg-black/20 px-6 py-10 text-center">
-              <div className="max-w-md space-y-3">
-                <Video className="mx-auto h-10 w-10 text-white/80" />
-                <p className="text-lg font-semibold text-white">
-                  Meet-style classroom stage
-                </p>
-                <p className="text-sm text-white/65">
-                  Join the classroom to launch the new LiveKit meeting layout
-                  with built-in device controls, screen sharing, and the
-                  existing classroom recording workflow.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="grid gap-3 lg:grid-cols-4">
-          <div className="rounded-2xl border bg-muted/20 p-4">
-            <p className="text-sm text-muted-foreground">Your devices</p>
-            <div className="mt-3 space-y-2 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span>Camera</span>
-                <Badge variant="outline">{cameraEnabled ? "On" : "Off"}</Badge>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span>Microphone</span>
-                <Badge variant="outline">
-                  {microphoneEnabled ? "On" : "Off"}
-                </Badge>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-muted/20 p-4">
-            <p className="text-sm text-muted-foreground">Remote presence</p>
-            <div className="mt-3 space-y-2 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Participants
-                </span>
-                <Badge variant="outline">{remoteParticipantCount}</Badge>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span>Camera tracks</span>
-                <Badge variant="outline">{remoteVideoTrackCount}</Badge>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-muted/20 p-4">
-            <p className="text-sm text-muted-foreground">Recording input</p>
-            <div className="mt-3 space-y-2 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex items-center gap-2">
-                  <Mic className="h-4 w-4" />
-                  Student mic tracks
-                </span>
-                <Badge variant="outline">{remoteMicrophoneTrackCount}</Badge>
-              </div>
-              <p className="text-muted-foreground">
-                Classroom recording becomes available only when the student
-                publishes a microphone track.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-muted/20 p-4">
-            <p className="text-sm text-muted-foreground">Screen share</p>
-            <div className="mt-3 space-y-2 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex items-center gap-2">
-                  <Monitor className="h-4 w-4" />
-                  Share status
-                </span>
-                <Badge variant="outline">
-                  {screenShareEnabled ? "Live" : "Inactive"}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span>Picture-in-picture</span>
-                <Badge variant="outline">
-                  {pictureInPictureSupported ? "Supported" : "Unavailable"}
-                </Badge>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {hasJoined &&
-        remoteParticipantCount > 0 &&
-        remoteVideoTrackCount === 0 ? (
-          <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-            The other participant is connected, but no remote camera track is
-            publishing yet.
-          </div>
-        ) : null}
-
-        {hasJoined && remoteParticipantCount === 0 ? (
-          <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-            Waiting for the other participant to join.
-          </div>
-        ) : null}
-
-        {isVideoPlaybackBlocked ? (
-          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-700">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                Your browser blocked remote video playback. Resume it to see
-                the other camera.
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void resumeRemoteVideo()}
-              >
-                Resume video
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        {hasPausedRemoteVideo && !isVideoPlaybackBlocked ? (
-          <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-            Remote video is currently paused by the media pipeline. Keeping
-            this tab visible and reconnecting the classroom should restore it.
-          </div>
-        ) : null}
-
-        <div className="flex flex-wrap gap-2">
-          {!hasJoined ? (
-            <Button
-              onClick={handleJoin}
-              disabled={!isConfigured || isJoining || isSyncingSession}
-            >
-              {isJoining ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Joining classroom...
-                </>
-              ) : (
-                <>
-                  <Video className="mr-2 h-4 w-4" />
-                  Join classroom
-                </>
-              )}
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => void togglePictureInPicture()}
-                disabled={!pictureInPictureSupported || !hasJoined}
-              >
-                <PictureInPicture2 className="mr-2 h-4 w-4" />
-                {pictureInPictureActive ? "Exit PiP" : "Open PiP"}
-              </Button>
-              {role === "tutor" ? (
-                recordingStatus === "recording" ? (
-                  <Button
-                    variant="destructive"
-                    onClick={() => void updateRecording("stop")}
-                    disabled={isRecordingActionPending}
-                  >
-                    {isRecordingActionPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Radio className="mr-2 h-4 w-4" />
-                    )}
-                    Stop recording
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    onClick={() => void updateRecording("start")}
-                    disabled={
-                      isRecordingActionPending ||
-                      startRecordingDisabledReason !== null
-                    }
-                    title={startRecordingDisabledReason ?? "Start recording"}
-                  >
-                    {isRecordingActionPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Radio className="mr-2 h-4 w-4" />
-                    )}
-                    Start recording
-                  </Button>
-                )
-              ) : null}
-              <Button
-                variant="destructive"
-                onClick={() => void handleDisconnect()}
-                disabled={isSyncingSession || isRecordingActionPending}
-              >
-                <PhoneOff className="mr-2 h-4 w-4" />
-                Leave classroom
-              </Button>
-            </>
-          )}
-        </div>
-
-        <div className="rounded-2xl border bg-muted/20 p-4">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">
-              Speaking timer
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Live classroom speaking balance is tracked locally while the room
-              stays connected.
-            </p>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border bg-background/70 p-4">
-              <p className="text-sm text-muted-foreground">{localSpeakingLabel}</p>
-              <p className="mt-2 text-2xl font-semibold text-foreground">
-                {localSpeakingShare}%
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {formatSpeakingDuration(speakingTotals.local)}
-              </p>
-            </div>
-            <div className="rounded-2xl border bg-background/70 p-4">
-              <p className="text-sm text-muted-foreground">{remoteSpeakingLabel}</p>
-              <p className="mt-2 text-2xl font-semibold text-foreground">
-                {remoteSpeakingShare}%
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {formatSpeakingDuration(speakingTotals.remote)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border bg-muted/20 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">
-                Recording controls
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Classroom recording is tutor-controlled. Only student speech in
-                the saved transcript syncs into active vocabulary evidence.
-              </p>
-              {screenShareEnabled ? (
-                <p className="text-sm text-muted-foreground">
-                  Screen sharing is live in this classroom session.
-                </p>
-              ) : null}
-              {role === "tutor" &&
-              recordingStatus !== "recording" &&
-              startRecordingDisabledReason ? (
-                <p className="text-sm text-muted-foreground">
-                  {startRecordingDisabledReason}.
-                </p>
-              ) : null}
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Video className="h-5 w-5 text-primary" />
+                Connection Classroom
+              </CardTitle>
+              <CardDescription>
+                {isConfigured
+                  ? "Join the persistent classroom for this tutor-student connection. Recording consent and server-side classroom recordings are managed directly here now."
+                  : "LiveKit is not configured yet, so the classroom cannot connect to realtime media yet."}
+              </CardDescription>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge
-                variant={
-                  recordingStatus === "recording" ? "secondary" : "outline"
-                }
-              >
-                <Radio className="mr-1 h-3.5 w-3.5" />
-                Recording {getRecordingStatusLabel(recordingStatus)}
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={statusTone}>
+                {getConnectionStateLabel(connectionState)}
               </Badge>
+              <Badge variant="outline">{getRoomStatusLabel(roomStatus)}</Badge>
             </div>
           </div>
-
-          {role === "tutor" && !recordingConfigured ? (
-            <div className="mt-4 rounded-2xl border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!isConfigured ? (
+            <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
               <p className="font-medium text-foreground">
-                Recording storage setup required
+                LiveKit setup required
               </p>
-              <p className="mt-1">
-                {recordingConfigurationError ||
-                  "Add the LiveKit egress storage variables to enable server-side classroom recordings."}
+              <p className="mt-2">
+                Configure <span className="font-mono">LIVEKIT_URL</span>,{" "}
+                <span className="font-mono">LIVEKIT_API_KEY</span>, and{" "}
+                <span className="font-mono">LIVEKIT_API_SECRET</span> to enable
+                classroom calls.
               </p>
             </div>
           ) : null}
-        </div>
 
+          {serverUrl ? (
+            <div className="rounded-2xl border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+              Media server:{" "}
+              <span className="font-medium text-foreground">{serverUrl}</span>
+            </div>
+          ) : null}
+
+          {joinError ? (
+            <div className="rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{joinError}</span>
+              </div>
+            </div>
+          ) : null}
+
+          {hasJoined && roomRef.current ? (
+            <LiveKitMeetStage
+              room={roomRef.current}
+              allowScreenShare
+              stageRef={meetStageRef}
+            />
+          ) : (
+            <div
+              data-lk-theme="default"
+              className="lk-room-container overflow-hidden rounded-[2rem] border border-border/60 bg-[radial-gradient(circle_at_top,_rgba(74,222,128,0.1),_transparent_35%),linear-gradient(180deg,_rgba(10,15,12,0.92),_rgba(3,7,4,0.98))] p-6 text-white shadow-[0_36px_120px_-48px_rgba(0,0,0,0.85)]"
+            >
+              <div className="flex min-h-[420px] items-center justify-center rounded-[1.75rem] border border-dashed border-white/10 bg-black/20 px-6 py-10 text-center">
+                <div className="max-w-md space-y-3">
+                  <Video className="mx-auto h-10 w-10 text-white/80" />
+                  <p className="text-lg font-semibold text-white">
+                    Meet-style classroom stage
+                  </p>
+                  <p className="text-sm text-white/65">
+                    Join the classroom to launch the new LiveKit meeting layout
+                    with built-in device controls, screen sharing, and the
+                    existing classroom recording workflow.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-3 lg:grid-cols-4">
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <p className="text-sm text-muted-foreground">Your devices</p>
+              <div className="mt-3 space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span>Camera</span>
+                  <Badge variant="outline">
+                    {cameraEnabled ? "On" : "Off"}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Microphone</span>
+                  <Badge variant="outline">
+                    {microphoneEnabled ? "On" : "Off"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <p className="text-sm text-muted-foreground">Remote presence</p>
+              <div className="mt-3 space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Participants
+                  </span>
+                  <Badge variant="outline">{remoteParticipantCount}</Badge>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Camera tracks</span>
+                  <Badge variant="outline">{remoteVideoTrackCount}</Badge>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <p className="text-sm text-muted-foreground">Recording input</p>
+              <div className="mt-3 space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2">
+                    <Mic className="h-4 w-4" />
+                    Student mic tracks
+                  </span>
+                  <Badge variant="outline">{remoteMicrophoneTrackCount}</Badge>
+                </div>
+                <p className="text-muted-foreground">
+                  Classroom recording becomes available only when the student
+                  publishes a microphone track.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-muted/20 p-4">
+              <p className="text-sm text-muted-foreground">Screen share</p>
+              <div className="mt-3 space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2">
+                    <Monitor className="h-4 w-4" />
+                    Share status
+                  </span>
+                  <Badge variant="outline">
+                    {screenShareEnabled ? "Live" : "Inactive"}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Picture-in-picture</span>
+                  <Badge variant="outline">
+                    {pictureInPictureSupported ? "Supported" : "Unavailable"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {hasJoined &&
+          remoteParticipantCount > 0 &&
+          remoteVideoTrackCount === 0 ? (
+            <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+              The other participant is connected, but no remote camera track is
+              publishing yet.
+            </div>
+          ) : null}
+
+          {hasJoined && remoteParticipantCount === 0 ? (
+            <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+              Waiting for the other participant to join.
+            </div>
+          ) : null}
+
+          {isVideoPlaybackBlocked ? (
+            <div className="rounded-2xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-700">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                  Your browser blocked remote video playback. Resume it to see
+                  the other camera.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void resumeRemoteVideo()}
+                >
+                  Resume video
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {hasPausedRemoteVideo && !isVideoPlaybackBlocked ? (
+            <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+              Remote video is currently paused by the media pipeline. Keeping
+              this tab visible and reconnecting the classroom should restore it.
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            {!hasJoined ? (
+              <Button
+                onClick={handleJoin}
+                disabled={!isConfigured || isJoining || isSyncingSession}
+              >
+                {isJoining ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Joining classroom...
+                  </>
+                ) : (
+                  <>
+                    <Video className="mr-2 h-4 w-4" />
+                    Join classroom
+                  </>
+                )}
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => void togglePictureInPicture()}
+                  disabled={!pictureInPictureSupported || !hasJoined}
+                >
+                  <PictureInPicture2 className="mr-2 h-4 w-4" />
+                  {pictureInPictureActive ? "Exit PiP" : "Open PiP"}
+                </Button>
+                {role === "tutor" ? (
+                  recordingStatus === "recording" ? (
+                    <Button
+                      variant="destructive"
+                      onClick={() => void updateRecording("stop")}
+                      disabled={isRecordingActionPending}
+                    >
+                      {isRecordingActionPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Radio className="mr-2 h-4 w-4" />
+                      )}
+                      Stop recording
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={() => void updateRecording("start")}
+                      disabled={
+                        isRecordingActionPending ||
+                        startRecordingDisabledReason !== null
+                      }
+                      title={startRecordingDisabledReason ?? "Start recording"}
+                    >
+                      {isRecordingActionPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Radio className="mr-2 h-4 w-4" />
+                      )}
+                      Start recording
+                    </Button>
+                  )
+                ) : null}
+                <Button
+                  variant="destructive"
+                  onClick={() => void handleDisconnect()}
+                  disabled={isSyncingSession || isRecordingActionPending}
+                >
+                  <PhoneOff className="mr-2 h-4 w-4" />
+                  Leave classroom
+                </Button>
+              </>
+            )}
+          </div>
+
+          <div className="rounded-2xl border bg-muted/20 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">
+                Speaking timer
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Live classroom speaking balance is tracked locally while the
+                room stays connected.
+              </p>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border bg-background/70 p-4">
+                <p className="text-sm text-muted-foreground">
+                  {localSpeakingLabel}
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">
+                  {localSpeakingShare}%
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatSpeakingDuration(speakingTotals.local)}
+                </p>
+              </div>
+              <div className="rounded-2xl border bg-background/70 p-4">
+                <p className="text-sm text-muted-foreground">
+                  {remoteSpeakingLabel}
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">
+                  {remoteSpeakingShare}%
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatSpeakingDuration(speakingTotals.remote)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border bg-muted/20 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  Recording controls
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Classroom recording is tutor-controlled. Only student speech
+                  in the saved transcript syncs into active vocabulary evidence.
+                </p>
+                {screenShareEnabled ? (
+                  <p className="text-sm text-muted-foreground">
+                    Screen sharing is live in this classroom session.
+                  </p>
+                ) : null}
+                {role === "tutor" &&
+                recordingStatus !== "recording" &&
+                startRecordingDisabledReason ? (
+                  <p className="text-sm text-muted-foreground">
+                    {startRecordingDisabledReason}.
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge
+                  variant={
+                    recordingStatus === "recording" ? "secondary" : "outline"
+                  }
+                >
+                  <Radio className="mr-1 h-3.5 w-3.5" />
+                  Recording {getRecordingStatusLabel(recordingStatus)}
+                </Badge>
+              </div>
+            </div>
+
+            {role === "tutor" && !recordingConfigured ? (
+              <div className="mt-4 rounded-2xl border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">
+                  Recording storage setup required
+                </p>
+                <p className="mt-1">
+                  {recordingConfigurationError ||
+                    "Add the LiveKit egress storage variables to enable server-side classroom recordings."}
+                </p>
+              </div>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
@@ -1424,17 +1461,15 @@ export function ClassroomRoomClient({
               recording.
             </p>
             <p>
-              If consent is off, recording stays unavailable until you enable
-              it again.
+              If consent is off, recording stays unavailable until you enable it
+              again.
             </p>
             <div className="flex flex-col gap-3 rounded-2xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1">
                 <p className="font-medium text-foreground">
                   Status: {getRecordingConsentLabel(recordingConsentStatus)}
                 </p>
-                <p>
-                  Use the toggle to grant or revoke recording permission.
-                </p>
+                <p>Use the toggle to grant or revoke recording permission.</p>
               </div>
               <div className="flex items-center gap-3 self-start sm:self-center">
                 <span className="text-sm text-muted-foreground">

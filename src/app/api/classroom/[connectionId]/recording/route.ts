@@ -14,7 +14,10 @@ import {
   isLiveKitRecordingConfigured,
 } from "@/lib/livekit";
 
-function buildStudentParticipantIdentity(connectionId: string, studentId: string) {
+function buildStudentParticipantIdentity(
+  connectionId: string,
+  studentId: string,
+) {
   return `classroom:${connectionId}:student:${studentId}`;
 }
 
@@ -23,7 +26,8 @@ export async function POST(
   { params }: { params: Promise<{ connectionId: string }> },
 ) {
   const { connectionId } = await params;
-  const access = await requireTutorStudentClassroomParticipantAccess(connectionId);
+  const access =
+    await requireTutorStudentClassroomParticipantAccess(connectionId);
 
   if ("errorResponse" in access) {
     return access.errorResponse;
@@ -159,7 +163,9 @@ export async function POST(
           // Best-effort cleanup if persistence fails after starting egress.
         }
 
-        throw recordingError ?? new Error("Failed to persist classroom recording");
+        throw (
+          recordingError ?? new Error("Failed to persist classroom recording")
+        );
       }
 
       const { data: classroom, error: classroomError } = await supabaseAdmin
@@ -227,7 +233,8 @@ export async function POST(
     const durationSeconds = Math.max(
       0,
       Math.round(
-        (Date.parse(endedAtIso) - Date.parse(activeRecording.created_at)) / 1000,
+        (Date.parse(endedAtIso) - Date.parse(activeRecording.created_at)) /
+          1000,
       ),
     );
     const { data: recording, error: recordingError } = await supabaseAdmin

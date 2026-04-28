@@ -58,9 +58,7 @@ function isDownloadableStatus(status: string) {
 
 export async function GET(
   _request: Request,
-  {
-    params,
-  }: { params: Promise<{ id: string; recordingId: string }> },
+  { params }: { params: Promise<{ id: string; recordingId: string }> },
 ) {
   const { id, recordingId } = await params;
   const access = await requireLessonRoomParticipantAccess(id);
@@ -93,7 +91,10 @@ export async function GET(
 
   if (!recording.storage_bucket || !recording.storage_path) {
     return NextResponse.json(
-      { error: "The selected lesson recording does not have a stored media file" },
+      {
+        error:
+          "The selected lesson recording does not have a stored media file",
+      },
       { status: 409 },
     );
   }

@@ -22,10 +22,9 @@ interface LiveKitMeetStageProps {
 }
 
 function getTrackLabel(trackRef: TrackReferenceOrPlaceholder) {
-  const baseLabel =
-    trackRef.participant.isLocal
-      ? "You"
-      : trackRef.participant.name || trackRef.participant.identity;
+  const baseLabel = trackRef.participant.isLocal
+    ? "You"
+    : trackRef.participant.name || trackRef.participant.identity;
 
   return trackRef.source === Track.Source.ScreenShare
     ? `${baseLabel} screen`
@@ -40,7 +39,9 @@ function MeetParticipantTile({
   return (
     <div
       data-pip-label={getTrackLabel(trackRef)}
-      data-pip-participant-type={trackRef.participant.isLocal ? "local" : "remote"}
+      data-pip-participant-type={
+        trackRef.participant.isLocal ? "local" : "remote"
+      }
       data-pip-track-kind={
         trackRef.source === Track.Source.ScreenShare ? "screen" : "camera"
       }
@@ -75,7 +76,9 @@ function MeetStageLayout() {
       trackRef.publication.source === Track.Source.ScreenShare,
   );
   const primaryTrack = screenShareTracks[0] ?? tracks[0] ?? null;
-  const secondaryTracks = tracks.filter((trackRef) => trackRef !== primaryTrack);
+  const secondaryTracks = tracks.filter(
+    (trackRef) => trackRef !== primaryTrack,
+  );
 
   if (!primaryTrack) {
     return (
