@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   Loader2,
   Mic,
-  MicOff,
   Monitor,
   PictureInPicture2,
   PhoneOff,
@@ -22,9 +21,9 @@ import {
   ShieldCheck,
   Users,
   Video,
-  VideoOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import { LiveKitMeetStage } from "@/components/lessons/livekit-meet-stage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -211,71 +210,29 @@ function formatSpeakingDuration(totalSeconds: number) {
   return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
 
-function clearMediaContainer(container: HTMLDivElement | null) {
-  if (!container) {
-    return;
-  }
-
-  const mediaElements = Array.from(
-    container.querySelectorAll("audio, video"),
-  ) as HTMLMediaElement[];
-
-  for (const mediaElement of mediaElements) {
-    mediaElement.pause();
-    mediaElement.srcObject = null;
-    mediaElement.remove();
-  }
-
-  container.innerHTML = "";
+function getPiPTrackElements(container: HTMLDivElement | null) {
+  return Array.from(
+    container?.querySelectorAll("[data-pip-track-kind]") ?? [],
+  ).filter((element): element is HTMLDivElement => element instanceof HTMLDivElement);
 }
 
-function createParticipantVideoSlot(
-  label: string,
-  element: HTMLMediaElement,
+function getPiPTrackElement(
+  elements: HTMLDivElement[],
   participantType: PiPParticipantType,
   trackKind: PiPTrackKind,
 ) {
-  const wrapper = document.createElement("div");
-  wrapper.className =
-    "relative aspect-video overflow-hidden rounded-2xl border bg-black/95";
-
-  element.className = "h-full w-full object-cover";
-
-  if (element instanceof HTMLVideoElement) {
-    element.dataset.pipLabel = label;
-    element.dataset.pipParticipantType = participantType;
-    element.dataset.pipTrackKind = trackKind;
-  }
-
-  if (element instanceof HTMLVideoElement) {
-    element.autoplay = true;
-    element.playsInline = true;
-  }
-
-  const badge = document.createElement("div");
-  badge.className =
-    "absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white";
-  badge.textContent = label;
-
-  wrapper.appendChild(element);
-  wrapper.appendChild(badge);
-
-  return wrapper;
-}
-
-function getPiPVideoElements(container: HTMLDivElement | null) {
-  return Array.from(container?.querySelectorAll("video") ?? []).filter(
-    (element): element is HTMLVideoElement => element instanceof HTMLVideoElement,
-  );
-}
-
-function getPiPVideoByKind(
-  videos: HTMLVideoElement[],
-  trackKind: PiPTrackKind,
-) {
   return (
-    videos.find((video) => video.dataset.pipTrackKind === trackKind) ?? null
+    elements.find(
+      (element) =>
+        element.dataset.pipParticipantType === participantType &&
+        element.dataset.pipTrackKind === trackKind,
+    ) ?? null
   );
+}
+
+function getPiPTrackVideo(element: HTMLDivElement | null) {
+  const video = element?.querySelector("video") ?? null;
+  return video instanceof HTMLVideoElement ? video : null;
 }
 
 function drawPiPVideoFrame(
@@ -359,17 +316,6 @@ function drawPiPTile(
   context.fillText(tile.label, x + 40, y + 50);
 }
 
-function getTrackLabel(
-  defaultLabel: string,
-  source: Track.Source | undefined,
-) {
-  if (source === Track.Source.ScreenShare) {
-    return `${defaultLabel} screen`;
-  }
-
-  return defaultLabel;
-}
-
 export function ClassroomRoomClient({
   connectionId,
   role,
@@ -385,9 +331,7 @@ export function ClassroomRoomClient({
   const roomRef = useRef<Room | null>(null);
   const speakingTimerRef = useRef<number | null>(null);
   const speakingTotalsRef = useRef({ local: 0, remote: 0 });
-  const localVideoContainerRef = useRef<HTMLDivElement | null>(null);
-  const remoteVideoContainerRef = useRef<HTMLDivElement | null>(null);
-  const remoteAudioContainerRef = useRef<HTMLDivElement | null>(null);
+  const meetStageRef = useRef<HTMLDivElement | null>(null);
   const pictureInPictureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const pictureInPictureVideoRef = useRef<HTMLVideoElement | null>(null);
   const pictureInPictureFrameRef = useRef<number | null>(null);
@@ -403,6 +347,8 @@ export function ClassroomRoomClient({
   const [microphoneEnabled, setMicrophoneEnabled] = useState(false);
   const [screenShareEnabled, setScreenShareEnabled] = useState(false);
   const [remoteParticipantCount, setRemoteParticipantCount] = useState(0);
+  const [remoteMicrophoneTrackCount, setRemoteMicrophoneTrackCount] =
+    useState(0);
   const [remoteVideoTrackCount, setRemoteVideoTrackCount] = useState(0);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [recordingStatus, setRecordingStatus] = useState(
@@ -438,6 +384,8 @@ export function ClassroomRoomClient({
     ? "Join the classroom first"
     : remoteParticipantCount === 0
       ? "The student must join before recording can start"
+      : remoteMicrophoneTrackCount === 0
+        ? "The student must join with microphone enabled before recording can start"
       : !recordingConfigured
         ? "Recording storage setup is required"
         : recordingConsentStatus !== "granted"
@@ -609,12 +557,6 @@ export function ClassroomRoomClient({
     [connectionId, postJson, refreshRoute],
   );
 
-  const clearMediaElements = useCallback(() => {
-    clearMediaContainer(localVideoContainerRef.current);
-    clearMediaContainer(remoteVideoContainerRef.current);
-    clearMediaContainer(remoteAudioContainerRef.current);
-  }, []);
-
   const resetSpeakingTimer = useCallback(() => {
     if (speakingTimerRef.current !== null) {
       window.clearInterval(speakingTimerRef.current);
@@ -668,32 +610,35 @@ export function ClassroomRoomClient({
   }, [stopPictureInPictureRenderer]);
 
   const getPictureInPictureTiles = useCallback(() => {
-    const localVideos = getPiPVideoElements(localVideoContainerRef.current);
-    const remoteVideos = getPiPVideoElements(remoteVideoContainerRef.current);
-    const localCameraVideo = getPiPVideoByKind(localVideos, "camera");
-    const remoteCameraVideo = getPiPVideoByKind(remoteVideos, "camera");
-    const screenShareVideos = [...localVideos, ...remoteVideos].filter(
-      (video) => video.dataset.pipTrackKind === "screen",
+    const trackElements = getPiPTrackElements(meetStageRef.current);
+    const localCameraTrack = getPiPTrackElement(trackElements, "local", "camera");
+    const remoteCameraTrack = getPiPTrackElement(
+      trackElements,
+      "remote",
+      "camera",
+    );
+    const screenShareTracks = trackElements.filter(
+      (element) => element.dataset.pipTrackKind === "screen",
     );
     const remoteParticipantLabel = role === "tutor" ? "Student" : "Tutor";
 
     return [
       {
-        label: localCameraVideo?.dataset.pipLabel || "You",
-        video: localCameraVideo,
+        label: localCameraTrack?.dataset.pipLabel || "You",
+        video: getPiPTrackVideo(localCameraTrack),
         placeholder: "Your camera is off",
       },
       {
-        label: remoteCameraVideo?.dataset.pipLabel || remoteParticipantLabel,
-        video: remoteCameraVideo,
+        label: remoteCameraTrack?.dataset.pipLabel || remoteParticipantLabel,
+        video: getPiPTrackVideo(remoteCameraTrack),
         placeholder:
           remoteParticipantCount > 0
             ? `${remoteParticipantLabel} camera is off`
             : `Waiting for ${remoteParticipantLabel.toLowerCase()}`,
       },
-      ...screenShareVideos.map((video) => ({
-        label: video.dataset.pipLabel || "Screen share",
-        video,
+      ...screenShareTracks.map((element) => ({
+        label: element.dataset.pipLabel || "Screen share",
+        video: getPiPTrackVideo(element),
         placeholder: "Screen share is unavailable",
       })),
     ] satisfies PiPVideoTile[];
@@ -738,54 +683,13 @@ export function ClassroomRoomClient({
     );
   }, [getPictureInPictureTiles]);
 
-  const syncRoomMedia = useCallback(
+  const syncRoomState = useCallback(
     (room: Room) => {
-      clearMediaElements();
-
-      const localVideoContainer = localVideoContainerRef.current;
-      const remoteVideoContainer = remoteVideoContainerRef.current;
-      const remoteAudioContainer = remoteAudioContainerRef.current;
-
-      if (
-        !localVideoContainer ||
-        !remoteVideoContainer ||
-        !remoteAudioContainer
-      ) {
-        return;
-      }
-
+      let nextRemoteMicrophoneTrackCount = 0;
       let nextRemoteVideoTrackCount = 0;
       let nextHasPausedRemoteVideo = false;
-      let nextScreenShareEnabled = false;
-
-      for (const publication of room.localParticipant.videoTrackPublications.values()) {
-        const track = publication.track;
-
-        if (!track || track.kind !== Track.Kind.Video) {
-          continue;
-        }
-
-        const element = track.attach();
-
-        if (element instanceof HTMLVideoElement) {
-          element.muted = true;
-        }
-
-        nextScreenShareEnabled ||= publication.source === Track.Source.ScreenShare;
-
-        localVideoContainer.appendChild(
-          createParticipantVideoSlot(
-            getTrackLabel("You", publication.source),
-            element,
-            "local",
-            publication.source === Track.Source.ScreenShare ? "screen" : "camera",
-          ),
-        );
-      }
 
       for (const participant of room.remoteParticipants.values()) {
-        const participantLabel = participant.name || participant.identity;
-
         for (const publication of participant.videoTrackPublications.values()) {
           const track = publication.track;
 
@@ -796,16 +700,6 @@ export function ClassroomRoomClient({
           nextRemoteVideoTrackCount += 1;
           nextHasPausedRemoteVideo ||=
             track.streamState === Track.StreamState.Paused;
-
-          const element = track.attach();
-          remoteVideoContainer.appendChild(
-            createParticipantVideoSlot(
-              getTrackLabel(participantLabel, publication.source),
-              element,
-              "remote",
-              publication.source === Track.Source.ScreenShare ? "screen" : "camera",
-            ),
-          );
         }
 
         for (const publication of participant.audioTrackPublications.values()) {
@@ -815,20 +709,18 @@ export function ClassroomRoomClient({
             continue;
           }
 
-          const element = track.attach();
-
-          if (element instanceof HTMLAudioElement) {
-            element.autoplay = true;
+          if (publication.source === Track.Source.Microphone) {
+            nextRemoteMicrophoneTrackCount += 1;
           }
-
-          element.className = "hidden";
-          remoteAudioContainer.appendChild(element);
         }
       }
 
+      setCameraEnabled(room.localParticipant.isCameraEnabled);
+      setMicrophoneEnabled(room.localParticipant.isMicrophoneEnabled);
       setRemoteParticipantCount(room.remoteParticipants.size);
+      setRemoteMicrophoneTrackCount(nextRemoteMicrophoneTrackCount);
       setRemoteVideoTrackCount(nextRemoteVideoTrackCount);
-      setScreenShareEnabled(nextScreenShareEnabled);
+      setScreenShareEnabled(room.localParticipant.isScreenShareEnabled);
       setHasPausedRemoteVideo(nextHasPausedRemoteVideo);
       setIsVideoPlaybackBlocked(!room.canPlaybackVideo);
       if (typeof document !== "undefined") {
@@ -837,7 +729,7 @@ export function ClassroomRoomClient({
         );
       }
     },
-    [clearMediaElements],
+    [],
   );
 
   const togglePictureInPicture = useCallback(async () => {
@@ -922,31 +814,31 @@ export function ClassroomRoomClient({
     const room = new Room({ dynacast: true });
     roomRef.current = room;
 
-    const syncMedia = () => syncRoomMedia(room);
+    const syncState = () => syncRoomState(room);
 
     room.on(RoomEvent.ConnectionStateChanged, (state) => {
       setConnectionState(state);
     });
-    room.on(RoomEvent.Connected, syncMedia);
+    room.on(RoomEvent.Connected, syncState);
     room.on(RoomEvent.ParticipantConnected, (participant) => {
-      syncMedia();
+      syncState();
       // Only play sound for remote participants (not ourselves)
       if (participant.identity !== room.localParticipant.identity) {
         playJoinSound();
       }
     });
     room.on(RoomEvent.ParticipantDisconnected, (participant) => {
-      syncMedia();
+      syncState();
       // Only play sound for remote participants (not ourselves)
       if (participant.identity !== room.localParticipant.identity) {
         playLeaveSound();
       }
     });
-    room.on(RoomEvent.TrackSubscribed, syncMedia);
-    room.on(RoomEvent.TrackUnsubscribed, syncMedia);
-    room.on(RoomEvent.TrackStreamStateChanged, syncMedia);
-    room.on(RoomEvent.LocalTrackPublished, syncMedia);
-    room.on(RoomEvent.LocalTrackUnpublished, syncMedia);
+    room.on(RoomEvent.TrackSubscribed, syncState);
+    room.on(RoomEvent.TrackUnsubscribed, syncState);
+    room.on(RoomEvent.TrackStreamStateChanged, syncState);
+    room.on(RoomEvent.LocalTrackPublished, syncState);
+    room.on(RoomEvent.LocalTrackUnpublished, syncState);
     room.on(RoomEvent.VideoPlaybackStatusChanged, (canPlayback) => {
       setIsVideoPlaybackBlocked(!canPlayback);
     });
@@ -955,7 +847,6 @@ export function ClassroomRoomClient({
         roomRef.current = null;
       }
 
-      clearMediaElements();
       setHasJoined(false);
       setCameraEnabled(false);
       setMicrophoneEnabled(false);
@@ -963,6 +854,7 @@ export function ClassroomRoomClient({
       void closePictureInPicture();
       resetSpeakingTimer();
       setRemoteParticipantCount(0);
+      setRemoteMicrophoneTrackCount(0);
       setRemoteVideoTrackCount(0);
       setHasPausedRemoteVideo(false);
       setIsVideoPlaybackBlocked(false);
@@ -1002,15 +894,13 @@ export function ClassroomRoomClient({
 
       try {
         await room.localParticipant.enableCameraAndMicrophone();
-        setCameraEnabled(true);
-        setMicrophoneEnabled(true);
       } catch {
         setJoinError(
-          "Connected to the classroom, but camera or microphone access was denied. Use the controls below to retry.",
+          "Connected to the classroom, but camera or microphone access was denied. Use the LiveKit controls below to retry.",
         );
       }
 
-      syncMedia();
+      syncState();
       setIsVideoPlaybackBlocked(!room.canPlaybackVideo);
 
       try {
@@ -1027,7 +917,6 @@ export function ClassroomRoomClient({
         roomRef.current = null;
       }
 
-      clearMediaElements();
       setHasJoined(false);
       setCameraEnabled(false);
       setMicrophoneEnabled(false);
@@ -1035,6 +924,7 @@ export function ClassroomRoomClient({
       void closePictureInPicture();
       resetSpeakingTimer();
       setRemoteParticipantCount(0);
+      setRemoteMicrophoneTrackCount(0);
       setRemoteVideoTrackCount(0);
       setHasPausedRemoteVideo(false);
       setIsVideoPlaybackBlocked(false);
@@ -1074,7 +964,6 @@ export function ClassroomRoomClient({
     try {
       await room.disconnect(true);
     } finally {
-      clearMediaElements();
       setHasJoined(false);
       setCameraEnabled(false);
       setMicrophoneEnabled(false);
@@ -1082,6 +971,7 @@ export function ClassroomRoomClient({
       void closePictureInPicture();
       resetSpeakingTimer();
       setRemoteParticipantCount(0);
+      setRemoteMicrophoneTrackCount(0);
       setRemoteVideoTrackCount(0);
       setHasPausedRemoteVideo(false);
       setIsVideoPlaybackBlocked(false);
@@ -1096,57 +986,6 @@ export function ClassroomRoomClient({
             : "Left the classroom, but failed to sync room state",
         );
       }
-    }
-  }
-
-  async function toggleCamera() {
-    const room = roomRef.current;
-
-    if (!room) {
-      return;
-    }
-
-    const nextEnabled = !cameraEnabled;
-    await room.localParticipant.setCameraEnabled(nextEnabled);
-    setCameraEnabled(nextEnabled);
-    syncRoomMedia(room);
-  }
-
-  async function toggleMicrophone() {
-    const room = roomRef.current;
-
-    if (!room) {
-      return;
-    }
-
-    const nextEnabled = !microphoneEnabled;
-    await room.localParticipant.setMicrophoneEnabled(nextEnabled);
-    setMicrophoneEnabled(nextEnabled);
-    syncRoomMedia(room);
-  }
-
-  async function toggleScreenShare() {
-    const room = roomRef.current;
-
-    if (!room) {
-      return;
-    }
-
-    const nextEnabled = !screenShareEnabled;
-
-    try {
-      await room.localParticipant.setScreenShareEnabled(nextEnabled);
-      setScreenShareEnabled(nextEnabled);
-      syncRoomMedia(room);
-      toast.success(
-        nextEnabled ? "Screen sharing started" : "Screen sharing stopped",
-      );
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to update screen sharing",
-      );
     }
   }
 
@@ -1203,10 +1042,9 @@ export function ClassroomRoomClient({
       }
 
       void closePictureInPicture();
-      clearMediaElements();
       resetSpeakingTimer();
     };
-  }, [clearMediaElements, closePictureInPicture, resetSpeakingTimer]);
+  }, [closePictureInPicture, resetSpeakingTimer]);
 
   const statusTone = useMemo(() => {
     if (isConnected) {
@@ -1274,85 +1112,146 @@ export function ClassroomRoomClient({
           </div>
         ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Your camera</p>
+        {hasJoined && roomRef.current ? (
+          <LiveKitMeetStage
+            room={roomRef.current}
+            allowScreenShare
+            stageRef={meetStageRef}
+          />
+        ) : (
+          <div
+            data-lk-theme="default"
+            className="lk-room-container overflow-hidden rounded-[2rem] border border-border/60 bg-[radial-gradient(circle_at_top,_rgba(74,222,128,0.1),_transparent_35%),linear-gradient(180deg,_rgba(10,15,12,0.92),_rgba(3,7,4,0.98))] p-6 text-white shadow-[0_36px_120px_-48px_rgba(0,0,0,0.85)]"
+          >
+            <div className="flex min-h-[420px] items-center justify-center rounded-[1.75rem] border border-dashed border-white/10 bg-black/20 px-6 py-10 text-center">
+              <div className="max-w-md space-y-3">
+                <Video className="mx-auto h-10 w-10 text-white/80" />
+                <p className="text-lg font-semibold text-white">
+                  Meet-style classroom stage
+                </p>
+                <p className="text-sm text-white/65">
+                  Join the classroom to launch the new LiveKit meeting layout
+                  with built-in device controls, screen sharing, and the
+                  existing classroom recording workflow.
+                </p>
+              </div>
             </div>
-            <div className="relative rounded-2xl border border-dashed bg-muted/20 p-3">
-              <div
-                ref={localVideoContainerRef}
-                className="grid min-h-[220px] gap-3"
-              />
-              {!hasJoined ? (
-                <div className="pointer-events-none absolute inset-3 flex items-center justify-center">
-                  <div className="space-y-2 text-center text-sm text-muted-foreground">
-                    <Video className="mx-auto h-8 w-8" />
-                    <p>Join the classroom to publish your local video.</p>
-                  </div>
-                </div>
-              ) : null}
+          </div>
+        )}
+
+        <div className="grid gap-3 lg:grid-cols-4">
+          <div className="rounded-2xl border bg-muted/20 p-4">
+            <p className="text-sm text-muted-foreground">Your devices</p>
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span>Camera</span>
+                <Badge variant="outline">{cameraEnabled ? "On" : "Off"}</Badge>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Microphone</span>
+                <Badge variant="outline">
+                  {microphoneEnabled ? "On" : "Off"}
+                </Badge>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Remote participants</p>
-              <Badge variant="outline">
-                <Users className="mr-1 h-3.5 w-3.5" />
-                {remoteParticipantCount}
-              </Badge>
-            </div>
-            <div className="relative rounded-2xl border border-dashed bg-muted/20 p-3">
-              <div
-                ref={remoteVideoContainerRef}
-                className="grid min-h-[220px] gap-3"
-              />
-              {hasJoined &&
-              remoteParticipantCount > 0 &&
-              remoteVideoTrackCount === 0 ? (
-                <div className="pointer-events-none absolute inset-3 flex items-center justify-center">
-                  <div className="rounded-2xl border border-dashed bg-background/60 p-6 text-center text-sm text-muted-foreground">
-                    The other participant is connected, but no remote camera
-                    track is publishing yet.
-                  </div>
-                </div>
-              ) : null}
-              {hasJoined && remoteParticipantCount === 0 ? (
-                <div className="pointer-events-none absolute inset-3 flex items-center justify-center">
-                  <div className="rounded-2xl border border-dashed bg-background/60 p-6 text-center text-sm text-muted-foreground">
-                    Waiting for the other participant to join.
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            {isVideoPlaybackBlocked ? (
-              <div className="rounded-2xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-700">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <span>
-                    Your browser blocked remote video playback. Resume it to see
-                    the other camera.
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void resumeRemoteVideo()}
-                  >
-                    Resume video
-                  </Button>
-                </div>
+          <div className="rounded-2xl border bg-muted/20 p-4">
+            <p className="text-sm text-muted-foreground">Remote presence</p>
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Participants
+                </span>
+                <Badge variant="outline">{remoteParticipantCount}</Badge>
               </div>
-            ) : null}
-            {hasPausedRemoteVideo && !isVideoPlaybackBlocked ? (
-              <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                Remote video is currently paused by the media pipeline. Keeping
-                this tab visible and reconnecting the classroom should restore it.
+              <div className="flex items-center justify-between gap-3">
+                <span>Camera tracks</span>
+                <Badge variant="outline">{remoteVideoTrackCount}</Badge>
               </div>
-            ) : null}
-            <div ref={remoteAudioContainerRef} className="hidden" />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border bg-muted/20 p-4">
+            <p className="text-sm text-muted-foreground">Recording input</p>
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2">
+                  <Mic className="h-4 w-4" />
+                  Student mic tracks
+                </span>
+                <Badge variant="outline">{remoteMicrophoneTrackCount}</Badge>
+              </div>
+              <p className="text-muted-foreground">
+                Classroom recording becomes available only when the student
+                publishes a microphone track.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border bg-muted/20 p-4">
+            <p className="text-sm text-muted-foreground">Screen share</p>
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2">
+                  <Monitor className="h-4 w-4" />
+                  Share status
+                </span>
+                <Badge variant="outline">
+                  {screenShareEnabled ? "Live" : "Inactive"}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Picture-in-picture</span>
+                <Badge variant="outline">
+                  {pictureInPictureSupported ? "Supported" : "Unavailable"}
+                </Badge>
+              </div>
+            </div>
           </div>
         </div>
+
+        {hasJoined &&
+        remoteParticipantCount > 0 &&
+        remoteVideoTrackCount === 0 ? (
+          <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+            The other participant is connected, but no remote camera track is
+            publishing yet.
+          </div>
+        ) : null}
+
+        {hasJoined && remoteParticipantCount === 0 ? (
+          <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+            Waiting for the other participant to join.
+          </div>
+        ) : null}
+
+        {isVideoPlaybackBlocked ? (
+          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-700">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Your browser blocked remote video playback. Resume it to see
+                the other camera.
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void resumeRemoteVideo()}
+              >
+                Resume video
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {hasPausedRemoteVideo && !isVideoPlaybackBlocked ? (
+          <div className="rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+            Remote video is currently paused by the media pipeline. Keeping
+            this tab visible and reconnecting the classroom should restore it.
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           {!hasJoined ? (
@@ -1376,102 +1275,52 @@ export function ClassroomRoomClient({
             <>
               <Button
                 variant="outline"
-                className="size-[3.75rem]"
-                onClick={() => void toggleCamera()}
-                aria-label={cameraEnabled ? "Turn camera off" : "Turn camera on"}
-                title={cameraEnabled ? "Turn camera off" : "Turn camera on"}
-              >
-                {cameraEnabled ? (
-                  <Video className="h-6 w-6 text-emerald-600" />
-                ) : (
-                  <VideoOff className="h-6 w-6 text-red-600" />
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                className="size-[3.75rem]"
-                onClick={() => void toggleMicrophone()}
-                aria-label={
-                  microphoneEnabled ? "Mute microphone" : "Unmute microphone"
-                }
-                title={
-                  microphoneEnabled ? "Mute microphone" : "Unmute microphone"
-                }
-              >
-                {microphoneEnabled ? (
-                  <Mic className="h-6 w-6 text-emerald-600" />
-                ) : (
-                  <MicOff className="h-6 w-6 text-red-600" />
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                className="size-[3.75rem]"
-                onClick={() => void toggleScreenShare()}
-                aria-label={screenShareEnabled ? "Stop sharing" : "Share screen"}
-                title={screenShareEnabled ? "Stop sharing" : "Share screen"}
-              >
-                <Monitor
-                  className={`h-6 w-6 ${screenShareEnabled ? "text-emerald-600" : ""}`}
-                />
-              </Button>
-              <Button
-                variant="outline"
-                className="size-[3.75rem]"
                 onClick={() => void togglePictureInPicture()}
                 disabled={!pictureInPictureSupported || !hasJoined}
-                aria-label={pictureInPictureActive ? "Exit PiP" : "Open PiP"}
-                title={pictureInPictureActive ? "Exit PiP" : "Open PiP"}
               >
-                <PictureInPicture2 className="h-6 w-6" />
+                <PictureInPicture2 className="mr-2 h-4 w-4" />
+                {pictureInPictureActive ? "Exit PiP" : "Open PiP"}
               </Button>
               {role === "tutor" ? (
                 recordingStatus === "recording" ? (
                   <Button
                     variant="destructive"
-                    className="size-[3.75rem]"
                     onClick={() => void updateRecording("stop")}
                     disabled={isRecordingActionPending}
-                    aria-label="Stop recording"
-                    title="Stop recording"
                   >
                     {isRecordingActionPending ? (
-                      <Loader2 className="h-6 w-6 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <Radio className="h-6 w-6" />
+                      <Radio className="mr-2 h-4 w-4" />
                     )}
+                    Stop recording
                   </Button>
                 ) : (
                   <Button
                     variant="outline"
-                    className="size-[3.75rem]"
                     onClick={() => void updateRecording("start")}
                     disabled={
                       isRecordingActionPending ||
                       startRecordingDisabledReason !== null
                     }
-                    aria-label={
-                      startRecordingDisabledReason ?? "Start recording"
-                    }
                     title={startRecordingDisabledReason ?? "Start recording"}
                   >
                     {isRecordingActionPending ? (
-                      <Loader2 className="h-6 w-6 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <Radio className="h-6 w-6" />
+                      <Radio className="mr-2 h-4 w-4" />
                     )}
+                    Start recording
                   </Button>
                 )
               ) : null}
               <Button
                 variant="destructive"
-                className="size-[3.75rem]"
                 onClick={() => void handleDisconnect()}
                 disabled={isSyncingSession || isRecordingActionPending}
-                aria-label="Leave classroom"
-                title="Leave classroom"
               >
-                <PhoneOff className="h-6 w-6" />
+                <PhoneOff className="mr-2 h-4 w-4" />
+                Leave classroom
               </Button>
             </>
           )}

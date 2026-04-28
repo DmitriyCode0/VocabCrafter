@@ -115,23 +115,31 @@ export async function POST(
         );
       }
 
+      if (!studentParticipant.track?.sid) {
+        return NextResponse.json(
+          {
+            error:
+              "The student must be connected with microphone enabled before recording can start",
+          },
+          { status: 409 },
+        );
+      }
+
       const output = createLiveKitRecordingOutput({
         lessonId: id,
         sessionId: access.session.id,
       });
       const nowIso = new Date().toISOString();
       const egressClient = createLiveKitEgressClient();
-      const egressInfo = await egressClient.startParticipantEgress(
+      const egressInfo = await egressClient.startTrackEgress(
         access.session.provider_room_key,
-        studentParticipantIdentity,
         output,
+        studentParticipant.track.sid,
       );
 
       const storageBucket =
-        output.file?.output.case === "s3"
-          ? output.file.output.value.bucket
-          : null;
-      const storagePath = output.file?.filepath ?? null;
+        output.output.case === "s3" ? output.output.value.bucket : null;
+      const storagePath = output.filepath ?? null;
       const { data: recording, error: recordingError } = await supabaseAdmin
         .from("lesson_room_recordings")
         .insert({

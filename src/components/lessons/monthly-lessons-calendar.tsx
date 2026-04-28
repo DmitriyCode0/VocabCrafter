@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { CreateLessonDialog } from "@/components/lessons/create-lesson-dialog";
 import { DeleteLessonButton } from "@/components/lessons/delete-lesson-button";
@@ -126,11 +125,6 @@ export function MonthlyLessonsCalendar({
               <Badge variant="outline">
                 {formatLessonCurrency(lesson.priceCents)}
               </Badge>
-            ) : null}
-            {!compact ? (
-              <Button asChild variant="outline" size="sm" className="h-8">
-                <Link href={`/lessons/${lesson.id}/room`}>Open room</Link>
-              </Button>
             ) : null}
             {showManageActions ? (
               <div className="flex items-center gap-1">

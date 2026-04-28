@@ -386,16 +386,16 @@ export default async function ClassroomPage({
                   <CardTitle className="flex items-center gap-2 text-base">
                     <Download className="h-5 w-5 text-primary" />
                     {appLanguage === "uk"
-                      ? "Аудіокліпи студента"
-                      : "Student Audio Clips"}
+                      ? "Аудіозаписи студента"
+                      : "Student Audio Recordings"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   {classroomRecordings.length === 0 ? (
                     <p className="text-muted-foreground">
                       {appLanguage === "uk"
-                        ? "Збережені аудіокліпи студента з’являться тут після старту й зупинки запису у classroom."
-                        : "Saved student audio clips will appear here after classroom recording has been started and stopped."}
+                        ? "Збережені аудіозаписи студента з’являться тут після старту й зупинки запису у classroom."
+                        : "Saved student audio recordings will appear here after classroom recording has been started and stopped."}
                     </p>
                   ) : (
                     classroomRecordings.map((recording) => {

@@ -59,6 +59,10 @@ function getRecordingMimeType(
     return "audio/mpeg";
   }
 
+  if (normalizedPath.endsWith(".ogg") || normalizedPath.endsWith(".oga")) {
+    return "audio/ogg";
+  }
+
   if (normalizedPath.endsWith(".wav")) {
     return "audio/wav";
   }

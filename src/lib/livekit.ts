@@ -2,14 +2,12 @@ import "server-only";
 
 import {
   AccessToken,
-  EncodedFileOutput,
+  DirectFileOutput,
   EgressClient,
-  EncodedFileType,
   EncodingOptionsPreset,
   RoomServiceClient,
   S3Upload,
   TrackSource,
-  type EncodedOutputs,
 } from "livekit-server-sdk";
 import type { Role } from "@/types/roles";
 
@@ -166,7 +164,7 @@ export function createLiveKitEgressClient() {
 export function createLiveKitRecordingOutput({
   lessonId,
   sessionId,
-}: LiveKitRecordingOutputOptions): EncodedOutputs {
+}: LiveKitRecordingOutputOptions) {
   const config = getLiveKitRecordingTargetConfig();
 
   if (!config) {
@@ -180,35 +178,32 @@ export function createLiveKitRecordingOutput({
   const prefix = config.filePrefix
     ? `${config.filePrefix.replace(/^\/+|\/+$/g, "")}/`
     : "";
-  const filepath = `${prefix}lessons/${lessonId}/sessions/${sessionId}/recordings/${timestamp}.mp3`;
+  const filepath = `${prefix}lessons/${lessonId}/sessions/${sessionId}/recordings/${timestamp}.ogg`;
 
-  return {
-    file: new EncodedFileOutput({
-      fileType: EncodedFileType.MP3,
-      filepath,
-      output: {
-        case: "s3",
-        value: new S3Upload({
-          bucket: config.bucket,
-          region: config.region,
-          endpoint: config.endpoint ?? "",
-          accessKey: config.accessKey,
-          secret: config.secret,
-          forcePathStyle: config.forcePathStyle,
-          metadata: {
-            lessonId,
-            sessionId,
-          },
-        }),
-      },
-    }),
-  };
+  return new DirectFileOutput({
+    filepath,
+    output: {
+      case: "s3",
+      value: new S3Upload({
+        bucket: config.bucket,
+        region: config.region,
+        endpoint: config.endpoint ?? "",
+        accessKey: config.accessKey,
+        secret: config.secret,
+        forcePathStyle: config.forcePathStyle,
+        metadata: {
+          lessonId,
+          sessionId,
+        },
+      }),
+    },
+  });
 }
 
 export function createLiveKitClassroomRecordingOutput({
   connectionId,
   classroomId,
-}: LiveKitClassroomRecordingOutputOptions): EncodedOutputs {
+}: LiveKitClassroomRecordingOutputOptions) {
   const config = getLiveKitRecordingTargetConfig();
 
   if (!config) {
@@ -222,29 +217,26 @@ export function createLiveKitClassroomRecordingOutput({
   const prefix = config.filePrefix
     ? `${config.filePrefix.replace(/^\/+|\/+$/g, "")}/`
     : "";
-  const filepath = `${prefix}classrooms/${connectionId}/rooms/${classroomId}/recordings/${timestamp}.mp3`;
+  const filepath = `${prefix}classrooms/${connectionId}/rooms/${classroomId}/recordings/${timestamp}.ogg`;
 
-  return {
-    file: new EncodedFileOutput({
-      fileType: EncodedFileType.MP3,
-      filepath,
-      output: {
-        case: "s3",
-        value: new S3Upload({
-          bucket: config.bucket,
-          region: config.region,
-          endpoint: config.endpoint ?? "",
-          accessKey: config.accessKey,
-          secret: config.secret,
-          forcePathStyle: config.forcePathStyle,
-          metadata: {
-            connectionId,
-            classroomId,
-          },
-        }),
-      },
-    }),
-  };
+  return new DirectFileOutput({
+    filepath,
+    output: {
+      case: "s3",
+      value: new S3Upload({
+        bucket: config.bucket,
+        region: config.region,
+        endpoint: config.endpoint ?? "",
+        accessKey: config.accessKey,
+        secret: config.secret,
+        forcePathStyle: config.forcePathStyle,
+        metadata: {
+          connectionId,
+          classroomId,
+        },
+      }),
+    },
+  });
 }
 
 export async function getLiveKitPublishedParticipantTrack({
@@ -253,7 +245,20 @@ export async function getLiveKitPublishedParticipantTrack({
   source = TrackSource.MICROPHONE,
 }: LiveKitParticipantTrackLookupOptions) {
   const roomServiceClient = createLiveKitRoomServiceClient();
-  const participants = await roomServiceClient.listParticipants(roomName);
+  const participants = await roomServiceClient
+    .listParticipants(roomName)
+    .catch((error: { status?: number; code?: string }) => {
+      if (error.status === 404 || error.code === "not_found") {
+        return null;
+      }
+
+      throw error;
+    });
+
+  if (!participants) {
+    return null;
+  }
+
   const participant =
     participants.find((item) => item.identity === participantIdentity) ?? null;
 

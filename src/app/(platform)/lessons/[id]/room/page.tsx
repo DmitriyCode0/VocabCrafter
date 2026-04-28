@@ -212,21 +212,21 @@ export default async function LessonRoomPage({
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Mic className="h-5 w-5 text-primary" />
-                Student Audio Capture
+                Student Audio Recording
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
               <p>
-                Tutors can confirm consent and capture a downloadable
-                student-only audio clip from the lesson room.
+                Tutors can confirm consent and capture a downloadable,
+                student-only audio recording from the lesson room.
               </p>
               <p>
                 Recording starts only when the student is connected with a
                 published microphone track.
               </p>
               <p>
-                Stopping the recording finalizes an MP3 file in private storage
-                for later download.
+                Stopping the recording finalizes an OGG audio file in private
+                storage for later download and transcription.
               </p>
             </CardContent>
           </Card>
@@ -235,14 +235,14 @@ export default async function LessonRoomPage({
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Download className="h-5 w-5 text-primary" />
-                Student Audio Clips
+                Student Audio Recordings
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               {lessonRecordings.length === 0 ? (
                 <p className="text-muted-foreground">
-                  Saved student audio clips will appear here once recording has
-                  been started and stopped from the lesson room.
+                  Saved student audio recordings will appear here once
+                  recording has been started and stopped from the lesson room.
                 </p>
               ) : (
                 lessonRecordings.map((recording) => {
