@@ -40,10 +40,12 @@ export function DeleteActiveEvidenceButton({
     setIsDeleting(true);
 
     try {
-      const response = await fetch(`/api/mastery/active-evidence/${evidenceId}`,
+      const response = await fetch(
+        `/api/mastery/active-evidence/${evidenceId}`,
         {
           method: "DELETE",
-        });
+        },
+      );
 
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as {

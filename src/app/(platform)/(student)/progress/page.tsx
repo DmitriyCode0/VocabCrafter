@@ -163,7 +163,9 @@ export default async function ProgressPage({
           size="sm"
           variant={chartView === "overall" ? "default" : "outline"}
         >
-          <Link href="/progress">{appLanguage === "uk" ? "Загалом" : "Overall"}</Link>
+          <Link href="/progress">
+            {appLanguage === "uk" ? "Загалом" : "Overall"}
+          </Link>
         </Button>
         <Button
           asChild

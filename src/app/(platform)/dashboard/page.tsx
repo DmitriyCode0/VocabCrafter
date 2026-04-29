@@ -268,7 +268,7 @@ async function StudentDashboard({
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="text-2xl font-bold">
-                  {(monthlyQuizCount ?? 0).toLocaleString()} {" "}
+                  {(monthlyQuizCount ?? 0).toLocaleString()}{" "}
                   <span className="text-sm font-normal text-muted-foreground">
                     / {fmtLimit(quizLimit)}
                   </span>
@@ -339,7 +339,9 @@ async function StudentDashboard({
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalWordsTracked ?? 0}</div>
+                <div className="text-2xl font-bold">
+                  {totalWordsTracked ?? 0}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {messages.dashboard.student.totalWordsDescription}
                 </p>
@@ -550,7 +552,7 @@ async function TutorDashboard({
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="text-2xl font-bold">
-                  {(monthlyQuizCount ?? 0).toLocaleString()} {" "}
+                  {(monthlyQuizCount ?? 0).toLocaleString()}{" "}
                   <span className="text-sm font-normal text-muted-foreground">
                     / {fmtLimit(quizLimit)}
                   </span>
@@ -675,7 +677,7 @@ async function AdminDashboard({
                 {textRequestCount.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                {formatApproxUsd(textCost)} {" "}
+                {formatApproxUsd(textCost)}{" "}
                 {messages.dashboard.admin.trackedInMonth(monthLabel)}
               </p>
             </CardContent>
@@ -695,7 +697,7 @@ async function AdminDashboard({
                 {ttsRequestCount.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                {formatApproxUsd(ttsCost)} {" "}
+                {formatApproxUsd(ttsCost)}{" "}
                 {messages.dashboard.admin.trackedInMonth(monthLabel)}
               </p>
             </CardContent>

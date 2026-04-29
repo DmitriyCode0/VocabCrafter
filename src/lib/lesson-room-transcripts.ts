@@ -76,7 +76,9 @@ export function extractParsedStudentActiveVocabularyTermsFromTranscriptSegments(
   segments: LessonTranscriptSegmentInput[],
 ) {
   return Array.from(
-    new Set(extractStudentActiveVocabularyTermsFromTranscriptSegments(segments)),
+    new Set(
+      extractStudentActiveVocabularyTermsFromTranscriptSegments(segments),
+    ),
   ).sort((left, right) =>
     left.localeCompare(right, undefined, { sensitivity: "base" }),
   );

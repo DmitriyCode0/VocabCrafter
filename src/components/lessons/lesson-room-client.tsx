@@ -673,7 +673,9 @@ export function LessonRoomClient({
                           isRecordingActionPending ||
                           startRecordingDisabledReason !== null
                         }
-                        title={startRecordingDisabledReason ?? "Start recording"}
+                        title={
+                          startRecordingDisabledReason ?? "Start recording"
+                        }
                       >
                         {isRecordingActionPending ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />

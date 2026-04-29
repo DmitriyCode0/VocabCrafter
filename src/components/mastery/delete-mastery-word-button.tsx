@@ -73,8 +73,7 @@ export function DeleteMasteryWordButton({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {description ??
-              `${term} will be removed from your Mastery list.`}
+            {description ?? `${term} will be removed from your Mastery list.`}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

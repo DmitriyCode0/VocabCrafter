@@ -375,32 +375,36 @@ async function loadActiveVocabularyWorkspace(
 ) {
   const supabaseAdmin = createAdminClient();
   const evidenceRange = getPaginationRange(evidencePage, EVIDENCE_PAGE_SIZE);
-  const [studentProfileResult, evidenceCountResult, summaryRowsResult, evidenceRowsResult] =
-    await Promise.all([
-      supabaseAdmin
-        .from("profiles")
-        .select("full_name, email, cefr_level")
-        .eq("id", studentId)
-        .single(),
-      supabaseAdmin
-        .from("active_vocabulary_evidence")
-        .select("id", { count: "exact", head: true })
-        .eq("student_id", studentId),
-      supabaseAdmin
-        .from("active_vocabulary_evidence")
-        .select(
-          "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(cefr_level, part_of_speech)",
-        )
-        .eq("student_id", studentId),
-      supabaseAdmin
-        .from("active_vocabulary_evidence")
-        .select(
-          "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(cefr_level, part_of_speech)",
-        )
-        .eq("student_id", studentId)
-        .order("last_used_at", { ascending: false })
-        .range(evidenceRange.from, evidenceRange.to),
-    ]);
+  const [
+    studentProfileResult,
+    evidenceCountResult,
+    summaryRowsResult,
+    evidenceRowsResult,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("profiles")
+      .select("full_name, email, cefr_level")
+      .eq("id", studentId)
+      .single(),
+    supabaseAdmin
+      .from("active_vocabulary_evidence")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", studentId),
+    supabaseAdmin
+      .from("active_vocabulary_evidence")
+      .select(
+        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(cefr_level, part_of_speech)",
+      )
+      .eq("student_id", studentId),
+    supabaseAdmin
+      .from("active_vocabulary_evidence")
+      .select(
+        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(cefr_level, part_of_speech)",
+      )
+      .eq("student_id", studentId)
+      .order("last_used_at", { ascending: false })
+      .range(evidenceRange.from, evidenceRange.to),
+  ]);
 
   if (studentProfileResult.error || !studentProfileResult.data) {
     return null;
@@ -429,7 +433,9 @@ async function loadActiveVocabularyWorkspace(
     })),
   );
 
-  const evidenceItems = ((evidenceRowsResult.data ?? []) as ActiveEvidenceQueryRow[]).map(
+  const evidenceItems = (
+    (evidenceRowsResult.data ?? []) as ActiveEvidenceQueryRow[]
+  ).map(
     (row): ActiveEvidenceListItem => ({
       id: row.id,
       term: row.term,
@@ -649,10 +655,13 @@ export async function PassiveVocabularyPageContent({
                 {role !== "student" && (
                   <Badge variant="outline">Student Workspace</Badge>
                 )}
-                <Badge variant="secondary">Target {activeWorkspace.cefrLevel}</Badge>
+                <Badge variant="secondary">
+                  Target {activeWorkspace.cefrLevel}
+                </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Lesson-derived active vocabulary evidence for {activeWorkspace.studentEmail}.
+                Lesson-derived active vocabulary evidence for{" "}
+                {activeWorkspace.studentEmail}.
               </p>
             </div>
           </div>
@@ -714,7 +723,8 @@ export async function PassiveVocabularyPageContent({
             <CardHeader>
               <CardTitle className="text-base">Active Evidence</CardTitle>
               <CardDescription>
-                Review lesson-derived production words and remove entries that should not stay attached to the student.
+                Review lesson-derived production words and remove entries that
+                should not stay attached to the student.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -754,11 +764,13 @@ export async function PassiveVocabularyPageContent({
                 {role !== "student" && (
                   <Badge variant="outline">Student Workspace</Badge>
                 )}
-                <Badge variant="secondary">Target {passiveWorkspace.cefrLevel}</Badge>
+                <Badge variant="secondary">
+                  Target {passiveWorkspace.cefrLevel}
+                </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                {passiveWorkspace.targetLanguageLabel} passive-recognition evidence for{" "}
-                {passiveWorkspace.studentEmail}.
+                {passiveWorkspace.targetLanguageLabel} passive-recognition
+                evidence for {passiveWorkspace.studentEmail}.
               </p>
             </div>
           </div>
@@ -794,8 +806,8 @@ export async function PassiveVocabularyPageContent({
                   {passiveWorkspace.summary.equivalentWordCount}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {passiveWorkspace.summary.rawEquivalentWordCount} raw items before
-                  level weighting
+                  {passiveWorkspace.summary.rawEquivalentWordCount} raw items
+                  before level weighting
                 </p>
               </CardContent>
             </Card>
@@ -812,8 +824,8 @@ export async function PassiveVocabularyPageContent({
                   {passiveWorkspace.aboveTargetCount}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  library-tagged words above the current {passiveWorkspace.cefrLevel}{" "}
-                  target
+                  library-tagged words above the current{" "}
+                  {passiveWorkspace.cefrLevel} target
                 </p>
               </CardContent>
             </Card>
@@ -835,7 +847,9 @@ export async function PassiveVocabularyPageContent({
 
           <ImportPassiveVocabularyCard
             targetLanguage={passiveWorkspace.targetLanguage}
-            studentId={role === "student" ? undefined : passiveWorkspace.studentId}
+            studentId={
+              role === "student" ? undefined : passiveWorkspace.studentId
+            }
             cardId="passive-recognition"
           />
 

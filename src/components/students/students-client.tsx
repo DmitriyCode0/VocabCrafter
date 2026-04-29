@@ -225,8 +225,8 @@ export function StudentsClient({
                   Choose a Student for Passive Vocabulary Import
                 </CardTitle>
                 <CardDescription>
-                  Jump straight to the passive vocabulary view for a
-                  connected student.
+                  Jump straight to the passive vocabulary view for a connected
+                  student.
                 </CardDescription>
               </div>
             </div>

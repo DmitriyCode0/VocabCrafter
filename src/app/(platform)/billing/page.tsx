@@ -26,7 +26,10 @@ import {
 import type { Role } from "@/types/roles";
 import { fmtLimit } from "@/lib/plans";
 import { getPlan } from "@/lib/plans-server";
-import { normalizeAppLanguage, type AppLanguage } from "@/lib/i18n/app-language";
+import {
+  normalizeAppLanguage,
+  type AppLanguage,
+} from "@/lib/i18n/app-language";
 import { formatMonthNameForAppLanguage } from "@/lib/i18n/format";
 import { getAppMessages, type AppMessages } from "@/lib/i18n/messages";
 import {
@@ -206,7 +209,10 @@ export default async function BillingPage() {
       {/*  Usage meters                           */}
       {/* ═══════════════════════════════════════ */}
       {isSuperadmin ? (
-        <SuperadminOverviewCards appLanguage={appLanguage} messages={messages} />
+        <SuperadminOverviewCards
+          appLanguage={appLanguage}
+          messages={messages}
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <UsageMeter

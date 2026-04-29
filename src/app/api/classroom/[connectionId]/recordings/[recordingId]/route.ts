@@ -27,7 +27,9 @@ function getAggregateTranscriptStatus(statuses: string[]) {
     return "ready";
   }
 
-  if (statuses.some((status) => status === "processing" || status === "pending")) {
+  if (
+    statuses.some((status) => status === "processing" || status === "pending")
+  ) {
     return "processing";
   }
 
@@ -45,7 +47,8 @@ export async function DELETE(
   }: { params: Promise<{ connectionId: string; recordingId: string }> },
 ) {
   const { connectionId, recordingId } = await params;
-  const access = await requireTutorStudentClassroomParticipantAccess(connectionId);
+  const access =
+    await requireTutorStudentClassroomParticipantAccess(connectionId);
 
   if ("errorResponse" in access) {
     return access.errorResponse;
@@ -152,16 +155,17 @@ export async function DELETE(
     );
   }
 
-  const [remainingRecordingsResult, remainingTranscriptsResult] = await Promise.all([
-    supabaseAdmin
-      .from("tutor_student_classroom_recordings")
-      .select("status")
-      .eq("classroom_id", access.classroom.id),
-    supabaseAdmin
-      .from("tutor_student_classroom_transcripts")
-      .select("diarization_status")
-      .eq("classroom_id", access.classroom.id),
-  ]);
+  const [remainingRecordingsResult, remainingTranscriptsResult] =
+    await Promise.all([
+      supabaseAdmin
+        .from("tutor_student_classroom_recordings")
+        .select("status")
+        .eq("classroom_id", access.classroom.id),
+      supabaseAdmin
+        .from("tutor_student_classroom_transcripts")
+        .select("diarization_status")
+        .eq("classroom_id", access.classroom.id),
+    ]);
 
   if (remainingRecordingsResult.error || remainingTranscriptsResult.error) {
     return NextResponse.json(

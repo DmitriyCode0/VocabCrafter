@@ -880,10 +880,12 @@ export function TutorStudentMonthlyReportsWorkspace({
                       : ""}
                   </Badge>
                   <Badge variant="outline">
-                    Classroom sessions: {report.metricsSnapshot.classroomSessions}
+                    Classroom sessions:{" "}
+                    {report.metricsSnapshot.classroomSessions}
                   </Badge>
                   <Badge variant="outline">
-                    Student speaking time: {formatHours(report.metricsSnapshot.studentSpeakingHours)}
+                    Student speaking time:{" "}
+                    {formatHours(report.metricsSnapshot.studentSpeakingHours)}
                   </Badge>
                   <Badge variant="outline">
                     New words: {report.metricsSnapshot.newMasteryWords}
@@ -892,7 +894,10 @@ export function TutorStudentMonthlyReportsWorkspace({
                       : ""}
                   </Badge>
                   <Badge variant="outline">
-                    Student speaking share: {formatPercentage(report.metricsSnapshot.studentSpeakingShare)}
+                    Student speaking share:{" "}
+                    {formatPercentage(
+                      report.metricsSnapshot.studentSpeakingShare,
+                    )}
                   </Badge>
                   <Badge variant="outline">
                     Avg score:{" "}

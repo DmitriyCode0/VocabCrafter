@@ -4,10 +4,7 @@ import { z } from "zod";
 import { extractTextUsageSnapshot, recordAIUsageEvent } from "@/lib/ai/usage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTutorStudentClassroomParticipantAccess } from "@/lib/classroom-access";
-import {
-  GEMINI_TRANSCRIPTION_MODEL,
-  getGenAI,
-} from "@/lib/gemini/client";
+import { GEMINI_TRANSCRIPTION_MODEL, getGenAI } from "@/lib/gemini/client";
 import {
   saveClassroomTranscriptAndSyncEvidence,
   type ClassroomTranscriptReviewStatus,

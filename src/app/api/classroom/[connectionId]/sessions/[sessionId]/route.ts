@@ -4,14 +4,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function DELETE(
   _request: Request,
-  {
-    params,
-  }: { params: Promise<{ connectionId: string; sessionId: string }> },
+  { params }: { params: Promise<{ connectionId: string; sessionId: string }> },
 ) {
   const { connectionId, sessionId } = await params;
-  const access = await requireTutorStudentClassroomParticipantAccess(
-    connectionId,
-  );
+  const access =
+    await requireTutorStudentClassroomParticipantAccess(connectionId);
 
   if ("errorResponse" in access) {
     return access.errorResponse;

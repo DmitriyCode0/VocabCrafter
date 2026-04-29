@@ -123,7 +123,11 @@ export function StudentMasteryCards({
 
     setExpandedStudentId(studentId);
 
-    if ((totalWords === 0 || wordsByStudent[studentId]) || loadingByStudent[studentId]) {
+    if (
+      totalWords === 0 ||
+      wordsByStudent[studentId] ||
+      loadingByStudent[studentId]
+    ) {
       return;
     }
 

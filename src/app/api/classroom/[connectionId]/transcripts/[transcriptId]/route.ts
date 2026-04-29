@@ -35,7 +35,8 @@ export async function PATCH(
   }: { params: Promise<{ connectionId: string; transcriptId: string }> },
 ) {
   const { connectionId, transcriptId } = await params;
-  const access = await requireTutorStudentClassroomParticipantAccess(connectionId);
+  const access =
+    await requireTutorStudentClassroomParticipantAccess(connectionId);
 
   if ("errorResponse" in access) {
     return access.errorResponse;
@@ -86,7 +87,8 @@ export async function DELETE(
   }: { params: Promise<{ connectionId: string; transcriptId: string }> },
 ) {
   const { connectionId, transcriptId } = await params;
-  const access = await requireTutorStudentClassroomParticipantAccess(connectionId);
+  const access =
+    await requireTutorStudentClassroomParticipantAccess(connectionId);
 
   if ("errorResponse" in access) {
     return access.errorResponse;

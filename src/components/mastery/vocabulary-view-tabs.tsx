@@ -24,7 +24,10 @@ export function VocabularyViewTabs({
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
       {activeHref ? (
-        <Button asChild variant={activeTab === "active" ? "default" : "outline"}>
+        <Button
+          asChild
+          variant={activeTab === "active" ? "default" : "outline"}
+        >
           <Link href={activeHref}>
             <Zap className="mr-2 h-4 w-4" />
             {messages.vocabularyTabs.active}

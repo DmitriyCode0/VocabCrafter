@@ -47,7 +47,8 @@ export async function POST(
   { params }: { params: Promise<{ connectionId: string }> },
 ) {
   const { connectionId } = await params;
-  const access = await requireTutorStudentClassroomParticipantAccess(connectionId);
+  const access =
+    await requireTutorStudentClassroomParticipantAccess(connectionId);
 
   if ("errorResponse" in access) {
     return access.errorResponse;
@@ -80,7 +81,8 @@ export async function POST(
       reviewStatus: parsed.data.reviewStatus as ClassroomTranscriptReviewStatus,
       fullText: parsed.data.fullText ?? null,
       errorMessage: parsed.data.errorMessage ?? null,
-      segments: (parsed.data.segments ?? []) as ClassroomTranscriptSegmentInput[],
+      segments: (parsed.data.segments ??
+        []) as ClassroomTranscriptSegmentInput[],
       syncActiveEvidence: false,
     });
 

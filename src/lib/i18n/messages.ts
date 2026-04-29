@@ -1363,7 +1363,8 @@ const EN_MESSAGES = {
       cost: string,
       input: string,
       output: string,
-    ) => `${cost} approx. - ${input} transcription input / ${output} transcript output tokens`,
+    ) =>
+      `${cost} approx. - ${input} transcription input / ${output} transcript output tokens`,
     ttsRequestsSummary: (cost: string, input: string, output: string) =>
       `${cost} approx. - ${input} text input / ${output} audio output tokens`,
     trackedCostSummary: (count: string, month: string) =>
@@ -1375,7 +1376,8 @@ const EN_MESSAGES = {
     pricingBasisDescription:
       "Official Google AI paid-tier pricing for the models currently used in this app",
     inputTokensPrice: (cost: string) => `${cost} per 1M input tokens`,
-    inputAudioTokensPrice: (cost: string) => `${cost} per 1M audio input tokens`,
+    inputAudioTokensPrice: (cost: string) =>
+      `${cost} per 1M audio input tokens`,
     outputTokensPrice: (cost: string) => `${cost} per 1M output tokens`,
     inputTextTokensPrice: (cost: string) => `${cost} per 1M input text tokens`,
     outputAudioTokensPrice: (cost: string) =>
@@ -2784,7 +2786,8 @@ const UK_MESSAGES: AppMessages = {
       cost: string,
       input: string,
       output: string,
-    ) => `${cost} приблизно - ${input} вхідних токенів транскрипції / ${output} вихідних токенів тексту`,
+    ) =>
+      `${cost} приблизно - ${input} вхідних токенів транскрипції / ${output} вихідних токенів тексту`,
     ttsRequestsSummary: (cost: string, input: string, output: string) =>
       `${cost} приблизно - ${input} текстових вхідних / ${output} аудіовихідних токенів`,
     trackedCostSummary: (count: string, month: string) =>
@@ -2797,7 +2800,8 @@ const UK_MESSAGES: AppMessages = {
     pricingBasisDescription:
       "Офіційні ціни Google AI paid-tier для моделей, які зараз використовуються в цьому застосунку",
     inputTokensPrice: (cost: string) => `${cost} за 1 млн вхідних токенів`,
-    inputAudioTokensPrice: (cost: string) => `${cost} за 1 млн аудіовхідних токенів`,
+    inputAudioTokensPrice: (cost: string) =>
+      `${cost} за 1 млн аудіовхідних токенів`,
     outputTokensPrice: (cost: string) => `${cost} за 1 млн вихідних токенів`,
     inputTextTokensPrice: (cost: string) =>
       `${cost} за 1 млн вхідних текстових токенів`,

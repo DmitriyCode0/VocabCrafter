@@ -228,15 +228,12 @@ export async function approvePassiveVocabularyLibrarySuggestion(
       libraryItemId: suggestion.library_item_id,
       updatedBy: userId,
       canonicalTerm: suggestion.proposed_canonical_term,
-      cefrLevel: suggestion.proposed_cefr_level as
-        | PassiveVocabularyLibraryCefrLevel
-        | null,
-      partOfSpeech: suggestion.proposed_part_of_speech as
-        | PassiveVocabularyPartOfSpeech
-        | null,
-      ukrainianTranslation: getPassiveVocabularyUkrainianTranslation(
-        proposedAttributes,
-      ),
+      cefrLevel:
+        suggestion.proposed_cefr_level as PassiveVocabularyLibraryCefrLevel | null,
+      partOfSpeech:
+        suggestion.proposed_part_of_speech as PassiveVocabularyPartOfSpeech | null,
+      ukrainianTranslation:
+        getPassiveVocabularyUkrainianTranslation(proposedAttributes),
       attributes: proposedAttributes,
     });
 

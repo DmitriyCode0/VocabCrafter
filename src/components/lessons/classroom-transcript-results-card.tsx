@@ -126,10 +126,7 @@ function getWordCount(fullText: string | null) {
     return 0;
   }
 
-  return fullText
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
+  return fullText.trim().split(/\s+/).filter(Boolean).length;
 }
 
 function TranscriptReviewDialog({
@@ -266,9 +263,7 @@ function TranscriptReviewDialog({
       }
 
       toast.success(
-        appLanguage === "uk"
-          ? "Транскрипт видалено"
-          : "Transcript deleted",
+        appLanguage === "uk" ? "Транскрипт видалено" : "Transcript deleted",
       );
       router.refresh();
     } catch (error) {
@@ -312,7 +307,9 @@ function TranscriptReviewDialog({
             {getReviewLabel(transcript.reviewStatus, appLanguage)}
           </Badge>
           <Badge
-            variant={transcript.activeEvidenceSyncedAt ? "secondary" : "outline"}
+            variant={
+              transcript.activeEvidenceSyncedAt ? "secondary" : "outline"
+            }
           >
             {transcript.activeEvidenceSyncedAt
               ? appLanguage === "uk"
@@ -503,7 +500,9 @@ export function ClassroomTranscriptResultsCard({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={getBadgeVariant(transcript.diarizationStatus)}>
+                    <Badge
+                      variant={getBadgeVariant(transcript.diarizationStatus)}
+                    >
                       <ScanText className="mr-1.5 h-3.5 w-3.5" />
                       {getDiarizationLabel(
                         transcript.diarizationStatus,
@@ -515,7 +514,9 @@ export function ClassroomTranscriptResultsCard({
                     </Badge>
                     <Badge
                       variant={
-                        transcript.activeEvidenceSyncedAt ? "secondary" : "outline"
+                        transcript.activeEvidenceSyncedAt
+                          ? "secondary"
+                          : "outline"
                       }
                     >
                       {transcript.activeEvidenceSyncedAt
@@ -537,7 +538,8 @@ export function ClassroomTranscriptResultsCard({
                   </span>
                   {wordCount > 0 ? (
                     <span>
-                      {wordCount.toLocaleString()} {appLanguage === "uk" ? "слів" : "words"}
+                      {wordCount.toLocaleString()}{" "}
+                      {appLanguage === "uk" ? "слів" : "words"}
                     </span>
                   ) : null}
                 </div>
@@ -546,7 +548,9 @@ export function ClassroomTranscriptResultsCard({
                   {previewText ? (
                     <p className="text-muted-foreground">{previewText}</p>
                   ) : transcript.errorMessage ? (
-                    <p className="text-destructive">{transcript.errorMessage}</p>
+                    <p className="text-destructive">
+                      {transcript.errorMessage}
+                    </p>
                   ) : (
                     <p className="text-muted-foreground">
                       {appLanguage === "uk"

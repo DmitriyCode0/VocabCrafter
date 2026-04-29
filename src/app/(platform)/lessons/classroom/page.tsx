@@ -1,8 +1,5 @@
 import Link from "next/link";
-import {
-  CalendarDays,
-  Download,
-} from "lucide-react";
+import { CalendarDays, Download } from "lucide-react";
 import { ClassroomConnectionPicker } from "@/components/lessons/classroom-connection-picker";
 import { DeleteRecordingButton } from "@/components/lessons/delete-recording-button";
 import { ClassroomRoomClient } from "@/components/lessons/classroom-room-client";
@@ -201,33 +198,33 @@ export default async function ClassroomPage({
       { data: transcripts, error: transcriptsError },
       { data: transcriptSegments, error: transcriptSegmentsError },
     ] = await Promise.all([
-        supabaseAdmin
-          .from("tutor_student_classroom_recordings")
-          .select(
-            "id, created_at, status, duration_seconds, storage_bucket, storage_path",
-          )
-          .eq("classroom_id", access.classroom.id)
-          .order("created_at", { ascending: false })
-          .limit(12),
-        listTutorStudentClassroomSessionSummaries(access.classroom.id),
-        role === "tutor"
-          ? supabaseAdmin
-              .from("tutor_student_classroom_transcripts")
-              .select(
-                "id, recording_id, language_code, diarization_status, review_status, full_text, error_message, active_evidence_synced_at, created_at, updated_at",
-              )
-              .eq("classroom_id", access.classroom.id)
-              .order("updated_at", { ascending: false })
-              .limit(8)
-          : Promise.resolve({ data: [], error: null }),
-        role === "tutor"
-          ? supabaseAdmin
-              .from("tutor_student_classroom_transcript_segments")
-              .select("transcript_id, speaker_role, content, created_at")
-              .eq("classroom_id", access.classroom.id)
-              .order("created_at", { ascending: true })
-          : Promise.resolve({ data: [], error: null }),
-      ]);
+      supabaseAdmin
+        .from("tutor_student_classroom_recordings")
+        .select(
+          "id, created_at, status, duration_seconds, storage_bucket, storage_path",
+        )
+        .eq("classroom_id", access.classroom.id)
+        .order("created_at", { ascending: false })
+        .limit(12),
+      listTutorStudentClassroomSessionSummaries(access.classroom.id),
+      role === "tutor"
+        ? supabaseAdmin
+            .from("tutor_student_classroom_transcripts")
+            .select(
+              "id, recording_id, language_code, diarization_status, review_status, full_text, error_message, active_evidence_synced_at, created_at, updated_at",
+            )
+            .eq("classroom_id", access.classroom.id)
+            .order("updated_at", { ascending: false })
+            .limit(8)
+        : Promise.resolve({ data: [], error: null }),
+      role === "tutor"
+        ? supabaseAdmin
+            .from("tutor_student_classroom_transcript_segments")
+            .select("transcript_id, speaker_role, content, created_at")
+            .eq("classroom_id", access.classroom.id)
+            .order("created_at", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+    ]);
 
     if (recordingsError) {
       throw recordingsError;
@@ -263,7 +260,10 @@ export default async function ClassroomPage({
       }));
 
     const recordingCreatedAtById = new Map(
-      (recordings ?? []).map((recording) => [recording.id, recording.created_at]),
+      (recordings ?? []).map((recording) => [
+        recording.id,
+        recording.created_at,
+      ]),
     );
     const transcriptSegmentsById = new Map<
       string,
@@ -292,7 +292,8 @@ export default async function ClassroomPage({
       id: transcript.id,
       recordingId: transcript.recording_id,
       recordedAt:
-        recordingCreatedAtById.get(transcript.recording_id) ?? transcript.created_at,
+        recordingCreatedAtById.get(transcript.recording_id) ??
+        transcript.created_at,
       createdAt: transcript.created_at,
       updatedAt: transcript.updated_at,
       languageCode: transcript.language_code,
@@ -450,7 +451,8 @@ export default async function ClassroomPage({
                               <Badge variant="outline">
                                 {getRecordingStatusLabel(recording.status)}
                               </Badge>
-                              {role === "tutor" && recording.status !== "recording" ? (
+                              {role === "tutor" &&
+                              recording.status !== "recording" ? (
                                 <DeleteRecordingButton
                                   deleteUrl={`/api/classroom/${selectedConnection.id}/recordings/${recording.id}`}
                                   recordingLabel={formatSessionDateTime(

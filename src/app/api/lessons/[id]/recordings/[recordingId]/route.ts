@@ -27,7 +27,9 @@ function getAggregateTranscriptStatus(statuses: string[]) {
     return "ready";
   }
 
-  if (statuses.some((status) => status === "processing" || status === "pending")) {
+  if (
+    statuses.some((status) => status === "processing" || status === "pending")
+  ) {
     return "processing";
   }
 
@@ -150,16 +152,17 @@ export async function DELETE(
     );
   }
 
-  const [remainingRecordingsResult, remainingTranscriptsResult] = await Promise.all([
-    supabaseAdmin
-      .from("lesson_room_recordings")
-      .select("status")
-      .eq("session_id", access.session.id),
-    supabaseAdmin
-      .from("lesson_room_transcripts")
-      .select("diarization_status")
-      .eq("lesson_id", access.lesson.id),
-  ]);
+  const [remainingRecordingsResult, remainingTranscriptsResult] =
+    await Promise.all([
+      supabaseAdmin
+        .from("lesson_room_recordings")
+        .select("status")
+        .eq("session_id", access.session.id),
+      supabaseAdmin
+        .from("lesson_room_transcripts")
+        .select("diarization_status")
+        .eq("lesson_id", access.lesson.id),
+    ]);
 
   if (remainingRecordingsResult.error || remainingTranscriptsResult.error) {
     return NextResponse.json(

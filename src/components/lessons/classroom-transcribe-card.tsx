@@ -77,7 +77,8 @@ function formatRecordingOption(
   appLanguage: "en" | "uk",
 ) {
   const durationLabel =
-    typeof recording.durationSeconds === "number" && recording.durationSeconds > 0
+    typeof recording.durationSeconds === "number" &&
+    recording.durationSeconds > 0
       ? appLanguage === "uk"
         ? ` · ${recording.durationSeconds} с`
         : ` · ${recording.durationSeconds}s`
@@ -110,7 +111,11 @@ export function ClassroomTranscribeCard({
   );
 
   useEffect(() => {
-    if (!eligibleRecordings.some((recording) => recording.id === selectedRecordingId)) {
+    if (
+      !eligibleRecordings.some(
+        (recording) => recording.id === selectedRecordingId,
+      )
+    ) {
       setSelectedRecordingId(eligibleRecordings[0]?.id ?? "");
     }
   }, [eligibleRecordings, selectedRecordingId]);
@@ -194,7 +199,8 @@ export function ClassroomTranscribeCard({
             </CardDescription>
           </div>
           <Badge variant={getTranscriptBadgeVariant(transcriptStatus)}>
-            {appLanguage === "uk" ? "Статус" : "Status"} {getTranscriptStatusLabel(transcriptStatus, appLanguage)}
+            {appLanguage === "uk" ? "Статус" : "Status"}{" "}
+            {getTranscriptStatusLabel(transcriptStatus, appLanguage)}
           </Badge>
         </div>
       </CardHeader>
@@ -227,7 +233,10 @@ export function ClassroomTranscribeCard({
                 value={selectedRecordingId}
                 onValueChange={setSelectedRecordingId}
               >
-                <SelectTrigger id="classroom-transcribe-recording" className="w-full">
+                <SelectTrigger
+                  id="classroom-transcribe-recording"
+                  className="w-full"
+                >
                   <SelectValue
                     placeholder={
                       appLanguage === "uk"
@@ -264,7 +273,9 @@ export function ClassroomTranscribeCard({
                 value={languageCode}
                 onChange={(event) => setLanguageCode(event.target.value)}
                 maxLength={16}
-                placeholder={appLanguage === "uk" ? "Наприклад, en" : "For example, en"}
+                placeholder={
+                  appLanguage === "uk" ? "Наприклад, en" : "For example, en"
+                }
               />
             </div>
 

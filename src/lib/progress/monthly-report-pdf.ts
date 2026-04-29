@@ -708,7 +708,9 @@ export async function buildMonthlyReportPdf({
   }
 
   function drawMonthlyPentagram(
-    pentagram: NonNullable<StoredMonthlyReport["metricsSnapshot"]["monthlyPentagram"]>,
+    pentagram: NonNullable<
+      StoredMonthlyReport["metricsSnapshot"]["monthlyPentagram"]
+    >,
   ) {
     const panelHeight = 318;
     const panelY = cursorY - panelHeight;
@@ -728,7 +730,11 @@ export async function buildMonthlyReportPdf({
       locale,
     );
     const axes = pentagram.currentMonth.axes;
-    const axisCount = Math.max(axes.length, pentagram.previousMonth.axes.length, 0);
+    const axisCount = Math.max(
+      axes.length,
+      pentagram.previousMonth.axes.length,
+      0,
+    );
 
     ensureSpace(panelHeight + 8);
 
@@ -810,23 +816,25 @@ export async function buildMonthlyReportPdf({
         });
       }
 
-      const previousPoints = pentagram.previousMonth.chartData.map((item, index) =>
-        getRadarPoint(
-          chartCenterX,
-          chartCenterY,
-          chartRadius * (item.score / 100),
-          index,
-          axisCount,
-        ),
+      const previousPoints = pentagram.previousMonth.chartData.map(
+        (item, index) =>
+          getRadarPoint(
+            chartCenterX,
+            chartCenterY,
+            chartRadius * (item.score / 100),
+            index,
+            axisCount,
+          ),
       );
-      const currentPoints = pentagram.currentMonth.chartData.map((item, index) =>
-        getRadarPoint(
-          chartCenterX,
-          chartCenterY,
-          chartRadius * (item.score / 100),
-          index,
-          axisCount,
-        ),
+      const currentPoints = pentagram.currentMonth.chartData.map(
+        (item, index) =>
+          getRadarPoint(
+            chartCenterX,
+            chartCenterY,
+            chartRadius * (item.score / 100),
+            index,
+            axisCount,
+          ),
       );
 
       for (let index = 0; index < previousPoints.length; index += 1) {
@@ -850,10 +858,16 @@ export async function buildMonthlyReportPdf({
 
     let rightY = panelY + panelHeight - 24;
     rightY =
-      drawWrappedTextBlock(copy.monthlyPentagramNote, rightX, rightY, rightWidth, {
-        fontSize: 10,
-        color: MUTED_TEXT,
-      }) - 10;
+      drawWrappedTextBlock(
+        copy.monthlyPentagramNote,
+        rightX,
+        rightY,
+        rightWidth,
+        {
+          fontSize: 10,
+          color: MUTED_TEXT,
+        },
+      ) - 10;
 
     page.drawRectangle({
       x: rightX,

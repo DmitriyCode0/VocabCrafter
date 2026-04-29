@@ -377,7 +377,8 @@ export async function approveClassroomTranscriptActiveEvidence({
     extractStudentActiveVocabularyTermsFromClassroomTranscriptSegments(
       normalizeClassroomTranscriptSegments(
         (segments ?? []).map((segment) => ({
-          speakerRole: segment.speaker_role as ClassroomTranscriptSegmentInput["speakerRole"],
+          speakerRole:
+            segment.speaker_role as ClassroomTranscriptSegmentInput["speakerRole"],
           content: segment.content,
         })),
       ),

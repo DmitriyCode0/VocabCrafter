@@ -275,10 +275,13 @@ export default async function LessonRoomPage({
                           <Badge variant="outline">
                             {getRecordingStatusLabel(recording.status)}
                           </Badge>
-                          {role === "tutor" && recording.status !== "recording" ? (
+                          {role === "tutor" &&
+                          recording.status !== "recording" ? (
                             <DeleteRecordingButton
                               deleteUrl={`/api/lessons/${id}/recordings/${recording.id}`}
-                              recordingLabel={formatAppDateTime(recording.createdAt)}
+                              recordingLabel={formatAppDateTime(
+                                recording.createdAt,
+                              )}
                               appLanguage="en"
                               scope="lesson"
                             />

@@ -229,10 +229,14 @@ export default async function PlansAndReportsReportsPage({
                             : ""}
                         </Badge>
                         <Badge variant="outline">
-                          Classroom sessions: {report.metricsSnapshot.classroomSessions}
+                          Classroom sessions:{" "}
+                          {report.metricsSnapshot.classroomSessions}
                         </Badge>
                         <Badge variant="outline">
-                          Student speaking time: {formatHours(report.metricsSnapshot.studentSpeakingHours)}
+                          Student speaking time:{" "}
+                          {formatHours(
+                            report.metricsSnapshot.studentSpeakingHours,
+                          )}
                         </Badge>
                         <Badge variant="outline">
                           New words: {report.metricsSnapshot.newMasteryWords}
@@ -242,7 +246,10 @@ export default async function PlansAndReportsReportsPage({
                             : ""}
                         </Badge>
                         <Badge variant="outline">
-                          Student speaking share: {formatPercentage(report.metricsSnapshot.studentSpeakingShare)}
+                          Student speaking share:{" "}
+                          {formatPercentage(
+                            report.metricsSnapshot.studentSpeakingShare,
+                          )}
                         </Badge>
                         <Badge variant="outline">
                           Active days in application:{" "}
@@ -307,7 +314,10 @@ export default async function PlansAndReportsReportsPage({
                           Classroom sessions
                         </p>
                         <p className="text-xl font-semibold">
-                          {formatNumber(report.metricsSnapshot.classroomSessions, 0)}
+                          {formatNumber(
+                            report.metricsSnapshot.classroomSessions,
+                            0,
+                          )}
                         </p>
                       </div>
                       <div className="rounded-lg border px-3 py-3">
@@ -323,7 +333,9 @@ export default async function PlansAndReportsReportsPage({
                           Student speaking time
                         </p>
                         <p className="text-xl font-semibold">
-                          {formatHours(report.metricsSnapshot.studentSpeakingHours)}
+                          {formatHours(
+                            report.metricsSnapshot.studentSpeakingHours,
+                          )}
                         </p>
                       </div>
                       <div className="rounded-lg border px-3 py-3">
@@ -331,7 +343,9 @@ export default async function PlansAndReportsReportsPage({
                           Student speaking share
                         </p>
                         <p className="text-xl font-semibold">
-                          {formatPercentage(report.metricsSnapshot.studentSpeakingShare)}
+                          {formatPercentage(
+                            report.metricsSnapshot.studentSpeakingShare,
+                          )}
                         </p>
                       </div>
                       <div className="rounded-lg border px-3 py-3">
