@@ -19,6 +19,8 @@ interface LiveKitMeetStageProps {
   allowScreenShare?: boolean;
   className?: string;
   stageRef?: React.Ref<HTMLDivElement>;
+  toolbarActions?: React.ReactNode;
+  toolbarTrailingActions?: React.ReactNode;
 }
 
 function getTrackLabel(trackRef: TrackReferenceOrPlaceholder) {
@@ -119,6 +121,8 @@ export function LiveKitMeetStage({
   allowScreenShare = false,
   className,
   stageRef,
+  toolbarActions,
+  toolbarTrailingActions,
 }: LiveKitMeetStageProps) {
   return (
     <div
@@ -140,18 +144,33 @@ export function LiveKitMeetStage({
 
           <MeetStageLayout />
 
-          <div className="rounded-[1.5rem] border border-white/10 bg-black/35 px-3 py-3 backdrop-blur sm:px-4">
-            <ControlBar
-              controls={{
-                microphone: true,
-                camera: true,
-                screenShare: allowScreenShare,
-                chat: false,
-                settings: false,
-                leave: false,
-              }}
-              className="!justify-center"
-            />
+          <div className="rounded-[1.6rem] border border-white/10 bg-black/40 px-3 py-3.5 backdrop-blur sm:px-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-center justify-center gap-1.5 lg:flex-1 lg:justify-center">
+                <ControlBar
+                  controls={{
+                    microphone: true,
+                    camera: true,
+                    screenShare: allowScreenShare,
+                    chat: false,
+                    settings: false,
+                    leave: false,
+                  }}
+                  className="!justify-center"
+                />
+                {toolbarActions ? (
+                  <div className="flex flex-wrap items-center justify-center gap-1.5">
+                    {toolbarActions}
+                  </div>
+                ) : null}
+              </div>
+
+              {toolbarTrailingActions ? (
+                <div className="flex flex-wrap items-center justify-center gap-1.5 lg:justify-end">
+                  {toolbarTrailingActions}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 

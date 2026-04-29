@@ -81,6 +81,7 @@ export async function POST(
       fullText: parsed.data.fullText ?? null,
       errorMessage: parsed.data.errorMessage ?? null,
       segments: (parsed.data.segments ?? []) as ClassroomTranscriptSegmentInput[],
+      syncActiveEvidence: false,
     });
 
     return NextResponse.json(result);

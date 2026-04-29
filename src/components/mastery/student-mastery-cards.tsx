@@ -2,10 +2,6 @@
 
 import { useState } from "react";
 import { ChevronDown, Loader2 } from "lucide-react";
-import {
-  ActiveEvidenceList,
-  type ActiveEvidenceListItem,
-} from "@/components/mastery/active-evidence-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -31,8 +27,6 @@ interface StudentMasterySummary {
   levelCounts: number[];
   passiveEvidenceCount: number;
   equivalentWords: number;
-  activeEvidenceCount: number;
-  activeEvidenceTotalUses: number;
 }
 
 interface StudentWord {
@@ -59,9 +53,6 @@ export function StudentMasteryCards({
   const [wordsByStudent, setWordsByStudent] = useState<
     Record<string, StudentWord[]>
   >({});
-  const [activeEvidenceByStudent, setActiveEvidenceByStudent] = useState<
-    Record<string, ActiveEvidenceListItem[]>
-  >({});
   const [loadingByStudent, setLoadingByStudent] = useState<
     Record<string, boolean>
   >({});
@@ -79,13 +70,7 @@ export function StudentMasteryCards({
 
   async function loadStudentDetails(
     studentId: string,
-    {
-      includeWords,
-      includeActiveEvidence,
-    }: {
-      includeWords: boolean;
-      includeActiveEvidence: boolean;
-    },
+    { includeWords }: { includeWords: boolean },
   ) {
     setLoadingByStudent((current) => ({ ...current, [studentId]: true }));
     setErrorByStudent((current) => {
@@ -95,18 +80,11 @@ export function StudentMasteryCards({
     });
 
     try {
-      const [wordsResponse, activeEvidenceResponse] = await Promise.all([
-        includeWords
-          ? fetch(`/api/mastery/students/${studentId}/words`, {
-              cache: "no-store",
-            })
-          : Promise.resolve(null),
-        includeActiveEvidence
-          ? fetch(`/api/mastery/students/${studentId}/active-evidence`, {
-              cache: "no-store",
-            })
-          : Promise.resolve(null),
-      ]);
+      const wordsResponse = includeWords
+        ? await fetch(`/api/mastery/students/${studentId}/words`, {
+            cache: "no-store",
+          })
+        : null;
 
       if (wordsResponse) {
         const data = (await wordsResponse.json().catch(() => null)) as {
@@ -123,24 +101,6 @@ export function StudentMasteryCards({
           [studentId]: data?.words ?? [],
         }));
       }
-
-      if (activeEvidenceResponse) {
-        const data = (await activeEvidenceResponse
-          .json()
-          .catch(() => null)) as {
-          items?: ActiveEvidenceListItem[];
-          error?: string;
-        } | null;
-
-        if (!activeEvidenceResponse.ok) {
-          throw new Error(data?.error || "Failed to load active evidence");
-        }
-
-        setActiveEvidenceByStudent((current) => ({
-          ...current,
-          [studentId]: data?.items ?? [],
-        }));
-      }
     } catch (error) {
       setErrorByStudent((current) => ({
         ...current,
@@ -154,13 +114,7 @@ export function StudentMasteryCards({
 
   async function handleToggle(
     studentId: string,
-    {
-      totalWords,
-      activeEvidenceCount,
-    }: {
-      totalWords: number;
-      activeEvidenceCount: number;
-    },
+    { totalWords }: { totalWords: number },
   ) {
     if (expandedStudentId === studentId) {
       setExpandedStudentId(null);
@@ -169,18 +123,12 @@ export function StudentMasteryCards({
 
     setExpandedStudentId(studentId);
 
-    if (
-      ((totalWords === 0 || wordsByStudent[studentId]) &&
-        (activeEvidenceCount === 0 || activeEvidenceByStudent[studentId])) ||
-      loadingByStudent[studentId]
-    ) {
+    if ((totalWords === 0 || wordsByStudent[studentId]) || loadingByStudent[studentId]) {
       return;
     }
 
     await loadStudentDetails(studentId, {
       includeWords: totalWords > 0 && !wordsByStudent[studentId],
-      includeActiveEvidence:
-        activeEvidenceCount > 0 && !activeEvidenceByStudent[studentId],
     });
   }
 
@@ -198,10 +146,8 @@ export function StudentMasteryCards({
         const isExpanded = expandedStudentId === student.studentId;
         const isLoading = loadingByStudent[student.studentId] === true;
         const words = wordsByStudent[student.studentId] ?? [];
-        const activeEvidence = activeEvidenceByStudent[student.studentId] ?? [];
         const error = errorByStudent[student.studentId];
-        const canExpand =
-          student.totalWords > 0 || student.activeEvidenceCount > 0;
+        const canExpand = student.totalWords > 0;
 
         return (
           <div
@@ -223,12 +169,6 @@ export function StudentMasteryCards({
                     student.equivalentWords,
                   )}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  {messages.tutorMastery.cards.activeSummary(
-                    student.activeEvidenceCount,
-                    student.activeEvidenceTotalUses,
-                  )}
-                </p>
               </div>
 
               {canExpand ? (
@@ -238,7 +178,6 @@ export function StudentMasteryCards({
                   onClick={() =>
                     void handleToggle(student.studentId, {
                       totalWords: student.totalWords,
-                      activeEvidenceCount: student.activeEvidenceCount,
                     })
                   }
                   aria-expanded={isExpanded}
@@ -308,8 +247,6 @@ export function StudentMasteryCards({
                       onClick={() =>
                         void loadStudentDetails(student.studentId, {
                           includeWords: student.totalWords > 0,
-                          includeActiveEvidence:
-                            student.activeEvidenceCount > 0,
                         })
                       }
                     >
@@ -360,18 +297,6 @@ export function StudentMasteryCards({
                           ))}
                         </div>
                       )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">
-                        {messages.tutorMastery.cards.activeEvidenceTitle}
-                      </p>
-                      <ActiveEvidenceList
-                        items={activeEvidence}
-                        emptyMessage={
-                          messages.tutorMastery.cards.noActiveEvidence
-                        }
-                      />
                     </div>
                   </div>
                 )}

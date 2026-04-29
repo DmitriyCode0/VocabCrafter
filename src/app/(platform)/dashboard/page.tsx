@@ -245,7 +245,7 @@ async function StudentDashboard({
               </CardHeader>
               <CardFooter className="mt-auto justify-center">
                 <Button asChild variant="outline" className="w-full">
-                  <Link href="/passive-vocabulary">
+                  <Link href="/vocabulary">
                     {messages.dashboard.student.passiveButton}
                   </Link>
                 </Button>
@@ -398,8 +398,8 @@ async function TutorDashboard({
   const isQuizOver = quizPercentage >= 100;
   const passiveImportHref =
     connectedStudentIds.length === 1
-      ? `/passive-vocabulary?student=${connectedStudentIds[0]}`
-      : "/passive-vocabulary";
+      ? `/vocabulary?student=${connectedStudentIds[0]}`
+      : "/vocabulary";
   const passiveImportDescription =
     connectedStudentIds.length === 0
       ? messages.dashboard.tutor.passiveDescriptionNone

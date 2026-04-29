@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { DeleteActiveEvidenceButton } from "@/components/mastery/delete-active-evidence-button";
 import { formatAppDate } from "@/lib/dates";
 import { formatPassiveVocabularyPartOfSpeech } from "@/lib/mastery/passive-vocabulary";
 
@@ -17,6 +18,11 @@ export interface ActiveEvidenceListItem {
 interface ActiveEvidenceListProps {
   items: ActiveEvidenceListItem[];
   emptyMessage: string;
+  canDelete?: boolean;
+  deleteTitle?: string;
+  getDeleteDescription?: (term: string) => string;
+  getDeleteSuccessMessage?: (term: string) => string;
+  onItemDeleted?: (itemId: string) => void;
 }
 
 function formatActiveEvidenceSourceType(
@@ -35,6 +41,11 @@ function formatActiveEvidenceSourceType(
 export function ActiveEvidenceList({
   items,
   emptyMessage,
+  canDelete = false,
+  deleteTitle,
+  getDeleteDescription,
+  getDeleteSuccessMessage,
+  onItemDeleted,
 }: ActiveEvidenceListProps) {
   if (items.length === 0) {
     return (
@@ -51,8 +62,21 @@ export function ActiveEvidenceList({
           key={item.id}
           className="flex flex-col gap-3 rounded-lg border p-3"
         >
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{item.term}</p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{item.term}</p>
+            </div>
+
+            {canDelete ? (
+              <DeleteActiveEvidenceButton
+                evidenceId={item.id}
+                term={item.term}
+                title={deleteTitle}
+                description={getDeleteDescription?.(item.term)}
+                successMessage={getDeleteSuccessMessage?.(item.term)}
+                onDeleted={onItemDeleted}
+              />
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-1.5">

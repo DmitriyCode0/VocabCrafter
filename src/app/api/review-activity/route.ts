@@ -65,6 +65,7 @@ export async function POST() {
         .from("word_mastery")
         .select("term, definition, mastery_level, next_review, last_practiced")
         .eq("student_id", user.id)
+        .neq("mastery_level", 4)
         .not("next_review", "is", null)
         .lte("next_review", nowIso)
         .order("next_review", { ascending: true })

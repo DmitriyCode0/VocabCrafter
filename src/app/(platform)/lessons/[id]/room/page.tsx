@@ -6,6 +6,7 @@ import {
   Mic,
   ShieldCheck,
 } from "lucide-react";
+import { DeleteRecordingButton } from "@/components/lessons/delete-recording-button";
 import { LessonRoomClient } from "@/components/lessons/lesson-room-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -274,6 +275,14 @@ export default async function LessonRoomPage({
                           <Badge variant="outline">
                             {getRecordingStatusLabel(recording.status)}
                           </Badge>
+                          {role === "tutor" && recording.status !== "recording" ? (
+                            <DeleteRecordingButton
+                              deleteUrl={`/api/lessons/${id}/recordings/${recording.id}`}
+                              recordingLabel={formatAppDateTime(recording.createdAt)}
+                              appLanguage="en"
+                              scope="lesson"
+                            />
+                          ) : null}
                           {canDownload ? (
                             <Button asChild size="sm" variant="outline">
                               <a
@@ -345,8 +354,8 @@ export default async function LessonRoomPage({
                 <Link
                   href={
                     role === "tutor"
-                      ? "/mastery"
-                      : "/vocabulary#active-evidence"
+                      ? "/vocabulary?tab=active"
+                      : "/vocabulary?tab=active#active-evidence"
                   }
                 >
                   {role === "tutor"

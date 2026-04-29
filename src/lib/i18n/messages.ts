@@ -123,7 +123,7 @@ const EN_MESSAGES = {
     progress: "Progress",
     plansAndReports: "Plans and reports",
     plan: "Plan",
-    vocabMastery: "Vocab Mastery",
+    vocabMastery: "Mastery",
     feedback: "Feedback",
     myTutors: "My Tutors",
     classes: "Classes",
@@ -131,7 +131,7 @@ const EN_MESSAGES = {
     myStudents: "My Students",
     results: "Results",
     history: "History",
-    passiveVocabulary: "Passive Vocabulary",
+    passiveVocabulary: "Vocabulary",
     library: "Library",
     analytics: "Analytics",
     users: "Users",
@@ -139,6 +139,10 @@ const EN_MESSAGES = {
     plans: "Plans",
     billing: "Billing",
     settings: "Settings",
+  },
+  vocabularyTabs: {
+    active: "Active",
+    passive: "Passive",
   },
   library: {
     title: "Library",
@@ -887,7 +891,7 @@ const EN_MESSAGES = {
     noMonthlyActivityDescription:
       "You do not have completed quizzes or lessons recorded in the last 30 days.",
     createQuiz: "Create a Quiz",
-    openVocabMastery: "Open Vocab Mastery",
+    openVocabMastery: "Open Mastery",
     completedQuizzes: "Completed quizzes",
     completedLessons: "Completed lessons",
     activeDays: "Active days",
@@ -1055,14 +1059,14 @@ const EN_MESSAGES = {
     whatItMeans: "What It Means",
     passiveExplanation:
       "Equivalent words is the recognition-weighted single-word total used by passive-vocabulary estimates. Words at or below the student's current level count fully. Higher-level words count partially until the learner's overall profile catches up.",
-    passiveVocabularyTitle: "Passive Vocabulary",
+    passiveVocabularyTitle: "Vocabulary",
     passiveVocabularyDescription: (name: string) =>
       `Import passive-recognition evidence and review the latest library-tagged passive words on the dedicated passive-vocabulary page for ${name}.`,
     passiveItems: (count: number) =>
       `${count} ${formatPluralizedCount("en", count, { one: "passive item", other: "passive items" })}`,
     equivalentWordsBadge: (count: number) =>
       `${count} ${formatPluralizedCount("en", count, { one: "equivalent word", other: "equivalent words" })}`,
-    openPassiveVocabulary: "Open Passive Vocabulary",
+    openPassiveVocabulary: "Open Vocabulary",
   },
   tutorPlansReportsPage: {
     title: "Plans and reports",
@@ -1139,7 +1143,7 @@ const EN_MESSAGES = {
     articleEditorRevokedLabel: "Not granted",
   },
   tutorMastery: {
-    title: "Student Vocab Mastery",
+    title: "Student Mastery",
     description:
       "See how well your students know their vocabulary across all classes, including passive evidence imported from text they already understand.",
     noClassesTitle: "No classes yet",
@@ -1181,9 +1185,14 @@ const EN_MESSAGES = {
         `${count} ${formatPluralizedCount("en", count, { one: "word", other: "words" })}`,
       deleteTitle: "Delete word for student",
       deleteDescription: (term: string) =>
-        `${term} will be removed from this student's Vocab Mastery list.`,
+        `${term} will be removed from this student's Mastery list.`,
       deleteSuccess: (term: string) =>
-        `Deleted ${term} from the student's Vocab Mastery list`,
+        `Deleted ${term} from the student's Mastery list`,
+      deleteActiveEvidenceTitle: "Delete active evidence",
+      deleteActiveEvidenceDescription: (term: string) =>
+        `${term} will be removed from this student's active evidence.`,
+      deleteActiveEvidenceSuccess: (term: string) =>
+        `Deleted ${term} from the student's active evidence`,
     },
   },
   plans: {
@@ -1322,7 +1331,8 @@ const EN_MESSAGES = {
       quizzesCreated: "Quizzes Created",
       quizAttempts: "Quiz Attempts",
       wordBanks: "Word Banks",
-      textRequests: "Text Requests",
+      generalTextRequests: "General Text Requests",
+      speechToTextRequests: "Speech-to-Text Requests",
       ttsRequests: "TTS Requests",
       trackedAiCost: "Tracked AI Cost",
       unallocatedCalls: "Unallocated Calls",
@@ -1340,14 +1350,20 @@ const EN_MESSAGES = {
     platformAiUsageDescription: (
       textModel: string,
       ttsModel: string,
+      transcriptionModel: string,
       month: string,
     ) =>
-      `Paid-tier estimates for ${textModel} text generation and ${ttsModel} text-to-speech in ${month}`,
+      `Paid-tier estimates for ${textModel} text generation, ${ttsModel} text-to-speech, and ${transcriptionModel} speech-to-text in ${month}`,
     loadFailedTitle: "Platform AI Usage",
     loadFailedDescription:
       "Unable to load Gemini paid-tier usage estimates right now.",
-    textRequestsSummary: (cost: string, input: string, output: string) =>
+    generalTextRequestsSummary: (cost: string, input: string, output: string) =>
       `${cost} approx. - ${input} input / ${output} output tokens`,
+    speechToTextRequestsSummary: (
+      cost: string,
+      input: string,
+      output: string,
+    ) => `${cost} approx. - ${input} transcription input / ${output} transcript output tokens`,
     ttsRequestsSummary: (cost: string, input: string, output: string) =>
       `${cost} approx. - ${input} text input / ${output} audio output tokens`,
     trackedCostSummary: (count: string, month: string) =>
@@ -1359,6 +1375,7 @@ const EN_MESSAGES = {
     pricingBasisDescription:
       "Official Google AI paid-tier pricing for the models currently used in this app",
     inputTokensPrice: (cost: string) => `${cost} per 1M input tokens`,
+    inputAudioTokensPrice: (cost: string) => `${cost} per 1M audio input tokens`,
     outputTokensPrice: (cost: string) => `${cost} per 1M output tokens`,
     inputTextTokensPrice: (cost: string) => `${cost} per 1M input text tokens`,
     outputAudioTokensPrice: (cost: string) =>
@@ -1503,7 +1520,7 @@ const UK_MESSAGES: AppMessages = {
     progress: "Прогрес",
     plansAndReports: "Плани та звіти",
     plan: "План",
-    vocabMastery: "Засвоєння слів",
+    vocabMastery: "Засвоєння",
     feedback: "Відгук",
     myTutors: "Мої викладачі",
     classes: "Класи",
@@ -1511,7 +1528,7 @@ const UK_MESSAGES: AppMessages = {
     myStudents: "Мої студенти",
     results: "Результати",
     history: "Історія",
-    passiveVocabulary: "Пасивний словник",
+    passiveVocabulary: "Словник",
     library: "Бібліотека",
     analytics: "Аналітика",
     users: "Користувачі",
@@ -1519,6 +1536,10 @@ const UK_MESSAGES: AppMessages = {
     plans: "Тарифи",
     billing: "Оплата",
     settings: "Налаштування",
+  },
+  vocabularyTabs: {
+    active: "Активний",
+    passive: "Пасивний",
   },
   library: {
     title: "Бібліотека",
@@ -2286,7 +2307,7 @@ const UK_MESSAGES: AppMessages = {
     noMonthlyActivityDescription:
       "За останні 30 днів у вас немає завершених вікторин або уроків.",
     createQuiz: "Створити вікторину",
-    openVocabMastery: "Відкрити засвоєння слів",
+    openVocabMastery: "Відкрити засвоєння",
     completedQuizzes: "Завершені вікторини",
     completedLessons: "Завершені уроки",
     activeDays: "Активні дні",
@@ -2458,14 +2479,14 @@ const UK_MESSAGES: AppMessages = {
     whatItMeans: "Що це означає",
     passiveExplanation:
       "Еквівалентні слова - це зважена на розпізнавання сума одиночних слів, яка використовується в оцінках пасивного словника. Слова на рівні студента або нижче зараховуються повністю. Слова вищого рівня зараховуються частково, доки загальний профіль учня не наздожене їх.",
-    passiveVocabularyTitle: "Пасивний словник",
+    passiveVocabularyTitle: "Словник",
     passiveVocabularyDescription: (name: string) =>
       `Імпортуйте свідчення пасивного розпізнавання та перегляньте останні пасивні слова, позначені як library, на окремій сторінці пасивного словника для ${name}.`,
     passiveItems: (count: number) =>
       `${count} ${formatPluralizedCount("uk", count, { one: "пасивний елемент", few: "пасивні елементи", many: "пасивних елементів" })}`,
     equivalentWordsBadge: (count: number) =>
       `${count} ${formatPluralizedCount("uk", count, { one: "еквівалентне слово", few: "еквівалентні слова", many: "еквівалентних слів" })}`,
-    openPassiveVocabulary: "Відкрити пасивний словник",
+    openPassiveVocabulary: "Відкрити словник",
   },
   tutorPlansReportsPage: {
     title: "Плани та звіти",
@@ -2543,7 +2564,7 @@ const UK_MESSAGES: AppMessages = {
     articleEditorRevokedLabel: "Не надано",
   },
   tutorMastery: {
-    title: "Засвоєння слів студентами",
+    title: "Засвоєння студентів",
     description:
       "Переглядайте, наскільки добре ваші студенти знають лексику в усіх класах, включно з пасивними свідченнями, імпортованими з текстів, які вони вже розуміють.",
     noClassesTitle: "Поки немає класів",
@@ -2585,9 +2606,14 @@ const UK_MESSAGES: AppMessages = {
         `${count} ${formatPluralizedCount("uk", count, { one: "слово", few: "слова", many: "слів" })}`,
       deleteTitle: "Видалити слово для студента",
       deleteDescription: (term: string) =>
-        `${term} буде видалено зі списку засвоєння слів цього студента.`,
+        `${term} буде видалено зі списку засвоєння цього студента.`,
       deleteSuccess: (term: string) =>
-        `${term} видалено зі списку засвоєння слів студента`,
+        `${term} видалено зі списку засвоєння студента`,
+      deleteActiveEvidenceTitle: "Видалити активне свідчення",
+      deleteActiveEvidenceDescription: (term: string) =>
+        `${term} буде видалено з активного свідчення цього студента.`,
+      deleteActiveEvidenceSuccess: (term: string) =>
+        `${term} видалено з активного свідчення студента`,
     },
   },
   plans: {
@@ -2726,7 +2752,8 @@ const UK_MESSAGES: AppMessages = {
       quizzesCreated: "Створені вікторини",
       quizAttempts: "Спроби вікторин",
       wordBanks: "Банки слів",
-      textRequests: "Текстові запити",
+      generalTextRequests: "Звичайні текстові запити",
+      speechToTextRequests: "STT-запити",
       ttsRequests: "TTS-запити",
       trackedAiCost: "Відстежена AI-вартість",
       unallocatedCalls: "Нерозподілені запити",
@@ -2744,14 +2771,20 @@ const UK_MESSAGES: AppMessages = {
     platformAiUsageDescription: (
       textModel: string,
       ttsModel: string,
+      transcriptionModel: string,
       month: string,
     ) =>
-      `Оцінки paid-tier для текстової генерації ${textModel} і text-to-speech ${ttsModel} у ${month}`,
+      `Оцінки paid-tier для текстової генерації ${textModel}, text-to-speech ${ttsModel} і speech-to-text ${transcriptionModel} у ${month}`,
     loadFailedTitle: "Платформене використання AI",
     loadFailedDescription:
       "Зараз не вдалося завантажити оцінки використання Gemini paid-tier.",
-    textRequestsSummary: (cost: string, input: string, output: string) =>
+    generalTextRequestsSummary: (cost: string, input: string, output: string) =>
       `${cost} приблизно - ${input} вхідних / ${output} вихідних токенів`,
+    speechToTextRequestsSummary: (
+      cost: string,
+      input: string,
+      output: string,
+    ) => `${cost} приблизно - ${input} вхідних токенів транскрипції / ${output} вихідних токенів тексту`,
     ttsRequestsSummary: (cost: string, input: string, output: string) =>
       `${cost} приблизно - ${input} текстових вхідних / ${output} аудіовихідних токенів`,
     trackedCostSummary: (count: string, month: string) =>
@@ -2764,6 +2797,7 @@ const UK_MESSAGES: AppMessages = {
     pricingBasisDescription:
       "Офіційні ціни Google AI paid-tier для моделей, які зараз використовуються в цьому застосунку",
     inputTokensPrice: (cost: string) => `${cost} за 1 млн вхідних токенів`,
+    inputAudioTokensPrice: (cost: string) => `${cost} за 1 млн аудіовхідних токенів`,
     outputTokensPrice: (cost: string) => `${cost} за 1 млн вихідних токенів`,
     inputTextTokensPrice: (cost: string) =>
       `${cost} за 1 млн вхідних текстових токенів`,

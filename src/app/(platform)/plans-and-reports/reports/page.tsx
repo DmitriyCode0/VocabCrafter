@@ -232,6 +232,9 @@ export default async function PlansAndReportsReportsPage({
                           Classroom sessions: {report.metricsSnapshot.classroomSessions}
                         </Badge>
                         <Badge variant="outline">
+                          Student speaking time: {formatHours(report.metricsSnapshot.studentSpeakingHours)}
+                        </Badge>
+                        <Badge variant="outline">
                           New words: {report.metricsSnapshot.newMasteryWords}
                           {report.goalsSnapshot.monthlyNewMasteryWordsTarget !=
                           null
@@ -305,14 +308,6 @@ export default async function PlansAndReportsReportsPage({
                         </p>
                         <p className="text-xl font-semibold">
                           {formatNumber(report.metricsSnapshot.classroomSessions, 0)}
-                        </p>
-                      </div>
-                      <div className="rounded-lg border px-3 py-3">
-                        <p className="text-xs text-muted-foreground">
-                          Classroom time
-                        </p>
-                        <p className="text-xl font-semibold">
-                          {formatHours(report.metricsSnapshot.classroomHours)}
                         </p>
                       </div>
                       <div className="rounded-lg border px-3 py-3">

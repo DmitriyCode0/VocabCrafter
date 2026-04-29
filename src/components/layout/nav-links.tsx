@@ -82,7 +82,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     labelKey: "vocabMastery",
-    href: "/vocabulary",
+    href: "/mastery",
     icon: Zap,
     roles: ["student"],
   },
@@ -150,7 +150,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     labelKey: "passiveVocabulary",
-    href: "/passive-vocabulary",
+    href: "/vocabulary",
     icon: BookMarked,
     roles: ["student", "tutor", "superadmin"],
   },

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { StudentMasteryCards } from "@/components/mastery/student-mastery-cards";
+import { StudentVocabularyPageContent } from "@/app/(platform)/(student)/vocabulary/page";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { Users } from "lucide-react";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
@@ -28,22 +29,19 @@ interface PassiveEvidenceSummaryRow {
   student_id: string;
 }
 
-interface ActiveEvidenceSummaryRow {
-  student_id: string;
-  usage_count: number;
-}
-
 interface StudentProfile {
   id: string;
   full_name: string | null;
   email: string;
 }
 
-export default async function TutorMasteryPage({
-  searchParams,
-}: {
+interface TutorMasteryPageProps {
   searchParams: Promise<{ page?: string }>;
-}) {
+}
+
+export async function TutorMasteryPageContent({
+  searchParams,
+}: TutorMasteryPageProps) {
   const supabase = await createClient();
   const resolvedSearchParams = await searchParams;
   const currentPage = getCurrentPage(resolvedSearchParams.page);
@@ -61,6 +59,16 @@ export default async function TutorMasteryPage({
     .single();
 
   const messages = getAppMessages(normalizeAppLanguage(profile?.app_language));
+  const pageHeader = (
+    <div>
+      <h1 className="text-2xl font-bold tracking-tight">
+        {messages.tutorMastery.title}
+      </h1>
+      <p className="text-muted-foreground">
+        {messages.tutorMastery.description}
+      </p>
+    </div>
+  );
 
   const supabaseAdmin = createAdminClient();
 
@@ -75,14 +83,7 @@ export default async function TutorMasteryPage({
   if (classIds.length === 0) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {messages.tutorMastery.title}
-          </h1>
-          <p className="text-muted-foreground">
-            {messages.tutorMastery.description}
-          </p>
-        </div>
+        {pageHeader}
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -109,14 +110,7 @@ export default async function TutorMasteryPage({
   if (studentIds.length === 0) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {messages.tutorMastery.title}
-          </h1>
-          <p className="text-muted-foreground">
-            {messages.tutorMastery.description}
-          </p>
-        </div>
+        {pageHeader}
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -152,16 +146,10 @@ export default async function TutorMasteryPage({
     .from("passive_vocabulary_evidence")
     .select("student_id")
     .in("student_id", studentIds);
-  const { data: activeEvidenceRows } = await supabaseAdmin
-    .from("active_vocabulary_evidence")
-    .select("student_id, usage_count")
-    .in("student_id", studentIds);
 
   const visibleMastery = (allMasteryRows ?? []) as MasteryLevelRow[];
   const visiblePassiveEvidence = (passiveEvidenceRows ??
     []) as PassiveEvidenceSummaryRow[];
-  const visibleActiveEvidence = (activeEvidenceRows ??
-    []) as ActiveEvidenceSummaryRow[];
 
   // Group by student for lightweight summary statistics.
   const studentMastery = new Map<string, number[]>();
@@ -187,25 +175,6 @@ export default async function TutorMasteryPage({
     passiveEvidenceCounts.set(
       studentId,
       (passiveEvidenceCounts.get(studentId) ?? 0) + 1,
-    );
-  }
-
-  const activeEvidenceCounts = new Map<string, number>();
-  const activeEvidenceUsageTotals = new Map<string, number>();
-  for (const row of visibleActiveEvidence) {
-    const studentId = row.student_id;
-    if (!studentId) {
-      continue;
-    }
-
-    activeEvidenceCounts.set(
-      studentId,
-      (activeEvidenceCounts.get(studentId) ?? 0) + 1,
-    );
-    activeEvidenceUsageTotals.set(
-      studentId,
-      (activeEvidenceUsageTotals.get(studentId) ?? 0) +
-        Math.max(row.usage_count ?? 0, 0),
     );
   }
 
@@ -235,8 +204,6 @@ export default async function TutorMasteryPage({
       levelCounts,
       passiveEvidenceCount: passiveEvidenceCounts.get(sid) ?? 0,
       equivalentWords: passiveEvidenceCounts.get(sid) ?? 0,
-      activeEvidenceCount: activeEvidenceCounts.get(sid) ?? 0,
-      activeEvidenceTotalUses: activeEvidenceUsageTotals.get(sid) ?? 0,
     };
   };
 
@@ -269,14 +236,7 @@ export default async function TutorMasteryPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {messages.tutorMastery.title}
-        </h1>
-        <p className="text-muted-foreground">
-          {messages.tutorMastery.description}
-        </p>
-      </div>
+      {pageHeader}
 
       <Card>
         <CardHeader>
@@ -305,4 +265,33 @@ export default async function TutorMasteryPage({
       />
     </div>
   );
+}
+
+export default async function TutorMasteryPage({
+  searchParams,
+}: TutorMasteryPageProps) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role === "student") {
+    return StudentVocabularyPageContent({ searchParams });
+  }
+
+  if (profile?.role === "superadmin") {
+    redirect("/vocabulary");
+  }
+
+  return TutorMasteryPageContent({ searchParams });
 }

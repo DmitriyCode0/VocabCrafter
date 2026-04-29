@@ -4,14 +4,16 @@ import { z } from "zod";
 import { extractTextUsageSnapshot, recordAIUsageEvent } from "@/lib/ai/usage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTutorStudentClassroomParticipantAccess } from "@/lib/classroom-access";
-import { getGenAI } from "@/lib/gemini/client";
+import {
+  GEMINI_TRANSCRIPTION_MODEL,
+  getGenAI,
+} from "@/lib/gemini/client";
 import {
   saveClassroomTranscriptAndSyncEvidence,
   type ClassroomTranscriptReviewStatus,
 } from "@/lib/classroom-transcript-processing";
 import { normalizeClassroomTranscriptSegments } from "@/lib/classroom-transcripts";
 
-const GEMINI_TRANSCRIPTION_MODEL = "gemini-2.5-flash";
 const fileStateSchema = z.enum([
   FileState.STATE_UNSPECIFIED,
   FileState.PROCESSING,
@@ -278,11 +280,12 @@ export async function POST(
           content: segment.content,
         })),
       ),
+      syncActiveEvidence: false,
     });
 
     await recordAIUsageEvent({
       userId: access.userId,
-      feature: "lesson_transcript",
+      feature: "classroom_transcript",
       requestType: "text",
       model: GEMINI_TRANSCRIPTION_MODEL,
       snapshot: extractTextUsageSnapshot({

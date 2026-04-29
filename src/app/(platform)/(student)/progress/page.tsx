@@ -137,7 +137,7 @@ export default async function ProgressPage({
               </Link>
             </Button>
             <Button asChild variant="outline" className="w-full max-w-xs">
-              <Link href="/vocabulary">
+              <Link href="/mastery">
                 <BookOpen className="mr-2 h-4 w-4" />
                 {messages.progress.openVocabMastery}
               </Link>

@@ -12,6 +12,7 @@ export type AIUsageFeature =
   | "monthly_report"
   | "passive_vocabulary_enrichment"
   | "lesson_transcript"
+  | "classroom_transcript"
   | "tts";
 
 export type AIUsageRequestType = "text" | "tts";
@@ -38,6 +39,12 @@ export const GEMINI_TEXT_INPUT_COST_PER_MILLION = 0.25;
 export const GEMINI_TEXT_OUTPUT_COST_PER_MILLION = 1.5;
 export const GEMINI_TTS_INPUT_COST_PER_MILLION = 0.5;
 export const GEMINI_TTS_OUTPUT_COST_PER_MILLION = 10;
+export const GEMINI_STT_INPUT_COST_PER_MILLION = 1;
+export const GEMINI_STT_OUTPUT_COST_PER_MILLION = 2.5;
+
+export function isSpeechToTextFeature(feature: string | null | undefined) {
+  return feature === "lesson_transcript" || feature === "classroom_transcript";
+}
 
 function estimateTextTokens(text: string) {
   const normalized = text.trim();
@@ -182,6 +189,16 @@ export function calculateTtsCostUsd(
   return (
     (promptTokens / 1_000_000) * GEMINI_TTS_INPUT_COST_PER_MILLION +
     (audioOutputTokens / 1_000_000) * GEMINI_TTS_OUTPUT_COST_PER_MILLION
+  );
+}
+
+export function calculateSttCostUsd(
+  promptTokens: number,
+  responseTokens: number,
+) {
+  return (
+    (promptTokens / 1_000_000) * GEMINI_STT_INPUT_COST_PER_MILLION +
+    (responseTokens / 1_000_000) * GEMINI_STT_OUTPUT_COST_PER_MILLION
   );
 }
 

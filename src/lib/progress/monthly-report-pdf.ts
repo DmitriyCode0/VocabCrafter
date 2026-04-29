@@ -110,7 +110,6 @@ const PDF_COPY: Record<
     gapFillExercises: string;
     completedLessons: string;
     classroomSessions: string;
-    classroomTime: string;
     appLearningTime: string;
     studentSpeakingTime: string;
     studentSpeakingShare: string;
@@ -152,7 +151,6 @@ const PDF_COPY: Record<
     gapFillExercises: "Gap fill exercises",
     completedLessons: "Completed lessons",
     classroomSessions: "Classroom sessions",
-    classroomTime: "Classroom time",
     appLearningTime: "App learning time",
     studentSpeakingTime: "Student speaking time",
     studentSpeakingShare: "Student speaking share",
@@ -193,7 +191,6 @@ const PDF_COPY: Record<
     gapFillExercises: "Вправи на заповнення пропусків",
     completedLessons: "Завершені уроки",
     classroomSessions: "Сесії в classroom",
-    classroomTime: "Час у classroom",
     appLearningTime: "Час навчання в застосунку",
     studentSpeakingTime: "Час мовлення студента",
     studentSpeakingShare: "Частка мовлення студента",
@@ -625,10 +622,6 @@ export async function buildMonthlyReportPdf({
       {
         label: copy.classroomSessions,
         value: formatNumber(report.metricsSnapshot.classroomSessions, 0),
-      },
-      {
-        label: copy.classroomTime,
-        value: formatHours(report.metricsSnapshot.classroomHours),
       },
       {
         label: copy.appLearningTime,

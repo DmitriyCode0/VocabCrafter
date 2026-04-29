@@ -543,12 +543,6 @@ export function TutorStudentMonthlyReportsWorkspace({
                 </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Classroom time</p>
-                <p className="text-2xl font-semibold">
-                  {formatHours(metrics.classroomHours)}
-                </p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
                 <p className="text-xs text-muted-foreground">
                   App learning time
                 </p>
@@ -887,6 +881,9 @@ export function TutorStudentMonthlyReportsWorkspace({
                   </Badge>
                   <Badge variant="outline">
                     Classroom sessions: {report.metricsSnapshot.classroomSessions}
+                  </Badge>
+                  <Badge variant="outline">
+                    Student speaking time: {formatHours(report.metricsSnapshot.studentSpeakingHours)}
                   </Badge>
                   <Badge variant="outline">
                     New words: {report.metricsSnapshot.newMasteryWords}

@@ -4,14 +4,16 @@ import { z } from "zod";
 import { extractTextUsageSnapshot, recordAIUsageEvent } from "@/lib/ai/usage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireLessonRoomParticipantAccess } from "@/lib/lesson-room-access";
-import { getGenAI } from "@/lib/gemini/client";
+import {
+  GEMINI_TRANSCRIPTION_MODEL,
+  getGenAI,
+} from "@/lib/gemini/client";
 import {
   saveLessonTranscriptAndSyncEvidence,
   type LessonTranscriptReviewStatus,
 } from "@/lib/lesson-room-transcript-processing";
 import { normalizeLessonTranscriptSegments } from "@/lib/lesson-room-transcripts";
 
-const GEMINI_TRANSCRIPTION_MODEL = "gemini-2.5-flash";
 const fileStateSchema = z.enum([
   FileState.STATE_UNSPECIFIED,
   FileState.PROCESSING,

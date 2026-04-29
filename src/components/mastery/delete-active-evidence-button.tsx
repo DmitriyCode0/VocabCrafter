@@ -15,21 +15,23 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-interface DeleteMasteryWordButtonProps {
-  wordId: string;
+interface DeleteActiveEvidenceButtonProps {
+  evidenceId: string;
   term: string;
   title?: string;
   description?: string;
   successMessage?: string;
+  onDeleted?: (evidenceId: string) => void;
 }
 
-export function DeleteMasteryWordButton({
-  wordId,
+export function DeleteActiveEvidenceButton({
+  evidenceId,
   term,
-  title = "Remove word from learning",
+  title = "Delete active evidence",
   description,
   successMessage,
-}: DeleteMasteryWordButtonProps) {
+  onDeleted,
+}: DeleteActiveEvidenceButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -38,23 +40,27 @@ export function DeleteMasteryWordButton({
     setIsDeleting(true);
 
     try {
-      const response = await fetch(`/api/mastery/words/${wordId}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(`/api/mastery/active-evidence/${evidenceId}`,
+        {
+          method: "DELETE",
+        });
 
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new Error(data?.error || "Failed to remove word");
+        throw new Error(data?.error || "Failed to delete active evidence");
       }
 
-      toast.success(successMessage ?? `Removed ${term} from learning`);
+      toast.success(successMessage ?? `Removed ${term} from active evidence`);
+      onDeleted?.(evidenceId);
       setOpen(false);
       router.refresh();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to remove word",
+        error instanceof Error
+          ? error.message
+          : "Failed to delete active evidence",
       );
     } finally {
       setIsDeleting(false);
@@ -66,7 +72,7 @@ export function DeleteMasteryWordButton({
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="h-7 w-7">
           <Trash2 className="h-4 w-4 text-muted-foreground" />
-          <span className="sr-only">Remove {term}</span>
+          <span className="sr-only">Delete {term}</span>
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -74,7 +80,7 @@ export function DeleteMasteryWordButton({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
             {description ??
-              `${term} will be removed from your Mastery list.`}
+              `${term} will be removed from active evidence for this student.`}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -86,7 +92,7 @@ export function DeleteMasteryWordButton({
             onClick={handleDelete}
             disabled={isDeleting}
           >
-            {isDeleting ? "Removing..." : "Remove"}
+            {isDeleting ? "Deleting..." : "Delete"}
           </Button>
         </DialogFooter>
       </DialogContent>

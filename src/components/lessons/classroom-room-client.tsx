@@ -13,13 +13,10 @@ import { ConnectionState, Room, RoomEvent, Track } from "livekit-client";
 import {
   AlertTriangle,
   Loader2,
-  Mic,
-  Monitor,
   PictureInPicture2,
   PhoneOff,
   Radio,
   ShieldCheck,
-  Users,
   Video,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -357,8 +354,6 @@ export function ClassroomRoomClient({
   const [roomStatus, setRoomStatus] = useState(initialRoomStatus);
   const [isJoining, setIsJoining] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
-  const [cameraEnabled, setCameraEnabled] = useState(false);
-  const [microphoneEnabled, setMicrophoneEnabled] = useState(false);
   const [screenShareEnabled, setScreenShareEnabled] = useState(false);
   const [remoteParticipantCount, setRemoteParticipantCount] = useState(0);
   const [remoteMicrophoneTrackCount, setRemoteMicrophoneTrackCount] =
@@ -733,8 +728,6 @@ export function ClassroomRoomClient({
       }
     }
 
-    setCameraEnabled(room.localParticipant.isCameraEnabled);
-    setMicrophoneEnabled(room.localParticipant.isMicrophoneEnabled);
     setRemoteParticipantCount(room.remoteParticipants.size);
     setRemoteMicrophoneTrackCount(nextRemoteMicrophoneTrackCount);
     setRemoteVideoTrackCount(nextRemoteVideoTrackCount);
@@ -875,8 +868,6 @@ export function ClassroomRoomClient({
       }
 
       setHasJoined(false);
-      setCameraEnabled(false);
-      setMicrophoneEnabled(false);
       setScreenShareEnabled(false);
       void closePictureInPicture();
       resetSpeakingTimer();
@@ -948,8 +939,6 @@ export function ClassroomRoomClient({
       }
 
       setHasJoined(false);
-      setCameraEnabled(false);
-      setMicrophoneEnabled(false);
       setScreenShareEnabled(false);
       void closePictureInPicture();
       resetSpeakingTimer();
@@ -995,8 +984,6 @@ export function ClassroomRoomClient({
       await room.disconnect(true);
     } finally {
       setHasJoined(false);
-      setCameraEnabled(false);
-      setMicrophoneEnabled(false);
       setScreenShareEnabled(false);
       void closePictureInPicture();
       resetSpeakingTimer();
@@ -1088,6 +1075,11 @@ export function ClassroomRoomClient({
     return "outline" as const;
   }, [isConnected, joinError]);
 
+  const toolbarButtonClassName =
+    "h-14 rounded-[1.35rem] border border-white/10 bg-[#242424] px-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] hover:bg-[#303030] hover:text-white disabled:border-white/5 disabled:bg-[#171717] disabled:text-white/35";
+  const toolbarDangerButtonClassName =
+    "h-14 rounded-[1.35rem] border border-rose-400/30 bg-[#64241d] px-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:bg-[#7a2a22] hover:text-white disabled:border-rose-400/10 disabled:bg-[#4d211d] disabled:text-white/60";
+
   return (
     <>
       <Card className="overflow-hidden">
@@ -1149,6 +1141,65 @@ export function ClassroomRoomClient({
               room={roomRef.current}
               allowScreenShare
               stageRef={meetStageRef}
+              toolbarActions={
+                <>
+                  <Button
+                    variant="ghost"
+                    className={toolbarButtonClassName}
+                    onClick={() => void togglePictureInPicture()}
+                    disabled={!pictureInPictureSupported || !hasJoined}
+                  >
+                    <PictureInPicture2 className="mr-2 h-4 w-4" />
+                    {pictureInPictureActive ? "Exit PiP" : "Open PiP"}
+                  </Button>
+                  {role === "tutor" ? (
+                    recordingStatus === "recording" ? (
+                      <Button
+                        variant="ghost"
+                        className={toolbarDangerButtonClassName}
+                        onClick={() => void updateRecording("stop")}
+                        disabled={isRecordingActionPending}
+                      >
+                        {isRecordingActionPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Radio className="mr-2 h-4 w-4" />
+                        )}
+                        Stop recording
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        className={toolbarButtonClassName}
+                        onClick={() => void updateRecording("start")}
+                        disabled={
+                          isRecordingActionPending ||
+                          startRecordingDisabledReason !== null
+                        }
+                        title={startRecordingDisabledReason ?? "Start recording"}
+                      >
+                        {isRecordingActionPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Radio className="mr-2 h-4 w-4" />
+                        )}
+                        Start recording
+                      </Button>
+                    )
+                  ) : null}
+                </>
+              }
+              toolbarTrailingActions={
+                <Button
+                  variant="ghost"
+                  className={toolbarDangerButtonClassName}
+                  onClick={() => void handleDisconnect()}
+                  disabled={isSyncingSession || isRecordingActionPending}
+                >
+                  <PhoneOff className="mr-2 h-4 w-4" />
+                  Leave classroom
+                </Button>
+              }
             />
           ) : (
             <div
@@ -1170,81 +1221,6 @@ export function ClassroomRoomClient({
               </div>
             </div>
           )}
-
-          <div className="grid gap-3 lg:grid-cols-4">
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <p className="text-sm text-muted-foreground">Your devices</p>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span>Camera</span>
-                  <Badge variant="outline">
-                    {cameraEnabled ? "On" : "Off"}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Microphone</span>
-                  <Badge variant="outline">
-                    {microphoneEnabled ? "On" : "Off"}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <p className="text-sm text-muted-foreground">Remote presence</p>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Participants
-                  </span>
-                  <Badge variant="outline">{remoteParticipantCount}</Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Camera tracks</span>
-                  <Badge variant="outline">{remoteVideoTrackCount}</Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <p className="text-sm text-muted-foreground">Recording input</p>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2">
-                    <Mic className="h-4 w-4" />
-                    Student mic tracks
-                  </span>
-                  <Badge variant="outline">{remoteMicrophoneTrackCount}</Badge>
-                </div>
-                <p className="text-muted-foreground">
-                  Classroom recording becomes available only when the student
-                  publishes a microphone track.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <p className="text-sm text-muted-foreground">Screen share</p>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2">
-                    <Monitor className="h-4 w-4" />
-                    Share status
-                  </span>
-                  <Badge variant="outline">
-                    {screenShareEnabled ? "Live" : "Inactive"}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Picture-in-picture</span>
-                  <Badge variant="outline">
-                    {pictureInPictureSupported ? "Supported" : "Unavailable"}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {hasJoined &&
           remoteParticipantCount > 0 &&
@@ -1287,8 +1263,8 @@ export function ClassroomRoomClient({
             </div>
           ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            {!hasJoined ? (
+          {!hasJoined ? (
+            <div className="flex flex-wrap gap-2">
               <Button
                 onClick={handleJoin}
                 disabled={!isConfigured || isJoining || isSyncingSession}
@@ -1305,60 +1281,8 @@ export function ClassroomRoomClient({
                   </>
                 )}
               </Button>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => void togglePictureInPicture()}
-                  disabled={!pictureInPictureSupported || !hasJoined}
-                >
-                  <PictureInPicture2 className="mr-2 h-4 w-4" />
-                  {pictureInPictureActive ? "Exit PiP" : "Open PiP"}
-                </Button>
-                {role === "tutor" ? (
-                  recordingStatus === "recording" ? (
-                    <Button
-                      variant="destructive"
-                      onClick={() => void updateRecording("stop")}
-                      disabled={isRecordingActionPending}
-                    >
-                      {isRecordingActionPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Radio className="mr-2 h-4 w-4" />
-                      )}
-                      Stop recording
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      onClick={() => void updateRecording("start")}
-                      disabled={
-                        isRecordingActionPending ||
-                        startRecordingDisabledReason !== null
-                      }
-                      title={startRecordingDisabledReason ?? "Start recording"}
-                    >
-                      {isRecordingActionPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Radio className="mr-2 h-4 w-4" />
-                      )}
-                      Start recording
-                    </Button>
-                  )
-                ) : null}
-                <Button
-                  variant="destructive"
-                  onClick={() => void handleDisconnect()}
-                  disabled={isSyncingSession || isRecordingActionPending}
-                >
-                  <PhoneOff className="mr-2 h-4 w-4" />
-                  Leave classroom
-                </Button>
-              </>
-            )}
-          </div>
+            </div>
+          ) : null}
 
           <div className="rounded-2xl border bg-muted/20 p-4">
             <div className="space-y-1">

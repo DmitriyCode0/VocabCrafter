@@ -1,5 +1,6 @@
 import { formatAppDateTime } from "@/lib/dates";
 import {
+  extractParsedStudentActiveVocabularyTermsFromTranscriptSegments,
   buildLessonTranscriptFullText,
   extractStudentActiveVocabularyTermsFromTranscriptSegments,
   normalizeLessonTranscriptSegments,
@@ -15,6 +16,8 @@ export const normalizeClassroomTranscriptSegments =
 export const buildClassroomTranscriptFullText = buildLessonTranscriptFullText;
 export const extractStudentActiveVocabularyTermsFromClassroomTranscriptSegments =
   extractStudentActiveVocabularyTermsFromTranscriptSegments;
+export const extractParsedStudentActiveVocabularyTermsFromClassroomTranscriptSegments =
+  extractParsedStudentActiveVocabularyTermsFromTranscriptSegments;
 
 export function buildClassroomActiveEvidenceSourceLabel({
   tutorName,

@@ -92,7 +92,7 @@ export function ImportVocabularyCard({
       const successMessage =
         updatedCount > 0
           ? `Imported ${importedCount} words. Added ${createdCount} new and refreshed ${updatedCount} existing entries up to ${appliedLevelLabel} (Level ${appliedLevel}).`
-          : `Imported ${importedCount} words into Vocab Mastery at ${appliedLevelLabel} (Level ${appliedLevel}).`;
+          : `Imported ${importedCount} words into Mastery at ${appliedLevelLabel} (Level ${appliedLevel}).`;
 
       toast.success(successMessage);
       setTerms([]);
@@ -196,7 +196,7 @@ export function ImportVocabularyCard({
                   disabled={isImporting || terms.length === 0}
                   className="w-full sm:w-auto"
                 >
-                  {isImporting ? "Importing..." : "Import to Vocab Mastery"}
+                  {isImporting ? "Importing..." : "Import to Mastery"}
                 </Button>
               </div>
             </div>

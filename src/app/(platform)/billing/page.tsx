@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   CreditCard,
+  Captions,
   Cpu,
   Zap,
   TrendingUp,
@@ -34,14 +35,22 @@ import {
 } from "@/lib/i18n/plans";
 import {
   AUDIO_TOKENS_PER_SECOND,
+  GEMINI_STT_INPUT_COST_PER_MILLION,
+  GEMINI_STT_OUTPUT_COST_PER_MILLION,
   GEMINI_TEXT_INPUT_COST_PER_MILLION,
   GEMINI_TEXT_OUTPUT_COST_PER_MILLION,
   GEMINI_TTS_INPUT_COST_PER_MILLION,
   GEMINI_TTS_OUTPUT_COST_PER_MILLION,
+  calculateSttCostUsd,
   calculateTextCostUsd,
   calculateTtsCostUsd,
+  isSpeechToTextFeature,
 } from "@/lib/ai/usage";
-import { GEMINI_MODEL, GEMINI_TTS_MODEL } from "@/lib/gemini/client";
+import {
+  GEMINI_MODEL,
+  GEMINI_TRANSCRIPTION_MODEL,
+  GEMINI_TTS_MODEL,
+} from "@/lib/gemini/client";
 
 export const dynamic = "force-dynamic";
 
@@ -448,7 +457,7 @@ async function AdminUsageSection({
     supabaseAdmin
       .from("ai_usage_events")
       .select(
-        "request_type, prompt_tokens, response_tokens, audio_output_tokens, is_estimated",
+        "feature, request_type, prompt_tokens, response_tokens, audio_output_tokens, is_estimated",
       )
       .gte("created_at", monthISO),
   ]);
@@ -484,14 +493,20 @@ async function AdminUsageSection({
     0,
   );
   const monthlyUsageEvents = monthlyUsageEventsResult.data ?? [];
+  const speechToTextEvents = monthlyUsageEvents.filter(
+    (event) =>
+      event.request_type === "text" && isSpeechToTextFeature(event.feature),
+  );
   const textEvents = monthlyUsageEvents.filter(
-    (event) => event.request_type === "text",
+    (event) =>
+      event.request_type === "text" && !isSpeechToTextFeature(event.feature),
   );
   const ttsEvents = monthlyUsageEvents.filter(
     (event) => event.request_type === "tts",
   );
 
   const textRequestCount = textEvents.length;
+  const speechToTextRequestCount = speechToTextEvents.length;
   const ttsRequestCount = ttsEvents.length;
   const trackedRequestCount = monthlyUsageEvents.length;
   const estimatedEventCount = monthlyUsageEvents.filter(
@@ -510,6 +525,14 @@ async function AdminUsageSection({
     (sum, event) => sum + (event.response_tokens ?? 0),
     0,
   );
+  const speechToTextPromptTokens = speechToTextEvents.reduce(
+    (sum, event) => sum + (event.prompt_tokens ?? 0),
+    0,
+  );
+  const speechToTextResponseTokens = speechToTextEvents.reduce(
+    (sum, event) => sum + (event.response_tokens ?? 0),
+    0,
+  );
   const ttsPromptTokens = ttsEvents.reduce(
     (sum, event) => sum + (event.prompt_tokens ?? 0),
     0,
@@ -520,8 +543,12 @@ async function AdminUsageSection({
   );
 
   const textCost = calculateTextCostUsd(textPromptTokens, textResponseTokens);
+  const speechToTextCost = calculateSttCostUsd(
+    speechToTextPromptTokens,
+    speechToTextResponseTokens,
+  );
   const ttsCost = calculateTtsCostUsd(ttsPromptTokens, ttsAudioOutputTokens);
-  const totalTrackedCost = textCost + ttsCost;
+  const totalTrackedCost = textCost + speechToTextCost + ttsCost;
 
   return (
     <>
@@ -535,16 +562,17 @@ async function AdminUsageSection({
           {messages.billing.platformAiUsageDescription(
             GEMINI_MODEL,
             GEMINI_TTS_MODEL,
+            GEMINI_TRANSCRIPTION_MODEL,
             monthLabel,
           )}
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              {messages.billing.usageTitles.textRequests}
+              {messages.billing.usageTitles.generalTextRequests}
             </CardTitle>
             <Cpu className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -553,10 +581,31 @@ async function AdminUsageSection({
               {textRequestCount.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              {messages.billing.textRequestsSummary(
+              {messages.billing.generalTextRequestsSummary(
                 formatApproxUsd(textCost),
                 textPromptTokens.toLocaleString(),
                 textResponseTokens.toLocaleString(),
+              )}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              {messages.billing.usageTitles.speechToTextRequests}
+            </CardTitle>
+            <Captions className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {speechToTextRequestCount.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {messages.billing.speechToTextRequestsSummary(
+                formatApproxUsd(speechToTextCost),
+                speechToTextPromptTokens.toLocaleString(),
+                speechToTextResponseTokens.toLocaleString(),
               )}
             </p>
           </CardContent>
@@ -657,6 +706,21 @@ async function AdminUsageSection({
               <p>
                 {messages.billing.outputAudioTokensPrice(
                   formatApproxUsd(GEMINI_TTS_OUTPUT_COST_PER_MILLION),
+                )}
+              </p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="font-medium text-foreground">
+                {GEMINI_TRANSCRIPTION_MODEL}
+              </p>
+              <p>
+                {messages.billing.inputAudioTokensPrice(
+                  formatApproxUsd(GEMINI_STT_INPUT_COST_PER_MILLION),
+                )}
+              </p>
+              <p>
+                {messages.billing.outputTokensPrice(
+                  formatApproxUsd(GEMINI_STT_OUTPUT_COST_PER_MILLION),
                 )}
               </p>
             </div>

@@ -451,7 +451,7 @@ export default async function CoachingResultsPage({
             </div>
 
             <Button asChild variant="outline" id="passive-recognition">
-              <Link href={`/passive-vocabulary?student=${activeStudentId}`}>
+              <Link href={`/vocabulary?student=${activeStudentId}`}>
                 {messages.tutorProgressPage.openPassiveVocabulary}
               </Link>
             </Button>

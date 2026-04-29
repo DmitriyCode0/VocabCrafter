@@ -57,6 +57,7 @@ async function requireLibraryRole(roles: Role[]) {
 function revalidateLibraryPaths() {
   revalidatePath("/library");
   revalidatePath("/library/dictionary");
+  revalidatePath("/vocabulary");
   revalidatePath("/passive-vocabulary");
 }
 

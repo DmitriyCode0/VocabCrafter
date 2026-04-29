@@ -29,6 +29,7 @@ interface SaveClassroomTranscriptInput {
   fullText?: string | null;
   errorMessage?: string | null;
   segments?: ClassroomTranscriptSegmentInput[];
+  syncActiveEvidence?: boolean;
 }
 
 interface SaveClassroomTranscriptResult {
@@ -95,6 +96,7 @@ export async function saveClassroomTranscriptAndSyncEvidence({
   fullText,
   errorMessage,
   segments,
+  syncActiveEvidence = true,
 }: SaveClassroomTranscriptInput): Promise<SaveClassroomTranscriptResult> {
   const supabaseAdmin = createAdminClient();
   const { data: recording, error: recordingError } = await supabaseAdmin
@@ -211,6 +213,7 @@ export async function saveClassroomTranscriptAndSyncEvidence({
     updatedCount: 0,
   };
   const shouldSyncActiveEvidence =
+    syncActiveEvidence &&
     diarizationStatus === "ready" &&
     hasSegmentsUpdate &&
     !transcript.active_evidence_synced_at;
@@ -303,5 +306,134 @@ export async function saveClassroomTranscriptAndSyncEvidence({
       studentName: getStudentLabel(access),
       recordedAt: recording.created_at,
     }),
+  };
+}
+
+export async function approveClassroomTranscriptActiveEvidence({
+  access,
+  transcriptId,
+  approvedTerms,
+}: {
+  access: TutorStudentClassroomAccessData;
+  transcriptId: string;
+  approvedTerms: string[];
+}) {
+  const normalizedApprovedTerms = new Set(
+    approvedTerms
+      .map((term) => term.trim().toLowerCase())
+      .filter((term) => term.length > 0),
+  );
+
+  if (normalizedApprovedTerms.size === 0) {
+    throw new Error("Choose at least one term to approve");
+  }
+
+  const supabaseAdmin = createAdminClient();
+  const { data: transcript, error: transcriptError } = await supabaseAdmin
+    .from("tutor_student_classroom_transcripts")
+    .select("id, recording_id, classroom_id, active_evidence_synced_at")
+    .eq("id", transcriptId)
+    .eq("classroom_id", access.classroom.id)
+    .maybeSingle();
+
+  if (transcriptError) {
+    throw new Error("Failed to load classroom transcript");
+  }
+
+  if (!transcript) {
+    throw new Error("Classroom transcript not found");
+  }
+
+  if (transcript.active_evidence_synced_at) {
+    throw new Error("This transcript has already been approved");
+  }
+
+  const { data: recording, error: recordingError } = await supabaseAdmin
+    .from("tutor_student_classroom_recordings")
+    .select("id, created_at")
+    .eq("id", transcript.recording_id)
+    .eq("classroom_id", access.classroom.id)
+    .maybeSingle();
+
+  if (recordingError) {
+    throw new Error("Failed to load classroom recording");
+  }
+
+  if (!recording) {
+    throw new Error("Classroom recording not found");
+  }
+
+  const { data: segments, error: segmentsError } = await supabaseAdmin
+    .from("tutor_student_classroom_transcript_segments")
+    .select("speaker_role, content")
+    .eq("transcript_id", transcript.id)
+    .order("created_at", { ascending: true });
+
+  if (segmentsError) {
+    throw new Error("Failed to load classroom transcript segments");
+  }
+
+  const selectedOccurrences =
+    extractStudentActiveVocabularyTermsFromClassroomTranscriptSegments(
+      normalizeClassroomTranscriptSegments(
+        (segments ?? []).map((segment) => ({
+          speakerRole: segment.speaker_role as ClassroomTranscriptSegmentInput["speakerRole"],
+          content: segment.content,
+        })),
+      ),
+    ).filter((term) => normalizedApprovedTerms.has(term));
+
+  if (selectedOccurrences.length === 0) {
+    throw new Error("No approved student terms were available to import");
+  }
+
+  const { data: studentProfile, error: studentProfileError } =
+    await supabaseAdmin
+      .from("profiles")
+      .select("preferred_language")
+      .eq("id", access.connection.student_id)
+      .maybeSingle();
+
+  if (studentProfileError) {
+    throw new Error("Failed to load the student's language profile");
+  }
+
+  const activeEvidence = await upsertActiveVocabularyEvidence({
+    adminClient: supabaseAdmin,
+    studentId: access.connection.student_id,
+    actorUserId: access.userId,
+    targetLanguage: normalizeLearningLanguage(
+      studentProfile?.preferred_language,
+    ),
+    terms: selectedOccurrences,
+    sourceType: "lesson_recording",
+    sourceLabel: buildClassroomActiveEvidenceSourceLabel({
+      tutorName: getTutorLabel(access),
+      studentName: getStudentLabel(access),
+      recordedAt: recording.created_at,
+    }),
+    usedAt: recording.created_at,
+  });
+
+  const nowIso = new Date().toISOString();
+  const { data: updatedTranscript, error: updatedTranscriptError } =
+    await supabaseAdmin
+      .from("tutor_student_classroom_transcripts")
+      .update({
+        active_evidence_synced_at: nowIso,
+        review_status: "reviewed",
+        updated_at: nowIso,
+      })
+      .eq("id", transcript.id)
+      .select("*")
+      .single();
+
+  if (updatedTranscriptError || !updatedTranscript) {
+    throw new Error("Failed to finalize classroom transcript approval");
+  }
+
+  return {
+    transcript: updatedTranscript,
+    activeEvidence,
   };
 }
