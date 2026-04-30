@@ -45,7 +45,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <NextTopLoader color="oklch(0.5234 0.1347 144.1672)" showSpinner={false} height={3} />
+        <NextTopLoader
+          color="oklch(0.5234 0.1347 144.1672)"
+          showSpinner={false}
+          height={3}
+        />
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

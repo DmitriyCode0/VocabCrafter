@@ -13,10 +13,7 @@ export function LoadingSkeleton({
   return (
     <div className={cn("space-y-3", className)}>
       {Array.from({ length: lines }).map((_, i) => (
-        <Skeleton
-          key={i}
-          className={cn("h-4", i === lines - 1 && "w-3/4")}
-        />
+        <Skeleton key={i} className={cn("h-4", i === lines - 1 && "w-3/4")} />
       ))}
     </div>
   );

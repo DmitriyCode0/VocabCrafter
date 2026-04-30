@@ -51,7 +51,8 @@ export function MonthlyLessonsCalendar({
   const [isMonthlyListExpanded, setIsMonthlyListExpanded] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [quickCreateDate, setQuickCreateDate] = useState<string | null>(null);
-  const [localLessons, setLocalLessons] = useState<MonthlyLessonItem[]>(lessons);
+  const [localLessons, setLocalLessons] =
+    useState<MonthlyLessonItem[]>(lessons);
   useEffect(() => {
     setLocalLessons(lessons);
   }, [lessons]);
@@ -68,7 +69,9 @@ export function MonthlyLessonsCalendar({
     // Also clear the selected date panel if it becomes empty
     setSelectedDate((prev) => {
       if (!prev) return prev;
-      const remaining = (lessonsByDate.get(prev) ?? []).filter((l) => l.id !== id);
+      const remaining = (lessonsByDate.get(prev) ?? []).filter(
+        (l) => l.id !== id,
+      );
       return remaining.length === 0 ? null : prev;
     });
   }
@@ -115,7 +118,9 @@ export function MonthlyLessonsCalendar({
             {showParticipant ? (
               <p
                 className={cn(
-                  compact ? "truncate font-semibold text-foreground" : "text-muted-foreground",
+                  compact
+                    ? "truncate font-semibold text-foreground"
+                    : "text-muted-foreground",
                 )}
               >
                 {compact
