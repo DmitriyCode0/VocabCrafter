@@ -109,13 +109,9 @@ export function UserMenu({ profile }: UserMenuProps) {
           <p className="text-xs text-muted-foreground">{profile.email}</p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/settings")}>
+        <DropdownMenuItem onClick={() => router.push("/settings")}> 
           <Settings className="mr-2 h-4 w-4" />
           {messages.userMenu.settings}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/dashboard")}>
-          <User className="mr-2 h-4 w-4" />
-          {messages.userMenu.profile}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuSub>

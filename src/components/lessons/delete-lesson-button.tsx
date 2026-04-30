@@ -19,6 +19,7 @@ import { getLessonDisplayTitle } from "@/lib/lessons";
 interface DeleteLessonButtonProps {
   lessonId: string;
   title?: string | null;
+  onDeleted?: () => void;
 }
 
 interface DeleteLessonResponse {
@@ -32,6 +33,7 @@ interface DeleteLessonResponse {
 export function DeleteLessonButton({
   lessonId,
   title,
+  onDeleted,
 }: DeleteLessonButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -62,6 +64,7 @@ export function DeleteLessonButton({
         toast.error(data.calendarSync.message);
       }
       setOpen(false);
+      onDeleted?.();
       router.refresh();
     } catch (error) {
       toast.error(

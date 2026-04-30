@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import {
@@ -14,6 +15,7 @@ import { StudentProgressInsights } from "@/components/progress/student-progress-
 import { StudentResultsSummary } from "@/components/progress/student-results-summary";
 import { StudentProgressOverviewCards } from "@/components/progress/student-progress-overview-cards";
 import { TutorProgressPageHeader } from "@/components/progress/tutor-progress-page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, BookOpen, PlusCircle } from "lucide-react";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAppMessages } from "@/lib/i18n/messages";
@@ -44,46 +46,79 @@ function formatMonthLabel(reportMonth: string, appLanguage: "en" | "uk") {
   }).format(new Date(`${reportMonth}T00:00:00.000Z`));
 }
 
-export default async function ProgressPage({
-  searchParams,
+function ProgressBodySkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="pb-2">
+              <Skeleton className="h-4 w-24" />
+            </CardHeader>
+            <div className="px-6 pb-6">
+              <Skeleton className="h-8 w-16 mb-1" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </Card>
+        ))}
+      </div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <div className="px-6 pb-6">
+            <Skeleton className="h-64 w-full rounded-xl" />
+          </div>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-4 w-48 mt-1" />
+          </CardHeader>
+          <div className="px-6 pb-6 space-y-3">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-4/6" />
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+async function ProgressBody({
+  userId,
+  chartView,
+  appLanguage,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  userId: string;
+  chartView: "overall" | "monthly";
+  appLanguage: "en" | "uk";
 }) {
-  const { view } = await searchParams;
   const supabase = await createClient();
+  const messages = getAppMessages(appLanguage);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const [profileResult, snapshot, savedInsightsResult, publishedTutorOverride] =
+  const [snapshot, savedInsightsResult, publishedTutorOverride] =
     await Promise.all([
-      supabase
-        .from("profiles")
-        .select("app_language")
-        .eq("id", user.id)
-        .single(),
-      getStudentProgressSnapshot(user.id),
+      getStudentProgressSnapshot(userId),
       supabase
         .from("student_progress_insights")
         .select("insights")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .maybeSingle(),
-      getPublishedTutorProgressOverride(user.id),
+      getPublishedTutorProgressOverride(userId),
     ]);
-  const appLanguage = normalizeAppLanguage(profileResult.data?.app_language);
-  const messages = getAppMessages(appLanguage);
-  const chartView = view === "monthly" ? "monthly" : "overall";
+
   const monthlyComparison =
     chartView === "monthly"
       ? await getStudentMonthlyComparisonSnapshot(
-          user.id,
+          userId,
           undefined,
           publishedTutorOverride?.override.monthlyTargetOverrides,
         )
       : null;
+
   const savedInsights = parseProgressInsightsValue(
     savedInsightsResult.data?.insights,
   );
@@ -111,73 +146,36 @@ export default async function ProgressPage({
 
   if (!hasAnyData) {
     return (
-      <div className="space-y-6">
-        <TutorProgressPageHeader
-          currentSection="overall"
-          basePath="/progress"
-          title={messages.progress.title}
-          description={messages.progress.description}
-        />
-
-        <Card>
-          <CardHeader className="items-center text-center py-12">
-            <TrendingUp className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">
-              {messages.progress.noProgressTitle}
-            </CardTitle>
-            <CardDescription>
-              {messages.progress.noProgressDescription}
-            </CardDescription>
-          </CardHeader>
-          <CardFooter className="flex-col justify-center gap-3 pb-12 sm:flex-row">
-            <Button asChild className="w-full max-w-xs">
-              <Link href="/quizzes/new">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                {messages.progress.createQuiz}
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full max-w-xs">
-              <Link href="/mastery">
-                <BookOpen className="mr-2 h-4 w-4" />
-                {messages.progress.openVocabMastery}
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader className="items-center text-center py-12">
+          <TrendingUp className="h-12 w-12 text-muted-foreground/50 mb-2" />
+          <CardTitle className="text-lg">
+            {messages.progress.noProgressTitle}
+          </CardTitle>
+          <CardDescription>
+            {messages.progress.noProgressDescription}
+          </CardDescription>
+        </CardHeader>
+        <CardFooter className="flex-col justify-center gap-3 pb-12 sm:flex-row">
+          <Button asChild className="w-full max-w-xs">
+            <Link href="/quizzes/new">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              {messages.progress.createQuiz}
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="w-full max-w-xs">
+            <Link href="/mastery">
+              <BookOpen className="mr-2 h-4 w-4" />
+              {messages.progress.openVocabMastery}
+            </Link>
+          </Button>
+        </CardFooter>
+      </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <TutorProgressPageHeader
-        currentSection="overall"
-        basePath="/progress"
-        title={messages.progress.title}
-        description={messages.progress.description}
-      />
-
-      <div className="flex flex-wrap gap-2">
-        <Button
-          asChild
-          size="sm"
-          variant={chartView === "overall" ? "default" : "outline"}
-        >
-          <Link href="/progress">
-            {appLanguage === "uk" ? "Загалом" : "Overall"}
-          </Link>
-        </Button>
-        <Button
-          asChild
-          size="sm"
-          variant={chartView === "monthly" ? "default" : "outline"}
-        >
-          <Link href="/progress?view=monthly">
-            {appLanguage === "uk" ? "Порівняння місяців" : "Monthly Comparison"}
-          </Link>
-        </Button>
-      </div>
-
+    <>
       {chartView === "overall" ? (
         <StudentResultsSummary snapshot={effectiveSnapshot} />
       ) : null}
@@ -207,7 +205,7 @@ export default async function ProgressPage({
           description={
             chartView === "monthly"
               ? appLanguage === "uk"
-                ? "Порівняння поточного місяця з попереднім за тими самими п’ятьма осями."
+                ? "Порівняння поточного місяця з попереднім за тими самими п'ятьма осями."
                 : "Compare the current month with the previous month across the same five axes."
               : undefined
           }
@@ -243,6 +241,71 @@ export default async function ProgressPage({
       ) : null}
 
       <StudentProgressOverviewCards snapshot={effectiveSnapshot} />
+    </>
+  );
+}
+
+export default async function ProgressPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const { view } = await searchParams;
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const profileResult = await supabase
+    .from("profiles")
+    .select("app_language")
+    .eq("id", user.id)
+    .single();
+
+  const appLanguage = normalizeAppLanguage(profileResult.data?.app_language);
+  const messages = getAppMessages(appLanguage);
+  const chartView = view === "monthly" ? "monthly" : "overall";
+
+  return (
+    <div className="space-y-6">
+      <TutorProgressPageHeader
+        currentSection="overall"
+        basePath="/progress"
+        title={messages.progress.title}
+        description={messages.progress.description}
+      />
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          asChild
+          size="sm"
+          variant={chartView === "overall" ? "default" : "outline"}
+        >
+          <Link href="/progress">
+            {appLanguage === "uk" ? "Загалом" : "Overall"}
+          </Link>
+        </Button>
+        <Button
+          asChild
+          size="sm"
+          variant={chartView === "monthly" ? "default" : "outline"}
+        >
+          <Link href="/progress?view=monthly">
+            {appLanguage === "uk" ? "Порівняння місяців" : "Monthly Comparison"}
+          </Link>
+        </Button>
+      </div>
+
+      <Suspense fallback={<ProgressBodySkeleton />}>
+        <ProgressBody
+          userId={user.id}
+          chartView={chartView}
+          appLanguage={appLanguage}
+        />
+      </Suspense>
     </div>
   );
 }

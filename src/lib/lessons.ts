@@ -60,6 +60,39 @@ export interface LessonMonthCell {
 const MONTH_PARAM_PATTERN = /^\d{4}-\d{2}$/;
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+/** Returns true when a lesson can be joined right now.
+ *  Window: 30 minutes before start time through end time (or +60 min if no end time). */
+export function isLessonJoinable(lesson: {
+  lessonDate: string;
+  startTime: string | null;
+  endTime: string | null;
+  status: LessonStatus;
+}): boolean {
+  if (lesson.status !== "planned") return false;
+
+  const now = new Date();
+  const todayIso = toIsoDate(now);
+
+  if (lesson.lessonDate !== todayIso) return false;
+  if (!lesson.startTime) return true; // no time info — show if today
+
+  const [startHour, startMin] = lesson.startTime.split(":").map(Number);
+  const lessonStart = new Date(now);
+  lessonStart.setHours(startHour, startMin, 0, 0);
+
+  const windowOpenMs = 30 * 60 * 1000;
+  if (now < new Date(lessonStart.getTime() - windowOpenMs)) return false;
+
+  if (lesson.endTime) {
+    const [endHour, endMin] = lesson.endTime.split(":").map(Number);
+    const lessonEnd = new Date(now);
+    lessonEnd.setHours(endHour, endMin, 0, 0);
+    if (now > lessonEnd) return false;
+  }
+
+  return true;
+}
+
 function toIsoDate(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");

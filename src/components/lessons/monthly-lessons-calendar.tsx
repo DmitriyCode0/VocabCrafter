@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { CreateLessonDialog } from "@/components/lessons/create-lesson-dialog";
 import { DeleteLessonButton } from "@/components/lessons/delete-lesson-button";
 import { EditLessonDialog } from "@/components/lessons/edit-lesson-dialog";
@@ -26,10 +27,11 @@ import {
   getLessonStatusSurfaceClassName,
   getLessonWeekdayLabels,
   groupLessonsByDate,
+  isLessonJoinable,
   type LessonStudentOption,
   type MonthlyLessonItem,
 } from "@/lib/lessons";
-import { CalendarDays, ChevronDown, PlusCircle } from "lucide-react";
+import { CalendarDays, ChevronDown, PlusCircle, Video } from "lucide-react";
 
 interface MonthlyLessonsCalendarProps {
   month: Date;
@@ -49,12 +51,27 @@ export function MonthlyLessonsCalendar({
   const [isMonthlyListExpanded, setIsMonthlyListExpanded] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [quickCreateDate, setQuickCreateDate] = useState<string | null>(null);
+  const [localLessons, setLocalLessons] = useState<MonthlyLessonItem[]>(lessons);
+  useEffect(() => {
+    setLocalLessons(lessons);
+  }, [lessons]);
+
   const cells = buildLessonMonthCells(month);
   const weekdayLabels = getLessonWeekdayLabels();
-  const lessonsByDate = groupLessonsByDate(lessons);
+  const lessonsByDate = groupLessonsByDate(localLessons);
   const selectedDateLessons = selectedDate
     ? (lessonsByDate.get(selectedDate) ?? [])
     : [];
+
+  function handleLessonDeleted(id: string) {
+    setLocalLessons((prev) => prev.filter((l) => l.id !== id));
+    // Also clear the selected date panel if it becomes empty
+    setSelectedDate((prev) => {
+      if (!prev) return prev;
+      const remaining = (lessonsByDate.get(prev) ?? []).filter((l) => l.id !== id);
+      return remaining.length === 0 ? null : prev;
+    });
+  }
   const canQuickCreate = canManageLessons;
   const quickCreateDefaultStudentId = undefined;
 
@@ -95,11 +112,12 @@ export function MonthlyLessonsCalendar({
                 ? formatLessonTimeRange(lesson.startTime, lesson.endTime)
                 : getLessonDisplayTitle(lesson.title)}
             </p>
-            {compact ? (
-              <p className="truncate">{getLessonDisplayTitle(lesson.title)}</p>
-            ) : null}
             {showParticipant ? (
-              <p className="text-muted-foreground">
+              <p
+                className={cn(
+                  compact ? "truncate font-semibold text-foreground" : "text-muted-foreground",
+                )}
+              >
                 {compact
                   ? lesson.participantName
                   : `${lesson.participantLabel}: ${lesson.participantName}`}
@@ -126,6 +144,14 @@ export function MonthlyLessonsCalendar({
                 {formatLessonCurrency(lesson.priceCents)}
               </Badge>
             ) : null}
+            {!compact && isLessonJoinable(lesson) ? (
+              <Button asChild size="sm" className="gap-1.5">
+                <Link href={`/lessons/${lesson.id}/room`}>
+                  <Video className="h-3.5 w-3.5" />
+                  Join
+                </Link>
+              </Button>
+            ) : null}
             {showManageActions ? (
               <div className="flex items-center gap-1">
                 <EditLessonDialog
@@ -142,7 +168,11 @@ export function MonthlyLessonsCalendar({
                   }}
                   students={studentOptions}
                 />
-                <DeleteLessonButton lessonId={lesson.id} title={lesson.title} />
+                <DeleteLessonButton
+                  lessonId={lesson.id}
+                  title={lesson.title}
+                  onDeleted={() => handleLessonDeleted(lesson.id)}
+                />
               </div>
             ) : null}
           </div>
@@ -171,7 +201,7 @@ export function MonthlyLessonsCalendar({
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="hidden md:block">
         <CardHeader>
           <CardTitle className="text-base">Monthly Calendar</CardTitle>
         </CardHeader>

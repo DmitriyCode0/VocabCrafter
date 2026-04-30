@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, type MouseEvent } from "react";
 import { motion } from "motion/react";
 import {
   LayoutDashboard,
@@ -23,6 +24,7 @@ import {
   UserPlus,
   FileText,
   LibraryBig,
+  Loader2,
 } from "lucide-react";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import {
@@ -201,7 +203,19 @@ interface NavLinksProps {
 
 export function NavLinks({ role, collapsed = false }: NavLinksProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { messages } = useAppI18n();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pendingHref) {
+      return;
+    }
+
+    if (pathname === pendingHref || pathname.startsWith(`${pendingHref}/`)) {
+      setPendingHref(null);
+    }
+  }, [pathname, pendingHref]);
 
   const filteredItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
@@ -219,7 +233,28 @@ export function NavLinks({ role, collapsed = false }: NavLinksProps) {
         {filteredItems.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const isPending = pendingHref === item.href && !isActive;
           const label = messages.nav[item.labelKey];
+
+          const handleMouseEnter = () => {
+            router.prefetch(item.href);
+          };
+
+          const handleLinkClick = (event: MouseEvent<HTMLAnchorElement>) => {
+            if (
+              event.defaultPrevented ||
+              event.button !== 0 ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey ||
+              isActive
+            ) {
+              return;
+            }
+
+            setPendingHref(item.href);
+          };
 
           return (
             <motion.div
@@ -235,15 +270,23 @@ export function NavLinks({ role, collapsed = false }: NavLinksProps) {
                   <Link
                     href={item.href}
                     data-active={isActive}
+                    data-pending={isPending}
+                    onMouseEnter={handleMouseEnter}
+                    onClick={handleLinkClick}
                     className={cn(
-                      "nav-link-animated flex items-center rounded-lg py-3 text-base transition-[padding,justify-content] duration-200 ease-out",
+                      "nav-link-animated flex items-center rounded-lg py-3 text-base transition-[padding,justify-content,opacity] duration-200 ease-out",
                       collapsed ? "justify-center px-0" : "gap-4 px-4",
+                      isPending && "animate-pulse opacity-90",
                       isActive
                         ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
                   >
-                    <item.icon className="h-6 w-6 shrink-0" />
+                    {isPending ? (
+                      <Loader2 className="h-6 w-6 shrink-0 animate-spin" />
+                    ) : (
+                      <item.icon className="h-6 w-6 shrink-0" />
+                    )}
                     <span className={cn("truncate", collapsed && "sr-only")}>
                       {label}
                     </span>

@@ -7,7 +7,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { DeleteRecordingButton } from "@/components/lessons/delete-recording-button";
-import { LessonRoomClient } from "@/components/lessons/lesson-room-client";
+import { LessonRoomClientLoader } from "@/components/lessons/lesson-room-client-loader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -166,7 +166,7 @@ export default async function LessonRoomPage({
       </div>
 
       <div className="space-y-4">
-        <LessonRoomClient
+        <LessonRoomClientLoader
           lessonId={id}
           role={role}
           isConfigured={liveKitConfigured}

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface LoadingSkeletonProps {
   className?: string;
@@ -12,12 +13,9 @@ export function LoadingSkeleton({
   return (
     <div className={cn("space-y-3", className)}>
       {Array.from({ length: lines }).map((_, i) => (
-        <div
+        <Skeleton
           key={i}
-          className={cn(
-            "h-4 rounded-md skeleton-shimmer",
-            i === lines - 1 && "w-3/4",
-          )}
+          className={cn("h-4", i === lines - 1 && "w-3/4")}
         />
       ))}
     </div>

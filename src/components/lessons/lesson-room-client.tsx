@@ -40,7 +40,7 @@ interface LessonRoomJoinPayload {
   participantName: string;
 }
 
-interface LessonRoomClientProps {
+export interface LessonRoomClientProps {
   lessonId: string;
   role: Role;
   isConfigured: boolean;
