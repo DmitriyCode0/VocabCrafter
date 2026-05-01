@@ -123,7 +123,7 @@ function randomizeMCQContent(rawContent: unknown) {
       );
       const shuffledDistractors = shuffleArray(distractors);
       const nextOptions = [...shuffledDistractors];
-      const targetIndex = targetIndexes[index] ?? (index % 4);
+      const targetIndex = targetIndexes[index] ?? index % 4;
       nextOptions.splice(targetIndex, 0, correctOption);
 
       return {
