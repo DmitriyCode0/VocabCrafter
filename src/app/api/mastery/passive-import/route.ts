@@ -6,6 +6,7 @@ import {
   passiveVocabularyImportSchema,
 } from "@/lib/mastery/passive-vocabulary";
 import { resolvePassiveVocabularyLibraryItems } from "@/lib/mastery/passive-vocabulary-library";
+import { isEnglishWord } from "@/lib/text/language-detection";
 import { normalizeLearningLanguage } from "@/lib/languages";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
 import { createClient } from "@/lib/supabase/server";
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
       const normalizedTerm = normalizePassiveVocabularyText(trimmedTerm);
       const definition = rawItem.definition?.trim() || null;
 
-      if (!normalizedTerm) {
+      if (!normalizedTerm || !isEnglishWord(trimmedTerm)) {
         continue;
       }
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { isEnglishWord } from "@/lib/text/language-detection";
 import {
   getPassiveVocabularyUkrainianTranslation,
   normalizePassiveVocabularyLibraryAttributes,
@@ -304,6 +305,7 @@ export async function addManualPassiveVocabularyLibraryItems(items: Array<{
   const validItems = items.map((item) => {
     const normalizedTerm = normalizePassiveVocabularyText(item.term);
     if (!normalizedTerm) throw new Error(`Invalid term: ${item.term}`);
+    if (!isEnglishWord(item.term)) throw new Error(`Non-English term not allowed: ${item.term}`);
     return { ...item, term: item.term.trim(), normalizedTerm };
   });
 

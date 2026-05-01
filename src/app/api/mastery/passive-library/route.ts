@@ -11,6 +11,7 @@ import {
   passiveVocabularyLibraryImportSchema,
   type PassiveVocabularyItemType,
 } from "@/lib/mastery/passive-vocabulary";
+import { isEnglishWord } from "@/lib/text/language-detection";
 import type { PassiveVocabularyLibraryAdminItem } from "@/lib/mastery/passive-vocabulary-library";
 import { importPassiveVocabularyLibraryItems as importPassiveVocabularyLibraryBatch } from "@/lib/mastery/passive-vocabulary-library";
 
@@ -190,7 +191,7 @@ export async function POST(request: NextRequest) {
     const trimmedTerm = rawItem.term.trim().replace(/\s+/g, " ");
     const normalizedTerm = normalizePassiveVocabularyText(trimmedTerm);
 
-    if (!normalizedTerm) {
+    if (!normalizedTerm || !isEnglishWord(trimmedTerm)) {
       continue;
     }
 

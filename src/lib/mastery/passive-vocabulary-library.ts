@@ -3,6 +3,7 @@ import { z } from "zod";
 import { recordAIUsageEvent } from "@/lib/ai/usage";
 import { incrementAICalls } from "@/lib/ai/quota";
 import { GEMINI_MODEL, generateFromGeminiWithUsage } from "@/lib/gemini/client";
+import { isEnglishWord } from "@/lib/text/language-detection";
 import {
   getLearningLanguageLabel,
   normalizeLearningLanguage,
@@ -673,8 +674,15 @@ export async function createPassiveVocabularyLibraryEntries(
   targetLanguage: LearningLanguage,
   actorUserId: string,
 ) {
-  const wordInputs = inputs.filter((input) => input.itemType === "word");
-  const phraseInputs = inputs.filter((input) => input.itemType === "phrase");
+  // Filter out non-English words
+  const englishInputs = inputs.filter((input) => isEnglishWord(input.term));
+  
+  if (englishInputs.length === 0) {
+    return;
+  }
+
+  const wordInputs = englishInputs.filter((input) => input.itemType === "word");
+  const phraseInputs = englishInputs.filter((input) => input.itemType === "phrase");
   const enrichmentByRequestedTerm = await enrichPassiveVocabularyWords(
     wordInputs,
     targetLanguage,
