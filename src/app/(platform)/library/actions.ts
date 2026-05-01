@@ -326,7 +326,7 @@ export async function addManualPassiveVocabularyLibraryItems(items: Array<{
 }
 
 export async function deletePassiveVocabularyLibraryItem(itemId: string) {
-  const { adminClient, userId, role } = await requireLibraryAdminAccess();
+  const { adminClient, userId, role } = await requireLibraryRole(["tutor", "superadmin"]);
 
   const canEdit = await canUserEditDictionary(userId, role);
   if (!canEdit) {
