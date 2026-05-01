@@ -342,6 +342,7 @@ ${topicInstruction}
 
 For each word in the provided list, create one question that tests its meaning. The question could be a definition, a synonym, an antonym, or a fill-in-the-blank sentence.
 Generate four options for each question: one correct answer and three plausible but incorrect distractors. Crucially, all four options should be of similar length and grammatical structure to prevent the correct answer from being obvious.
+Randomize the position of the correct answer across questions so it is not concentrated in one slot. Also vary question order instead of mirroring the input order.
 Ensure the 'originalTerm' field matches the ${targetLanguageLabel} word from the input list exactly.
 
 Vocabulary terms:

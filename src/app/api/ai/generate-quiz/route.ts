@@ -74,6 +74,74 @@ const discussionPromptKeys = [
   "topic",
 ] as const;
 
+interface GeneratedMCQQuestion {
+  id: number;
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  originalTerm: string;
+}
+
+function shuffleArray<T>(items: readonly T[]): T[] {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+function normalizeChoice(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function randomizeMCQContent(rawContent: unknown) {
+  const parsed = mcqResponseSchema.parse(rawContent);
+  const targetIndexes = shuffleArray(
+    parsed.questions.map((_, index) => index % 4),
+  );
+
+  const randomizedQuestions: GeneratedMCQQuestion[] = parsed.questions.map(
+    (question, index) => {
+      const exactCorrectIndex = question.options.findIndex(
+        (option) => option === question.correctAnswer,
+      );
+      const normalizedCorrectIndex =
+        exactCorrectIndex >= 0
+          ? exactCorrectIndex
+          : question.options.findIndex(
+              (option) =>
+                normalizeChoice(option) ===
+                normalizeChoice(question.correctAnswer),
+            );
+      const safeCorrectIndex =
+        normalizedCorrectIndex >= 0 ? normalizedCorrectIndex : 0;
+
+      const correctOption = question.options[safeCorrectIndex];
+      const distractors = question.options.filter(
+        (_, optionIndex) => optionIndex !== safeCorrectIndex,
+      );
+      const shuffledDistractors = shuffleArray(distractors);
+      const nextOptions = [...shuffledDistractors];
+      const targetIndex = targetIndexes[index] ?? (index % 4);
+      nextOptions.splice(targetIndex, 0, correctOption);
+
+      return {
+        ...question,
+        options: nextOptions,
+        correctAnswer: correctOption,
+      };
+    },
+  );
+
+  return {
+    questions: shuffleArray(randomizedQuestions).map((question, index) => ({
+      ...question,
+      id: index + 1,
+    })),
+  };
+}
+
 function cleanDiscussionPromptText(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -353,7 +421,8 @@ export async function POST(request: Request) {
         SCHEMA_MAP[type],
       );
 
-      generatedContent = result.data;
+      generatedContent =
+        type === "mcq" ? randomizeMCQContent(result.data) : result.data;
       usageSnapshot = result.usageSnapshot;
     }
 
