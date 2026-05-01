@@ -31,53 +31,67 @@ drop trigger if exists set_updated_at on public.passive_vocabulary_dictionary_ed
 create trigger set_updated_at
   before update on public.passive_vocabulary_dictionary_editor_permissions
   for each row
-  execute function public.set_current_timestamp_updated_at();
+  execute function public.update_updated_at();
 
 -- Update check constraints to add 'phrasal verb' and 'idiom' to part_of_speech
-alter table public.passive_vocabulary_library
-  drop constraint if exists passive_vocabulary_library_part_of_speech_check;
-alter table public.passive_vocabulary_library
-  add constraint passive_vocabulary_library_part_of_speech_check
-  check (
-    part_of_speech in (
-      'noun',
-      'verb',
-      'adjective',
-      'adverb',
-      'pronoun',
-      'preposition',
-      'conjunction',
-      'determiner',
-      'interjection',
-      'phrase',
-      'other',
-      'modal verb',
-      'auxiliary',
-      'phrasal verb',
-      'idiom'
-    )
-  );
-
-alter table public.passive_vocabulary_library_suggestions
-  drop constraint if exists passive_vocabulary_library_suggestions_proposed_part_of_speech_check;
-alter table public.passive_vocabulary_library_suggestions
-  add constraint passive_vocabulary_library_suggestions_proposed_part_of_speech_check
-  check (
-    proposed_part_of_speech in (
-      'noun',
-      'verb',
-      'adjective',
-      'adverb',
-      'pronoun',
-      'preposition',
-      'conjunction',
-      'determiner',
-      'interjection',
-      'phrase',
-      'other',
-      'modal verb',
-      'auxiliary',
-      'phrasal verb',
-      'idiom'
-    )
-  );
+-- Note: These constraints will be updated if the tables exist
+do $$
+begin
+  if exists (
+    select 1 from information_schema.tables 
+    where table_schema = 'public' and table_name = 'passive_vocabulary_library'
+  ) then
+    alter table public.passive_vocabulary_library
+      drop constraint if exists passive_vocabulary_library_part_of_speech_check;
+    alter table public.passive_vocabulary_library
+      add constraint passive_vocabulary_library_part_of_speech_check
+      check (
+        part_of_speech in (
+          'noun',
+          'verb',
+          'adjective',
+          'adverb',
+          'pronoun',
+          'preposition',
+          'conjunction',
+          'determiner',
+          'interjection',
+          'phrase',
+          'other',
+          'modal verb',
+          'auxiliary',
+          'phrasal verb',
+          'idiom'
+        )
+      );
+  end if;
+  
+  if exists (
+    select 1 from information_schema.tables 
+    where table_schema = 'public' and table_name = 'passive_vocabulary_library_suggestions'
+  ) then
+    alter table public.passive_vocabulary_library_suggestions
+      drop constraint if exists passive_vocabulary_library_suggestions_proposed_part_of_speech_check;
+    alter table public.passive_vocabulary_library_suggestions
+      add constraint passive_vocabulary_library_suggestions_proposed_part_of_speech_check
+      check (
+        proposed_part_of_speech in (
+          'noun',
+          'verb',
+          'adjective',
+          'adverb',
+          'pronoun',
+          'preposition',
+          'conjunction',
+          'determiner',
+          'interjection',
+          'phrase',
+          'other',
+          'modal verb',
+          'auxiliary',
+          'phrasal verb',
+          'idiom'
+        )
+      );
+  end if;
+end $$;
