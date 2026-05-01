@@ -29,6 +29,8 @@ export const PASSIVE_VOCABULARY_PARTS_OF_SPEECH = [
   "determiner",
   "interjection",
   "phrase",
+  "phrasal verb",
+  "idiom",
   "other",
 ] as const;
 

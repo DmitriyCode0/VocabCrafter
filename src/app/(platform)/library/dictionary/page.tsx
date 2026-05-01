@@ -15,6 +15,7 @@ import { isMissingPassiveVocabularyLibrarySuggestionsTableError } from "@/lib/ma
 import { createClient } from "@/lib/supabase/server";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAppMessages } from "@/lib/i18n/messages";
+import { canUserEditDictionary } from "@/lib/dictionary/dictionary-permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,7 @@ export default async function LibraryDictionaryPage() {
   const role = profile.role;
   const messages = getAppMessages(normalizeAppLanguage(profile.app_language));
   const supabaseAdmin = createAdminClient();
-  const [libraryCountResult, libraryRowsResult] = await Promise.all([
+  const [libraryCountResult, libraryRowsResult, canDirectlyAdd] = await Promise.all([
     supabaseAdmin
       .from("passive_vocabulary_library")
       .select("id", { count: "exact", head: true }),
@@ -67,6 +68,7 @@ export default async function LibraryDictionaryPage() {
       )
       .order("updated_at", { ascending: false })
       .range(0, LIBRARY_PAGE_SIZE - 1),
+    canUserEditDictionary(user.id, role),
   ]);
 
   if (libraryRowsResult.error) {
@@ -212,6 +214,8 @@ export default async function LibraryDictionaryPage() {
           updated_at: item.updated_at,
         }))}
         initialHasMore={(libraryCountResult.count ?? 0) > LIBRARY_PAGE_SIZE}
+        totalItems={libraryCountResult.count ?? 0}
+        canDirectlyAdd={canDirectlyAdd}
         pendingSuggestions={pendingSuggestions}
         myPendingSuggestions={myPendingSuggestions}
       />

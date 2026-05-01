@@ -168,6 +168,45 @@ export interface Database {
           },
         ];
       };
+      passive_vocabulary_dictionary_editor_permissions: {
+        Row: {
+          id: string;
+          user_id: string;
+          granted_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "passive_vocabulary_dictionary_editor_permissions_granted_by_fkey";
+            columns: ["granted_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "passive_vocabulary_dictionary_editor_permissions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       student_grammar_topic_mastery: {
         Row: {
           id: string;
@@ -2121,6 +2160,8 @@ export type Assignment = Database["public"]["Tables"]["assignments"]["Row"];
 export type Feedback = Database["public"]["Tables"]["feedback"]["Row"];
 export type GrammarArticleEditorPermission =
   Database["public"]["Tables"]["grammar_article_editor_permissions"]["Row"];
+export type DictionaryEditorPermission =
+  Database["public"]["Tables"]["passive_vocabulary_dictionary_editor_permissions"]["Row"];
 export type GrammarTopicPromptOverride =
   Database["public"]["Tables"]["grammar_topic_prompt_overrides"]["Row"];
 export type GrammarTopicLibraryContent =

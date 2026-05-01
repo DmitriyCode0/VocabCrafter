@@ -10,13 +10,14 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, RotateCcw, Search, X } from "lucide-react";
+import { Check, Loader2, RotateCcw, Search, X, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import { formatAppDate } from "@/lib/dates";
 import {
   formatPassiveVocabularyPartOfSpeech,
   getPassiveVocabularyUkrainianTranslation,
+  PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
   type PassiveVocabularyLibraryAttributes,
   type PassiveVocabularyLibraryCefrLevel,
   type PassiveVocabularyPartOfSpeech,
@@ -25,9 +26,11 @@ import type { PassiveVocabularyLibraryAdminItem } from "@/lib/mastery/passive-vo
 import {
   approvePassiveVocabularyLibrarySuggestion,
   rejectPassiveVocabularyLibrarySuggestion,
+  deletePassiveVocabularyLibraryItem,
 } from "@/app/(platform)/library/actions";
 import { EditPassiveLibraryDialog } from "@/components/mastery/edit-passive-library-dialog";
 import { SuggestPassiveLibraryChangeDialog } from "@/components/library/suggest-passive-library-change-dialog";
+import { AddDictionaryItemDialog } from "@/components/library/add-dictionary-item-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -98,6 +101,8 @@ interface LibraryDictionaryBrowserProps {
   role: "tutor" | "superadmin";
   initialItems: PassiveVocabularyLibraryAdminItem[];
   initialHasMore: boolean;
+  totalItems: number;
+  canDirectlyAdd: boolean;
   pendingSuggestions?: LibraryDictionarySuggestionReviewItem[];
   myPendingSuggestions?: LibraryDictionaryPendingSuggestion[];
 }
@@ -126,6 +131,8 @@ export function LibraryDictionaryBrowser({
   role,
   initialItems,
   initialHasMore,
+  totalItems,
+  canDirectlyAdd,
   pendingSuggestions = [],
   myPendingSuggestions = [],
 }: LibraryDictionaryBrowserProps) {
@@ -138,6 +145,7 @@ export function LibraryDictionaryBrowser({
   const [cefrFilter, setCefrFilter] = useState<"all" | "unknown" | CEFRLevel>(
     "all",
   );
+  const [posFilter, setPosFilter] = useState<PassiveVocabularyPartOfSpeech[]>([]);
   const [initialLoading, setInitialLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -152,7 +160,7 @@ export function LibraryDictionaryBrowser({
   const initialFilterEffectRef = useRef(true);
   const initialLoadingRef = useRef(false);
   const loadingMoreRef = useRef(false);
-  const queryKey = `${searchQuery}:${cefrFilter}`;
+  const queryKey = `${searchQuery}:${cefrFilter}:${[...posFilter].sort().join(",")}`;
   const latestQueryKeyRef = useRef(queryKey);
 
   latestQueryKeyRef.current = queryKey;
@@ -193,7 +201,15 @@ export function LibraryDictionaryBrowser({
       }
 
       if (cefrFilter !== "all") {
-        searchParams.set("cefr", cefrFilter);
+        if (cefrFilter === "unknown") {
+          searchParams.set("cefr", "null");
+        } else {
+          searchParams.set("cefr", cefrFilter);
+        }
+      }
+
+      if (posFilter.length > 0) {
+        searchParams.set("pos", posFilter.join(","));
       }
 
       const response = await fetch(
@@ -500,6 +516,19 @@ export function LibraryDictionaryBrowser({
     [messages.library.dictionary, router],
   );
 
+  const handleDeleteItem = async (item: PassiveVocabularyLibraryAdminItem) => {
+    if (!window.confirm(`Are you sure you want to delete "${item.canonical_term}"?`)) {
+      return;
+    }
+    try {
+      await deletePassiveVocabularyLibraryItem(item.id);
+      toast.success(`Deleted "${item.canonical_term}"`);
+      await reloadItems();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete item");
+    }
+  };
+
   const hasActiveFilters = searchQuery.length > 0 || cefrFilter !== "all";
 
   return (
@@ -639,6 +668,9 @@ export function LibraryDictionaryBrowser({
           onSubmit={handleSearchSubmit}
         >
           <div className="flex w-full flex-col gap-2 sm:flex-row xl:max-w-2xl">
+            {(role === "superadmin" || (role === "tutor" && canDirectlyAdd)) && (
+              <AddDictionaryItemDialog role={role} onAdded={reloadItems} />
+            )}
             <Input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
@@ -652,6 +684,10 @@ export function LibraryDictionaryBrowser({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {totalItems} total words
+            </span>
+            <span className="text-muted-foreground/40">•</span>
             <span>
               {messages.library.dictionary.loadedItems(items.length, searchQuery || undefined)}
             </span>
@@ -696,6 +732,29 @@ export function LibraryDictionaryBrowser({
               {option.label}
             </Button>
           ))}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {PASSIVE_VOCABULARY_PARTS_OF_SPEECH.map((pos) => {
+            const isSelected = posFilter.includes(pos);
+            return (
+              <Button
+                key={pos}
+                type="button"
+                variant={isSelected ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setPosFilter((current) =>
+                    isSelected
+                      ? current.filter((p) => p !== pos)
+                      : [...current, pos]
+                  );
+                }}
+              >
+                {pos}
+              </Button>
+            );
+          })}
         </div>
 
         {initialLoading ? (
@@ -810,6 +869,16 @@ export function LibraryDictionaryBrowser({
                                   router.refresh();
                                 }}
                               />
+
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => void handleDeleteItem(item)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </>
                           ) : (
                             <SuggestPassiveLibraryChangeDialog
