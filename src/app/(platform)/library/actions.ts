@@ -346,3 +346,28 @@ export async function deletePassiveVocabularyLibraryItem(itemId: string) {
 
   revalidateLibraryPaths();
 }
+
+export async function deletePassiveVocabularyLibraryItems(itemIds: string[]) {
+  const { adminClient, userId, role } = await requireLibraryRole(["tutor", "superadmin"]);
+
+  const canEdit = await canUserEditDictionary(userId, role);
+  if (!canEdit) {
+    throw new Error("You do not have permission to delete dictionary items.");
+  }
+
+  const uniqueItemIds = Array.from(new Set(itemIds.filter(Boolean)));
+  if (uniqueItemIds.length === 0) {
+    return;
+  }
+
+  const { error } = await adminClient
+    .from("passive_vocabulary_library")
+    .delete()
+    .in("id", uniqueItemIds);
+
+  if (error) {
+    throw new Error("Failed to delete selected dictionary items");
+  }
+
+  revalidateLibraryPaths();
+}

@@ -27,6 +27,7 @@ import {
   approvePassiveVocabularyLibrarySuggestion,
   rejectPassiveVocabularyLibrarySuggestion,
   deletePassiveVocabularyLibraryItem,
+  deletePassiveVocabularyLibraryItems,
 } from "@/app/(platform)/library/actions";
 import { EditPassiveLibraryDialog } from "@/components/mastery/edit-passive-library-dialog";
 import { SuggestPassiveLibraryChangeDialog } from "@/components/library/suggest-passive-library-change-dialog";
@@ -41,6 +42,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -156,6 +158,13 @@ export function LibraryDictionaryBrowser({
     total: number;
   } | null>(null);
   const [reviewingSuggestionId, setReviewingSuggestionId] = useState<string | null>(null);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+  const [isBatchReEnriching, setIsBatchReEnriching] = useState(false);
+  const [batchReEnrichProgress, setBatchReEnrichProgress] = useState<{
+    completed: number;
+    total: number;
+  } | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const initialFilterEffectRef = useRef(true);
   const initialLoadingRef = useRef(false);
@@ -188,6 +197,27 @@ export function LibraryDictionaryBrowser({
       })),
     [messages.library.dictionary.allFilter, messages.library.dictionary.unknownValue],
   );
+  const selectedItemIdSet = useMemo(
+    () => new Set(selectedItemIds),
+    [selectedItemIds],
+  );
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedItemIdSet.has(item.id)),
+    [items, selectedItemIdSet],
+  );
+  const selectedWordItems = useMemo(
+    () => selectedItems.filter((item) => item.item_type === "word"),
+    [selectedItems],
+  );
+  const canBatchManage = role === "superadmin" || (role === "tutor" && canDirectlyAdd);
+  const allVisibleSelected =
+    items.length > 0 && items.every((item) => selectedItemIdSet.has(item.id));
+
+  useEffect(() => {
+    setSelectedItemIds((current) =>
+      current.filter((id) => items.some((item) => item.id === id)),
+    );
+  }, [items]);
 
   const fetchLibraryPage = useCallback(
     async (offset: number) => {
@@ -529,6 +559,105 @@ export function LibraryDictionaryBrowser({
     }
   };
 
+  const handleSelectVisible = useCallback((checked: boolean) => {
+    if (!checked) {
+      setSelectedItemIds([]);
+      return;
+    }
+
+    setSelectedItemIds(items.map((item) => item.id));
+  }, [items]);
+
+  const handleToggleItemSelection = useCallback(
+    (itemId: string, checked: boolean) => {
+      setSelectedItemIds((current) => {
+        if (checked) {
+          return current.includes(itemId) ? current : [...current, itemId];
+        }
+
+        return current.filter((id) => id !== itemId);
+      });
+    },
+    [],
+  );
+
+  const handleBatchDelete = useCallback(async () => {
+    if (selectedItems.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${selectedItems.length} selected item${selectedItems.length === 1 ? "" : "s"}?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsBatchDeleting(true);
+
+    try {
+      await deletePassiveVocabularyLibraryItems(selectedItems.map((item) => item.id));
+      toast.success(
+        `Deleted ${selectedItems.length} item${selectedItems.length === 1 ? "" : "s"}`,
+      );
+      setSelectedItemIds([]);
+      await reloadItems();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete selected dictionary items",
+      );
+    } finally {
+      setIsBatchDeleting(false);
+    }
+  }, [reloadItems, selectedItems]);
+
+  const handleBatchReEnrich = useCallback(async () => {
+    if (selectedWordItems.length === 0) {
+      return;
+    }
+
+    setIsBatchReEnriching(true);
+    setBatchReEnrichProgress({ completed: 0, total: selectedWordItems.length });
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    try {
+      for (let index = 0; index < selectedWordItems.length; index += 1) {
+        try {
+          await reEnrichItem(selectedWordItems[index]);
+          successCount += 1;
+        } catch {
+          failureCount += 1;
+        }
+
+        setBatchReEnrichProgress({
+          completed: index + 1,
+          total: selectedWordItems.length,
+        });
+      }
+
+      if (failureCount === 0) {
+        toast.success(
+          `Re-enriched ${successCount} selected word${successCount === 1 ? "" : "s"}`,
+        );
+      } else if (successCount > 0) {
+        toast.success(
+          `Re-enriched ${successCount}; ${failureCount} failed`,
+        );
+      } else {
+        toast.error("None of the selected words could be re-enriched");
+      }
+
+      await reloadItems();
+    } finally {
+      setIsBatchReEnriching(false);
+      setBatchReEnrichProgress(null);
+    }
+  }, [reloadItems, reEnrichItem, selectedWordItems]);
+
   const hasActiveFilters = searchQuery.length > 0 || cefrFilter !== "all";
 
   return (
@@ -717,8 +846,53 @@ export function LibraryDictionaryBrowser({
                 )}
               </span>
             )}
+
+            {batchReEnrichProgress && (
+              <span>
+                Re-enriching selected: {batchReEnrichProgress.completed}/
+                {batchReEnrichProgress.total}
+              </span>
+            )}
           </div>
         </form>
+
+        {canBatchManage && items.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">
+              Selected: {selectedItems.length}
+            </Badge>
+            {role === "superadmin" ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={selectedWordItems.length === 0 || isBatchReEnriching || isBatchDeleting}
+                onClick={() => void handleBatchReEnrich()}
+              >
+                {isBatchReEnriching ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                )}
+                Re-enrich selected ({selectedWordItems.length})
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={selectedItems.length === 0 || isBatchReEnriching || isBatchDeleting}
+              onClick={() => void handleBatchDelete()}
+            >
+              {isBatchDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Delete selected ({selectedItems.length})
+            </Button>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           {cefrFilterOptions.map((option) => (
@@ -775,6 +949,15 @@ export function LibraryDictionaryBrowser({
             <Table>
               <TableHeader>
                 <TableRow>
+                  {canBatchManage ? (
+                    <TableHead className="w-[56px]">
+                      <Checkbox
+                        checked={allVisibleSelected}
+                        onCheckedChange={(checked) => handleSelectVisible(checked === true)}
+                        aria-label="Select all loaded words"
+                      />
+                    </TableHead>
+                  ) : null}
                   <TableHead>{messages.library.dictionary.termColumn}</TableHead>
                   <TableHead>{messages.library.dictionary.typeColumn}</TableHead>
                   <TableHead>{messages.library.dictionary.cefrColumn}</TableHead>
@@ -796,6 +979,17 @@ export function LibraryDictionaryBrowser({
 
                   return (
                     <TableRow key={item.id}>
+                      {canBatchManage ? (
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedItemIdSet.has(item.id)}
+                            onCheckedChange={(checked) =>
+                              handleToggleItemSelection(item.id, checked === true)
+                            }
+                            aria-label={`Select ${item.canonical_term}`}
+                          />
+                        </TableCell>
+                      ) : null}
                       <TableCell>
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
