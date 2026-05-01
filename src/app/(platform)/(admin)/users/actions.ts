@@ -150,3 +150,59 @@ export async function setGrammarArticleEditorPermission(
   revalidatePath("/users");
   revalidatePath("/library");
 }
+
+export async function setDictionaryEditorPermission(
+  userId: string,
+  enabled: boolean,
+) {
+  await requireSuperadmin();
+
+  const admin = createAdminClient();
+  const { data: targetProfile, error: targetProfileError } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .single();
+
+  if (targetProfileError || !targetProfile) {
+    throw new Error(targetProfileError?.message ?? "User not found");
+  }
+
+  if (targetProfile.role !== "tutor") {
+    throw new Error("Only tutors can receive dictionary editor access");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  if (enabled) {
+    const { error } = await admin
+      .from("passive_vocabulary_dictionary_editor_permissions")
+      .upsert({
+        user_id: userId,
+        granted_by: user.id,
+      });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  } else {
+    const { error } = await admin
+      .from("passive_vocabulary_dictionary_editor_permissions")
+      .delete()
+      .eq("user_id", userId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  revalidatePath("/users");
+  revalidatePath("/library");
+}

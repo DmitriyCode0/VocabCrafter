@@ -13,8 +13,13 @@ import {
   type PassiveVocabularyLibraryCefrLevel,
   type PassiveVocabularyPartOfSpeech,
 } from "@/lib/mastery/passive-vocabulary";
+import { canUserEditDictionary } from "@/lib/dictionary/dictionary-permissions";
+import {
+  createPassiveVocabularyLibraryEntries,
+} from "@/lib/mastery/passive-vocabulary-library";
 import { updatePassiveVocabularyLibraryItem } from "@/lib/mastery/passive-vocabulary-library-updates";
 import { isMissingPassiveVocabularyLibrarySuggestionsTableError } from "@/lib/mastery/passive-vocabulary-library-suggestions";
+import { normalizeLearningLanguage } from "@/lib/languages";
 import type { Role } from "@/types/roles";
 
 interface SuggestPassiveVocabularyLibraryChangeInput {
@@ -279,6 +284,62 @@ export async function rejectPassiveVocabularyLibrarySuggestion(
     }
   } catch (error) {
     throw toSuggestionActionError(error);
+  }
+
+  revalidateLibraryPaths();
+}
+
+export async function addManualPassiveVocabularyLibraryItems(items: Array<{
+  term: string;
+  itemType: "word" | "phrase";
+  partOfSpeech?: PassiveVocabularyPartOfSpeech;
+}>) {
+  const { userId, role, adminClient } = await requireLibraryRole(["tutor", "superadmin"]);
+  
+  const canEdit = await canUserEditDictionary(userId, role);
+  if (!canEdit) {
+    throw new Error("You do not have permission to directly add words to the dictionary.");
+  }
+
+  const validItems = items.map((item) => {
+    const normalizedTerm = normalizePassiveVocabularyText(item.term);
+    if (!normalizedTerm) throw new Error(`Invalid term: ${item.term}`);
+    return { ...item, term: item.term.trim(), normalizedTerm };
+  });
+
+  if (validItems.length === 0) return;
+
+  try {
+    await createPassiveVocabularyLibraryEntries(
+      adminClient,
+      validItems,
+      normalizeLearningLanguage("english"),
+      userId,
+    );
+  } catch (error) {
+    throw new Error(
+      error instanceof Error ? error.message : "Failed to add manual library items",
+    );
+  }
+
+  revalidateLibraryPaths();
+}
+
+export async function deletePassiveVocabularyLibraryItem(itemId: string) {
+  const { adminClient, userId, role } = await requireLibraryAdminAccess();
+
+  const canEdit = await canUserEditDictionary(userId, role);
+  if (!canEdit) {
+    throw new Error("You do not have permission to delete dictionary items.");
+  }
+
+  const { error } = await adminClient
+    .from("passive_vocabulary_library")
+    .delete()
+    .eq("id", itemId);
+
+  if (error) {
+    throw new Error("Failed to delete dictionary item");
   }
 
   revalidateLibraryPaths();

@@ -58,9 +58,11 @@ function mergePlanLimitRow(
   };
 }
 
-export async function getPlansCatalog(): Promise<
+import { unstable_cache } from "next/cache";
+
+export const getPlansCatalog = unstable_cache(async (): Promise<
   Record<PlanKey, PlanDefinition>
-> {
+> => {
   const admin = createAdminClient();
   const { data, error } = await admin.from("plan_limits").select("*");
 
@@ -83,7 +85,7 @@ export async function getPlansCatalog(): Promise<
     },
     {} as Record<PlanKey, PlanDefinition>,
   );
-}
+}, ["plans-catalog"], { revalidate: 3600 });
 
 export async function listPlans(): Promise<PlanDefinition[]> {
   const catalog = await getPlansCatalog();

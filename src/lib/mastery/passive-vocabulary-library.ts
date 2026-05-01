@@ -22,6 +22,7 @@ import {
   type PassiveVocabularyLibraryCefrLevel,
   type PassiveVocabularyPartOfSpeech,
 } from "./passive-vocabulary";
+import { lookupFreeDictionary } from "@/lib/dictionary/free-dictionary";
 
 type AdminClient = SupabaseClient<Database>;
 type LibraryRow =
@@ -33,6 +34,7 @@ interface PassiveVocabularyLibraryInput {
   term: string;
   normalizedTerm: string;
   itemType: PassiveVocabularyItemType;
+  partOfSpeech?: PassiveVocabularyPartOfSpeech;
 }
 
 interface PassiveVocabularyEnrichmentItem {
@@ -577,6 +579,13 @@ async function enrichPassiveVocabularyWords(
     inputs,
     PASSIVE_VOCABULARY_ENRICHMENT_BATCH_SIZE,
   )) {
+    const dictionaryEntries = await Promise.all(
+      batch.map(async (input) => {
+        const entry = await lookupFreeDictionary(input.term);
+        return { input, entry };
+      })
+    );
+
     const prompt = [
       `Target language: ${targetLanguageLabel}`,
       "For each requested single word, return:",
@@ -592,8 +601,13 @@ async function enrichPassiveVocabularyWords(
       "Never translate the word. Never return multiple words as the canonical form for a single-word input.",
       "If the word is already canonical, keep it unchanged.",
       'Respond with JSON in this exact shape: { "items": [ { "requestedTerm": "...", "canonicalTerm": "...", "cefrLevel": "A1", "partOfSpeech": "noun", "ukrainianTranslation": "...", "attributes": {} } ] }.',
-      "Requested terms:",
-      ...batch.map((input) => `- ${input.term}`),
+      "Requested terms and dictionary context:",
+      ...dictionaryEntries.map(({ input, entry }) => {
+        if (!entry && !input.partOfSpeech) return `- ${input.term}`;
+        const definition = entry?.meanings[0]?.definitions[0]?.definition || "No definition";
+        const pos = input.partOfSpeech || entry?.meanings[0]?.partOfSpeech || "unknown";
+        return `- ${input.term} (Dictionary context: ${pos} - ${definition})`;
+      }),
     ].join("\n");
 
     try {
@@ -620,6 +634,19 @@ async function enrichPassiveVocabularyWords(
       await incrementAICalls(actorUserId);
 
       for (const item of normalizedItems) {
+        const dictionaryContext = dictionaryEntries.find(
+          (d) => normalizePassiveVocabularyText(d.input.term) === normalizePassiveVocabularyText(item.requestedTerm)
+        )?.entry;
+
+        const baseAttributes = normalizePassiveVocabularyLibraryAttributes(item.attributes);
+        if (dictionaryContext) {
+          const phonetic = dictionaryContext.phonetics.find(p => p.audio)?.audio;
+          if (phonetic) baseAttributes.phoneticAudioUrl = phonetic;
+
+          const definition = dictionaryContext.meanings[0]?.definitions[0]?.definition;
+          if (definition) baseAttributes.englishDefinition = definition;
+        }
+
         enrichmentMap.set(normalizePassiveVocabularyText(item.requestedTerm), {
           requestedTerm: item.requestedTerm,
           canonicalTerm: item.canonicalTerm,
@@ -627,7 +654,7 @@ async function enrichPassiveVocabularyWords(
           partOfSpeech: item.partOfSpeech,
           ukrainianTranslation: item.ukrainianTranslation ?? null,
           attributes: withPassiveVocabularyUkrainianTranslation(
-            normalizePassiveVocabularyLibraryAttributes(item.attributes),
+            baseAttributes,
             item.ukrainianTranslation ?? null,
           ),
         });
@@ -640,7 +667,7 @@ async function enrichPassiveVocabularyWords(
   return enrichmentMap;
 }
 
-async function createPassiveVocabularyLibraryEntries(
+export async function createPassiveVocabularyLibraryEntries(
   adminClient: AdminClient,
   inputs: PassiveVocabularyLibraryInput[],
   targetLanguage: LearningLanguage,

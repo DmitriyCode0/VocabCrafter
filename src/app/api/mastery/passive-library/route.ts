@@ -120,6 +120,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Math.max(requestedLimit || DEFAULT_LIMIT, 1), MAX_LIMIT);
   const searchQuery = searchParams.get("q")?.trim() ?? "";
   const cefrFilter = searchParams.get("cefr")?.trim() ?? "all";
+  const posFilter = searchParams.get("pos")?.trim();
 
   let query = access.adminClient
     .from("passive_vocabulary_library")
@@ -136,6 +137,11 @@ export async function GET(request: NextRequest) {
     query = query.is("cefr_level", null);
   } else if (PASSIVE_VOCABULARY_CEFR_LEVELS.includes(cefrFilter as never)) {
     query = query.eq("cefr_level", cefrFilter);
+  }
+
+  if (posFilter) {
+    const posValues = posFilter.split(",");
+    query = query.in("part_of_speech", posValues);
   }
 
   const { data, error } = await query.range(offset, offset + limit);
