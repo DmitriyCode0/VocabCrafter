@@ -55,7 +55,11 @@ export function ReportMonthFilter({
     const anchor = parseMonth(activeMonth);
     const next = [] as Array<{ value: string; label: string }>;
 
-    for (let offset = -monthCountBefore; offset <= monthCountAfter; offset += 1) {
+    for (
+      let offset = -monthCountBefore;
+      offset <= monthCountAfter;
+      offset += 1
+    ) {
       const month = toMonthKey(addUtcMonths(anchor, offset));
       next.push({ value: month, label: formatMonthLabel(month, locale) });
     }

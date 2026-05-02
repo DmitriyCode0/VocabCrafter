@@ -353,16 +353,14 @@ export interface StudentProgressSnapshot {
       progressPercent: number;
       remainingHours: number;
     };
-    nextLevel:
-      | {
-          level: CEFRLevel;
-          minHours: number;
-          maxHours: number;
-          averageHours: number;
-          progressPercent: number;
-          remainingHours: number;
-        }
-      | null;
+    nextLevel: {
+      level: CEFRLevel;
+      minHours: number;
+      maxHours: number;
+      averageHours: number;
+      progressPercent: number;
+      remainingHours: number;
+    } | null;
   };
   overallPerformance: {
     score: number;
@@ -608,7 +606,9 @@ function buildProgressMonthWindow(referenceDate: Date): ProgressMonthWindow {
     periodEnd: toUtcDateString(periodEndDate),
     endExclusive: toUtcDateString(addUtcDays(periodEndDate, 1)),
     dayCount:
-      Math.floor((periodEndDate.getTime() - monthStart.getTime()) / 86_400_000) + 1,
+      Math.floor(
+        (periodEndDate.getTime() - monthStart.getTime()) / 86_400_000,
+      ) + 1,
     totalDaysInMonth: new Date(
       Date.UTC(
         referenceDate.getUTCFullYear(),
@@ -757,11 +757,12 @@ function buildStudentMonthlyProgressSnapshot({
   const transcriptSegmentsInWindow = transcriptSegments.filter((segment) =>
     isIsoDateInWindow(getIsoDateFromTimestamp(segment.occurred_at), window),
   );
-  const classroomSessionsInWindow = classroomSessionSummaries.filter((session) =>
-    isIsoDateInWindow(
-      getIsoDateFromTimestamp(session.session_started_at),
-      window,
-    ),
+  const classroomSessionsInWindow = classroomSessionSummaries.filter(
+    (session) =>
+      isIsoDateInWindow(
+        getIsoDateFromTimestamp(session.session_started_at),
+        window,
+      ),
   );
 
   const activeTerms = transcriptSegmentsInWindow.flatMap((segment) =>
@@ -829,7 +830,9 @@ function buildStudentMonthlyProgressSnapshot({
           (tutorMarkedGrammarTopicKeys?.has(topicKey) ?? false) ||
           attemptCount >= GRAMMAR_MASTERY_MIN_ATTEMPTS,
       ).length;
-  const topicsForProgress = scopedGrammarTopicKeys ?? Array.from(grammarHighScoreAttemptsByTopic.keys());
+  const topicsForProgress =
+    scopedGrammarTopicKeys ??
+    Array.from(grammarHighScoreAttemptsByTopic.keys());
   const grammarHighScoreAttemptsTotal = topicsForProgress.reduce(
     (sum, topicKey) =>
       sum +
@@ -842,8 +845,9 @@ function buildStudentMonthlyProgressSnapshot({
     0,
   );
   const practicedGrammarTopicCount = scopedGrammarTopicKeys
-    ? scopedGrammarTopicKeys.filter((topicKey) => practicedGrammarTopics.has(topicKey))
-        .length
+    ? scopedGrammarTopicKeys.filter((topicKey) =>
+        practicedGrammarTopics.has(topicKey),
+      ).length
     : practicedGrammarTopics.size;
 
   const sessionSpeakingShares: number[] = [];
@@ -944,9 +948,8 @@ export async function getStudentMonthlyComparisonSnapshot(
 ): Promise<StudentMonthlyComparisonSnapshot> {
   const supabaseAdmin = createAdminClient();
   const currentWindow = buildProgressMonthWindow(referenceDate);
-  const previousReferenceDate = getComparablePreviousMonthReferenceDate(
-    referenceDate,
-  );
+  const previousReferenceDate =
+    getComparablePreviousMonthReferenceDate(referenceDate);
   const previousWindow = buildProgressMonthWindow(previousReferenceDate);
 
   const [
@@ -958,55 +961,54 @@ export async function getStudentMonthlyComparisonSnapshot(
     lessonsResult,
     connectionsResult,
     grammarMasteryResult,
-  ] =
-    await Promise.all([
-      supabaseAdmin
-        .from("profiles")
-        .select("cefr_level, preferred_language")
-        .eq("id", userId)
-        .single(),
-      supabaseAdmin
-        .from("quiz_attempts")
-        .select("score, max_score, completed_at, quizzes(type, config)")
-        .eq("student_id", userId)
-        .gte("completed_at", `${previousWindow.periodStart}T00:00:00.000Z`)
-        .lt("completed_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
-      supabaseAdmin
-        .from("word_mastery")
-        .select("created_at")
-        .eq("student_id", userId)
-        .gte("created_at", `${previousWindow.periodStart}T00:00:00.000Z`)
-        .lt("created_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
-      supabaseAdmin
-        .from("word_mastery")
-        .select("mastery_level, last_practiced")
-        .eq("student_id", userId)
-        .gte("last_practiced", `${previousWindow.periodStart}T00:00:00.000Z`)
-        .lt("last_practiced", `${currentWindow.endExclusive}T00:00:00.000Z`),
-      supabaseAdmin
-        .from("passive_vocabulary_evidence")
-        .select(
-          "term, definition, item_type, source_type, source_label, import_count, last_imported_at, created_at, passive_vocabulary_library(cefr_level, part_of_speech, attributes)",
-        )
-        .eq("student_id", userId)
-        .gte("created_at", `${previousWindow.periodStart}T00:00:00.000Z`)
-        .lt("created_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
-      supabaseAdmin
-        .from("tutor_student_lessons")
-        .select("id, lesson_date, status")
-        .eq("student_id", userId)
-        .gte("lesson_date", previousWindow.periodStart)
-        .lte("lesson_date", currentWindow.periodEnd),
-      supabaseAdmin
-        .from("tutor_students")
-        .select("id")
-        .eq("student_id", userId)
-        .eq("status", "active"),
-      supabaseAdmin
-        .from("student_grammar_topic_mastery")
-        .select("topic_key, source")
-        .eq("student_id", userId),
-    ]);
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("profiles")
+      .select("cefr_level, preferred_language")
+      .eq("id", userId)
+      .single(),
+    supabaseAdmin
+      .from("quiz_attempts")
+      .select("score, max_score, completed_at, quizzes(type, config)")
+      .eq("student_id", userId)
+      .gte("completed_at", `${previousWindow.periodStart}T00:00:00.000Z`)
+      .lt("completed_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
+    supabaseAdmin
+      .from("word_mastery")
+      .select("created_at")
+      .eq("student_id", userId)
+      .gte("created_at", `${previousWindow.periodStart}T00:00:00.000Z`)
+      .lt("created_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
+    supabaseAdmin
+      .from("word_mastery")
+      .select("mastery_level, last_practiced")
+      .eq("student_id", userId)
+      .gte("last_practiced", `${previousWindow.periodStart}T00:00:00.000Z`)
+      .lt("last_practiced", `${currentWindow.endExclusive}T00:00:00.000Z`),
+    supabaseAdmin
+      .from("passive_vocabulary_evidence")
+      .select(
+        "term, definition, item_type, source_type, source_label, import_count, last_imported_at, created_at, passive_vocabulary_library(cefr_level, part_of_speech, attributes)",
+      )
+      .eq("student_id", userId)
+      .gte("created_at", `${previousWindow.periodStart}T00:00:00.000Z`)
+      .lt("created_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
+    supabaseAdmin
+      .from("tutor_student_lessons")
+      .select("id, lesson_date, status")
+      .eq("student_id", userId)
+      .gte("lesson_date", previousWindow.periodStart)
+      .lte("lesson_date", currentWindow.periodEnd),
+    supabaseAdmin
+      .from("tutor_students")
+      .select("id")
+      .eq("student_id", userId)
+      .eq("status", "active"),
+    supabaseAdmin
+      .from("student_grammar_topic_mastery")
+      .select("topic_key, source")
+      .eq("student_id", userId),
+  ]);
 
   if (profileResult.error || !profileResult.data) {
     throw new Error("Failed to load student monthly progress profile");
@@ -1043,8 +1045,14 @@ export async function getStudentMonthlyComparisonSnapshot(
           "session_started_at, tutor_speaking_seconds, student_speaking_seconds",
         )
         .in("connection_id", connectionIds)
-        .gte("session_started_at", `${previousWindow.periodStart}T00:00:00.000Z`)
-        .lt("session_started_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
+        .gte(
+          "session_started_at",
+          `${previousWindow.periodStart}T00:00:00.000Z`,
+        )
+        .lt(
+          "session_started_at",
+          `${currentWindow.endExclusive}T00:00:00.000Z`,
+        ),
     ]);
 
     if (classroomsData.error) {
@@ -1056,25 +1064,26 @@ export async function getStudentMonthlyComparisonSnapshot(
     }
 
     classroomIds = (classroomsData.data ?? []).map((c) => c.id);
-    classroomSessionSummaries =
-      (classroomSessionsData.data ?? []) as MonthlyClassroomSessionSummaryRow[];
+    classroomSessionSummaries = (classroomSessionsData.data ??
+      []) as MonthlyClassroomSessionSummaryRow[];
   }
 
   let transcriptSegments: MonthlyTranscriptSegmentRow[] = [];
   if (lessonIds.length > 0) {
-    const { data: transcriptsResult, error: transcriptsError } = await supabaseAdmin
-      .from("lesson_room_transcripts")
-      .select("id, lesson_id")
-      .in("lesson_id", lessonIds)
-      .eq("diarization_status", "ready");
+    const { data: transcriptsResult, error: transcriptsError } =
+      await supabaseAdmin
+        .from("lesson_room_transcripts")
+        .select("id, lesson_id")
+        .in("lesson_id", lessonIds)
+        .eq("diarization_status", "ready");
 
     if (transcriptsError) {
       throw transcriptsError;
     }
 
-    const transcriptIds = ((transcriptsResult ?? []) as MonthlyTranscriptRow[]).map(
-      (transcript) => transcript.id,
-    );
+    const transcriptIds = (
+      (transcriptsResult ?? []) as MonthlyTranscriptRow[]
+    ).map((transcript) => transcript.id);
 
     if (transcriptIds.length > 0) {
       const { data: segmentsResult, error: segmentsError } = await supabaseAdmin
@@ -1119,13 +1128,16 @@ export async function getStudentMonthlyComparisonSnapshot(
       throw classroomRecordingsError;
     }
 
-    const classroomRecordings =
-      (classroomRecordingsResult ?? []) as MonthlyClassroomRecordingRow[];
+    const classroomRecordings = (classroomRecordingsResult ??
+      []) as MonthlyClassroomRecordingRow[];
     const classroomRecordingIds = classroomRecordings.map(
       (recording) => recording.id,
     );
     const classroomRecordingDateById = new Map(
-      classroomRecordings.map((recording) => [recording.id, recording.created_at]),
+      classroomRecordings.map((recording) => [
+        recording.id,
+        recording.created_at,
+      ]),
     );
 
     if (classroomRecordingIds.length > 0) {
@@ -1142,8 +1154,8 @@ export async function getStudentMonthlyComparisonSnapshot(
         throw classroomTranscriptsError;
       }
 
-      const classroomTranscripts =
-        (classroomTranscriptsResult ?? []) as MonthlyClassroomTranscriptRow[];
+      const classroomTranscripts = (classroomTranscriptsResult ??
+        []) as MonthlyClassroomTranscriptRow[];
       const classroomTranscriptIds = classroomTranscripts.map(
         (transcript) => transcript.id,
       );
@@ -1155,14 +1167,12 @@ export async function getStudentMonthlyComparisonSnapshot(
       );
 
       if (classroomTranscriptIds.length > 0) {
-        const {
-          data: classroomSegmentsResult,
-          error: classroomSegmentsError,
-        } = await supabaseAdmin
-          .from("tutor_student_classroom_transcript_segments")
-          .select("transcript_id, speaker_role, content")
-          .in("transcript_id", classroomTranscriptIds)
-          .eq("speaker_role", "student");
+        const { data: classroomSegmentsResult, error: classroomSegmentsError } =
+          await supabaseAdmin
+            .from("tutor_student_classroom_transcript_segments")
+            .select("transcript_id, speaker_role, content")
+            .in("transcript_id", classroomTranscriptIds)
+            .eq("speaker_role", "student");
 
         if (classroomSegmentsError) {
           throw classroomSegmentsError;
@@ -1196,8 +1206,12 @@ export async function getStudentMonthlyComparisonSnapshot(
   }
 
   const tutorMarkedGrammarTopicKeys = new Set(
-    ((grammarMasteryResult.data ?? []) as Array<{ topic_key: string; source: string }>)
-      .map((row) => row.topic_key),
+    (
+      (grammarMasteryResult.data ?? []) as Array<{
+        topic_key: string;
+        source: string;
+      }>
+    ).map((row) => row.topic_key),
   );
 
   const currentMonth = buildStudentMonthlyProgressSnapshot({
@@ -1205,10 +1219,10 @@ export async function getStudentMonthlyComparisonSnapshot(
     availableGrammarTopicCount,
     attempts: (attemptsResult.data ?? []) as AttemptRow[],
     wordAdditions: (wordAdditionsResult.data ?? []) as MonthlyWordAdditionRow[],
-    wordMasteryProgress:
-      (wordMasteryProgressResult.data ?? []) as MonthlyWordMasteryProgressRow[],
-    passiveEvidenceRows:
-      (passiveEvidenceResult.data ?? []) as PassiveEvidenceWithLibraryRow[],
+    wordMasteryProgress: (wordMasteryProgressResult.data ??
+      []) as MonthlyWordMasteryProgressRow[],
+    passiveEvidenceRows: (passiveEvidenceResult.data ??
+      []) as PassiveEvidenceWithLibraryRow[],
     lessons,
     classroomSessionSummaries,
     transcriptSegments,
@@ -1222,10 +1236,10 @@ export async function getStudentMonthlyComparisonSnapshot(
     availableGrammarTopicCount,
     attempts: (attemptsResult.data ?? []) as AttemptRow[],
     wordAdditions: (wordAdditionsResult.data ?? []) as MonthlyWordAdditionRow[],
-    wordMasteryProgress:
-      (wordMasteryProgressResult.data ?? []) as MonthlyWordMasteryProgressRow[],
-    passiveEvidenceRows:
-      (passiveEvidenceResult.data ?? []) as PassiveEvidenceWithLibraryRow[],
+    wordMasteryProgress: (wordMasteryProgressResult.data ??
+      []) as MonthlyWordMasteryProgressRow[],
+    passiveEvidenceRows: (passiveEvidenceResult.data ??
+      []) as PassiveEvidenceWithLibraryRow[],
     lessons,
     classroomSessionSummaries,
     transcriptSegments,
@@ -1398,12 +1412,11 @@ export async function getStudentProgressSnapshot(
     passiveEvidenceRows,
     cefrLevel,
   );
-  const classroomSessions =
-    classroomSessionSummariesResult.data as Array<{
-      duration_seconds: number | null;
-      tutor_speaking_seconds: number;
-      student_speaking_seconds: number;
-    }>;
+  const classroomSessions = classroomSessionSummariesResult.data as Array<{
+    duration_seconds: number | null;
+    tutor_speaking_seconds: number;
+    student_speaking_seconds: number;
+  }>;
   const classroomDurationSeconds = classroomSessions.reduce(
     (total, session) => total + Math.max(0, session.duration_seconds ?? 0),
     0,
@@ -1414,7 +1427,8 @@ export async function getStudentProgressSnapshot(
     0,
   );
   const classroomTutorSpeakingSeconds = classroomSessions.reduce(
-    (total, session) => total + Math.max(0, session.tutor_speaking_seconds ?? 0),
+    (total, session) =>
+      total + Math.max(0, session.tutor_speaking_seconds ?? 0),
     0,
   );
   const classroomTotalSpeakingSeconds =
@@ -1789,7 +1803,8 @@ export async function getStudentProgressSnapshot(
       studentSpeakingShare:
         classroomTotalSpeakingSeconds > 0
           ? roundMetric(
-              (classroomStudentSpeakingSeconds / classroomTotalSpeakingSeconds) *
+              (classroomStudentSpeakingSeconds /
+                classroomTotalSpeakingSeconds) *
                 100,
             )
           : null,
@@ -1810,27 +1825,30 @@ export async function getStudentProgressSnapshot(
         averageHours: currentGuidedHours.averageHours,
         progressPercent: timeProgressScore,
         remainingHours: Number(
-          Math.max(0, currentGuidedHours.averageHours - totalLearningHoursRaw).toFixed(
-            1,
-          ),
+          Math.max(
+            0,
+            currentGuidedHours.averageHours - totalLearningHoursRaw,
+          ).toFixed(1),
         ),
       },
-      nextLevel: nextLevel && nextGuidedHours
-        ? {
-            level: nextLevel,
-            minHours: nextGuidedHours.minHours,
-            maxHours: nextGuidedHours.maxHours,
-            averageHours: nextGuidedHours.averageHours,
-            progressPercent: clampScore(
-              (totalLearningHoursRaw / nextGuidedHours.averageHours) * 100,
-            ),
-            remainingHours: Number(
-              Math.max(0, nextGuidedHours.averageHours - totalLearningHoursRaw).toFixed(
-                1,
+      nextLevel:
+        nextLevel && nextGuidedHours
+          ? {
+              level: nextLevel,
+              minHours: nextGuidedHours.minHours,
+              maxHours: nextGuidedHours.maxHours,
+              averageHours: nextGuidedHours.averageHours,
+              progressPercent: clampScore(
+                (totalLearningHoursRaw / nextGuidedHours.averageHours) * 100,
               ),
-            ),
-          }
-        : null,
+              remainingHours: Number(
+                Math.max(
+                  0,
+                  nextGuidedHours.averageHours - totalLearningHoursRaw,
+                ).toFixed(1),
+              ),
+            }
+          : null,
     },
     overallPerformance: {
       score: overallPerformanceScore,

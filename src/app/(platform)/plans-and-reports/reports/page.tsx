@@ -288,8 +288,7 @@ export default async function PlansAndReportsReportsPage({
                         </Badge>
                         <Badge variant="outline">
                           Words added: {report.metricsSnapshot.newMasteryWords}
-                          {report.goalsSnapshot.monthlyWordsAddedTarget !=
-                          null
+                          {report.goalsSnapshot.monthlyWordsAddedTarget != null
                             ? ` / ${report.goalsSnapshot.monthlyWordsAddedTarget}`
                             : ""}
                         </Badge>
@@ -302,7 +301,7 @@ export default async function PlansAndReportsReportsPage({
                           )}
                         </Badge>
                         <Badge variant="outline">
-                          Mastered words: {" "}
+                          Mastered words:{" "}
                           {report.metricsSnapshot.masteredWordsLevel45}
                           {report.goalsSnapshot.monthlyMasteredWordsTarget !=
                           null
@@ -630,7 +629,8 @@ export default async function PlansAndReportsReportsPage({
           <p className="text-muted-foreground">
             {messages.tutorPlansReportsPage.reportsPanelDescription(
               studentName,
-            )} ({selectedMonthLabel})
+            )}{" "}
+            ({selectedMonthLabel})
           </p>
         </div>
 

@@ -29,7 +29,10 @@ async function requireTutorAccess(studentId: string) {
 
   if (!user) {
     return {
-      errorResponse: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      errorResponse: NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      ),
     };
   }
 

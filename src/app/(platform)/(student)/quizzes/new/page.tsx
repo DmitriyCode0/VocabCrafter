@@ -2,7 +2,10 @@ import { CreateQuizFlow } from "@/components/quiz/create-quiz-flow";
 import { getGrammarTopicPromptCatalog } from "@/lib/grammar/prompt-overrides";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { listStudentTutorPlans, type StudentTutorPlanCard } from "@/lib/progress/tutor-student-plan";
+import {
+  listStudentTutorPlans,
+  type StudentTutorPlanCard,
+} from "@/lib/progress/tutor-student-plan";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +33,9 @@ export default async function NewQuizPage() {
   const planGrammarTopicKeys: string[] = Array.from(
     new Set(
       studentPlans.flatMap((plan: StudentTutorPlanCard) =>
-        (plan.plan.grammarTopicKeys ?? []).filter((k): k is string => typeof k === "string"),
+        (plan.plan.grammarTopicKeys ?? []).filter(
+          (k): k is string => typeof k === "string",
+        ),
       ),
     ),
   );

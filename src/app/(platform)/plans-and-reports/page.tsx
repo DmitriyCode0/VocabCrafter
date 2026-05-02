@@ -193,15 +193,15 @@ export default async function PlansAndReportsPage({
                           {entry.plan.monthlyCompletedLessonsTarget ?? "n/a"}
                         </Badge>
                         <Badge variant="outline">
-                          Words added target: {" "}
+                          Words added target:{" "}
                           {entry.plan.monthlyWordsAddedTarget ?? "n/a"}
                         </Badge>
                         <Badge variant="outline">
-                          Mastered words target: {" "}
+                          Mastered words target:{" "}
                           {entry.plan.monthlyMasteredWordsTarget ?? "n/a"}
                         </Badge>
                         <Badge variant="outline">
-                          Speaking share target: {" "}
+                          Speaking share target:{" "}
                           {formatPercentage(
                             entry.plan.monthlyStudentSpeakingShareTarget,
                           )}
@@ -451,8 +451,8 @@ export default async function PlansAndReportsPage({
             ) : null}
           </div>
           <p className="text-muted-foreground">
-            {messages.tutorPlansReportsPage.planPanelDescription(studentName)}{" "}
-            ({selectedMonthLabel})
+            {messages.tutorPlansReportsPage.planPanelDescription(studentName)} (
+            {selectedMonthLabel})
           </p>
         </div>
 

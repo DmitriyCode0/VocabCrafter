@@ -189,27 +189,28 @@ export function TutorStudentPlanWorkspace({
       const response = await fetch(
         `/api/tutor/students/${studentId}/plan?month=${encodeURIComponent(planMonth)}`,
         {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planTitle,
-          goalSummary,
-          objectives: parseObjectives(objectives),
-          monthlySentenceTranslationTarget: parseNullableWholeNumber(
-            sentenceTranslationTarget,
-          ),
-          monthlyGapFillTarget: parseNullableWholeNumber(gapFillTarget),
-          monthlyCompletedLessonsTarget: parseNullableWholeNumber(lessonTarget),
-          monthlyWordsAddedTarget: parseNullableWholeNumber(wordsAddedTarget),
-          monthlyMasteredWordsTarget:
-            parseNullableWholeNumber(masteredWordsTarget),
-          monthlyStudentSpeakingShareTarget:
-            parseNullablePercentage(speakingShareTarget),
-          monthlyAverageScoreTarget:
-            parseNullablePercentage(averageScoreTarget),
-          grammarTopicKeys,
-        }),
-      },
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            planTitle,
+            goalSummary,
+            objectives: parseObjectives(objectives),
+            monthlySentenceTranslationTarget: parseNullableWholeNumber(
+              sentenceTranslationTarget,
+            ),
+            monthlyGapFillTarget: parseNullableWholeNumber(gapFillTarget),
+            monthlyCompletedLessonsTarget:
+              parseNullableWholeNumber(lessonTarget),
+            monthlyWordsAddedTarget: parseNullableWholeNumber(wordsAddedTarget),
+            monthlyMasteredWordsTarget:
+              parseNullableWholeNumber(masteredWordsTarget),
+            monthlyStudentSpeakingShareTarget:
+              parseNullablePercentage(speakingShareTarget),
+            monthlyAverageScoreTarget:
+              parseNullablePercentage(averageScoreTarget),
+            grammarTopicKeys,
+          }),
+        },
       );
 
       const data = (await response.json().catch(() => null)) as {

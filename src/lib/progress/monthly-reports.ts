@@ -80,7 +80,9 @@ export const monthlyReportMetricsSchema = z.object({
   practicedWords: z.number().int().min(0),
   trackedWordsTotal: z.number().int().min(0),
   averageScore: z.number().min(0).max(100).nullable(),
-  monthlyPentagram: monthlyReportPentagramSnapshotSchema.nullable().default(null),
+  monthlyPentagram: monthlyReportPentagramSnapshotSchema
+    .nullable()
+    .default(null),
 });
 
 export const monthlyReportStatusSchema = z.enum([
@@ -370,8 +372,7 @@ export async function updateTutorStudentMonthlyReportSettings(
     monthlyCompletedLessonsTarget: parsed.monthlyCompletedLessonsTarget,
     monthlyWordsAddedTarget: parsed.monthlyWordsAddedTarget,
     monthlyMasteredWordsTarget: parsed.monthlyMasteredWordsTarget,
-    monthlyStudentSpeakingShareTarget:
-      parsed.monthlyStudentSpeakingShareTarget,
+    monthlyStudentSpeakingShareTarget: parsed.monthlyStudentSpeakingShareTarget,
     monthlyAverageScoreTarget: parsed.monthlyAverageScoreTarget,
   });
 

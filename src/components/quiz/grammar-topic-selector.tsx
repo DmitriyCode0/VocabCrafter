@@ -124,7 +124,9 @@ export function GrammarTopicSelector({
                 <div className="px-3 pb-3 grid gap-2 sm:grid-cols-2">
                   {topics.map((topic) => {
                     const isPlanTopic = planTopicKeys?.includes(topic.topicKey);
-                    const isMastered = masteredTopicKeys?.includes(topic.topicKey);
+                    const isMastered = masteredTopicKeys?.includes(
+                      topic.topicKey,
+                    );
                     const isPending = isPlanTopic && !isMastered;
                     return (
                       <label
@@ -136,7 +138,11 @@ export function GrammarTopicSelector({
                           onCheckedChange={() => toggleTopic(topic.topicKey)}
                           className="mt-0.5"
                         />
-                        <span className={isPending ? "text-amber-900" : undefined}>{topic.displayName}</span>
+                        <span
+                          className={isPending ? "text-amber-900" : undefined}
+                        >
+                          {topic.displayName}
+                        </span>
                       </label>
                     );
                   })}

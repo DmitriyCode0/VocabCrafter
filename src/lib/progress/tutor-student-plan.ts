@@ -130,7 +130,9 @@ function toReportMonthString(date: Date) {
   return `${year}-${month}-01`;
 }
 
-export function getCurrentTutorStudentPlanMonth(referenceDate: Date = new Date()) {
+export function getCurrentTutorStudentPlanMonth(
+  referenceDate: Date = new Date(),
+) {
   return toReportMonthString(referenceDate);
 }
 
@@ -366,7 +368,8 @@ export async function updateTutorStudentPlan(
         monthly_sentence_translation_target:
           nextPlan.monthlySentenceTranslationTarget,
         monthly_gap_fill_target: nextPlan.monthlyGapFillTarget,
-        monthly_completed_lessons_target: nextPlan.monthlyCompletedLessonsTarget,
+        monthly_completed_lessons_target:
+          nextPlan.monthlyCompletedLessonsTarget,
         monthly_words_added_target: nextPlan.monthlyWordsAddedTarget,
         monthly_mastered_words_target: nextPlan.monthlyMasteredWordsTarget,
         monthly_student_speaking_share_target:
@@ -398,7 +401,8 @@ export async function updateTutorStudentPlan(
           monthly_completed_lessons_target:
             nextPlan.monthlyCompletedLessonsTarget,
           monthly_new_mastery_words_target:
-            nextPlan.monthlyWordsAddedTarget ?? nextPlan.monthlyMasteredWordsTarget,
+            nextPlan.monthlyWordsAddedTarget ??
+            nextPlan.monthlyMasteredWordsTarget,
           monthly_average_score_target: nextPlan.monthlyAverageScoreTarget,
         })
         .eq("tutor_id", tutorId)

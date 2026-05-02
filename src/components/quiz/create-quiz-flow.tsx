@@ -120,7 +120,11 @@ const ACTIVITIES: {
   },
 ];
 
-export function CreateQuizFlow({ grammarTopicCatalog, planGrammarTopicKeys, masteredGrammarTopicKeys }: CreateQuizFlowProps) {
+export function CreateQuizFlow({
+  grammarTopicCatalog,
+  planGrammarTopicKeys,
+  masteredGrammarTopicKeys,
+}: CreateQuizFlowProps) {
   const router = useRouter();
   const { messages, appLanguage } = useAppI18n();
   const { profile } = useUser();

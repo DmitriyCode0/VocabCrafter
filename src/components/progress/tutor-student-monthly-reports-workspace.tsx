@@ -306,10 +306,10 @@ export function TutorStudentMonthlyReportsWorkspace({
       const response = await fetch(
         `/api/tutor/students/${studentId}/plan?month=${encodeURIComponent(currentReportMonth)}`,
         {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reportLanguage: nextLanguage }),
-      },
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reportLanguage: nextLanguage }),
+        },
       );
 
       const data = (await response.json().catch(() => null)) as {
@@ -926,7 +926,8 @@ export function TutorStudentMonthlyReportsWorkspace({
                     )}
                   </Badge>
                   <Badge variant="outline">
-                    Mastered words: {report.metricsSnapshot.masteredWordsLevel45}
+                    Mastered words:{" "}
+                    {report.metricsSnapshot.masteredWordsLevel45}
                     {report.goalsSnapshot.monthlyMasteredWordsTarget != null
                       ? ` / ${report.goalsSnapshot.monthlyMasteredWordsTarget}`
                       : ""}

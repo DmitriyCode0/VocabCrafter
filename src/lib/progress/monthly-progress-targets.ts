@@ -208,7 +208,9 @@ export function buildStudentMonthlyProgressPresentation({
   const engagementScore = clampScore(
     (activeDaysRatio * 0.5 + activityRatio * 0.5) * 100,
   );
-  const passiveVocabScore = clampScore(newWordsRatio * 30 + masteredWordsRatio * 70);
+  const passiveVocabScore = clampScore(
+    newWordsRatio * 30 + masteredWordsRatio * 70,
+  );
   const grammarSentencesRemaining = Math.max(
     0,
     targets.grammarTarget * MONTHLY_GRAMMAR_MASTERY_MIN_ATTEMPTS -
@@ -222,7 +224,8 @@ export function buildStudentMonthlyProgressPresentation({
       shortLabel: "Speaking",
       score: activeVocabScore,
       value: `${factors.studentSpeakingShare == null ? "n/a" : `${factors.studentSpeakingShare.toFixed(1).replace(/\.0$/, "")}%`} / ${targets.transcriptTarget.toLocaleString()}% speaking target`,
-      helper: "Monthly score follows student speaking share against the speaking goal from the month plan.",
+      helper:
+        "Monthly score follows student speaking share against the speaking goal from the month plan.",
       beta: true,
     },
     {
@@ -239,7 +242,8 @@ export function buildStudentMonthlyProgressPresentation({
       shortLabel: "Engagement",
       score: engagementScore,
       value: `${factors.activeDays}/${targets.activeDaysTarget} active days this month, ${factors.activityCount}/${targets.activityTarget} objective completions`,
-      helper: "50% active days in app this month, 50% objective completions progress.",
+      helper:
+        "50% active days in app this month, 50% objective completions progress.",
     },
     {
       key: "accuracy",
@@ -255,7 +259,8 @@ export function buildStudentMonthlyProgressPresentation({
       shortLabel: "Vocab",
       score: passiveVocabScore,
       value: `${factors.newPracticeWords.toLocaleString()}/${targets.practiceTarget.toLocaleString()} words added, ${factors.masteredWordsLevel45.toLocaleString()}/${targets.passiveTarget.toLocaleString()} mastered to level 4-5`,
-      helper: "Monthly vocabulary score = 30% words added vs target and 70% words reaching mastery levels 4-5 vs target.",
+      helper:
+        "Monthly vocabulary score = 30% words added vs target and 70% words reaching mastery levels 4-5 vs target.",
       beta: true,
     },
   ];
