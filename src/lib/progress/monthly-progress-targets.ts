@@ -1,5 +1,7 @@
 import type { CEFRLevel } from "@/types/quiz";
 
+export const MONTHLY_GRAMMAR_MASTERY_MIN_ATTEMPTS = 5;
+
 export interface StudentMonthlyProgressTargets {
   transcriptTarget: number;
   practiceTarget: number;
@@ -16,13 +18,18 @@ export interface StudentMonthlyProgressFactors {
   transcriptActiveTerms: number;
   transcriptUsageCount: number;
   newPracticeWords: number;
+  masteredWordsLevel45: number;
+  studentSpeakingShare: number | null;
   passiveEquivalentWords: number;
   activeDays: number;
+  daysElapsed: number;
+  totalDaysInMonth: number;
   activityCount: number;
   completedLessons: number;
   completedQuizzes: number;
   grammarTopicsPracticed: number;
   confidentGrammarTopics: number;
+  grammarHighScoreAttemptsTotal: number;
   accuracyAttemptCount: number;
   accuracyScore: number;
   availableGrammarTopicCount: number;
@@ -44,21 +51,21 @@ export interface StudentMonthlyProgressAxisData {
 }
 
 const MONTHLY_ACTIVE_VOCAB_TARGETS: Record<CEFRLevel, number> = {
-  A1: 30,
+  A1: 40,
   A2: 45,
-  B1: 90,
-  B2: 130,
-  C1: 180,
-  C2: 240,
+  B1: 50,
+  B2: 55,
+  C1: 60,
+  C2: 65,
 };
 
 const MONTHLY_PASSIVE_VOCAB_TARGETS: Record<CEFRLevel, number> = {
-  A1: 50,
-  A2: 80,
-  B1: 160,
-  B2: 240,
-  C1: 320,
-  C2: 420,
+  A1: 10,
+  A2: 16,
+  B1: 24,
+  B2: 32,
+  C1: 40,
+  C2: 48,
 };
 
 const MONTHLY_NEW_WORD_TARGETS: Record<CEFRLevel, number> = {
@@ -174,13 +181,17 @@ export function buildStudentMonthlyProgressPresentation({
   factors: StudentMonthlyProgressFactors;
   targets: StudentMonthlyProgressTargets;
 }) {
-  const transcriptTermsRatio = Math.min(
+  const speakingShareRatio = Math.min(
     1,
-    factors.transcriptActiveTerms / targets.transcriptTarget,
+    (factors.studentSpeakingShare ?? 0) / targets.transcriptTarget,
   );
   const newWordsRatio = Math.min(
     1,
     factors.newPracticeWords / targets.practiceTarget,
+  );
+  const masteredWordsRatio = Math.min(
+    1,
+    factors.masteredWordsLevel45 / targets.passiveTarget,
   );
   const activeDaysRatio = Math.min(
     1,
@@ -190,27 +201,28 @@ export function buildStudentMonthlyProgressPresentation({
     1,
     factors.activityCount / targets.activityTarget,
   );
-  const activeVocabScore = clampScore(
-    transcriptTermsRatio * 80 + newWordsRatio * 20,
-  );
+  const activeVocabScore = clampScore(speakingShareRatio * 100);
   const grammarVarietyScore = clampScore(
     (factors.confidentGrammarTopics / targets.grammarTarget) * 100,
   );
   const engagementScore = clampScore(
-    newWordsRatio * 40 + activeDaysRatio * 30 + activityRatio * 30,
+    (activeDaysRatio * 0.5 + activityRatio * 0.5) * 100,
   );
-  const passiveVocabScore = clampScore(
-    (factors.passiveEquivalentWords / targets.passiveTarget) * 100,
+  const passiveVocabScore = clampScore(newWordsRatio * 30 + masteredWordsRatio * 70);
+  const grammarSentencesRemaining = Math.max(
+    0,
+    targets.grammarTarget * MONTHLY_GRAMMAR_MASTERY_MIN_ATTEMPTS -
+      factors.grammarHighScoreAttemptsTotal,
   );
 
   const axes: StudentMonthlyProgressAxisData[] = [
     {
       key: "active_vocab",
-      label: "Active Vocab",
-      shortLabel: "Active",
+      label: "Speaking",
+      shortLabel: "Speaking",
       score: activeVocabScore,
-      value: `${factors.transcriptActiveTerms.toLocaleString()}/${targets.transcriptTarget.toLocaleString()} transcript target, ${factors.newPracticeWords.toLocaleString()}/${targets.practiceTarget.toLocaleString()} practice target`,
-      helper: "Monthly score = 80% transcript terms used in live lessons and 20% new words added for practice.",
+      value: `${factors.studentSpeakingShare == null ? "n/a" : `${factors.studentSpeakingShare.toFixed(1).replace(/\.0$/, "")}%`} / ${targets.transcriptTarget.toLocaleString()}% speaking target`,
+      helper: "Monthly score follows student speaking share against the speaking goal from the month plan.",
       beta: true,
     },
     {
@@ -218,16 +230,16 @@ export function buildStudentMonthlyProgressPresentation({
       label: "Grammar Variety",
       shortLabel: "Grammar",
       score: grammarVarietyScore,
-      value: `${factors.confidentGrammarTopics}/${targets.grammarTarget} monthly confident-topic target`,
-      helper: `${factors.availableGrammarTopicCount} topics are available at this level. A topic counts here after a sentence translation scored 90%+ during the month window.`,
+      value: `${factors.confidentGrammarTopics}/${targets.grammarTarget} topics mastered this month`,
+      helper: `A topic is mastered after 5 translation quizzes scored 90%+. Remaining auto-complete quizzes: ${grammarSentencesRemaining}.`,
     },
     {
       key: "engagement",
       label: "Engagement",
       shortLabel: "Engagement",
       score: engagementScore,
-      value: `${factors.newPracticeWords.toLocaleString()} new words, ${factors.activeDays}/${targets.activeDaysTarget} active days`,
-      helper: "40% new words added for practice, 30% active days, 30% quiz and lesson activity.",
+      value: `${factors.activeDays}/${targets.activeDaysTarget} active days this month, ${factors.activityCount}/${targets.activityTarget} objective completions`,
+      helper: "50% active days in app this month, 50% objective completions progress.",
     },
     {
       key: "accuracy",
@@ -239,11 +251,11 @@ export function buildStudentMonthlyProgressPresentation({
     },
     {
       key: "passive_vocab",
-      label: "Passive Vocab",
-      shortLabel: "Passive",
+      label: "Vocabulary",
+      shortLabel: "Vocab",
       score: passiveVocabScore,
-      value: `${factors.passiveEquivalentWords.toLocaleString()}/${targets.passiveTarget.toLocaleString()} monthly recognition target`,
-      helper: "New passive-recognition evidence added during the month window, normalized against a monthly CEFR target.",
+      value: `${factors.newPracticeWords.toLocaleString()}/${targets.practiceTarget.toLocaleString()} words added, ${factors.masteredWordsLevel45.toLocaleString()}/${targets.passiveTarget.toLocaleString()} mastered to level 4-5`,
+      helper: "Monthly vocabulary score = 30% words added vs target and 70% words reaching mastery levels 4-5 vs target.",
       beta: true,
     },
   ];

@@ -7,6 +7,7 @@ import {
   listTutorStudentMonthlyReports,
   monthlyReportGenerationInputSchema,
 } from "@/lib/progress/monthly-reports";
+import { normalizeTutorStudentPlanMonth } from "@/lib/progress/tutor-student-plan";
 
 async function requireTutorAccess(studentId: string) {
   const supabase = await createClient();
@@ -89,6 +90,10 @@ export async function POST(
   { params }: { params: Promise<{ studentId: string }> },
 ) {
   const { studentId } = await params;
+  const planMonth = normalizeTutorStudentPlanMonth(
+    request.nextUrl.searchParams.get("month"),
+  );
+  const referenceDate = new Date(`${planMonth}T00:00:00.000Z`);
   const access = await requireTutorAccess(studentId);
 
   if ("errorResponse" in access) {
@@ -111,6 +116,7 @@ export async function POST(
       studentId,
       generatedBy: access.user.id,
       generationSource: "manual",
+      referenceDate,
       forceRegenerate: parsed.data.forceRegenerate,
     });
 

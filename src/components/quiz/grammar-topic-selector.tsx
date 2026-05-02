@@ -21,12 +21,16 @@ interface GrammarTopicSelectorProps {
   levels: GrammarTopicLevelGroup[];
   selectedTopics: string[];
   onTopicsChange: (topics: string[]) => void;
+  planTopicKeys?: string[];
+  masteredTopicKeys?: string[];
 }
 
 export function GrammarTopicSelector({
   levels,
   selectedTopics,
   onTopicsChange,
+  planTopicKeys,
+  masteredTopicKeys,
 }: GrammarTopicSelectorProps) {
   const { messages } = useAppI18n();
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(
@@ -118,19 +122,24 @@ export function GrammarTopicSelector({
 
               {isExpanded && (
                 <div className="px-3 pb-3 grid gap-2 sm:grid-cols-2">
-                  {topics.map((topic) => (
-                    <label
-                      key={topic.topicKey}
-                      className="flex items-start gap-2 cursor-pointer rounded-md p-1.5 hover:bg-muted text-sm"
-                    >
-                      <Checkbox
-                        checked={selectedTopics.includes(topic.topicKey)}
-                        onCheckedChange={() => toggleTopic(topic.topicKey)}
-                        className="mt-0.5"
-                      />
-                      <span>{topic.displayName}</span>
-                    </label>
-                  ))}
+                  {topics.map((topic) => {
+                    const isPlanTopic = planTopicKeys?.includes(topic.topicKey);
+                    const isMastered = masteredTopicKeys?.includes(topic.topicKey);
+                    const isPending = isPlanTopic && !isMastered;
+                    return (
+                      <label
+                        key={topic.topicKey}
+                        className={`flex items-start gap-2 cursor-pointer rounded-md p-1.5 text-sm ${isPending ? "bg-amber-50 hover:bg-amber-100 border border-amber-200" : "hover:bg-muted"}`}
+                      >
+                        <Checkbox
+                          checked={selectedTopics.includes(topic.topicKey)}
+                          onCheckedChange={() => toggleTopic(topic.topicKey)}
+                          className="mt-0.5"
+                        />
+                        <span className={isPending ? "text-amber-900" : undefined}>{topic.displayName}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               )}
             </div>

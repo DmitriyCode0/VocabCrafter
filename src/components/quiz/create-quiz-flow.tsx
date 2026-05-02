@@ -86,6 +86,8 @@ interface CreateQuizFlowProps {
     english: GrammarTopicLevelGroup[];
     spanish: GrammarTopicLevelGroup[];
   };
+  planGrammarTopicKeys?: string[];
+  masteredGrammarTopicKeys?: string[];
 }
 
 const ACTIVITIES: {
@@ -118,7 +120,7 @@ const ACTIVITIES: {
   },
 ];
 
-export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
+export function CreateQuizFlow({ grammarTopicCatalog, planGrammarTopicKeys, masteredGrammarTopicKeys }: CreateQuizFlowProps) {
   const router = useRouter();
   const { messages, appLanguage } = useAppI18n();
   const { profile } = useUser();
@@ -613,6 +615,8 @@ export function CreateQuizFlow({ grammarTopicCatalog }: CreateQuizFlowProps) {
                   levels={availableGrammarLevels}
                   selectedTopics={grammarTopics}
                   onTopicsChange={setGrammarTopics}
+                  planTopicKeys={planGrammarTopicKeys}
+                  masteredTopicKeys={masteredGrammarTopicKeys}
                 />
               </CardContent>
             </Card>

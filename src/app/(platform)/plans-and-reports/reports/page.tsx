@@ -18,6 +18,7 @@ import {
   listStudentPublishedMonthlyReports,
   listTutorStudentMonthlyReports,
 } from "@/lib/progress/monthly-reports";
+import { ReportMonthFilter } from "@/components/progress/report-month-filter";
 import { TutorPlansReportsPageHeader } from "@/components/progress/tutor-plans-reports-page-header";
 import { ResultsStudentFilter } from "@/components/progress/results-student-filter";
 import { TutorStudentMonthlyReportsWorkspace } from "@/components/progress/tutor-student-monthly-reports-workspace";
@@ -32,7 +33,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getTutorProgressPageData } from "@/lib/progress/tutor-progress-page-data";
-import { getTutorStudentPlan } from "@/lib/progress/tutor-student-plan";
+import {
+  getTutorStudentPlan,
+  isTutorStudentMonthlyPlansTableAvailable,
+  normalizeTutorStudentPlanMonth,
+} from "@/lib/progress/tutor-student-plan";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +45,17 @@ const APP_LANGUAGE_LOCALES = {
   en: "en-GB",
   uk: "uk-UA",
 } as const;
+
+/** Returns today for the current calendar month, last day of month for past months. */
+function resolveMetricsReferenceDate(planMonth: string): Date {
+  const now = new Date();
+  const currentMonthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  if (planMonth === currentMonthKey) {
+    return now;
+  }
+  const [year, month] = planMonth.split("-").map(Number);
+  return new Date(Date.UTC(year, month, 0)); // day 0 of next month = last day of requested month
+}
 
 function formatNumber(value: number, maximumFractionDigits = 1) {
   if (Number.isInteger(value)) {
@@ -103,7 +119,7 @@ function formatStarRating(value: number | null) {
 export default async function PlansAndReportsReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ student?: string }>;
+  searchParams: Promise<{ student?: string; month?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const supabase = await createClient();
@@ -128,11 +144,38 @@ export default async function PlansAndReportsReportsPage({
   const role = profile.role;
   const appLanguage = normalizeAppLanguage(profile.app_language);
   const messages = getAppMessages(appLanguage);
+  const locale = APP_LANGUAGE_LOCALES[appLanguage];
+  const selectedMonth = normalizeTutorStudentPlanMonth(
+    resolvedSearchParams.month,
+  );
+  const selectedMonthDate = resolveMetricsReferenceDate(selectedMonth);
+  const selectedMonthLabel = formatMonthlyReportMonthLabel(
+    selectedMonth,
+    locale,
+  );
+  const monthlyPlansTableAvailable =
+    await isTutorStudentMonthlyPlansTableAvailable();
+
+  const fallbackBanner = monthlyPlansTableAvailable ? null : (
+    <Card className="border-amber-300 bg-amber-50/60">
+      <CardHeader className="py-4">
+        <CardTitle className="text-base text-amber-900">
+          Monthly plans migration is pending
+        </CardTitle>
+        <CardDescription className="text-amber-800">
+          The app is running in compatibility mode with legacy tutor plans.
+          Apply the latest Supabase migrations to enable full month-scoped plan
+          storage.
+        </CardDescription>
+      </CardHeader>
+    </Card>
+  );
 
   if (role === "student") {
-    const locale = APP_LANGUAGE_LOCALES[appLanguage];
     const admin = createAdminClient();
-    const reports = await listStudentPublishedMonthlyReports(user.id);
+    const reports = (await listStudentPublishedMonthlyReports(user.id)).filter(
+      (report) => report.reportMonth === selectedMonth,
+    );
     const tutorIds = [...new Set(reports.map((report) => report.tutorId))];
     const { data: tutorProfiles } = tutorIds.length
       ? await admin
@@ -157,7 +200,12 @@ export default async function PlansAndReportsReportsPage({
           basePath="/plans-and-reports"
           title={messages.studentPlansReportsPage.title}
           description={messages.studentPlansReportsPage.reportsDescription}
+          actions={
+            <ReportMonthFilter activeMonth={selectedMonth} locale={locale} />
+          }
         />
+
+        {fallbackBanner}
 
         {reports.length === 0 ? (
           <Card>
@@ -239,17 +287,27 @@ export default async function PlansAndReportsReportsPage({
                           )}
                         </Badge>
                         <Badge variant="outline">
-                          New words: {report.metricsSnapshot.newMasteryWords}
-                          {report.goalsSnapshot.monthlyNewMasteryWordsTarget !=
+                          Words added: {report.metricsSnapshot.newMasteryWords}
+                          {report.goalsSnapshot.monthlyWordsAddedTarget !=
                           null
-                            ? ` / ${report.goalsSnapshot.monthlyNewMasteryWordsTarget}`
+                            ? ` / ${report.goalsSnapshot.monthlyWordsAddedTarget}`
                             : ""}
                         </Badge>
                         <Badge variant="outline">
                           Student speaking share:{" "}
-                          {formatPercentage(
+                          {formatPercentageProgressValue(
                             report.metricsSnapshot.studentSpeakingShare,
+                            report.goalsSnapshot
+                              .monthlyStudentSpeakingShareTarget,
                           )}
+                        </Badge>
+                        <Badge variant="outline">
+                          Mastered words: {" "}
+                          {report.metricsSnapshot.masteredWordsLevel45}
+                          {report.goalsSnapshot.monthlyMasteredWordsTarget !=
+                          null
+                            ? ` / ${report.goalsSnapshot.monthlyMasteredWordsTarget}`
+                            : ""}
                         </Badge>
                         <Badge variant="outline">
                           Active days in application:{" "}
@@ -343,8 +401,21 @@ export default async function PlansAndReportsReportsPage({
                           Student speaking share
                         </p>
                         <p className="text-xl font-semibold">
-                          {formatPercentage(
+                          {formatPercentageProgressValue(
                             report.metricsSnapshot.studentSpeakingShare,
+                            report.goalsSnapshot
+                              .monthlyStudentSpeakingShareTarget,
+                          )}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border px-3 py-3">
+                        <p className="text-xs text-muted-foreground">
+                          Mastered words (levels 4-5)
+                        </p>
+                        <p className="text-xl font-semibold">
+                          {formatProgressValue(
+                            report.metricsSnapshot.masteredWordsLevel45,
+                            report.goalsSnapshot.monthlyMasteredWordsTarget,
                           )}
                         </p>
                       </div>
@@ -464,15 +535,18 @@ export default async function PlansAndReportsReportsPage({
       title={messages.tutorPlansReportsPage.title}
       description={messages.tutorPlansReportsPage.reportsDescription}
       actions={
-        students.length > 0 ? (
-          <ResultsStudentFilter
-            students={students.map((student) => ({
-              id: student.id,
-              label: student.full_name || student.email || "Unknown",
-            }))}
-            activeStudentId={activeStudentId ?? students[0].id}
-          />
-        ) : null
+        <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+          {students.length > 0 ? (
+            <ResultsStudentFilter
+              students={students.map((student) => ({
+                id: student.id,
+                label: student.full_name || student.email || "Unknown",
+              }))}
+              activeStudentId={activeStudentId ?? students[0].id}
+            />
+          ) : null}
+          <ReportMonthFilter activeMonth={selectedMonth} locale={locale} />
+        </div>
       }
     />
   );
@@ -502,8 +576,7 @@ export default async function PlansAndReportsReportsPage({
     );
   }
 
-  const locale = APP_LANGUAGE_LOCALES[appLanguage];
-  const currentWindow = getCurrentMonthlyReportWindow();
+  const currentWindow = getCurrentMonthlyReportWindow(selectedMonthDate);
   const currentMonthLabel = formatMonthlyReportMonthLabel(
     currentWindow.reportMonth,
     locale,
@@ -517,11 +590,13 @@ export default async function PlansAndReportsReportsPage({
         .select("preferred_language")
         .eq("id", activeStudentId)
         .single(),
-      getTutorStudentPlan(userId, activeStudentId),
-      getTutorStudentMonthlyReportMetrics(activeStudentId, undefined, {
+      getTutorStudentPlan(userId, activeStudentId, {
+        planMonth: selectedMonth,
+      }),
+      getTutorStudentMonthlyReportMetrics(activeStudentId, selectedMonthDate, {
         tutorId: userId,
       }),
-      getTutorMonthlyReportQuota(userId),
+      getTutorMonthlyReportQuota(userId, selectedMonthDate),
       listTutorStudentMonthlyReports(userId, activeStudentId),
     ]);
 
@@ -536,6 +611,8 @@ export default async function PlansAndReportsReportsPage({
   return (
     <div className="space-y-6">
       {header}
+
+      {fallbackBanner}
 
       <div className="space-y-6">
         <div>
@@ -553,12 +630,12 @@ export default async function PlansAndReportsReportsPage({
           <p className="text-muted-foreground">
             {messages.tutorPlansReportsPage.reportsPanelDescription(
               studentName,
-            )}
+            )} ({selectedMonthLabel})
           </p>
         </div>
 
         <TutorStudentMonthlyReportsWorkspace
-          key={activeStudentId}
+          key={`${activeStudentId}-${selectedMonth}`}
           studentId={activeStudentId}
           studentName={studentName}
           currentReportMonth={currentWindow.reportMonth}

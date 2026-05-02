@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateTutorStudentMonthlyReport } from "@/lib/progress/monthly-reports";
-import { normalizeReportLanguage } from "@/lib/progress/monthly-report-language";
-import { hasConfiguredTutorStudentPlan } from "@/lib/progress/tutor-student-plan";
+import {
+  getTutorStudentPlan,
+  hasConfiguredTutorStudentPlan,
+} from "@/lib/progress/tutor-student-plan";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +41,7 @@ export async function POST(request: NextRequest) {
     const admin = createAdminClient();
     const { data: connections, error } = await admin
       .from("tutor_students")
-      .select(
-        "tutor_id, student_id, plan_title, goal_summary, objectives, monthly_sentence_translation_target, monthly_gap_fill_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language",
-      )
+      .select("tutor_id, student_id")
       .eq("status", "active");
 
     if (error) {
@@ -66,31 +66,12 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      if (
-        !hasConfiguredTutorStudentPlan({
-          planTitle: connection.plan_title,
-          goalSummary: connection.goal_summary,
-          objectives: Array.isArray(connection.objectives)
-            ? connection.objectives.filter(
-                (item): item is string => typeof item === "string",
-              )
-            : [],
-          monthlySentenceTranslationTarget:
-            connection.monthly_sentence_translation_target,
-          monthlyGapFillTarget: connection.monthly_gap_fill_target,
-          monthlyCompletedLessonsTarget:
-            connection.monthly_completed_lessons_target,
-          monthlyNewMasteryWordsTarget:
-            connection.monthly_new_mastery_words_target,
-          monthlyAverageScoreTarget: connection.monthly_average_score_target,
-          grammarTopicKeys: Array.isArray(connection.grammar_topic_keys)
-            ? connection.grammar_topic_keys.filter(
-                (item): item is string => typeof item === "string",
-              )
-            : [],
-          reportLanguage: normalizeReportLanguage(connection.report_language),
-        })
-      ) {
+      const monthlyPlan = await getTutorStudentPlan(
+        connection.tutor_id,
+        connection.student_id,
+      );
+
+      if (!hasConfiguredTutorStudentPlan(monthlyPlan.plan)) {
         continue;
       }
 

@@ -8,6 +8,7 @@ import {
   getStudentMonthlyComparisonSnapshot,
   getStudentProgressSnapshot,
 } from "@/lib/progress/profile-metrics";
+import type { StudentMonthlyProgressTargetOverrides } from "@/lib/progress/monthly-progress-targets";
 import {
   parseTutorProgressOverride,
   progressAxisKeySchema,
@@ -75,6 +76,7 @@ export const monthlyReportMetricsSchema = z.object({
   studentSpeakingShare: z.number().min(0).max(100).nullable().default(null),
   totalHours: z.number().min(0).default(0),
   newMasteryWords: z.number().int().min(0),
+  masteredWordsLevel45: z.number().int().min(0).default(0),
   practicedWords: z.number().int().min(0),
   trackedWordsTotal: z.number().int().min(0),
   averageScore: z.number().min(0).max(100).nullable(),
@@ -104,7 +106,9 @@ export const monthlyReportSettingsInputSchema = z.object({
   monthlySentenceTranslationTarget: nullableWholeNumberSchema,
   monthlyGapFillTarget: nullableWholeNumberSchema,
   monthlyCompletedLessonsTarget: nullableWholeNumberSchema,
-  monthlyNewMasteryWordsTarget: nullableWholeNumberSchema,
+  monthlyWordsAddedTarget: nullableWholeNumberSchema,
+  monthlyMasteredWordsTarget: nullableWholeNumberSchema,
+  monthlyStudentSpeakingShareTarget: nullablePercentageSchema,
   monthlyAverageScoreTarget: nullablePercentageSchema,
 });
 
@@ -364,7 +368,10 @@ export async function updateTutorStudentMonthlyReportSettings(
     monthlySentenceTranslationTarget: parsed.monthlySentenceTranslationTarget,
     monthlyGapFillTarget: parsed.monthlyGapFillTarget,
     monthlyCompletedLessonsTarget: parsed.monthlyCompletedLessonsTarget,
-    monthlyNewMasteryWordsTarget: parsed.monthlyNewMasteryWordsTarget,
+    monthlyWordsAddedTarget: parsed.monthlyWordsAddedTarget,
+    monthlyMasteredWordsTarget: parsed.monthlyMasteredWordsTarget,
+    monthlyStudentSpeakingShareTarget:
+      parsed.monthlyStudentSpeakingShareTarget,
     monthlyAverageScoreTarget: parsed.monthlyAverageScoreTarget,
   });
 
@@ -388,10 +395,12 @@ export async function getTutorStudentMonthlyReportMetrics(
     attemptsResult,
     lessonsResult,
     newWordsResult,
+    masteredWordsResult,
     practicedWordsResult,
     totalWordsResult,
     connectionsResult,
     overrideResult,
+    monthlyPlanResult,
   ] = await Promise.all([
     admin
       .from("quiz_attempts")
@@ -414,6 +423,13 @@ export async function getTutorStudentMonthlyReportMetrics(
       .eq("student_id", studentId)
       .gte("created_at", `${window.periodStart}T00:00:00.000Z`)
       .lt("created_at", `${window.endExclusive}T00:00:00.000Z`),
+    admin
+      .from("word_mastery")
+      .select("id")
+      .eq("student_id", studentId)
+      .in("mastery_level", [4, 5])
+      .gte("last_practiced", `${window.periodStart}T00:00:00.000Z`)
+      .lt("last_practiced", `${window.endExclusive}T00:00:00.000Z`),
     admin
       .from("word_mastery")
       .select("id, last_practiced")
@@ -439,6 +455,11 @@ export async function getTutorStudentMonthlyReportMetrics(
           .eq("student_id", studentId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    options?.tutorId
+      ? getTutorStudentPlan(options.tutorId, studentId, {
+          planMonth: window.reportMonth,
+        })
+      : Promise.resolve(null),
   ]);
 
   if (attemptsResult.error) {
@@ -451,6 +472,10 @@ export async function getTutorStudentMonthlyReportMetrics(
 
   if (newWordsResult.error) {
     throw newWordsResult.error;
+  }
+
+  if (masteredWordsResult.error) {
+    throw masteredWordsResult.error;
   }
 
   if (practicedWordsResult.error) {
@@ -545,6 +570,8 @@ export async function getTutorStudentMonthlyReportMetrics(
     }
   }
 
+  const sessionSpeakingShares: number[] = [];
+
   for (const session of classroomSessionsResult.data ?? []) {
     classroomDurationSeconds += Math.max(0, session.duration_seconds ?? 0);
     tutorSpeakingSeconds += Math.max(0, session.tutor_speaking_seconds ?? 0);
@@ -552,6 +579,13 @@ export async function getTutorStudentMonthlyReportMetrics(
       0,
       session.student_speaking_seconds ?? 0,
     );
+
+    const tutorSec = Math.max(0, session.tutor_speaking_seconds ?? 0);
+    const studentSec = Math.max(0, session.student_speaking_seconds ?? 0);
+    const sessionTotal = tutorSec + studentSec;
+    if (sessionTotal > 0) {
+      sessionSpeakingShares.push((studentSec / sessionTotal) * 100);
+    }
   }
 
   const totalSpeakingSeconds = tutorSpeakingSeconds + studentSpeakingSeconds;
@@ -559,10 +593,49 @@ export async function getTutorStudentMonthlyReportMetrics(
   const monthlyTargetOverrides = parseTutorProgressOverride(
     overrideResult.data,
   ).monthlyTargetOverrides;
+  let effectiveMonthlyTargets: StudentMonthlyProgressTargetOverrides | null =
+    monthlyTargetOverrides;
+
+  if (monthlyPlanResult?.plan) {
+    const numericPlanTargets = [
+      monthlyPlanResult.plan.monthlySentenceTranslationTarget,
+      monthlyPlanResult.plan.monthlyGapFillTarget,
+      monthlyPlanResult.plan.monthlyCompletedLessonsTarget,
+      monthlyPlanResult.plan.monthlyWordsAddedTarget,
+      monthlyPlanResult.plan.monthlyMasteredWordsTarget,
+    ].filter((value): value is number => value != null);
+    const activityTargetFromPlan = numericPlanTargets.reduce(
+      (sum, value) => sum + value,
+      0,
+    );
+
+    effectiveMonthlyTargets = {
+      ...(monthlyTargetOverrides ?? {}),
+      transcriptTarget:
+        monthlyPlanResult.plan.monthlyStudentSpeakingShareTarget ??
+        monthlyTargetOverrides?.transcriptTarget,
+      practiceTarget:
+        monthlyPlanResult.plan.monthlyWordsAddedTarget ??
+        monthlyTargetOverrides?.practiceTarget,
+      passiveTarget:
+        monthlyPlanResult.plan.monthlyMasteredWordsTarget ??
+        monthlyTargetOverrides?.passiveTarget,
+      activityTarget:
+        activityTargetFromPlan > 0
+          ? activityTargetFromPlan
+          : monthlyTargetOverrides?.activityTarget,
+      grammarTarget:
+        monthlyPlanResult.plan.grammarTopicKeys.length > 0
+          ? monthlyPlanResult.plan.grammarTopicKeys.length
+          : monthlyTargetOverrides?.grammarTarget,
+    };
+  }
+
   const monthlyComparison = await getStudentMonthlyComparisonSnapshot(
     studentId,
     referenceDate,
-    monthlyTargetOverrides,
+    effectiveMonthlyTargets,
+    monthlyPlanResult?.plan.grammarTopicKeys ?? null,
   );
 
   return {
@@ -576,11 +649,15 @@ export async function getTutorStudentMonthlyReportMetrics(
     appLearningHours: roundHours(appLearningSeconds / 3600),
     studentSpeakingHours: roundHours(studentSpeakingSeconds / 3600),
     studentSpeakingShare:
-      totalSpeakingSeconds > 0
-        ? roundScore((studentSpeakingSeconds / totalSpeakingSeconds) * 100)
+      sessionSpeakingShares.length > 0
+        ? roundScore(
+            sessionSpeakingShares.reduce((sum, share) => sum + share, 0) /
+              sessionSpeakingShares.length,
+          )
         : null,
     totalHours: roundHours(totalHours),
     newMasteryWords: (newWordsResult.data ?? []).length,
+    masteredWordsLevel45: (masteredWordsResult.data ?? []).length,
     practicedWords: (practicedWordsResult.data ?? []).length,
     trackedWordsTotal: totalWordsResult.count ?? 0,
     averageScore:
@@ -864,7 +941,7 @@ function buildMonthlyReportPrompt({
     `- ${formatTargetLine("Completed sentence translation exercises", metrics.completedSentenceTranslations, goals.monthlySentenceTranslationTarget)}`,
     `- ${formatTargetLine("Completed gap fill exercises", metrics.completedGapFillExercises, goals.monthlyGapFillTarget)}`,
     `- ${formatTargetLine("Completed lessons", metrics.completedLessons, goals.monthlyCompletedLessonsTarget)}`,
-    `- ${formatTargetLine("New mastery words", metrics.newMasteryWords, goals.monthlyNewMasteryWordsTarget)}`,
+    `- ${formatTargetLine("Words added", metrics.newMasteryWords, goals.monthlyWordsAddedTarget)}`,
     `- ${formatTargetLine("Average quiz score", metrics.averageScore, goals.monthlyAverageScoreTarget, (value) => `${Number.isInteger(value) ? value.toString() : value.toFixed(1).replace(/\.0$/, "")}%`)}`,
     "",
     "Return JSON with:",

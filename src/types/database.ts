@@ -1927,6 +1927,93 @@ export interface Database {
           },
         ];
       };
+      tutor_student_monthly_plans: {
+        Row: {
+          id: string;
+          connection_id: string;
+          tutor_id: string;
+          student_id: string;
+          plan_month: string;
+          plan_title: string | null;
+          goal_summary: string | null;
+          objectives: Json;
+          grammar_topic_keys: Json;
+          report_language: string;
+          monthly_sentence_translation_target: number | null;
+          monthly_gap_fill_target: number | null;
+          monthly_completed_lessons_target: number | null;
+          monthly_words_added_target: number | null;
+          monthly_mastered_words_target: number | null;
+          monthly_student_speaking_share_target: number | null;
+          monthly_average_score_target: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          connection_id: string;
+          tutor_id: string;
+          student_id: string;
+          plan_month: string;
+          plan_title?: string | null;
+          goal_summary?: string | null;
+          objectives?: Json;
+          grammar_topic_keys?: Json;
+          report_language?: string;
+          monthly_sentence_translation_target?: number | null;
+          monthly_gap_fill_target?: number | null;
+          monthly_completed_lessons_target?: number | null;
+          monthly_words_added_target?: number | null;
+          monthly_mastered_words_target?: number | null;
+          monthly_student_speaking_share_target?: number | null;
+          monthly_average_score_target?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          connection_id?: string;
+          tutor_id?: string;
+          student_id?: string;
+          plan_month?: string;
+          plan_title?: string | null;
+          goal_summary?: string | null;
+          objectives?: Json;
+          grammar_topic_keys?: Json;
+          report_language?: string;
+          monthly_sentence_translation_target?: number | null;
+          monthly_gap_fill_target?: number | null;
+          monthly_completed_lessons_target?: number | null;
+          monthly_words_added_target?: number | null;
+          monthly_mastered_words_target?: number | null;
+          monthly_student_speaking_share_target?: number | null;
+          monthly_average_score_target?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_monthly_plans_connection_id_fkey";
+            columns: ["connection_id"];
+            isOneToOne: false;
+            referencedRelation: "tutor_students";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_monthly_plans_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_monthly_plans_tutor_id_fkey";
+            columns: ["tutor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tutor_student_monthly_reports: {
         Row: {
           id: string;

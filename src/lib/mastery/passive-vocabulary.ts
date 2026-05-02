@@ -47,6 +47,8 @@ export interface PassiveVocabularyLibraryAttributes extends Record<
   Json | undefined
 > {
   ukrainianTranslation?: string | null;
+  englishDefinition?: string | null;
+  englishDefinitions?: string[];
 }
 
 function normalizePassiveVocabularyAttributeText(value: unknown) {
@@ -69,13 +71,42 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
   const ukrainianTranslation = normalizePassiveVocabularyAttributeText(
     attributes.ukrainianTranslation ?? attributes.ukrainian_translation,
   );
+  const englishDefinition = normalizePassiveVocabularyAttributeText(
+    attributes.englishDefinition ?? attributes.english_definition,
+  );
+  const englishDefinitionsRaw =
+    attributes.englishDefinitions ?? attributes.english_definitions;
+  const englishDefinitions = Array.isArray(englishDefinitionsRaw)
+    ? Array.from(
+        new Set(
+          englishDefinitionsRaw
+            .map((definition) =>
+              normalizePassiveVocabularyAttributeText(definition),
+            )
+            .filter((definition): definition is string => Boolean(definition)),
+        ),
+      ).slice(0, 5)
+    : [];
 
   delete attributes.ukrainian_translation;
+  delete attributes.english_definition;
+  delete attributes.english_definitions;
 
   if (ukrainianTranslation) {
     attributes.ukrainianTranslation = ukrainianTranslation;
   } else {
     delete attributes.ukrainianTranslation;
+  }
+
+  if (englishDefinitions.length > 0) {
+    attributes.englishDefinitions = englishDefinitions;
+    attributes.englishDefinition = englishDefinitions[0] ?? null;
+  } else if (englishDefinition) {
+    attributes.englishDefinition = englishDefinition;
+    delete attributes.englishDefinitions;
+  } else {
+    delete attributes.englishDefinition;
+    delete attributes.englishDefinitions;
   }
 
   return attributes;

@@ -194,6 +194,11 @@ interface MonthlyWordAdditionRow {
   created_at: string;
 }
 
+interface MonthlyWordMasteryProgressRow {
+  mastery_level: number;
+  last_practiced: string;
+}
+
 interface MonthlyLessonRow {
   id: string;
   lesson_date: string;
@@ -220,6 +225,12 @@ interface MonthlyTranscriptSegmentRow {
   occurred_at: string;
   speaker_role: string;
   content: string;
+}
+
+interface MonthlyClassroomSessionSummaryRow {
+  session_started_at: string;
+  tutor_speaking_seconds: number;
+  student_speaking_seconds: number;
 }
 
 export interface StudentProgressAxis {
@@ -427,6 +438,7 @@ interface ProgressMonthWindow {
   periodEnd: string;
   endExclusive: string;
   dayCount: number;
+  totalDaysInMonth: number;
 }
 
 function clampScore(value: number) {
@@ -597,6 +609,13 @@ function buildProgressMonthWindow(referenceDate: Date): ProgressMonthWindow {
     endExclusive: toUtcDateString(addUtcDays(periodEndDate, 1)),
     dayCount:
       Math.floor((periodEndDate.getTime() - monthStart.getTime()) / 86_400_000) + 1,
+    totalDaysInMonth: new Date(
+      Date.UTC(
+        referenceDate.getUTCFullYear(),
+        referenceDate.getUTCMonth() + 1,
+        0,
+      ),
+    ).getUTCDate(),
   };
 }
 
@@ -694,27 +713,40 @@ function buildStudentMonthlyProgressSnapshot({
   availableGrammarTopicCount,
   attempts,
   wordAdditions,
+  wordMasteryProgress,
   passiveEvidenceRows,
   lessons,
+  classroomSessionSummaries,
   transcriptSegments,
   window,
   monthlyTargetOverrides,
+  selectedGrammarTopicKeys,
+  tutorMarkedGrammarTopicKeys,
 }: {
   cefrLevel: CEFRLevel;
   availableGrammarTopicCount: number;
   attempts: AttemptRow[];
   wordAdditions: MonthlyWordAdditionRow[];
+  wordMasteryProgress: MonthlyWordMasteryProgressRow[];
   passiveEvidenceRows: PassiveEvidenceWithLibraryRow[];
   lessons: MonthlyLessonRow[];
+  classroomSessionSummaries: MonthlyClassroomSessionSummaryRow[];
   transcriptSegments: MonthlyTranscriptSegmentRow[];
   window: ProgressMonthWindow;
   monthlyTargetOverrides?: StudentMonthlyProgressTargetOverrides | null;
+  selectedGrammarTopicKeys?: string[] | null;
+  tutorMarkedGrammarTopicKeys?: Set<string>;
 }): StudentMonthlyProgressSnapshot {
   const attemptsInWindow = attempts.filter((attempt) =>
     isIsoDateInWindow(getIsoDateFromTimestamp(attempt.completed_at), window),
   );
   const newWordsInWindow = wordAdditions.filter((word) =>
     isIsoDateInWindow(getIsoDateFromTimestamp(word.created_at), window),
+  );
+  const masteredWordsInWindow = wordMasteryProgress.filter(
+    (word) =>
+      word.mastery_level >= 4 &&
+      isIsoDateInWindow(getIsoDateFromTimestamp(word.last_practiced), window),
   );
   const passiveEvidenceInWindow = passiveEvidenceRows.filter((row) =>
     isIsoDateInWindow(getIsoDateFromTimestamp(row.created_at), window),
@@ -724,6 +756,12 @@ function buildStudentMonthlyProgressSnapshot({
   );
   const transcriptSegmentsInWindow = transcriptSegments.filter((segment) =>
     isIsoDateInWindow(getIsoDateFromTimestamp(segment.occurred_at), window),
+  );
+  const classroomSessionsInWindow = classroomSessionSummaries.filter((session) =>
+    isIsoDateInWindow(
+      getIsoDateFromTimestamp(session.session_started_at),
+      window,
+    ),
   );
 
   const activeTerms = transcriptSegmentsInWindow.flatMap((segment) =>
@@ -754,7 +792,7 @@ function buildStudentMonthlyProgressSnapshot({
         )
       : 0;
 
-  const confidentGrammarTopics = new Set<string>();
+  const grammarHighScoreAttemptsByTopic = new Map<string, number>();
   const practicedGrammarTopics = new Set<string>();
   for (const attempt of attemptsInWindow) {
     if (attempt.quizzes?.type !== "translation") {
@@ -769,9 +807,61 @@ function buildStudentMonthlyProgressSnapshot({
     practicedGrammarTopics.add(topicKey);
     const scorePercent = getScorePercent(attempt);
     if (scorePercent != null && scorePercent >= GRAMMAR_MASTERY_MIN_SCORE) {
-      confidentGrammarTopics.add(topicKey);
+      const nextHighScoreAttempts =
+        (grammarHighScoreAttemptsByTopic.get(topicKey) ?? 0) + 1;
+      grammarHighScoreAttemptsByTopic.set(topicKey, nextHighScoreAttempts);
     }
   }
+
+  const scopedGrammarTopicKeys =
+    selectedGrammarTopicKeys && selectedGrammarTopicKeys.length > 0
+      ? Array.from(new Set(selectedGrammarTopicKeys))
+      : null;
+  const confidentGrammarTopics = scopedGrammarTopicKeys
+    ? scopedGrammarTopicKeys.filter(
+        (topicKey) =>
+          (tutorMarkedGrammarTopicKeys?.has(topicKey) ?? false) ||
+          (grammarHighScoreAttemptsByTopic.get(topicKey) ?? 0) >=
+            GRAMMAR_MASTERY_MIN_ATTEMPTS,
+      ).length
+    : Array.from(grammarHighScoreAttemptsByTopic.entries()).filter(
+        ([topicKey, attemptCount]) =>
+          (tutorMarkedGrammarTopicKeys?.has(topicKey) ?? false) ||
+          attemptCount >= GRAMMAR_MASTERY_MIN_ATTEMPTS,
+      ).length;
+  const topicsForProgress = scopedGrammarTopicKeys ?? Array.from(grammarHighScoreAttemptsByTopic.keys());
+  const grammarHighScoreAttemptsTotal = topicsForProgress.reduce(
+    (sum, topicKey) =>
+      sum +
+      (tutorMarkedGrammarTopicKeys?.has(topicKey)
+        ? GRAMMAR_MASTERY_MIN_ATTEMPTS
+        : Math.min(
+            GRAMMAR_MASTERY_MIN_ATTEMPTS,
+            grammarHighScoreAttemptsByTopic.get(topicKey) ?? 0,
+          )),
+    0,
+  );
+  const practicedGrammarTopicCount = scopedGrammarTopicKeys
+    ? scopedGrammarTopicKeys.filter((topicKey) => practicedGrammarTopics.has(topicKey))
+        .length
+    : practicedGrammarTopics.size;
+
+  const sessionSpeakingShares: number[] = [];
+  for (const session of classroomSessionsInWindow) {
+    const tutorSec = Math.max(0, session.tutor_speaking_seconds);
+    const studentSec = Math.max(0, session.student_speaking_seconds);
+    const sessionTotal = tutorSec + studentSec;
+    if (sessionTotal > 0) {
+      sessionSpeakingShares.push((studentSec / sessionTotal) * 100);
+    }
+  }
+  const studentSpeakingShare =
+    sessionSpeakingShares.length > 0
+      ? roundMetric(
+          sessionSpeakingShares.reduce((sum, share) => sum + share, 0) /
+            sessionSpeakingShares.length,
+        )
+      : null;
 
   const completedLessons = lessonsInWindow.filter(
     (lesson) => lesson.status === "completed",
@@ -810,20 +900,26 @@ function buildStudentMonthlyProgressSnapshot({
     transcriptActiveTerms: transcriptUniqueTerms,
     transcriptUsageCount,
     newPracticeWords,
+    masteredWordsLevel45: masteredWordsInWindow.length,
+    studentSpeakingShare,
     passiveEquivalentWords: passiveSignals.equivalentWordCount,
     activeDays,
+    daysElapsed: window.dayCount,
+    totalDaysInMonth: window.totalDaysInMonth,
     activityCount,
     completedLessons,
     completedQuizzes,
-    grammarTopicsPracticed: practicedGrammarTopics.size,
-    confidentGrammarTopics: confidentGrammarTopics.size,
+    grammarTopicsPracticed: practicedGrammarTopicCount,
+    confidentGrammarTopics,
+    grammarHighScoreAttemptsTotal,
     accuracyAttemptCount: scoredAccuracyAttempts.length,
     accuracyScore,
-    availableGrammarTopicCount,
+    availableGrammarTopicCount:
+      scopedGrammarTopicKeys?.length ?? availableGrammarTopicCount,
   };
   const targets = resolveStudentMonthlyProgressTargets({
     cefrLevel,
-    dayCount: window.dayCount,
+    dayCount: window.totalDaysInMonth,
     overrides: monthlyTargetOverrides,
   });
   const presentation = buildStudentMonthlyProgressPresentation({
@@ -844,6 +940,7 @@ export async function getStudentMonthlyComparisonSnapshot(
   userId: string,
   referenceDate: Date = new Date(),
   monthlyTargetOverrides?: StudentMonthlyProgressTargetOverrides | null,
+  selectedGrammarTopicKeys?: string[] | null,
 ): Promise<StudentMonthlyComparisonSnapshot> {
   const supabaseAdmin = createAdminClient();
   const currentWindow = buildProgressMonthWindow(referenceDate);
@@ -856,9 +953,11 @@ export async function getStudentMonthlyComparisonSnapshot(
     profileResult,
     attemptsResult,
     wordAdditionsResult,
+    wordMasteryProgressResult,
     passiveEvidenceResult,
     lessonsResult,
-    classroomsResult,
+    connectionsResult,
+    grammarMasteryResult,
   ] =
     await Promise.all([
       supabaseAdmin
@@ -879,6 +978,12 @@ export async function getStudentMonthlyComparisonSnapshot(
         .gte("created_at", `${previousWindow.periodStart}T00:00:00.000Z`)
         .lt("created_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
       supabaseAdmin
+        .from("word_mastery")
+        .select("mastery_level, last_practiced")
+        .eq("student_id", userId)
+        .gte("last_practiced", `${previousWindow.periodStart}T00:00:00.000Z`)
+        .lt("last_practiced", `${currentWindow.endExclusive}T00:00:00.000Z`),
+      supabaseAdmin
         .from("passive_vocabulary_evidence")
         .select(
           "term, definition, item_type, source_type, source_label, import_count, last_imported_at, created_at, passive_vocabulary_library(cefr_level, part_of_speech, attributes)",
@@ -893,8 +998,13 @@ export async function getStudentMonthlyComparisonSnapshot(
         .gte("lesson_date", previousWindow.periodStart)
         .lte("lesson_date", currentWindow.periodEnd),
       supabaseAdmin
-        .from("tutor_student_classrooms")
+        .from("tutor_students")
         .select("id")
+        .eq("student_id", userId)
+        .eq("status", "active"),
+      supabaseAdmin
+        .from("student_grammar_topic_mastery")
+        .select("topic_key, source")
         .eq("student_id", userId),
     ]);
 
@@ -917,9 +1027,38 @@ export async function getStudentMonthlyComparisonSnapshot(
   const lessonDateById = new Map(
     lessons.map((lesson) => [lesson.id, lesson.lesson_date]),
   );
-  const classroomIds = (classroomsResult.data ?? []).map(
-    (classroom) => classroom.id,
-  );
+  const connectionIds = (connectionsResult.data ?? []).map((c) => c.id);
+  let classroomIds: string[] = [];
+  let classroomSessionSummaries: MonthlyClassroomSessionSummaryRow[] = [];
+
+  if (connectionIds.length > 0) {
+    const [classroomsData, classroomSessionsData] = await Promise.all([
+      supabaseAdmin
+        .from("tutor_student_classrooms")
+        .select("id")
+        .in("connection_id", connectionIds),
+      supabaseAdmin
+        .from("tutor_student_classroom_session_summaries")
+        .select(
+          "session_started_at, tutor_speaking_seconds, student_speaking_seconds",
+        )
+        .in("connection_id", connectionIds)
+        .gte("session_started_at", `${previousWindow.periodStart}T00:00:00.000Z`)
+        .lt("session_started_at", `${currentWindow.endExclusive}T00:00:00.000Z`),
+    ]);
+
+    if (classroomsData.error) {
+      throw classroomsData.error;
+    }
+
+    if (classroomSessionsData.error) {
+      throw classroomSessionsData.error;
+    }
+
+    classroomIds = (classroomsData.data ?? []).map((c) => c.id);
+    classroomSessionSummaries =
+      (classroomSessionsData.data ?? []) as MonthlyClassroomSessionSummaryRow[];
+  }
 
   let transcriptSegments: MonthlyTranscriptSegmentRow[] = [];
   if (lessonIds.length > 0) {
@@ -1056,29 +1195,44 @@ export async function getStudentMonthlyComparisonSnapshot(
     }
   }
 
+  const tutorMarkedGrammarTopicKeys = new Set(
+    ((grammarMasteryResult.data ?? []) as Array<{ topic_key: string; source: string }>)
+      .map((row) => row.topic_key),
+  );
+
   const currentMonth = buildStudentMonthlyProgressSnapshot({
     cefrLevel,
     availableGrammarTopicCount,
     attempts: (attemptsResult.data ?? []) as AttemptRow[],
     wordAdditions: (wordAdditionsResult.data ?? []) as MonthlyWordAdditionRow[],
+    wordMasteryProgress:
+      (wordMasteryProgressResult.data ?? []) as MonthlyWordMasteryProgressRow[],
     passiveEvidenceRows:
       (passiveEvidenceResult.data ?? []) as PassiveEvidenceWithLibraryRow[],
     lessons,
+    classroomSessionSummaries,
     transcriptSegments,
     window: currentWindow,
     monthlyTargetOverrides,
+    selectedGrammarTopicKeys,
+    tutorMarkedGrammarTopicKeys,
   });
   const previousMonth = buildStudentMonthlyProgressSnapshot({
     cefrLevel,
     availableGrammarTopicCount,
     attempts: (attemptsResult.data ?? []) as AttemptRow[],
     wordAdditions: (wordAdditionsResult.data ?? []) as MonthlyWordAdditionRow[],
+    wordMasteryProgress:
+      (wordMasteryProgressResult.data ?? []) as MonthlyWordMasteryProgressRow[],
     passiveEvidenceRows:
       (passiveEvidenceResult.data ?? []) as PassiveEvidenceWithLibraryRow[],
     lessons,
+    classroomSessionSummaries,
     transcriptSegments,
     window: previousWindow,
     monthlyTargetOverrides,
+    selectedGrammarTopicKeys,
+    tutorMarkedGrammarTopicKeys,
   });
 
   return {

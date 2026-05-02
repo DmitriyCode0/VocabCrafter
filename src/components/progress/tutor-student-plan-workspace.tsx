@@ -31,7 +31,9 @@ interface TutorStudentPlan {
   monthlySentenceTranslationTarget: number | null;
   monthlyGapFillTarget: number | null;
   monthlyCompletedLessonsTarget: number | null;
-  monthlyNewMasteryWordsTarget: number | null;
+  monthlyWordsAddedTarget: number | null;
+  monthlyMasteredWordsTarget: number | null;
+  monthlyStudentSpeakingShareTarget: number | null;
   monthlyAverageScoreTarget: number | null;
   grammarTopicKeys: string[];
   reportLanguage: ReportLanguage;
@@ -50,6 +52,8 @@ interface MonthlyReportMetrics {
   completedGapFillExercises: number;
   completedLessons: number;
   newMasteryWords: number;
+  masteredWordsLevel45: number;
+  studentSpeakingShare: number | null;
   practicedWords: number;
   trackedWordsTotal: number;
   averageScore: number | null;
@@ -58,6 +62,7 @@ interface MonthlyReportMetrics {
 interface TutorStudentPlanWorkspaceProps {
   studentId: string;
   studentName: string;
+  planMonth: string;
   currentMonthLabel: string;
   plan: TutorStudentPlan;
   metrics: MonthlyReportMetrics;
@@ -118,6 +123,7 @@ function parseObjectives(text: string) {
 export function TutorStudentPlanWorkspace({
   studentId,
   studentName,
+  planMonth,
   currentMonthLabel,
   plan,
   metrics,
@@ -137,8 +143,14 @@ export function TutorStudentPlanWorkspace({
   const [lessonTarget, setLessonTarget] = useState(
     plan.monthlyCompletedLessonsTarget?.toString() ?? "",
   );
-  const [wordTarget, setWordTarget] = useState(
-    plan.monthlyNewMasteryWordsTarget?.toString() ?? "",
+  const [wordsAddedTarget, setWordsAddedTarget] = useState(
+    plan.monthlyWordsAddedTarget?.toString() ?? "",
+  );
+  const [masteredWordsTarget, setMasteredWordsTarget] = useState(
+    plan.monthlyMasteredWordsTarget?.toString() ?? "",
+  );
+  const [speakingShareTarget, setSpeakingShareTarget] = useState(
+    plan.monthlyStudentSpeakingShareTarget?.toString() ?? "",
   );
   const [averageScoreTarget, setAverageScoreTarget] = useState(
     plan.monthlyAverageScoreTarget?.toString() ?? "",
@@ -174,7 +186,9 @@ export function TutorStudentPlanWorkspace({
     setIsSaving(true);
 
     try {
-      const response = await fetch(`/api/tutor/students/${studentId}/plan`, {
+      const response = await fetch(
+        `/api/tutor/students/${studentId}/plan?month=${encodeURIComponent(planMonth)}`,
+        {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -186,12 +200,17 @@ export function TutorStudentPlanWorkspace({
           ),
           monthlyGapFillTarget: parseNullableWholeNumber(gapFillTarget),
           monthlyCompletedLessonsTarget: parseNullableWholeNumber(lessonTarget),
-          monthlyNewMasteryWordsTarget: parseNullableWholeNumber(wordTarget),
+          monthlyWordsAddedTarget: parseNullableWholeNumber(wordsAddedTarget),
+          monthlyMasteredWordsTarget:
+            parseNullableWholeNumber(masteredWordsTarget),
+          monthlyStudentSpeakingShareTarget:
+            parseNullablePercentage(speakingShareTarget),
           monthlyAverageScoreTarget:
             parseNullablePercentage(averageScoreTarget),
           grammarTopicKeys,
         }),
-      });
+      },
+      );
 
       const data = (await response.json().catch(() => null)) as {
         error?: string;
@@ -387,14 +406,44 @@ export function TutorStudentPlanWorkspace({
 
               <div className="space-y-2">
                 <Label htmlFor="plan-word-target">
-                  Monthly new-word target
+                  Monthly words added target
                 </Label>
                 <Input
                   id="plan-word-target"
                   inputMode="numeric"
                   placeholder="e.g. 80"
-                  value={wordTarget}
-                  onChange={(event) => setWordTarget(event.target.value)}
+                  value={wordsAddedTarget}
+                  onChange={(event) => setWordsAddedTarget(event.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="plan-mastered-words-target">
+                  Monthly mastered words target (levels 4-5)
+                </Label>
+                <Input
+                  id="plan-mastered-words-target"
+                  inputMode="numeric"
+                  placeholder="e.g. 40"
+                  value={masteredWordsTarget}
+                  onChange={(event) =>
+                    setMasteredWordsTarget(event.target.value)
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="plan-speaking-share-target">
+                  Monthly student speaking share target
+                </Label>
+                <Input
+                  id="plan-speaking-share-target"
+                  inputMode="decimal"
+                  placeholder="e.g. 60"
+                  value={speakingShareTarget}
+                  onChange={(event) =>
+                    setSpeakingShareTarget(event.target.value)
+                  }
                 />
               </div>
 
@@ -460,6 +509,14 @@ export function TutorStudentPlanWorkspace({
                   {metrics.newMasteryWords}
                 </p>
               </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Mastered words (levels 4-5)
+                </p>
+                <p className="text-2xl font-semibold">
+                  {metrics.masteredWordsLevel45}
+                </p>
+              </div>
               {grammarTopicKeys.length > 0 ? (
                 <div className="rounded-lg border px-3 py-3">
                   <p className="text-xs text-muted-foreground">
@@ -516,6 +573,14 @@ export function TutorStudentPlanWorkspace({
                 </p>
                 <p className="text-2xl font-semibold">
                   {formatPercentage(metrics.averageScore)}
+                </p>
+              </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Student speaking share
+                </p>
+                <p className="text-2xl font-semibold">
+                  {formatPercentage(metrics.studentSpeakingShare)}
                 </p>
               </div>
             </div>

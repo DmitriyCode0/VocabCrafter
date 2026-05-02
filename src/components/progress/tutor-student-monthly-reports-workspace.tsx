@@ -53,6 +53,7 @@ interface MonthlyReportMetrics {
   studentSpeakingShare: number | null;
   totalHours: number;
   newMasteryWords: number;
+  masteredWordsLevel45: number;
   practicedWords: number;
   trackedWordsTotal: number;
   averageScore: number | null;
@@ -109,7 +110,9 @@ interface MonthlyReportGoals {
   monthlySentenceTranslationTarget: number | null;
   monthlyGapFillTarget: number | null;
   monthlyCompletedLessonsTarget: number | null;
-  monthlyNewMasteryWordsTarget: number | null;
+  monthlyWordsAddedTarget: number | null;
+  monthlyMasteredWordsTarget: number | null;
+  monthlyStudentSpeakingShareTarget: number | null;
   monthlyAverageScoreTarget: number | null;
   reportLanguage: ReportLanguage;
 }
@@ -147,7 +150,9 @@ interface TutorStudentMonthlyReportsWorkspaceProps {
     monthlySentenceTranslationTarget: number | null;
     monthlyGapFillTarget: number | null;
     monthlyCompletedLessonsTarget: number | null;
-    monthlyNewMasteryWordsTarget: number | null;
+    monthlyWordsAddedTarget: number | null;
+    monthlyMasteredWordsTarget: number | null;
+    monthlyStudentSpeakingShareTarget: number | null;
     monthlyAverageScoreTarget: number | null;
     reportLanguage: ReportLanguage;
   };
@@ -298,11 +303,14 @@ export function TutorStudentMonthlyReportsWorkspace({
     setIsSavingReportLanguage(true);
 
     try {
-      const response = await fetch(`/api/tutor/students/${studentId}/plan`, {
+      const response = await fetch(
+        `/api/tutor/students/${studentId}/plan?month=${encodeURIComponent(currentReportMonth)}`,
+        {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reportLanguage: nextLanguage }),
-      });
+      },
+      );
 
       const data = (await response.json().catch(() => null)) as {
         error?: string;
@@ -332,11 +340,14 @@ export function TutorStudentMonthlyReportsWorkspace({
     setIsGeneratingReport(true);
 
     try {
-      const response = await fetch(`/api/tutor/students/${studentId}/reports`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ forceRegenerate }),
-      });
+      const response = await fetch(
+        `/api/tutor/students/${studentId}/reports?month=${encodeURIComponent(currentReportMonth)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ forceRegenerate }),
+        },
+      );
 
       const data = (await response.json().catch(() => null)) as {
         error?: string;
@@ -563,17 +574,31 @@ export function TutorStudentMonthlyReportsWorkspace({
                   Student speaking share
                 </p>
                 <p className="text-2xl font-semibold">
-                  {formatPercentage(metrics.studentSpeakingShare)}
+                  {formatPercentageProgressValue(
+                    metrics.studentSpeakingShare,
+                    plan.monthlyStudentSpeakingShareTarget,
+                  )}
                 </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
                 <p className="text-xs text-muted-foreground">
-                  New mastery words
+                  Words added in app
                 </p>
                 <p className="text-2xl font-semibold">
                   {formatProgressValue(
                     metrics.newMasteryWords,
-                    plan.monthlyNewMasteryWordsTarget,
+                    plan.monthlyWordsAddedTarget,
+                  )}
+                </p>
+              </div>
+              <div className="rounded-lg border px-3 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Mastered words (levels 4-5)
+                </p>
+                <p className="text-2xl font-semibold">
+                  {formatProgressValue(
+                    metrics.masteredWordsLevel45,
+                    plan.monthlyMasteredWordsTarget,
                   )}
                 </p>
               </div>
@@ -889,15 +914,22 @@ export function TutorStudentMonthlyReportsWorkspace({
                   </Badge>
                   <Badge variant="outline">
                     New words: {report.metricsSnapshot.newMasteryWords}
-                    {report.goalsSnapshot.monthlyNewMasteryWordsTarget != null
-                      ? ` / ${report.goalsSnapshot.monthlyNewMasteryWordsTarget}`
+                    {report.goalsSnapshot.monthlyWordsAddedTarget != null
+                      ? ` / ${report.goalsSnapshot.monthlyWordsAddedTarget}`
                       : ""}
                   </Badge>
                   <Badge variant="outline">
                     Student speaking share:{" "}
-                    {formatPercentage(
+                    {formatPercentageProgressValue(
                       report.metricsSnapshot.studentSpeakingShare,
+                      report.goalsSnapshot.monthlyStudentSpeakingShareTarget,
                     )}
+                  </Badge>
+                  <Badge variant="outline">
+                    Mastered words: {report.metricsSnapshot.masteredWordsLevel45}
+                    {report.goalsSnapshot.monthlyMasteredWordsTarget != null
+                      ? ` / ${report.goalsSnapshot.monthlyMasteredWordsTarget}`
+                      : ""}
                   </Badge>
                   <Badge variant="outline">
                     Avg score:{" "}

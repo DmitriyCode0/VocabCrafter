@@ -237,6 +237,9 @@ export function EditPassiveLibraryDialog({
             <Label htmlFor={`library-attributes-${item.id}`}>
               Additional attributes JSON
             </Label>
+            <p className="text-xs text-muted-foreground">
+              To save multiple meanings, use <code>englishDefinitions</code> as an array and keep the primary meaning in <code>englishDefinition</code>.
+            </p>
             <Textarea
               id={`library-attributes-${item.id}`}
               value={attributesJson}

@@ -14,9 +14,9 @@ import {
 import { getReportLanguageLabel } from "@/lib/progress/monthly-report-language";
 import {
   formatMonthlyReportMonthLabel,
-  getCurrentMonthlyReportWindow,
   getTutorStudentMonthlyReportMetrics,
 } from "@/lib/progress/monthly-reports";
+import { ReportMonthFilter } from "@/components/progress/report-month-filter";
 import { TutorPlansReportsPageHeader } from "@/components/progress/tutor-plans-reports-page-header";
 import { ResultsStudentFilter } from "@/components/progress/results-student-filter";
 import { TutorStudentPlanWorkspace } from "@/components/progress/tutor-student-plan-workspace";
@@ -33,7 +33,9 @@ import { getTutorProgressPageData } from "@/lib/progress/tutor-progress-page-dat
 import {
   getTutorStudentPlan,
   hasConfiguredTutorStudentPlan,
+  isTutorStudentMonthlyPlansTableAvailable,
   listStudentTutorPlans,
+  normalizeTutorStudentPlanMonth,
 } from "@/lib/progress/tutor-student-plan";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +44,17 @@ const APP_LANGUAGE_LOCALES = {
   en: "en-GB",
   uk: "uk-UA",
 } as const;
+
+/** Returns today for the current calendar month, last day of month for past months. */
+function resolveMetricsReferenceDate(planMonth: string): Date {
+  const now = new Date();
+  const currentMonthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  if (planMonth === currentMonthKey) {
+    return now;
+  }
+  const [year, month] = planMonth.split("-").map(Number);
+  return new Date(Date.UTC(year, month, 0)); // day 0 of next month = last day of requested month
+}
 
 function formatPercentage(value: number | null) {
   if (value == null || !Number.isFinite(value)) {
@@ -54,7 +67,7 @@ function formatPercentage(value: number | null) {
 export default async function PlansAndReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ student?: string; tutor?: string }>;
+  searchParams: Promise<{ student?: string; tutor?: string; month?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const supabase = await createClient();
@@ -79,9 +92,37 @@ export default async function PlansAndReportsPage({
   const role = profile.role;
   const appLanguage = normalizeAppLanguage(profile.app_language);
   const messages = getAppMessages(appLanguage);
+  const locale = APP_LANGUAGE_LOCALES[appLanguage];
+  const selectedMonth = normalizeTutorStudentPlanMonth(
+    resolvedSearchParams.month,
+  );
+  const selectedMonthDate = resolveMetricsReferenceDate(selectedMonth);
+  const selectedMonthLabel = formatMonthlyReportMonthLabel(
+    selectedMonth,
+    locale,
+  );
+  const monthlyPlansTableAvailable =
+    await isTutorStudentMonthlyPlansTableAvailable();
+
+  const fallbackBanner = monthlyPlansTableAvailable ? null : (
+    <Card className="border-amber-300 bg-amber-50/60">
+      <CardHeader className="py-4">
+        <CardTitle className="text-base text-amber-900">
+          Monthly plans migration is pending
+        </CardTitle>
+        <CardDescription className="text-amber-800">
+          The app is running in compatibility mode with legacy tutor plans.
+          Apply the latest Supabase migrations to enable full month-scoped plan
+          storage.
+        </CardDescription>
+      </CardHeader>
+    </Card>
+  );
 
   if (role === "student") {
-    const plans = await listStudentTutorPlans(user.id);
+    const plans = await listStudentTutorPlans(user.id, {
+      planMonth: selectedMonth,
+    });
     const selectedTutorId = resolvedSearchParams.tutor ?? null;
     const visiblePlans = selectedTutorId
       ? plans.filter((plan) => plan.tutorId === selectedTutorId)
@@ -94,7 +135,12 @@ export default async function PlansAndReportsPage({
           basePath="/plans-and-reports"
           title={messages.studentPlansReportsPage.title}
           description={messages.studentPlansReportsPage.plansDescription}
+          actions={
+            <ReportMonthFilter activeMonth={selectedMonth} locale={locale} />
+          }
         />
+
+        {fallbackBanner}
 
         {visiblePlans.length === 0 ? (
           <Card>
@@ -147,8 +193,18 @@ export default async function PlansAndReportsPage({
                           {entry.plan.monthlyCompletedLessonsTarget ?? "n/a"}
                         </Badge>
                         <Badge variant="outline">
-                          New words:{" "}
-                          {entry.plan.monthlyNewMasteryWordsTarget ?? "n/a"}
+                          Words added target: {" "}
+                          {entry.plan.monthlyWordsAddedTarget ?? "n/a"}
+                        </Badge>
+                        <Badge variant="outline">
+                          Mastered words target: {" "}
+                          {entry.plan.monthlyMasteredWordsTarget ?? "n/a"}
+                        </Badge>
+                        <Badge variant="outline">
+                          Speaking share target: {" "}
+                          {formatPercentage(
+                            entry.plan.monthlyStudentSpeakingShareTarget,
+                          )}
                         </Badge>
                         <Badge variant="outline">
                           Avg score target:{" "}
@@ -272,15 +328,18 @@ export default async function PlansAndReportsPage({
       title={messages.tutorPlansReportsPage.title}
       description={messages.tutorPlansReportsPage.plansDescription}
       actions={
-        students.length > 0 ? (
-          <ResultsStudentFilter
-            students={students.map((student) => ({
-              id: student.id,
-              label: student.full_name || student.email || "Unknown",
-            }))}
-            activeStudentId={activeStudentId ?? students[0].id}
-          />
-        ) : null
+        <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+          {students.length > 0 ? (
+            <ResultsStudentFilter
+              students={students.map((student) => ({
+                id: student.id,
+                label: student.full_name || student.email || "Unknown",
+              }))}
+              activeStudentId={activeStudentId ?? students[0].id}
+            />
+          ) : null}
+          <ReportMonthFilter activeMonth={selectedMonth} locale={locale} />
+        </div>
       }
     />
   );
@@ -311,19 +370,16 @@ export default async function PlansAndReportsPage({
   }
 
   const admin = createAdminClient();
-  const locale = APP_LANGUAGE_LOCALES[appLanguage];
-  const currentMonthLabel = formatMonthlyReportMonthLabel(
-    getCurrentMonthlyReportWindow().reportMonth,
-    locale,
-  );
   const [studentProfileResult, planRecord, metrics] = await Promise.all([
     admin
       .from("profiles")
       .select("full_name, email, preferred_language, cefr_level")
       .eq("id", activeStudentId)
       .single(),
-    getTutorStudentPlan(userId, activeStudentId),
-    getTutorStudentMonthlyReportMetrics(activeStudentId, undefined, {
+    getTutorStudentPlan(userId, activeStudentId, {
+      planMonth: selectedMonth,
+    }),
+    getTutorStudentMonthlyReportMetrics(activeStudentId, selectedMonthDate, {
       tutorId: userId,
     }),
   ]);
@@ -377,6 +433,8 @@ export default async function PlansAndReportsPage({
     <div className="space-y-6">
       {header}
 
+      {fallbackBanner}
+
       <div className="space-y-6">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -393,15 +451,17 @@ export default async function PlansAndReportsPage({
             ) : null}
           </div>
           <p className="text-muted-foreground">
-            {messages.tutorPlansReportsPage.planPanelDescription(studentName)}
+            {messages.tutorPlansReportsPage.planPanelDescription(studentName)}{" "}
+            ({selectedMonthLabel})
           </p>
         </div>
 
         <TutorStudentPlanWorkspace
-          key={activeStudentId}
+          key={`${activeStudentId}-${selectedMonth}`}
           studentId={activeStudentId}
           studentName={studentName}
-          currentMonthLabel={currentMonthLabel}
+          planMonth={selectedMonth}
+          currentMonthLabel={selectedMonthLabel}
           plan={planRecord.plan}
           metrics={metrics}
           availableGrammarTopics={availableGrammarTopics}

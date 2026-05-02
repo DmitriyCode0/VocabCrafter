@@ -197,6 +197,99 @@ function getFallbackCanonicalTerm(input: PassiveVocabularyLibraryInput) {
   };
 }
 
+const DOMAIN_SPECIFIC_DEFINITION_MARKERS = [
+  "stock exchange",
+  "banking",
+  "finance",
+  "law",
+  "legal",
+  "medical",
+  "medicine",
+  "biology",
+  "chemistry",
+  "physics",
+  "athletics",
+  "track & field",
+  "breeds",
+  "zoology",
+  "linguistics",
+  "computing",
+  "programming",
+  "mathematics",
+  "music",
+  "slang",
+] as const;
+
+function normalizeDefinitionText(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function isLikelyDomainSpecificDefinition(definition: string) {
+  const normalized = definition.toLowerCase();
+  return DOMAIN_SPECIFIC_DEFINITION_MARKERS.some((marker) =>
+    normalized.includes(marker),
+  );
+}
+
+function rankDictionaryDefinitions(
+  dictionaryEntry: Awaited<ReturnType<typeof lookupFreeDictionary>>,
+  preferredPartOfSpeech?: string | null,
+) {
+  if (!dictionaryEntry) {
+    return [] as string[];
+  }
+
+  const flattened = dictionaryEntry.meanings.flatMap((meaning, meaningIndex) =>
+    meaning.definitions.map((definition, definitionIndex) => {
+      const normalizedDefinition = normalizeDefinitionText(definition.definition);
+      const normalizedPartOfSpeech = normalizePassiveVocabularyText(
+        meaning.partOfSpeech,
+      );
+      const normalizedPreferredPartOfSpeech = preferredPartOfSpeech
+        ? normalizePassiveVocabularyText(preferredPartOfSpeech)
+        : null;
+
+      let score = 0;
+
+      // Prefer earlier dictionary senses because they are usually most common.
+      score += Math.max(0, 8 - meaningIndex * 2);
+      score += Math.max(0, 6 - definitionIndex * 2);
+
+      if (
+        normalizedPreferredPartOfSpeech &&
+        normalizedPartOfSpeech === normalizedPreferredPartOfSpeech
+      ) {
+        score += 6;
+      }
+
+      if (definition.example) {
+        score += 2;
+      }
+
+      if (normalizedDefinition.length >= 20 && normalizedDefinition.length <= 140) {
+        score += 2;
+      }
+
+      if (isLikelyDomainSpecificDefinition(normalizedDefinition)) {
+        score -= 8;
+      }
+
+      return {
+        definition: normalizedDefinition,
+        score,
+      };
+    }),
+  );
+
+  return Array.from(
+    new Set(
+      flattened
+        .sort((left, right) => right.score - left.score)
+        .map((item) => item.definition),
+    ),
+  ).slice(0, 3);
+}
+
 function toAdminItem(row: LibraryRow): PassiveVocabularyLibraryAdminItem {
   return {
     id: row.id,
@@ -597,6 +690,8 @@ async function enrichPassiveVocabularyWords(
       "- ukrainianTranslation as a concise natural Ukrainian dictionary equivalent",
       "Use modal verb for can, could, may, might, must, shall, should, will, and would.",
       "Use auxiliary when the entry is best labeled as a helping verb rather than a main verb.",
+      "Prefer the most common everyday dictionary sense, not niche technical/legal/financial/sports senses unless the word is primarily used that way.",
+      "For polysemous words, pick the sense most suitable for broad CEFR-oriented learners.",
       "Merge regular noun plurals and regular third-person singular verb forms into the same canonical lemma when appropriate.",
       "Examples: tables -> table, works -> work, studies -> study.",
       "Never translate the word. Never return multiple words as the canonical form for a single-word input.",
@@ -605,7 +700,11 @@ async function enrichPassiveVocabularyWords(
       "Requested terms and dictionary context:",
       ...dictionaryEntries.map(({ input, entry }) => {
         if (!entry && !input.partOfSpeech) return `- ${input.term}`;
-        const definition = entry?.meanings[0]?.definitions[0]?.definition || "No definition";
+        const preferredDefinitions = rankDictionaryDefinitions(
+          entry,
+          input.partOfSpeech,
+        );
+        const definition = preferredDefinitions[0] ?? "No definition";
         const pos = input.partOfSpeech || entry?.meanings[0]?.partOfSpeech || "unknown";
         return `- ${input.term} (Dictionary context: ${pos} - ${definition})`;
       }),
@@ -644,8 +743,14 @@ async function enrichPassiveVocabularyWords(
           const phonetic = dictionaryContext.phonetics.find(p => p.audio)?.audio;
           if (phonetic) baseAttributes.phoneticAudioUrl = phonetic;
 
-          const definition = dictionaryContext.meanings[0]?.definitions[0]?.definition;
-          if (definition) baseAttributes.englishDefinition = definition;
+          const definitions = rankDictionaryDefinitions(
+            dictionaryContext,
+            item.partOfSpeech,
+          );
+          if (definitions.length > 0) {
+            baseAttributes.englishDefinitions = definitions;
+            baseAttributes.englishDefinition = definitions[0] ?? null;
+          }
         }
 
         enrichmentMap.set(normalizePassiveVocabularyText(item.requestedTerm), {

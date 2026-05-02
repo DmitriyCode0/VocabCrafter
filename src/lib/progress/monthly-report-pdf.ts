@@ -154,7 +154,7 @@ const PDF_COPY: Record<
     appLearningTime: "App learning time",
     studentSpeakingTime: "Student speaking time",
     studentSpeakingShare: "Student speaking share",
-    newWords: "New mastery words",
+    newWords: "Words added",
     activeDays: "Active days in application",
     practicedWords: "Words reviewed this month",
     trackedWords: "Words in vocabulary tracker",
@@ -642,7 +642,7 @@ export async function buildMonthlyReportPdf({
         label: copy.newWords,
         value: formatMetricProgressValue(
           report.metricsSnapshot.newMasteryWords,
-          report.goalsSnapshot.monthlyNewMasteryWordsTarget,
+          report.goalsSnapshot.monthlyWordsAddedTarget,
         ),
       },
       { label: copy.activeDays, value: `${report.metricsSnapshot.activeDays}` },

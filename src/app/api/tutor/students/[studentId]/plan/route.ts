@@ -4,10 +4,20 @@ import { createClient } from "@/lib/supabase/server";
 import { getTutorStudentMonthlyReportMetrics } from "@/lib/progress/monthly-reports";
 import {
   getTutorStudentPlan,
+  normalizeTutorStudentPlanMonth,
   tutorStudentPlanInputSchema,
   updateTutorStudentPlan,
 } from "@/lib/progress/tutor-student-plan";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
+
+function resolvePlanMonth(request: NextRequest) {
+  const month = request.nextUrl.searchParams.get("month");
+  return normalizeTutorStudentPlanMonth(month);
+}
+
+function toReferenceDate(planMonth: string) {
+  return new Date(`${planMonth}T00:00:00.000Z`);
+}
 
 async function requireTutorAccess(studentId: string) {
   const supabase = await createClient();
@@ -63,10 +73,12 @@ async function requireTutorAccess(studentId: string) {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ studentId: string }> },
 ) {
   const { studentId } = await params;
+  const planMonth = resolvePlanMonth(request);
+  const referenceDate = toReferenceDate(planMonth);
   const access = await requireTutorAccess(studentId);
 
   if ("errorResponse" in access) {
@@ -75,8 +87,8 @@ export async function GET(
 
   try {
     const [plan, metrics] = await Promise.all([
-      getTutorStudentPlan(access.user.id, studentId),
-      getTutorStudentMonthlyReportMetrics(studentId, undefined, {
+      getTutorStudentPlan(access.user.id, studentId, { planMonth }),
+      getTutorStudentMonthlyReportMetrics(studentId, referenceDate, {
         tutorId: access.user.id,
       }),
     ]);
@@ -96,6 +108,8 @@ export async function PATCH(
   { params }: { params: Promise<{ studentId: string }> },
 ) {
   const { studentId } = await params;
+  const planMonth = resolvePlanMonth(request);
+  const referenceDate = toReferenceDate(planMonth);
   const access = await requireTutorAccess(studentId);
 
   if ("errorResponse" in access) {
@@ -114,8 +128,10 @@ export async function PATCH(
 
   try {
     const [plan, metrics] = await Promise.all([
-      updateTutorStudentPlan(access.user.id, studentId, parsed.data),
-      getTutorStudentMonthlyReportMetrics(studentId, undefined, {
+      updateTutorStudentPlan(access.user.id, studentId, parsed.data, {
+        planMonth,
+      }),
+      getTutorStudentMonthlyReportMetrics(studentId, referenceDate, {
         tutorId: access.user.id,
       }),
     ]);

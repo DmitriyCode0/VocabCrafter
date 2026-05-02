@@ -6,6 +6,7 @@ import {
   normalizeReportLanguage,
   reportLanguageSchema,
 } from "@/lib/progress/monthly-report-language";
+import type { Database } from "@/types/database";
 
 const nullableTrimmedText = z
   .string()
@@ -16,6 +17,8 @@ const nullableTrimmedText = z
 
 export const nullableWholeNumberSchema = z.number().int().min(0).nullable();
 export const nullablePercentageSchema = z.number().min(0).max(100).nullable();
+
+const REPORT_MONTH_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 const grammarTopicKeysSchema = z
   .array(z.string().trim().min(1).max(160))
@@ -34,7 +37,9 @@ export const tutorStudentPlanSchema = z.object({
   monthlySentenceTranslationTarget: nullableWholeNumberSchema.default(null),
   monthlyGapFillTarget: nullableWholeNumberSchema.default(null),
   monthlyCompletedLessonsTarget: nullableWholeNumberSchema.default(null),
-  monthlyNewMasteryWordsTarget: nullableWholeNumberSchema.default(null),
+  monthlyWordsAddedTarget: nullableWholeNumberSchema.default(null),
+  monthlyMasteredWordsTarget: nullableWholeNumberSchema.default(null),
+  monthlyStudentSpeakingShareTarget: nullablePercentageSchema.default(null),
   monthlyAverageScoreTarget: nullablePercentageSchema.default(null),
   grammarTopicKeys: grammarTopicKeysSchema,
   reportLanguage: reportLanguageSchema.default("uk"),
@@ -47,7 +52,9 @@ export const tutorStudentPlanInputSchema = z.object({
   monthlySentenceTranslationTarget: nullableWholeNumberSchema.optional(),
   monthlyGapFillTarget: nullableWholeNumberSchema.optional(),
   monthlyCompletedLessonsTarget: nullableWholeNumberSchema.optional(),
-  monthlyNewMasteryWordsTarget: nullableWholeNumberSchema.optional(),
+  monthlyWordsAddedTarget: nullableWholeNumberSchema.optional(),
+  monthlyMasteredWordsTarget: nullableWholeNumberSchema.optional(),
+  monthlyStudentSpeakingShareTarget: nullablePercentageSchema.optional(),
   monthlyAverageScoreTarget: nullablePercentageSchema.optional(),
   grammarTopicKeys: grammarTopicKeysSchema.optional(),
   reportLanguage: reportLanguageSchema.optional(),
@@ -60,6 +67,7 @@ export interface TutorStudentPlanRecord {
   connectionId: string;
   tutorId: string;
   studentId: string;
+  planMonth: string;
   updatedAt: string;
   plan: TutorStudentPlan;
 }
@@ -116,6 +124,67 @@ function normalizeNullableNumber(value: unknown) {
   return null;
 }
 
+function toReportMonthString(date: Date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}-01`;
+}
+
+export function getCurrentTutorStudentPlanMonth(referenceDate: Date = new Date()) {
+  return toReportMonthString(referenceDate);
+}
+
+export function normalizeTutorStudentPlanMonth(
+  value?: string | null,
+  referenceDate: Date = new Date(),
+) {
+  if (value && REPORT_MONTH_PATTERN.test(value.trim())) {
+    return value.trim();
+  }
+
+  return getCurrentTutorStudentPlanMonth(referenceDate);
+}
+
+type TutorStudentConnectionRow =
+  Database["public"]["Tables"]["tutor_students"]["Row"];
+type TutorStudentMonthlyPlanRow =
+  Database["public"]["Tables"]["tutor_student_monthly_plans"]["Row"];
+
+function isMissingMonthlyPlansTableError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const maybeError = error as {
+    code?: string;
+    message?: string;
+  };
+
+  return (
+    maybeError.code === "PGRST205" &&
+    typeof maybeError.message === "string" &&
+    maybeError.message.includes("tutor_student_monthly_plans")
+  );
+}
+
+export async function isTutorStudentMonthlyPlansTableAvailable() {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("tutor_student_monthly_plans")
+    .select("id")
+    .limit(1);
+
+  if (!error) {
+    return true;
+  }
+
+  if (isMissingMonthlyPlansTableError(error)) {
+    return false;
+  }
+
+  throw error;
+}
+
 function normalizePlanShape(input: {
   plan_title?: string | null;
   goal_summary?: string | null;
@@ -123,11 +192,21 @@ function normalizePlanShape(input: {
   monthly_sentence_translation_target?: number | null;
   monthly_gap_fill_target?: number | null;
   monthly_completed_lessons_target?: number | null;
+  monthly_words_added_target?: number | null;
+  monthly_mastered_words_target?: number | null;
+  monthly_student_speaking_share_target?: number | null;
   monthly_new_mastery_words_target?: number | null;
   monthly_average_score_target?: number | null;
   grammar_topic_keys?: unknown;
   report_language?: string | null;
 }): TutorStudentPlan {
+  const wordsAddedTarget =
+    normalizeNullableNumber(input.monthly_words_added_target) ??
+    normalizeNullableNumber(input.monthly_new_mastery_words_target);
+  const masteredWordsTarget =
+    normalizeNullableNumber(input.monthly_mastered_words_target) ??
+    normalizeNullableNumber(input.monthly_new_mastery_words_target);
+
   return tutorStudentPlanSchema.parse({
     planTitle: normalizeText(input.plan_title),
     goalSummary: normalizeText(input.goal_summary),
@@ -141,8 +220,10 @@ function normalizePlanShape(input: {
     monthlyCompletedLessonsTarget: normalizeNullableNumber(
       input.monthly_completed_lessons_target,
     ),
-    monthlyNewMasteryWordsTarget: normalizeNullableNumber(
-      input.monthly_new_mastery_words_target,
+    monthlyWordsAddedTarget: wordsAddedTarget,
+    monthlyMasteredWordsTarget: masteredWordsTarget,
+    monthlyStudentSpeakingShareTarget: normalizeNullableNumber(
+      input.monthly_student_speaking_share_target,
     ),
     monthlyAverageScoreTarget: normalizeNullableNumber(
       input.monthly_average_score_target,
@@ -161,15 +242,17 @@ export function hasConfiguredTutorStudentPlan(plan: TutorStudentPlan) {
     plan.monthlySentenceTranslationTarget != null ||
     plan.monthlyGapFillTarget != null ||
     plan.monthlyCompletedLessonsTarget != null ||
-    plan.monthlyNewMasteryWordsTarget != null ||
+    plan.monthlyWordsAddedTarget != null ||
+    plan.monthlyMasteredWordsTarget != null ||
+    plan.monthlyStudentSpeakingShareTarget != null ||
     plan.monthlyAverageScoreTarget != null,
   );
 }
 
-export async function getTutorStudentPlan(
+async function getActiveTutorStudentConnection(
   tutorId: string,
   studentId: string,
-): Promise<TutorStudentPlanRecord> {
+) {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("tutor_students")
@@ -189,12 +272,57 @@ export async function getTutorStudentPlan(
     throw new Error("Tutor-student connection not found");
   }
 
+  return data;
+}
+
+async function getTutorStudentMonthlyPlanRow(
+  tutorId: string,
+  studentId: string,
+  planMonth: string,
+) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("tutor_student_monthly_plans")
+    .select(
+      "id, connection_id, tutor_id, student_id, plan_month, plan_title, goal_summary, objectives, grammar_topic_keys, report_language, monthly_sentence_translation_target, monthly_gap_fill_target, monthly_completed_lessons_target, monthly_words_added_target, monthly_mastered_words_target, monthly_student_speaking_share_target, monthly_average_score_target, updated_at",
+    )
+    .eq("tutor_id", tutorId)
+    .eq("student_id", studentId)
+    .eq("plan_month", planMonth)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingMonthlyPlansTableError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+
+  return data;
+}
+
+export async function getTutorStudentPlan(
+  tutorId: string,
+  studentId: string,
+  options?: {
+    planMonth?: string | null;
+  },
+): Promise<TutorStudentPlanRecord> {
+  const planMonth = normalizeTutorStudentPlanMonth(options?.planMonth);
+  const [connection, monthlyPlan] = await Promise.all([
+    getActiveTutorStudentConnection(tutorId, studentId),
+    getTutorStudentMonthlyPlanRow(tutorId, studentId, planMonth),
+  ]);
+  const source = monthlyPlan ?? connection;
+
   return {
-    connectionId: data.id,
-    tutorId: data.tutor_id,
-    studentId: data.student_id,
-    updatedAt: data.updated_at,
-    plan: normalizePlanShape(data),
+    connectionId: connection.id,
+    tutorId,
+    studentId,
+    planMonth,
+    updatedAt: source.updated_at,
+    plan: normalizePlanShape(source),
   };
 }
 
@@ -202,53 +330,107 @@ export async function updateTutorStudentPlan(
   tutorId: string,
   studentId: string,
   input: TutorStudentPlanInput,
+  options?: {
+    planMonth?: string | null;
+  },
 ): Promise<TutorStudentPlanRecord> {
   const parsed = tutorStudentPlanInputSchema.parse(input);
   const admin = createAdminClient();
+  const planMonth = normalizeTutorStudentPlanMonth(options?.planMonth);
+  const [connection, currentMonthlyPlan] = await Promise.all([
+    getActiveTutorStudentConnection(tutorId, studentId),
+    getTutorStudentMonthlyPlanRow(tutorId, studentId, planMonth),
+  ]);
+  const basePlan = normalizePlanShape(currentMonthlyPlan ?? connection);
+  const patch = Object.fromEntries(
+    Object.entries(parsed).filter(([, value]) => value !== undefined),
+  );
+  const nextPlan = tutorStudentPlanSchema.parse({
+    ...basePlan,
+    ...patch,
+  });
+
   const { data, error } = await admin
-    .from("tutor_students")
-    .update({
-      plan_title:
-        parsed.planTitle == null ? undefined : normalizeText(parsed.planTitle),
-      goal_summary:
-        parsed.goalSummary == null
-          ? undefined
-          : normalizeText(parsed.goalSummary),
-      objectives:
-        parsed.objectives == null
-          ? undefined
-          : normalizeObjectives(parsed.objectives),
-      monthly_sentence_translation_target:
-        parsed.monthlySentenceTranslationTarget,
-      monthly_gap_fill_target: parsed.monthlyGapFillTarget,
-      monthly_completed_lessons_target: parsed.monthlyCompletedLessonsTarget,
-      monthly_new_mastery_words_target: parsed.monthlyNewMasteryWordsTarget,
-      monthly_average_score_target: parsed.monthlyAverageScoreTarget,
-      grammar_topic_keys:
-        parsed.grammarTopicKeys == null
-          ? undefined
-          : normalizeGrammarTopicKeys(parsed.grammarTopicKeys),
-      report_language:
-        parsed.reportLanguage == null
-          ? undefined
-          : normalizeReportLanguage(parsed.reportLanguage),
-    })
-    .eq("tutor_id", tutorId)
-    .eq("student_id", studentId)
-    .eq("status", "active")
+    .from("tutor_student_monthly_plans")
+    .upsert(
+      {
+        connection_id: connection.id,
+        tutor_id: tutorId,
+        student_id: studentId,
+        plan_month: planMonth,
+        plan_title: nextPlan.planTitle,
+        goal_summary: nextPlan.goalSummary,
+        objectives: nextPlan.objectives,
+        grammar_topic_keys: nextPlan.grammarTopicKeys,
+        report_language: normalizeReportLanguage(nextPlan.reportLanguage),
+        monthly_sentence_translation_target:
+          nextPlan.monthlySentenceTranslationTarget,
+        monthly_gap_fill_target: nextPlan.monthlyGapFillTarget,
+        monthly_completed_lessons_target: nextPlan.monthlyCompletedLessonsTarget,
+        monthly_words_added_target: nextPlan.monthlyWordsAddedTarget,
+        monthly_mastered_words_target: nextPlan.monthlyMasteredWordsTarget,
+        monthly_student_speaking_share_target:
+          nextPlan.monthlyStudentSpeakingShareTarget,
+        monthly_average_score_target: nextPlan.monthlyAverageScoreTarget,
+      },
+      {
+        onConflict: "tutor_id,student_id,plan_month",
+      },
+    )
     .select(
-      "id, tutor_id, student_id, plan_title, goal_summary, objectives, monthly_sentence_translation_target, monthly_gap_fill_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language, updated_at",
+      "id, connection_id, tutor_id, student_id, plan_month, plan_title, goal_summary, objectives, grammar_topic_keys, report_language, monthly_sentence_translation_target, monthly_gap_fill_target, monthly_completed_lessons_target, monthly_words_added_target, monthly_mastered_words_target, monthly_student_speaking_share_target, monthly_average_score_target, updated_at",
     )
     .single();
 
-  if (error) {
-    throw error;
+  if (error || !data) {
+    if (error && isMissingMonthlyPlansTableError(error)) {
+      const { data: legacyData, error: legacyError } = await admin
+        .from("tutor_students")
+        .update({
+          plan_title: nextPlan.planTitle,
+          goal_summary: nextPlan.goalSummary,
+          objectives: nextPlan.objectives,
+          grammar_topic_keys: nextPlan.grammarTopicKeys,
+          report_language: normalizeReportLanguage(nextPlan.reportLanguage),
+          monthly_sentence_translation_target:
+            nextPlan.monthlySentenceTranslationTarget,
+          monthly_gap_fill_target: nextPlan.monthlyGapFillTarget,
+          monthly_completed_lessons_target:
+            nextPlan.monthlyCompletedLessonsTarget,
+          monthly_new_mastery_words_target:
+            nextPlan.monthlyWordsAddedTarget ?? nextPlan.monthlyMasteredWordsTarget,
+          monthly_average_score_target: nextPlan.monthlyAverageScoreTarget,
+        })
+        .eq("tutor_id", tutorId)
+        .eq("student_id", studentId)
+        .eq("status", "active")
+        .select(
+          "id, tutor_id, student_id, plan_title, goal_summary, objectives, monthly_sentence_translation_target, monthly_gap_fill_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language, updated_at",
+        )
+        .single();
+
+      if (legacyError || !legacyData) {
+        throw legacyError ?? new Error("Failed to save tutor-student plan");
+      }
+
+      return {
+        connectionId: legacyData.id,
+        tutorId,
+        studentId,
+        planMonth,
+        updatedAt: legacyData.updated_at,
+        plan: normalizePlanShape(legacyData),
+      };
+    }
+
+    throw error ?? new Error("Failed to save monthly tutor-student plan");
   }
 
   return {
-    connectionId: data.id,
-    tutorId: data.tutor_id,
-    studentId: data.student_id,
+    connectionId: data.connection_id,
+    tutorId,
+    studentId,
+    planMonth,
     updatedAt: data.updated_at,
     plan: normalizePlanShape(data),
   };
@@ -256,9 +438,13 @@ export async function updateTutorStudentPlan(
 
 export async function listStudentTutorPlans(
   studentId: string,
+  options?: {
+    planMonth?: string | null;
+  },
 ): Promise<StudentTutorPlanCard[]> {
+  const planMonth = normalizeTutorStudentPlanMonth(options?.planMonth);
   const admin = createAdminClient();
-  const { data, error } = await admin
+  const { data: connections, error } = await admin
     .from("tutor_students")
     .select(
       "id, tutor_id, student_id, plan_title, goal_summary, objectives, monthly_sentence_translation_target, monthly_gap_fill_target, monthly_completed_lessons_target, monthly_new_mastery_words_target, monthly_average_score_target, grammar_topic_keys, report_language, updated_at, profiles!tutor_students_tutor_id_fkey(id, full_name, email)",
@@ -271,16 +457,59 @@ export async function listStudentTutorPlans(
     throw error;
   }
 
-  return (data ?? []).map((row) => ({
-    connectionId: row.id,
-    tutorId: row.tutor_id,
-    studentId: row.student_id,
-    updatedAt: row.updated_at,
-    tutorProfile: {
-      id: row.profiles?.id ?? row.tutor_id,
-      fullName: row.profiles?.full_name ?? null,
-      email: row.profiles?.email ?? "",
-    },
-    plan: normalizePlanShape(row),
-  }));
+  const tutorIds = (connections ?? []).map((row) => row.tutor_id);
+  const { data: monthlyPlans, error: monthlyPlansError } =
+    tutorIds.length === 0
+      ? { data: [] as TutorStudentMonthlyPlanRow[], error: null }
+      : await admin
+          .from("tutor_student_monthly_plans")
+          .select(
+            "connection_id, tutor_id, student_id, plan_month, plan_title, goal_summary, objectives, grammar_topic_keys, report_language, monthly_sentence_translation_target, monthly_gap_fill_target, monthly_completed_lessons_target, monthly_words_added_target, monthly_mastered_words_target, monthly_student_speaking_share_target, monthly_average_score_target, updated_at",
+          )
+          .eq("student_id", studentId)
+          .eq("plan_month", planMonth)
+          .in("tutor_id", tutorIds);
+
+  if (monthlyPlansError) {
+    if (isMissingMonthlyPlansTableError(monthlyPlansError)) {
+      return (connections ?? []).map((connection) => ({
+        connectionId: connection.id,
+        tutorId: connection.tutor_id,
+        studentId: connection.student_id,
+        planMonth,
+        updatedAt: connection.updated_at,
+        tutorProfile: {
+          id: connection.profiles?.id ?? connection.tutor_id,
+          fullName: connection.profiles?.full_name ?? null,
+          email: connection.profiles?.email ?? "",
+        },
+        plan: normalizePlanShape(connection),
+      }));
+    }
+
+    throw monthlyPlansError;
+  }
+
+  const monthlyPlanByTutorId = new Map(
+    (monthlyPlans ?? []).map((row) => [row.tutor_id, row]),
+  );
+
+  return (connections ?? []).map((connection) => {
+    const monthlyPlan = monthlyPlanByTutorId.get(connection.tutor_id);
+    const source = monthlyPlan ?? connection;
+
+    return {
+      connectionId: connection.id,
+      tutorId: connection.tutor_id,
+      studentId: connection.student_id,
+      planMonth,
+      updatedAt: source.updated_at,
+      tutorProfile: {
+        id: connection.profiles?.id ?? connection.tutor_id,
+        fullName: connection.profiles?.full_name ?? null,
+        email: connection.profiles?.email ?? "",
+      },
+      plan: normalizePlanShape(source),
+    };
+  });
 }
