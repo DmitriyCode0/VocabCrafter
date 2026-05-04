@@ -10,6 +10,7 @@ import {
   normalizeClassroomTranscriptSegments,
   type ClassroomTranscriptSegmentInput,
 } from "@/lib/classroom-transcripts";
+import { extractPassiveVocabularyTermOccurrencesFromText } from "@/lib/mastery/passive-vocabulary";
 import { upsertActiveVocabularyEvidence } from "@/lib/mastery/active-vocabulary-evidence";
 import type { Database } from "@/types/database";
 
@@ -331,7 +332,7 @@ export async function approveClassroomTranscriptActiveEvidence({
   const supabaseAdmin = createAdminClient();
   const { data: transcript, error: transcriptError } = await supabaseAdmin
     .from("tutor_student_classroom_transcripts")
-    .select("id, recording_id, classroom_id, active_evidence_synced_at")
+    .select("id, recording_id, classroom_id, full_text, active_evidence_synced_at")
     .eq("id", transcriptId)
     .eq("classroom_id", access.classroom.id)
     .maybeSingle();
@@ -373,16 +374,35 @@ export async function approveClassroomTranscriptActiveEvidence({
     throw new Error("Failed to load classroom transcript segments");
   }
 
-  const selectedOccurrences =
+  const normalizedSegments = normalizeClassroomTranscriptSegments(
+    (segments ?? []).map((segment) => ({
+      speakerRole:
+        segment.speaker_role as ClassroomTranscriptSegmentInput["speakerRole"],
+      content: segment.content,
+    })),
+  );
+
+  let selectedOccurrences =
     extractStudentActiveVocabularyTermsFromClassroomTranscriptSegments(
-      normalizeClassroomTranscriptSegments(
-        (segments ?? []).map((segment) => ({
-          speakerRole:
-            segment.speaker_role as ClassroomTranscriptSegmentInput["speakerRole"],
-          content: segment.content,
-        })),
-      ),
+      normalizedSegments,
     ).filter((term) => normalizedApprovedTerms.has(term));
+
+  if (selectedOccurrences.length === 0) {
+    const nonTutorOccurrences = normalizedSegments
+      .filter((segment) => segment.speakerRole !== "tutor")
+      .flatMap((segment) =>
+        extractPassiveVocabularyTermOccurrencesFromText(segment.content),
+      )
+      .filter((term) => normalizedApprovedTerms.has(term));
+
+    selectedOccurrences = nonTutorOccurrences;
+  }
+
+  if (selectedOccurrences.length === 0) {
+    selectedOccurrences = extractPassiveVocabularyTermOccurrencesFromText(
+      transcript.full_text ?? "",
+    ).filter((term) => normalizedApprovedTerms.has(term));
+  }
 
   if (selectedOccurrences.length === 0) {
     throw new Error("No approved student terms were available to import");

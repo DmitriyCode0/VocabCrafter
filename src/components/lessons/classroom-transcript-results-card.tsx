@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { extractParsedStudentActiveVocabularyTermsFromClassroomTranscriptSegments } from "@/lib/classroom-transcripts";
+import { extractPassiveVocabularyTermOccurrencesFromText } from "@/lib/mastery/passive-vocabulary";
 import { cn } from "@/lib/utils";
 
 const APP_LANGUAGE_LOCALES = {
@@ -148,11 +149,42 @@ function TranscriptReviewDialog({
     !transcript.activeEvidenceSyncedAt && selectedTerms.length > 0;
   const parsedTermsSet = useMemo(() => new Set(selectedTerms), [selectedTerms]);
 
+  function buildFallbackParsedTerms() {
+    const unknownSpeakerTerms = Array.from(
+      new Set(
+        transcript.segments
+          .filter((segment) => segment.speakerRole !== "tutor")
+          .flatMap((segment) =>
+            extractPassiveVocabularyTermOccurrencesFromText(segment.content),
+          ),
+      ),
+    ).sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: "base" }),
+    );
+
+    if (unknownSpeakerTerms.length > 0) {
+      return unknownSpeakerTerms;
+    }
+
+    return Array.from(
+      new Set(
+        extractPassiveVocabularyTermOccurrencesFromText(transcript.fullText || ""),
+      ),
+    ).sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: "base" }),
+    );
+  }
+
   function handleParseTerms() {
-    const nextTerms =
+    const studentTerms =
       extractParsedStudentActiveVocabularyTermsFromClassroomTranscriptSegments(
         transcript.segments,
       );
+    let nextTerms = studentTerms;
+
+    if (nextTerms.length === 0) {
+      nextTerms = buildFallbackParsedTerms();
+    }
 
     if (nextTerms.length === 0) {
       toast.error(
@@ -161,6 +193,14 @@ function TranscriptReviewDialog({
           : "No student terms were found for active vocabulary",
       );
       return;
+    }
+
+    if (studentTerms.length === 0) {
+      toast(
+        appLanguage === "uk"
+          ? "У цьому транскрипті немає студентських міток, тому parse використав усі нерольовані репліки."
+          : "No student speaker labels were found, so parse used unlabeled transcript speech.",
+      );
     }
 
     setParsedTerms(nextTerms);

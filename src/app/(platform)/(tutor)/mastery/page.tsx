@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { StudentMasteryCards } from "@/components/mastery/student-mastery-cards";
-import { StudentVocabularyPageContent } from "@/app/(platform)/(student)/vocabulary/page";
+import { StudentVocabularyPageContent } from "@/components/mastery/student-vocabulary-page-content";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { Users } from "lucide-react";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";

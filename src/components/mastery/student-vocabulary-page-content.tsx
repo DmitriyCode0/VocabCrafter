@@ -15,7 +15,6 @@ import { Progress } from "@/components/ui/progress";
 import { PagePagination } from "@/components/shared/page-pagination";
 import { DeleteMasteryWordButton } from "@/components/mastery/delete-mastery-word-button";
 import { ImportVocabularyCard } from "@/components/mastery/import-vocabulary-card";
-import { PassiveVocabularyPageContent } from "@/app/(platform)/passive-vocabulary/page";
 import { formatAppDate } from "@/lib/dates";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import {
@@ -471,12 +470,4 @@ export async function StudentVocabularyPageContent({
       )}
     </div>
   );
-}
-
-export default async function VocabularyPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ student?: string; page?: string; tab?: string }>;
-}) {
-  return PassiveVocabularyPageContent({ searchParams });
 }
