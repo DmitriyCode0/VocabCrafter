@@ -332,7 +332,9 @@ export async function approveClassroomTranscriptActiveEvidence({
   const supabaseAdmin = createAdminClient();
   const { data: transcript, error: transcriptError } = await supabaseAdmin
     .from("tutor_student_classroom_transcripts")
-    .select("id, recording_id, classroom_id, full_text, active_evidence_synced_at")
+    .select(
+      "id, recording_id, classroom_id, full_text, active_evidence_synced_at",
+    )
     .eq("id", transcriptId)
     .eq("classroom_id", access.classroom.id)
     .maybeSingle();

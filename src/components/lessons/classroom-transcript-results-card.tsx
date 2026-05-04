@@ -168,7 +168,9 @@ function TranscriptReviewDialog({
 
     return Array.from(
       new Set(
-        extractPassiveVocabularyTermOccurrencesFromText(transcript.fullText || ""),
+        extractPassiveVocabularyTermOccurrencesFromText(
+          transcript.fullText || "",
+        ),
       ),
     ).sort((left, right) =>
       left.localeCompare(right, undefined, { sensitivity: "base" }),
