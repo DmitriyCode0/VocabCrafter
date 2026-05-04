@@ -176,10 +176,7 @@ export default async function PlansAndReportsPage({
                     <CardTitle className="text-base">{tutorName}</CardTitle>
                     <CardDescription>
                       Updated{" "}
-                      {formatDateForAppLanguage(
-                        appLanguage,
-                        entry.updatedAt,
-                      )}
+                      {formatDateForAppLanguage(appLanguage, entry.updatedAt)}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

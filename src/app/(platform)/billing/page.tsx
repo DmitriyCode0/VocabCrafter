@@ -132,16 +132,16 @@ export default async function BillingPage() {
 
   if (!isSuperadmin) {
     const [myMonthlyQuizzesResult, myWordBanksResult] = await Promise.all([
-        supabase
-          .from("quizzes")
-          .select("*", { count: "exact", head: true })
-          .eq("creator_id", user.id)
-          .gte("created_at", monthISO),
-        supabase
-          .from("word_banks")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id),
-      ]);
+      supabase
+        .from("quizzes")
+        .select("*", { count: "exact", head: true })
+        .eq("creator_id", user.id)
+        .gte("created_at", monthISO),
+      supabase
+        .from("word_banks")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id),
+    ]);
 
     quizUsed = myMonthlyQuizzesResult.count ?? 0;
     wbUsed = myWordBanksResult.count ?? 0;

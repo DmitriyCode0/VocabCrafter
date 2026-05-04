@@ -150,7 +150,8 @@ export function PlansPageContent({
     [plansState],
   );
   const visibleLimitDetailOrder = useMemo(
-    () => PLAN_LIMIT_DETAIL_ORDER.filter((detailKey) => detailKey !== "attempts"),
+    () =>
+      PLAN_LIMIT_DETAIL_ORDER.filter((detailKey) => detailKey !== "attempts"),
     [],
   );
 
@@ -241,9 +242,7 @@ export function PlansPageContent({
           <h1 className="text-2xl font-bold tracking-tight">
             {messages.plans.title}
           </h1>
-          <p className="text-muted-foreground">
-            {messages.plans.description}
-          </p>
+          <p className="text-muted-foreground">{messages.plans.description}</p>
         </div>
       ) : null}
 
@@ -320,10 +319,10 @@ export function PlansPageContent({
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
                         label={messages.plans.usageLabels.aiCalls}
-                        description={getLocalizedPlanLimitDetail(
-                          messages,
-                          "aiCalls",
-                        ).description}
+                        description={
+                          getLocalizedPlanLimitDetail(messages, "aiCalls")
+                            .description
+                        }
                       />
                     </p>
                   </div>
@@ -332,10 +331,10 @@ export function PlansPageContent({
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
                         label={messages.plans.usageLabels.reports}
-                        description={getLocalizedPlanLimitDetail(
-                          messages,
-                          "reports",
-                        ).description}
+                        description={
+                          getLocalizedPlanLimitDetail(messages, "reports")
+                            .description
+                        }
                       />
                     </p>
                   </div>
@@ -344,10 +343,10 @@ export function PlansPageContent({
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
                         label={messages.plans.usageLabels.quizzes}
-                        description={getLocalizedPlanLimitDetail(
-                          messages,
-                          "quizzes",
-                        ).description}
+                        description={
+                          getLocalizedPlanLimitDetail(messages, "quizzes")
+                            .description
+                        }
                       />
                     </p>
                   </div>
@@ -356,10 +355,10 @@ export function PlansPageContent({
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
                         label={messages.plans.usageLabels.attempts}
-                        description={getLocalizedPlanLimitDetail(
-                          messages,
-                          "attempts",
-                        ).description}
+                        description={
+                          getLocalizedPlanLimitDetail(messages, "attempts")
+                            .description
+                        }
                       />
                     </p>
                   </div>
@@ -368,10 +367,10 @@ export function PlansPageContent({
                     <p className="text-xs text-muted-foreground">
                       <InfoLabel
                         label={messages.plans.usageLabels.wordBanks}
-                        description={getLocalizedPlanLimitDetail(
-                          messages,
-                          "wordBanks",
-                        ).description}
+                        description={
+                          getLocalizedPlanLimitDetail(messages, "wordBanks")
+                            .description
+                        }
                       />
                     </p>
                   </div>
@@ -464,10 +463,10 @@ export function PlansPageContent({
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={getLocalizedPlanLimitDetail(
-                            messages,
-                            "price",
-                          ).description}
+                          description={
+                            getLocalizedPlanLimitDetail(messages, "price")
+                              .description
+                          }
                         />
                       </div>
                       <Input
@@ -490,10 +489,10 @@ export function PlansPageContent({
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={getLocalizedPlanLimitDetail(
-                            messages,
-                            "aiCalls",
-                          ).description}
+                          description={
+                            getLocalizedPlanLimitDetail(messages, "aiCalls")
+                              .description
+                          }
                         />
                       </div>
                       <Input
@@ -520,10 +519,10 @@ export function PlansPageContent({
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={getLocalizedPlanLimitDetail(
-                            messages,
-                            "reports",
-                          ).description}
+                          description={
+                            getLocalizedPlanLimitDetail(messages, "reports")
+                              .description
+                          }
                         />
                       </div>
                       <Input
@@ -551,10 +550,10 @@ export function PlansPageContent({
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={getLocalizedPlanLimitDetail(
-                            messages,
-                            "quizzes",
-                          ).description}
+                          description={
+                            getLocalizedPlanLimitDetail(messages, "quizzes")
+                              .description
+                          }
                         />
                       </div>
                       <Input
@@ -582,10 +581,10 @@ export function PlansPageContent({
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={getLocalizedPlanLimitDetail(
-                            messages,
-                            "attempts",
-                          ).description}
+                          description={
+                            getLocalizedPlanLimitDetail(messages, "attempts")
+                              .description
+                          }
                         />
                       </div>
                       <Input
@@ -613,10 +612,10 @@ export function PlansPageContent({
                         <InfoLabel
                           label=""
                           className="[&>span:first-child]:sr-only"
-                          description={getLocalizedPlanLimitDetail(
-                            messages,
-                            "wordBanks",
-                          ).description}
+                          description={
+                            getLocalizedPlanLimitDetail(messages, "wordBanks")
+                              .description
+                          }
                         />
                       </div>
                       <Input
