@@ -149,6 +149,10 @@ export function PlansPageContent({
     () => PLAN_ORDER.map((planKey) => plansState[planKey]),
     [plansState],
   );
+  const visibleLimitDetailOrder = useMemo(
+    () => PLAN_LIMIT_DETAIL_ORDER.filter((detailKey) => detailKey !== "attempts"),
+    [],
+  );
 
   function updateField(
     planKey: PlanKey,
@@ -397,8 +401,8 @@ export function PlansPageContent({
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-          {PLAN_LIMIT_DETAIL_ORDER.map((detailKey) => {
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          {visibleLimitDetailOrder.map((detailKey) => {
             const detail = PLAN_LIMIT_DETAILS[detailKey];
             const localizedDetail = getLocalizedPlanLimitDetail(
               messages,

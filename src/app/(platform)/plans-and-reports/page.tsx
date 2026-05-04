@@ -20,6 +20,7 @@ import { ReportMonthFilter } from "@/components/progress/report-month-filter";
 import { TutorPlansReportsPageHeader } from "@/components/progress/tutor-plans-reports-page-header";
 import { ResultsStudentFilter } from "@/components/progress/results-student-filter";
 import { TutorStudentPlanWorkspace } from "@/components/progress/tutor-student-plan-workspace";
+import { MonthlyReportPentagramCard } from "@/components/progress/monthly-report-pentagram-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -128,6 +129,14 @@ export default async function PlansAndReportsPage({
       ? plans.filter((plan) => plan.tutorId === selectedTutorId)
       : plans;
 
+    // Fetch metrics for all visible plans in parallel
+    const metricsPromises = visiblePlans.map((entry) =>
+      getTutorStudentMonthlyReportMetrics(user.id, selectedMonthDate, {
+        tutorId: entry.tutorId,
+      }).catch(() => null),
+    );
+    const allMetrics = await Promise.all(metricsPromises);
+
     return (
       <div className="space-y-6">
         <TutorPlansReportsPageHeader
@@ -155,150 +164,37 @@ export default async function PlansAndReportsPage({
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 xl:grid-cols-2">
-            {visiblePlans.map((entry) => {
+          <div className="grid gap-6">
+            {visiblePlans.map((entry, index) => {
               const tutorName =
                 entry.tutorProfile.fullName || entry.tutorProfile.email;
-              const hasPlan = hasConfiguredTutorStudentPlan(entry.plan);
+              const metrics = allMetrics[index];
 
               return (
                 <Card key={entry.connectionId}>
                   <CardHeader>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <CardTitle className="text-base">{tutorName}</CardTitle>
-                        <CardDescription>
-                          Updated{" "}
-                          {formatDateForAppLanguage(
-                            appLanguage,
-                            entry.updatedAt,
-                          )}
-                        </CardDescription>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="secondary">
-                          Report:{" "}
-                          {getReportLanguageLabel(entry.plan.reportLanguage)}
-                        </Badge>
-                        <Badge variant="outline">
-                          Sentence translation target:{" "}
-                          {entry.plan.monthlySentenceTranslationTarget ?? "n/a"}
-                        </Badge>
-                        <Badge variant="outline">
-                          Gap fill target:{" "}
-                          {entry.plan.monthlyGapFillTarget ?? "n/a"}
-                        </Badge>
-                        <Badge variant="outline">
-                          Lesson target:{" "}
-                          {entry.plan.monthlyCompletedLessonsTarget ?? "n/a"}
-                        </Badge>
-                        <Badge variant="outline">
-                          Words added target:{" "}
-                          {entry.plan.monthlyWordsAddedTarget ?? "n/a"}
-                        </Badge>
-                        <Badge variant="outline">
-                          Mastered words target:{" "}
-                          {entry.plan.monthlyMasteredWordsTarget ?? "n/a"}
-                        </Badge>
-                        <Badge variant="outline">
-                          Speaking share target:{" "}
-                          {formatPercentage(
-                            entry.plan.monthlyStudentSpeakingShareTarget,
-                          )}
-                        </Badge>
-                        <Badge variant="outline">
-                          Avg score target:{" "}
-                          {formatPercentage(
-                            entry.plan.monthlyAverageScoreTarget,
-                          )}
-                        </Badge>
-                      </div>
-                    </div>
+                    <CardTitle className="text-base">{tutorName}</CardTitle>
+                    <CardDescription>
+                      Updated{" "}
+                      {formatDateForAppLanguage(
+                        appLanguage,
+                        entry.updatedAt,
+                      )}
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    {!hasPlan ? (
-                      <div className="rounded-lg border border-dashed px-4 py-6 text-sm text-muted-foreground">
-                        This tutor has not outlined a plan yet.
-                      </div>
+                  <CardContent>
+                    {metrics?.monthlyPentagram ? (
+                      <MonthlyReportPentagramCard
+                        pentagram={metrics.monthlyPentagram}
+                        locale={locale}
+                        title="Performance Overview"
+                        description={`Your progress for ${selectedMonthLabel}`}
+                      />
                     ) : (
-                      <>
-                        {entry.plan.planTitle ? (
-                          <div className="space-y-1">
-                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                              Plan title
-                            </p>
-                            <p className="font-medium">
-                              {entry.plan.planTitle}
-                            </p>
-                          </div>
-                        ) : null}
-
-                        {entry.plan.goalSummary ? (
-                          <div className="space-y-1">
-                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                              Goal summary
-                            </p>
-                            <p className="text-sm leading-relaxed">
-                              {entry.plan.goalSummary}
-                            </p>
-                          </div>
-                        ) : null}
-
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            Objectives
-                          </p>
-                          {entry.plan.objectives.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                              No specific objectives listed yet.
-                            </p>
-                          ) : (
-                            <ul className="space-y-2 text-sm leading-relaxed">
-                              {entry.plan.objectives.map((objective) => (
-                                <li key={objective} className="flex gap-2">
-                                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
-                                  <span>{objective}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            Grammar focus topics
-                          </p>
-                          {entry.plan.grammarTopicKeys.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                              No grammar topics selected yet.
-                            </p>
-                          ) : (
-                            <div className="flex flex-wrap gap-2">
-                              {entry.plan.grammarTopicKeys.map((topic) => (
-                                <Badge key={topic} variant="outline">
-                                  {topic}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </>
+                      <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                        <p>No performance data available for this period.</p>
+                      </div>
                     )}
-
-                    <div className="flex flex-wrap gap-2">
-                      <Button asChild variant="outline" size="sm">
-                        <Link href="/plans-and-reports/reports">
-                          <FileText className="mr-2 h-4 w-4" />
-                          Monthly Reports
-                        </Link>
-                      </Button>
-                      <Button asChild variant="outline" size="sm">
-                        <Link href="/progress/monthly">
-                          <BookOpen className="mr-2 h-4 w-4" />
-                          Monthly Progress
-                        </Link>
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               );

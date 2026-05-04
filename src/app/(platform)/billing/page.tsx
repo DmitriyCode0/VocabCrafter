@@ -18,7 +18,6 @@ import {
   Zap,
   TrendingUp,
   BookOpen,
-  ClipboardList,
   Crown,
   Check,
   Database,
@@ -129,22 +128,15 @@ export default async function BillingPage() {
   const monthISO = monthStart.toISOString();
 
   let quizUsed = 0;
-  let attemptUsed = 0;
   let wbUsed = 0;
 
   if (!isSuperadmin) {
-    const [myMonthlyQuizzesResult, myMonthlyAttemptsResult, myWordBanksResult] =
-      await Promise.all([
+    const [myMonthlyQuizzesResult, myWordBanksResult] = await Promise.all([
         supabase
           .from("quizzes")
           .select("*", { count: "exact", head: true })
           .eq("creator_id", user.id)
           .gte("created_at", monthISO),
-        supabase
-          .from("quiz_attempts")
-          .select("*", { count: "exact", head: true })
-          .eq("student_id", user.id)
-          .gte("completed_at", monthISO),
         supabase
           .from("word_banks")
           .select("*", { count: "exact", head: true })
@@ -152,7 +144,6 @@ export default async function BillingPage() {
       ]);
 
     quizUsed = myMonthlyQuizzesResult.count ?? 0;
-    attemptUsed = myMonthlyAttemptsResult.count ?? 0;
     wbUsed = myWordBanksResult.count ?? 0;
   }
 
@@ -214,7 +205,7 @@ export default async function BillingPage() {
           messages={messages}
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <UsageMeter
             title={messages.billing.usageTitles.aiCalls}
             icon={<Cpu className="h-4 w-4 text-muted-foreground" />}
@@ -229,14 +220,6 @@ export default async function BillingPage() {
             used={quizUsed}
             limit={plan.quizzesPerMonth}
             color="bg-blue-500"
-            messages={messages}
-          />
-          <UsageMeter
-            title={messages.billing.usageTitles.quizAttempts}
-            icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
-            used={attemptUsed}
-            limit={plan.attemptsPerMonth}
-            color="bg-emerald-500"
             messages={messages}
           />
           <UsageMeter
@@ -279,8 +262,6 @@ async function SuperadminOverviewCards({
     profilesResult,
     totalQuizzesResult,
     monthlyQuizzesResult,
-    totalAttemptsResult,
-    monthlyAttemptsResult,
     totalWordBanksResult,
   ] = await Promise.all([
     supabaseAdmin
@@ -291,13 +272,6 @@ async function SuperadminOverviewCards({
       .from("quizzes")
       .select("id", { count: "exact", head: true })
       .gte("created_at", monthISO),
-    supabaseAdmin
-      .from("quiz_attempts")
-      .select("id", { count: "exact", head: true }),
-    supabaseAdmin
-      .from("quiz_attempts")
-      .select("id", { count: "exact", head: true })
-      .gte("completed_at", monthISO),
     supabaseAdmin
       .from("word_banks")
       .select("id", { count: "exact", head: true }),
@@ -315,13 +289,11 @@ async function SuperadminOverviewCards({
   );
   const totalQuizzes = totalQuizzesResult.count ?? 0;
   const monthlyQuizzes = monthlyQuizzesResult.count ?? 0;
-  const totalAttempts = totalAttemptsResult.count ?? 0;
-  const monthlyAttempts = monthlyAttemptsResult.count ?? 0;
   const totalWordBanks = totalWordBanksResult.count ?? 0;
   const monthLabel = formatMonthNameForAppLanguage(appLanguage, new Date());
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <PlatformStatCard
         title={messages.billing.usageTitles.aiCalls}
         icon={<Cpu className="h-4 w-4 text-muted-foreground" />}
@@ -334,14 +306,6 @@ async function SuperadminOverviewCards({
         value={totalQuizzes.toLocaleString()}
         description={messages.billing.platformDescriptions.quizzesCreated(
           monthlyQuizzes.toLocaleString(),
-        )}
-      />
-      <PlatformStatCard
-        title={messages.billing.usageTitles.quizAttempts}
-        icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
-        value={totalAttempts.toLocaleString()}
-        description={messages.billing.platformDescriptions.quizAttempts(
-          monthlyAttempts.toLocaleString(),
         )}
       />
       <PlatformStatCard

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { BarChart3, BookMarked, Loader2, TrendingUp } from "lucide-react";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 interface TutorProgressSectionTabsProps {
   currentSection: "overall" | "monthly" | "coaching";
@@ -19,7 +20,7 @@ export function TutorProgressSectionTabs({
   const searchParams = useSearchParams();
   const { messages } = useAppI18n();
   const [loadingTab, setLoadingTab] = useState<string | null>(null);
-  const sections = [
+  const allSections = [
     {
       value: "overall",
       href: basePath,
@@ -39,6 +40,10 @@ export function TutorProgressSectionTabs({
       icon: BookMarked,
     },
   ] as const;
+  const sections =
+    basePath === "/progress"
+      ? allSections.filter((section) => section.value !== "coaching")
+      : allSections;
 
   return (
     <Tabs
@@ -59,7 +64,10 @@ export function TutorProgressSectionTabs({
     >
       <TabsList
         variant="line"
-        className="mx-auto grid h-auto w-full max-w-4xl grid-cols-3 rounded-none border-b border-border/60 bg-transparent p-0"
+        className={cn(
+          "mx-auto grid h-auto w-full max-w-4xl rounded-none border-b border-border/60 bg-transparent p-0",
+          sections.length === 2 ? "grid-cols-2" : "grid-cols-3",
+        )}
       >
         {sections.map((section) => {
           const Icon = section.icon;
