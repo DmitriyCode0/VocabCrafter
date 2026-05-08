@@ -70,7 +70,7 @@ export function MobileBottomNav({ role }: MobileBottomNavProps) {
       className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-sm md:hidden overflow-visible"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="flex items-end justify-around pt-3 pb-3">
+      <div className="flex items-end justify-around pt-2 pb-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isQuizTab = tab.href === "/quizzes";
@@ -100,7 +100,7 @@ export function MobileBottomNav({ role }: MobileBottomNavProps) {
               href={tab.href}
               onClick={handleClick}
               className={cn(
-                "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors",
+                "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[9px] font-medium transition-colors",
                 tab.variant === "review" ? "py-0" : "pb-1",
                 tab.variant !== "review" && isActive && "text-primary",
                 tab.variant !== "review" &&
@@ -109,22 +109,22 @@ export function MobileBottomNav({ role }: MobileBottomNavProps) {
               )}
             >
               {isPending ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <Loader2 className="h-[18px] w-[18px] animate-spin" />
               ) : tab.variant === "review" ? (
                 <span
                   className={cn(
-                    "flex h-14 w-14 items-center justify-center rounded-full border-2 transition-all duration-200",
+                    "flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-200",
                     isActive
                       ? "border-green-700 bg-gradient-to-br from-green-600 to-green-700 text-white shadow-2xl shadow-green-500/60 ring-4 ring-green-300"
                       : "border-green-500 bg-gradient-to-br from-green-500 to-green-600 text-white shadow-xl shadow-green-400/50 hover:shadow-2xl hover:shadow-green-500/60 hover:scale-105",
                   )}
                 >
-                  <Icon className="h-6 w-6 shrink-0" />
+                  <Icon className="h-5 w-5 shrink-0" />
                 </span>
               ) : (
                 <Icon
                   className={cn(
-                    "h-6 w-6 shrink-0 transition-transform",
+                    "h-5 w-5 shrink-0 transition-transform",
                     isActive && "scale-110",
                   )}
                 />
