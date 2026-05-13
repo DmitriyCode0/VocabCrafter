@@ -69,17 +69,17 @@ export const ACTIVE_VOCAB_TARGETS: Record<CEFRLevel, number> = {
 };
 
 /**
- * Live-lesson active evidence observes only the vocabulary we have actually
- * heard the student produce, so it uses smaller targets than the full CEFR
- * productive lexicon targets above.
+ * Live-lesson active evidence uses its own CEFR-calibrated target table for
+ * unique words actually heard in lesson speech. This denominator is tracked
+ * separately from the broader productive-vocabulary targets above.
  */
 const OBSERVED_ACTIVE_VOCAB_TARGETS: Record<CEFRLevel, number> = {
-  A1: 30,
-  A2: 45,
-  B1: 90,
-  B2: 130,
-  C1: 180,
-  C2: 240,
+  A1: 400,
+  A2: 800,
+  B1: 1200,
+  B2: 2500,
+  C1: 4000,
+  C2: 7000,
 };
 
 /**
@@ -292,7 +292,6 @@ export interface StudentOverallPerformanceComponents {
   activeVocab: number;
   passiveVocab: number;
   grammar: number;
-  addedWords: number;
 }
 
 export interface StudentProgressSnapshot {
@@ -318,6 +317,7 @@ export interface StudentProgressSnapshot {
     activeDays30: number;
     totalWords: number;
     masteredWords: number;
+    activeVocabObservedTarget: number;
     avgMasteryLevel: number;
     grammarMasteredCount: number;
     grammarAvailableCount: number;
@@ -470,9 +470,8 @@ function calculateOverallPerformanceScore(
     (components.time +
       components.activeVocab +
       components.passiveVocab +
-      components.grammar +
-      components.addedWords) /
-      5,
+      components.grammar) /
+      4,
   );
 }
 
@@ -1658,14 +1657,12 @@ export async function getStudentProgressSnapshot(
     (topic) => !topicAttemptMap.has(topic.topicKey),
   );
 
-  const liveLessonActiveVocabScore = clampScore(
-    Math.min(
-      1,
-      activeSignals.uniqueItems / OBSERVED_ACTIVE_VOCAB_TARGETS[cefrLevel],
-    ) *
-      80 +
-      Math.min(1, masteredWords / ACTIVE_VOCAB_TARGETS[cefrLevel]) * 20,
+  const observedActiveVocabTarget = OBSERVED_ACTIVE_VOCAB_TARGETS[cefrLevel];
+  const liveLessonObservedRatio = Math.min(
+    1,
+    activeSignals.uniqueItems / observedActiveVocabTarget,
   );
+  const liveLessonActiveVocabScore = clampScore(liveLessonObservedRatio * 100);
 
   // --- Axis scores ---
   const activeVocabScore = liveLessonActiveVocabScore;
@@ -1681,15 +1678,11 @@ export async function getStudentProgressSnapshot(
     (totalLearningHoursRaw / currentGuidedHours.averageHours) * 100,
   );
   const activeVocabPerformanceScore = liveLessonActiveVocabScore;
-  const addedWordsScore = clampScore(
-    (totalWords / ACTIVE_VOCAB_TARGETS[cefrLevel]) * 100,
-  );
   const overallPerformanceComponents: StudentOverallPerformanceComponents = {
     time: timeProgressScore,
     activeVocab: activeVocabPerformanceScore,
     passiveVocab: passiveVocabScore,
     grammar: grammarVarietyScore,
-    addedWords: addedWordsScore,
   };
   const overallPerformanceScore = calculateOverallPerformanceScore(
     overallPerformanceComponents,
@@ -1703,8 +1696,8 @@ export async function getStudentProgressSnapshot(
       label: "Active Vocab",
       shortLabel: "Active",
       score: activeVocabScore,
-      value: `${activeSignals.uniqueItems.toLocaleString()} live-lesson words, ${masteredWords.toLocaleString()} at mastery 4-5`,
-      helper: `Based primarily on unique words actually used in live lessons and synced as active evidence, with a smaller boost from words practiced to mastery levels 4 and 5. ${activeSignals.totalUsageCount.toLocaleString()} total lesson-based uses recorded.`,
+      value: `${activeSignals.uniqueItems.toLocaleString()} / ${observedActiveVocabTarget.toLocaleString()} live-lesson words`,
+      helper: `Score = 100% unique live-lesson words versus the ${cefrLevel} target. ${activeSignals.totalUsageCount.toLocaleString()} total lesson-based uses recorded.`,
       beta: true,
     },
     {
@@ -1783,6 +1776,7 @@ export async function getStudentProgressSnapshot(
       activeDays30,
       totalWords,
       masteredWords,
+      activeVocabObservedTarget: observedActiveVocabTarget,
       avgMasteryLevel,
       grammarMasteredCount,
       grammarAvailableCount: availableGrammarTopics.length,

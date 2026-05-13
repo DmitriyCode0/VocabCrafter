@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractWordResults, upsertWordMastery } from "@/lib/mastery/engine";
+import { parseQuizSnapshot } from "@/lib/quiz-snapshot";
 
 /**
  * POST /api/mastery/backfill
@@ -36,7 +37,7 @@ export async function POST() {
     // Fetch all attempts ordered by completion date (oldest first)
     const { data: attempts, error: attErr } = await supabaseAdmin
       .from("quiz_attempts")
-      .select("id, student_id, quiz_id, answers, completed_at")
+      .select("id, student_id, quiz_id, answers, completed_at, quiz_snapshot")
       .order("completed_at", { ascending: true });
 
     if (attErr) {
@@ -69,7 +70,8 @@ export async function POST() {
     const { data: quizzes } = await supabaseAdmin
       .from("quizzes")
       .select("id, type, vocabulary_terms, generated_content")
-      .in("id", quizIds);
+      .in("id", quizIds)
+      .is("deleted_at", null);
 
     const quizMap = new Map(
       (quizzes ?? []).map((q) => [
@@ -92,7 +94,22 @@ export async function POST() {
     let skipped = 0;
 
     for (const attempt of attempts) {
-      const quiz = quizMap.get(attempt.quiz_id);
+      const quiz =
+        quizMap.get(attempt.quiz_id) ??
+        (() => {
+          const snapshot = parseQuizSnapshot(attempt.quiz_snapshot);
+
+          if (!snapshot || !snapshot.type) {
+            return null;
+          }
+
+          return {
+            type: snapshot.type,
+            vocabulary_terms: snapshot.vocabulary_terms,
+            generated_content: snapshot.generated_content,
+          };
+        })();
+
       if (!quiz) {
         skipped++;
         continue;

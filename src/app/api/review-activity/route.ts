@@ -235,6 +235,7 @@ export async function DELETE() {
         .from("quizzes")
         .select("id")
         .eq("creator_id", user.id)
+        .is("deleted_at", null)
         .ilike("title", `${REVIEW_ACTIVITY_TITLE_PREFIX}%`);
 
     if (reviewQuizzesError) {
@@ -251,25 +252,29 @@ export async function DELETE() {
       return NextResponse.json({ deletedCount: 0 });
     }
 
-    const [attemptDeleteResult, assignmentDeleteResult] = await Promise.all([
-      supabaseAdmin.from("quiz_attempts").delete().in("quiz_id", reviewQuizIds),
-      supabaseAdmin.from("assignments").delete().in("quiz_id", reviewQuizIds),
-    ]);
+    const { error: assignmentDeleteError } = await supabaseAdmin
+      .from("assignments")
+      .delete()
+      .in("quiz_id", reviewQuizIds);
 
-    if (attemptDeleteResult.error || assignmentDeleteResult.error) {
-      console.error("Review cleanup dependent delete error:", {
-        attemptDeleteError: attemptDeleteResult.error,
-        assignmentDeleteError: assignmentDeleteResult.error,
+    if (assignmentDeleteError) {
+      console.error("Review cleanup assignment delete error:", {
+        assignmentDeleteError,
       });
       return NextResponse.json(
-        { error: "Failed to delete review session dependencies" },
+        { error: "Failed to archive review sessions" },
         { status: 500 },
       );
     }
 
     const { error: quizDeleteError } = await supabaseAdmin
       .from("quizzes")
-      .delete()
+      .update({
+        deleted_at: new Date().toISOString(),
+        generated_content: {},
+        vocabulary_terms: [],
+        is_public: false,
+      })
       .eq("creator_id", user.id)
       .in("id", reviewQuizIds);
 

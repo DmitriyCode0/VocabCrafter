@@ -1484,6 +1484,7 @@ export interface Database {
           config: Record<string, unknown> | null;
           is_public: boolean;
           created_at: string;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -1496,6 +1497,7 @@ export interface Database {
           config?: Record<string, unknown> | null;
           is_public?: boolean;
           created_at?: string;
+          deleted_at?: string | null;
         };
         Update: {
           title?: string;
@@ -1505,6 +1507,7 @@ export interface Database {
           generated_content?: Record<string, unknown>;
           config?: Record<string, unknown> | null;
           is_public?: boolean;
+          deleted_at?: string | null;
         };
         Relationships: [
           {
@@ -1526,6 +1529,7 @@ export interface Database {
           max_score: number | null;
           time_spent_seconds: number;
           completed_at: string;
+          quiz_snapshot: Record<string, unknown> | null;
         };
         Insert: {
           id?: string;
@@ -1536,12 +1540,14 @@ export interface Database {
           max_score?: number | null;
           time_spent_seconds?: number;
           completed_at?: string;
+          quiz_snapshot?: Record<string, unknown> | null;
         };
         Update: {
           answers?: Record<string, unknown>;
           score?: number | null;
           max_score?: number | null;
           time_spent_seconds?: number;
+          quiz_snapshot?: Record<string, unknown> | null;
         };
         Relationships: [
           {

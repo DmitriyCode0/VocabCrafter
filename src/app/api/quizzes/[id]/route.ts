@@ -54,6 +54,7 @@ export async function PATCH(
       .update(updates)
       .eq("id", id)
       .eq("creator_id", user.id)
+      .is("deleted_at", null)
       .select()
       .single();
 
@@ -91,14 +92,13 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Use admin client to delete dependent rows — the user client is blocked
-    // by RLS on quiz_attempts and assignments (no DELETE policy for non-tutors).
+    // Use admin client for assignment cleanup and archival updates.
     const supabaseAdmin = createAdminClient();
 
     // Verify the quiz belongs to this user before proceeding
     const { data: owned } = await supabaseAdmin
       .from("quizzes")
-      .select("id")
+      .select("id, deleted_at")
       .eq("id", id)
       .eq("creator_id", user.id)
       .single();
@@ -107,15 +107,34 @@ export async function DELETE(
       return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
     }
 
-    // Delete dependents first (foreign key constraints)
-    await supabaseAdmin.from("quiz_attempts").delete().eq("quiz_id", id);
-    await supabaseAdmin.from("assignments").delete().eq("quiz_id", id);
+    if (owned.deleted_at) {
+      return NextResponse.json({ success: true });
+    }
+
+    const { error: assignmentError } = await supabaseAdmin
+      .from("assignments")
+      .delete()
+      .eq("quiz_id", id);
+
+    if (assignmentError) {
+      console.error("Quiz assignment cleanup error:", assignmentError);
+      return NextResponse.json(
+        { error: "Failed to archive quiz" },
+        { status: 500 },
+      );
+    }
 
     const { error } = await supabaseAdmin
       .from("quizzes")
-      .delete()
+      .update({
+        deleted_at: new Date().toISOString(),
+        generated_content: {},
+        vocabulary_terms: [],
+        is_public: false,
+      })
       .eq("id", id)
-      .eq("creator_id", user.id);
+      .eq("creator_id", user.id)
+      .is("deleted_at", null);
 
     if (error) {
       console.error("Quiz delete error:", error);
@@ -155,6 +174,7 @@ export async function GET(
       .from("quizzes")
       .select("*")
       .eq("id", id)
+      .is("deleted_at", null)
       .single();
 
     if (error || !quiz) {

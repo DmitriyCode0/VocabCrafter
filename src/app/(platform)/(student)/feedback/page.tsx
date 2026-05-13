@@ -14,6 +14,7 @@ import { ACTIVITY_LABELS } from "@/lib/constants";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { formatDateForAppLanguage } from "@/lib/i18n/format";
 import { getAppMessages } from "@/lib/i18n/messages";
+import { resolveAttemptQuiz } from "@/lib/quiz-snapshot";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,8 @@ interface FeedbackRow {
     score: number | null;
     max_score: number | null;
     completed_at: string;
-    quizzes: { title: string; type: string } | null;
+    quiz_snapshot?: Record<string, unknown> | null;
+    quizzes: { title: string; type: string; deleted_at?: string | null } | null;
   } | null;
 }
 
@@ -73,7 +75,7 @@ export default async function StudentFeedbackPage() {
   const { data: feedbackItems } = await supabaseAdmin
     .from("feedback")
     .select(
-      "id, content, rating, created_at, attempt_id, profiles(full_name), quiz_attempts(score, max_score, completed_at, quizzes(title, type))",
+      "id, content, rating, created_at, attempt_id, profiles(full_name), quiz_attempts(score, max_score, completed_at, quiz_snapshot, quizzes(title, type, deleted_at))",
     )
     .in(
       "attempt_id",
@@ -115,7 +117,7 @@ export default async function StudentFeedbackPage() {
       ) : (
         <div className="space-y-4">
           {items.map((fb) => {
-            const quiz = fb.quiz_attempts?.quizzes;
+            const quiz = resolveAttemptQuiz(fb.quiz_attempts);
             const attempt = fb.quiz_attempts;
             const tutor = fb.profiles;
             const scored = attempt?.score != null && attempt?.max_score != null;

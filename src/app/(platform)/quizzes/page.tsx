@@ -48,16 +48,19 @@ export default async function QuizzesPage({
     supabase
       .from("quizzes")
       .select("id", { count: "exact", head: true })
-      .eq("creator_id", user.id),
+      .eq("creator_id", user.id)
+      .is("deleted_at", null),
     supabase
       .from("quizzes")
       .select("id", { count: "exact", head: true })
       .eq("creator_id", user.id)
+      .is("deleted_at", null)
       .ilike("title", `${REVIEW_ACTIVITY_TITLE_PREFIX}%`),
     supabase
       .from("quizzes")
       .select("*")
       .eq("creator_id", user.id)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .range(from, to),
   ]);

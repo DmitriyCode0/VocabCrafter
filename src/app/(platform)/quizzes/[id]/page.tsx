@@ -28,6 +28,7 @@ export default async function QuizDetailPage({
     .from("quizzes")
     .select("*")
     .eq("id", id)
+    .is("deleted_at", null)
     .single();
 
   if (error || !quiz) {

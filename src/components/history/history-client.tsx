@@ -32,11 +32,12 @@ import {
   User,
 } from "lucide-react";
 import { ACTIVITY_LABELS } from "@/lib/constants";
+import { formatAppDateTime } from "@/lib/dates";
+import { resolveAttemptQuiz } from "@/lib/quiz-snapshot";
 import {
   getGrammarTopicDisplayName,
   getPrimaryGrammarTopic,
 } from "@/lib/utils";
-import { formatAppDateTime } from "@/lib/dates";
 import {
   HISTORY_PAGE_SIZE,
   type HistoryAttempt,
@@ -217,7 +218,7 @@ const AttemptCard = React.memo(function AttemptCard({
   ) => void;
   onTimeSpentSaved: (attemptId: string, result: AttemptTimeSaveResult) => void;
 }) {
-  const quiz = attempt.quizzes;
+  const quiz = resolveAttemptQuiz(attempt);
   const student = attempt.profiles;
   const scored = attempt.score != null && attempt.max_score != null;
   const pct = scored

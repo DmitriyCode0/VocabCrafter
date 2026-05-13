@@ -145,10 +145,9 @@ export function resolveStudentMonthlyProgressTargets({
       overrides?.passiveTarget,
       defaults.passiveTarget,
     ),
-    activeDaysTarget: normalizePositiveTarget(
-      overrides?.activeDaysTarget,
-      defaults.activeDaysTarget,
-    ),
+    // Active days should always track elapsed days in the selected month window.
+    // Keeping this tied to calendar progress avoids misleading denominators in reports.
+    activeDaysTarget: defaults.activeDaysTarget,
     activityTarget: normalizePositiveTarget(
       overrides?.activityTarget,
       defaults.activityTarget,
@@ -202,19 +201,24 @@ export function buildStudentMonthlyProgressPresentation({
     factors.activityCount / targets.activityTarget,
   );
   const activeVocabScore = clampScore(speakingShareRatio * 100);
-  const grammarVarietyScore = clampScore(
-    (factors.confidentGrammarTopics / targets.grammarTarget) * 100,
-  );
   const engagementScore = clampScore(
     (activeDaysRatio * 0.5 + activityRatio * 0.5) * 100,
   );
   const passiveVocabScore = clampScore(
     newWordsRatio * 30 + masteredWordsRatio * 70,
   );
+  const grammarSentencesGoal =
+    targets.grammarTarget * MONTHLY_GRAMMAR_MASTERY_MIN_ATTEMPTS;
+  const grammarCompletedQuizCount = Math.min(
+    Math.max(0, factors.grammarHighScoreAttemptsTotal),
+    grammarSentencesGoal,
+  );
   const grammarSentencesRemaining = Math.max(
     0,
-    targets.grammarTarget * MONTHLY_GRAMMAR_MASTERY_MIN_ATTEMPTS -
-      factors.grammarHighScoreAttemptsTotal,
+    grammarSentencesGoal - grammarCompletedQuizCount,
+  );
+  const grammarVarietyScore = clampScore(
+    (grammarCompletedQuizCount / grammarSentencesGoal) * 100,
   );
 
   const axes: StudentMonthlyProgressAxisData[] = [
@@ -233,8 +237,8 @@ export function buildStudentMonthlyProgressPresentation({
       label: "Grammar Variety",
       shortLabel: "Grammar",
       score: grammarVarietyScore,
-      value: `${factors.confidentGrammarTopics}/${targets.grammarTarget} topics mastered this month`,
-      helper: `A topic is mastered after 5 translation quizzes scored 90%+. Remaining auto-complete quizzes: ${grammarSentencesRemaining}.`,
+      value: `Completed selected grammar quizzes: ${grammarCompletedQuizCount}/${grammarSentencesGoal}`,
+      helper: `Remaining auto-complete quizzes: ${grammarSentencesRemaining}/${grammarSentencesGoal}. ${factors.confidentGrammarTopics}/${targets.grammarTarget} topics mastered this month. A topic is mastered after 5 translation quizzes scored 90%+.`,
     },
     {
       key: "engagement",

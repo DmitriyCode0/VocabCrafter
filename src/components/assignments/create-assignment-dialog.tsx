@@ -98,6 +98,7 @@ export function CreateAssignmentDialog({
             .from("quizzes")
             .select("id, title, type, cefr_level")
             .eq("creator_id", user.id)
+            .is("deleted_at", null)
             .order("created_at", { ascending: false });
           setQuizzes((data as QuizOption[]) ?? []);
         }

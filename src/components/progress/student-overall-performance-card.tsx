@@ -30,7 +30,7 @@ const PERFORMANCE_BAND_COPY: Record<
   strong: {
     label: "Strong",
     description:
-      "Your active and passive vocabulary, grammar topics learned, tracked words, and logged study time are lining up well with your current CEFR target.",
+      "Your active and passive vocabulary, grammar topics learned, and logged study time are lining up well with your current CEFR target.",
     badgeClassName:
       "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300",
   },
@@ -50,8 +50,8 @@ const PERFORMANCE_BAND_COPY: Record<
   },
   needs_focus: {
     label: "Needs Focus",
-    description:
-      "You have started the journey, but active and passive vocabulary growth, grammar topics learned, words added in the app, and logged study time are still below the pace usually associated with this CEFR target.",
+       description:
+         "You have started the journey, but active and passive vocabulary growth, grammar topics learned, and logged study time are still below the pace usually associated with this CEFR target.",
     badgeClassName:
       "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300",
   },

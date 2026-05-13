@@ -122,6 +122,7 @@ export async function GET() {
           .from("quizzes")
           .select("*")
           .eq("creator_id", user.id)
+          .is("deleted_at", null)
           .order("created_at", { ascending: false }),
       ]);
 
@@ -217,6 +218,7 @@ export async function GET() {
     const { data: assignedQuizzes, error: assignedQuizzesError } = await admin
       .from("quizzes")
       .select("*")
+      .is("deleted_at", null)
       .in("id", reusableAssignedQuizIds);
 
     if (assignedQuizzesError) {

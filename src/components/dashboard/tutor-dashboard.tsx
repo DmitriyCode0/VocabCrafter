@@ -56,6 +56,7 @@ export async function TutorDashboard({
         .from("quizzes")
         .select("*", { count: "exact", head: true })
         .eq("creator_id", userId)
+        .is("deleted_at", null)
         .gte("created_at", monthStart.toISOString()),
       supabaseAdmin
         .from("tutor_students")

@@ -52,7 +52,7 @@ export function StudentResultsSummary({
       key: "activeVocab",
       label: "Active Vocab",
       value: snapshot.overallPerformance.components.activeVocab,
-      helper: `${snapshot.activeSignals.uniqueItems} unique words from live-lesson speech across ${snapshot.activeSignals.totalUsageCount} recorded uses, plus ${snapshot.overview.masteredWords} words already practiced to mastery levels 4-5`,
+      helper: `${snapshot.activeSignals.uniqueItems}/${snapshot.overview.activeVocabObservedTarget} unique words from live-lesson speech across ${snapshot.activeSignals.totalUsageCount} recorded uses`,
     },
     {
       key: "passiveVocab",
@@ -65,12 +65,6 @@ export function StudentResultsSummary({
       label: "Grammar Topics Learned",
       value: snapshot.overallPerformance.components.grammar,
       helper: `${snapshot.overview.grammarMasteredCount}/${snapshot.overview.grammarAvailableCount} current-level topics marked as mastered`,
-    },
-    {
-      key: "addedWords",
-      label: "Words Added in App",
-      value: snapshot.overallPerformance.components.addedWords,
-      helper: `${snapshot.overview.totalWords} total tracked words, with ${snapshot.overview.masteredWords} already practiced up to mastery levels 4-5`,
     },
   ] as const;
 
@@ -86,10 +80,9 @@ export function StudentResultsSummary({
           <CardHeader>
             <CardTitle className="text-base">Performance Breakdown</CardTitle>
             <CardDescription>
-              This score blends active vocab, passive vocab, grammar topics learned,
-              words added in the app, and time logged. Active vocab is based
-              primarily on transcript-derived live-lesson speech, with a smaller
-              boost from words that have reached mastery levels 4 and 5.
+              This score blends time logged, active vocab, passive vocab, and
+              grammar topics learned. Active vocab is based 100% on unique
+              transcript-derived live-lesson words against the CEFR target.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

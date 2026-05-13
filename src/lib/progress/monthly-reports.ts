@@ -598,14 +598,13 @@ export async function getTutorStudentMonthlyReportMetrics(
     monthlyTargetOverrides;
 
   if (monthlyPlanResult?.plan) {
-    const numericPlanTargets = [
+    const engagementObjectiveTargets = [
       monthlyPlanResult.plan.monthlySentenceTranslationTarget,
       monthlyPlanResult.plan.monthlyGapFillTarget,
       monthlyPlanResult.plan.monthlyCompletedLessonsTarget,
-      monthlyPlanResult.plan.monthlyWordsAddedTarget,
-      monthlyPlanResult.plan.monthlyMasteredWordsTarget,
     ].filter((value): value is number => value != null);
-    const activityTargetFromPlan = numericPlanTargets.reduce(
+
+    const activityTargetFromPlan = engagementObjectiveTargets.reduce(
       (sum, value) => sum + value,
       0,
     );

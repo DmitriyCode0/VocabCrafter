@@ -7,6 +7,7 @@ import {
   fetchHistoryPageData,
   HISTORY_PAGE_SIZE,
 } from "@/lib/history/fetch-history-page-data";
+import { buildQuizSnapshot } from "@/lib/quiz-snapshot";
 import type { Role } from "@/types/roles";
 
 const createAttemptSchema = z.object({
@@ -48,6 +49,20 @@ export async function POST(request: Request) {
     }
 
     const { quizId, answers, score, maxScore, timeSpentSeconds } = parsed.data;
+    const supabaseAdmin = createAdminClient();
+    const { data: quiz, error: quizError } = await supabaseAdmin
+      .from("quizzes")
+      .select(
+        "title, type, cefr_level, vocabulary_terms, generated_content, config",
+      )
+      .eq("id", quizId)
+      .is("deleted_at", null)
+      .single();
+
+    if (quizError || !quiz) {
+      console.error("Attempt quiz lookup error:", quizError);
+      return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
+    }
 
     const { data: attempt, error: insertError } = await supabase
       .from("quiz_attempts")
@@ -58,6 +73,7 @@ export async function POST(request: Request) {
         score,
         max_score: maxScore,
         time_spent_seconds: timeSpentSeconds ?? 0,
+        quiz_snapshot: buildQuizSnapshot(quiz),
       })
       .select()
       .single();
@@ -72,13 +88,6 @@ export async function POST(request: Request) {
 
     // ── Update word mastery ──────────────────────────────
     try {
-      const supabaseAdmin = createAdminClient();
-      const { data: quiz } = await supabaseAdmin
-        .from("quizzes")
-        .select("type, vocabulary_terms, generated_content")
-        .eq("id", quizId)
-        .single();
-
       if (quiz) {
         const vocabTerms = (quiz.vocabulary_terms ?? []) as {
           term: string;

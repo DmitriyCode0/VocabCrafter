@@ -14,6 +14,7 @@ import {
   type TranslationScoreSaveResult,
 } from "@/components/review/editable-translation-results";
 import { TranslationFeedbackList } from "@/components/quiz/translation-feedback-list";
+import { resolveAttemptQuiz } from "@/lib/quiz-snapshot";
 import { stripMarkdownEmphasis } from "@/lib/utils";
 
 interface AttemptDetailProps {
@@ -73,7 +74,7 @@ export function AttemptDetail({
   onGapFillResultSaved,
   onTimeSpentSaved,
 }: AttemptDetailProps) {
-  const quiz = attempt.quizzes as Record<string, unknown> | null;
+  const quiz = resolveAttemptQuiz(attempt);
   const rawAnswers = attempt.answers as Record<string, unknown> | null;
   const quizType = quiz?.type as string;
   const attemptId = typeof attempt.id === "string" ? attempt.id : "";

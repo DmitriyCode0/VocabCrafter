@@ -11,6 +11,7 @@ export interface HistoryAttempt extends Record<string, unknown> {
   max_score: number | null;
   time_spent_seconds: number | null;
   completed_at: string;
+  quiz_snapshot?: Record<string, unknown> | null;
   quizzes?: {
     title: string | null;
     type: string | null;
@@ -18,6 +19,7 @@ export interface HistoryAttempt extends Record<string, unknown> {
     vocabulary_terms?: unknown;
     config?: unknown;
     generated_content?: unknown;
+    deleted_at?: string | null;
   } | null;
   profiles?: {
     full_name: string | null;
@@ -198,7 +200,7 @@ export async function fetchHistoryPageData({
     .select(
       [
         "*",
-        `${quizzesRelation}(title, type, cefr_level, vocabulary_terms, config, generated_content)`,
+        `${quizzesRelation}(title, type, cefr_level, vocabulary_terms, config, generated_content, deleted_at)`,
         "profiles(full_name, email, avatar_url)",
       ].join(", "),
     )

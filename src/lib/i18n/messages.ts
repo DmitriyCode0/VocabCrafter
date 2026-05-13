@@ -356,7 +356,7 @@ const EN_MESSAGES = {
         `${count} ${count === 1 ? "term" : "terms"}`,
       deleteTitle: "Delete Quiz",
       deleteDescription: (title: string) =>
-        `Are you sure you want to delete \"${title}\"? This action cannot be undone.`,
+        `Are you sure you want to delete \"${title}\" from My Quizzes? The quiz will disappear from your quiz library, and its stored questions will be cleared. History and statistics will stay available.`,
       deleteAction: "Delete",
       deleteAria: "Delete quiz",
       deleting: "Deleting...",
@@ -369,7 +369,7 @@ const EN_MESSAGES = {
     reviewRemoval: {
       title: "Remove Review Sessions",
       description: (count: number) =>
-        `This will permanently delete ${formatPluralizedCount("en", count, { one: "saved review session", other: "saved review sessions" })} from My Quizzes, along with any attempts tied to ${count === 1 ? "it" : "them"}. This cannot be undone.`,
+        `This will remove ${formatPluralizedCount("en", count, { one: "saved review session", other: "saved review sessions" })} from My Quizzes and clear their stored questions. History and statistics tied to those sessions will stay available.`,
       emptyDescription: "There are no saved review sessions to remove.",
       success: (count: number) =>
         `Removed ${formatPluralizedCount("en", count, { one: "review session", other: "review sessions" })}.`,
@@ -1764,7 +1764,7 @@ const UK_MESSAGES: AppMessages = {
         `${count} ${formatPluralizedCount("uk", count, { one: "слово", few: "слова", many: "слів" })}`,
       deleteTitle: "Видалити вікторину",
       deleteDescription: (title: string) =>
-        `Ви впевнені, що хочете видалити \"${title}\"? Цю дію неможливо скасувати.`,
+        `Ви впевнені, що хочете видалити \"${title}\" з розділу "Мої вікторини"? Вікторина зникне з бібліотеки, а збережені запитання буде очищено. Історія та статистика залишаться доступними.`,
       deleteAction: "Видалити",
       deleteAria: "Видалити вікторину",
       deleting: "Видалення...",
@@ -1777,7 +1777,7 @@ const UK_MESSAGES: AppMessages = {
     reviewRemoval: {
       title: "Видалити сесії повторення",
       description: (count: number) =>
-        `Це назавжди видалить ${formatPluralizedCount("uk", count, { one: "збережену сесію повторення", few: "збережені сесії повторення", many: "збережених сесій повторення" })} з розділу \"Мої вікторини\" разом з усіма пов’язаними спробами. Цю дію неможливо скасувати.`,
+        `Це видалить ${formatPluralizedCount("uk", count, { one: "збережену сесію повторення", few: "збережені сесії повторення", many: "збережених сесій повторення" })} з розділу "Мої вікторини" та очистить збережені запитання. Історія та статистика для цих сесій залишаться доступними.`,
       emptyDescription: "Немає збережених сесій повторення для видалення.",
       success: (count: number) =>
         `Видалено ${formatPluralizedCount("uk", count, { one: "сесію повторення", few: "сесії повторення", many: "сесій повторення" })}.`,

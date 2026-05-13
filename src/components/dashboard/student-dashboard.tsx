@@ -28,7 +28,11 @@ import {
   AnimatedCard,
 } from "@/components/ui/animated-dashboard";
 import { calculateDayStreak } from "@/lib/history/calculate-day-streak";
-import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
+import {
+  applyTutorTimeAdjustmentToSnapshot,
+  getStudentProgressSnapshot,
+} from "@/lib/progress/profile-metrics";
+import { getPublishedTutorProgressOverride } from "@/lib/progress/published-tutor-override";
 import type { AppMessages } from "@/lib/i18n/messages";
 
 function pct(used: number, total: number) {
@@ -58,11 +62,13 @@ export async function StudentDashboard({
     { data: attemptRows },
     { count: totalWordsTracked },
     progressSnapshot,
+    publishedTutorOverride,
   ] = await Promise.all([
     supabase
       .from("quizzes")
       .select("*", { count: "exact", head: true })
       .eq("creator_id", userId)
+      .is("deleted_at", null)
       .gte("created_at", monthStart.toISOString()),
     supabase
       .from("quiz_attempts")
@@ -74,7 +80,15 @@ export async function StudentDashboard({
       .select("id", { count: "exact", head: true })
       .eq("student_id", userId),
     getStudentProgressSnapshot(userId),
+    getPublishedTutorProgressOverride(userId),
   ]);
+
+  const effectiveProgressSnapshot = publishedTutorOverride
+    ? applyTutorTimeAdjustmentToSnapshot(
+        progressSnapshot,
+        publishedTutorOverride.override.timeAdjustmentHours,
+      )
+    : progressSnapshot;
 
   const quizLimit = plan.quizzesPerMonth;
   const quizPercentage = pct(monthlyQuizCount ?? 0, quizLimit);
@@ -239,7 +253,7 @@ export async function StudentDashboard({
         >
           <AnimatedCard>
             <StudentOverallPerformanceCard
-              snapshot={progressSnapshot}
+              snapshot={effectiveProgressSnapshot}
               href="/progress#overall-performance"
               ctaLabel={messages.nav.progress}
             />
