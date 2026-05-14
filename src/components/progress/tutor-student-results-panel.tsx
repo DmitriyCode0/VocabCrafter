@@ -67,7 +67,10 @@ export function TutorStudentResultsPanel({
         </Card>
       ) : (
         <>
-          <StudentResultsSummary snapshot={snapshot} />
+          <StudentResultsSummary
+            snapshot={snapshot}
+            showCefrGuidedHoursCard={false}
+          />
 
           <TutorTimeAdjustmentCard
             studentId={studentId}

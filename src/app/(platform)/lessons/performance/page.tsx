@@ -35,6 +35,11 @@ interface TrendPoint {
   description: string;
 }
 
+type LessonsPerformanceSearchParams = Record<
+  string,
+  string | string[] | undefined
+>;
+
 const TIME_PATTERN = /^([01][0-9]|2[0-3]):([0-5][0-9])$/;
 const DEFAULT_LESSON_DURATION_HOURS = 1;
 
@@ -87,10 +92,95 @@ function startOfWeek(date: Date) {
   return start;
 }
 
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+function startOfYear(date: Date) {
+  return new Date(date.getFullYear(), 0, 1);
+}
+
+function endOfYear(date: Date) {
+  return new Date(date.getFullYear(), 11, 31);
+}
+
 function addDays(date: Date, amount: number) {
   const next = stripTime(date);
   next.setDate(next.getDate() + amount);
   return next;
+}
+
+function addMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function addYears(date: Date, amount: number) {
+  return new Date(date.getFullYear() + amount, 0, 1);
+}
+
+function getSingleSearchParamValue(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parsePastPeriodOffset(value?: string | string[]) {
+  const parsedValue = Number.parseInt(getSingleSearchParamValue(value) ?? "", 10);
+
+  if (Number.isNaN(parsedValue)) {
+    return 0;
+  }
+
+  return Math.min(parsedValue, 0);
+}
+
+function buildPerformancePageHref(
+  pathname: string,
+  searchParams: LessonsPerformanceSearchParams,
+  periodParam: "weekOffset" | "monthOffset" | "yearOffset",
+  nextOffset: number,
+) {
+  const params = new URLSearchParams();
+
+  Object.entries(searchParams).forEach(([key, value]) => {
+    if (key === periodParam || value == null) {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((entry) => params.append(key, entry));
+      return;
+    }
+
+    params.set(key, value);
+  });
+
+  if (nextOffset < 0) {
+    params.set(periodParam, String(nextOffset));
+  }
+
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+function minDate(...dates: Date[]) {
+  return new Date(Math.min(...dates.map((date) => date.getTime())));
+}
+
+function getMetricLabel(
+  period: "week" | "month" | "year",
+) {
+  if (period === "week") {
+    return "Weekly performance";
+  }
+
+  if (period === "month") {
+    return "Monthly performance";
+  }
+
+  return "Yearly performance";
 }
 
 function formatShortDate(date: Date) {
@@ -280,7 +370,12 @@ function hasAssignedStudent(
   return typeof lesson.studentId === "string" && lesson.studentId.length > 0;
 }
 
-export default async function LessonsPerformancePage() {
+export default async function LessonsPerformancePage({
+  searchParams,
+}: {
+  searchParams: Promise<LessonsPerformanceSearchParams>;
+}) {
+  const resolvedSearchParams = await searchParams;
   const { userId, role, appLanguage } = await getLessonsViewerAccess({
     requireTutor: true,
   });
@@ -291,12 +386,26 @@ export default async function LessonsPerformancePage() {
     supabaseAdmin,
   });
   const today = stripTime(new Date());
-  const yearStart = new Date(today.getFullYear(), 0, 1);
-  const weeklyWindowStart = addDays(startOfWeek(today), -11 * 7);
-  const queryStart =
-    weeklyWindowStart.getTime() < yearStart.getTime()
-      ? weeklyWindowStart
-      : yearStart;
+  const currentWeekStart = startOfWeek(today);
+  const currentMonthStart = startOfMonth(today);
+  const currentYearStart = startOfYear(today);
+  const weekOffset = parsePastPeriodOffset(resolvedSearchParams.weekOffset);
+  const monthOffset = parsePastPeriodOffset(resolvedSearchParams.monthOffset);
+  const yearOffset = parsePastPeriodOffset(resolvedSearchParams.yearOffset);
+  const selectedWeekStart = addDays(currentWeekStart, weekOffset * 7);
+  const selectedWeekEnd = weekOffset === 0 ? today : addDays(selectedWeekStart, 6);
+  const selectedMonthStart = addMonths(currentMonthStart, monthOffset);
+  const selectedMonthEnd = monthOffset === 0 ? today : endOfMonth(selectedMonthStart);
+  const selectedYearStart = addYears(currentYearStart, yearOffset);
+  const selectedYearEnd = yearOffset === 0 ? today : endOfYear(selectedYearStart);
+  const weeklyWindowStart = addDays(currentWeekStart, -11 * 7);
+  const queryStart = minDate(
+    weeklyWindowStart,
+    currentYearStart,
+    selectedWeekStart,
+    selectedMonthStart,
+    selectedYearStart,
+  );
 
   const { data: completedLessonsResult } = await supabaseAdmin
     .from("tutor_student_lessons")
@@ -312,40 +421,51 @@ export default async function LessonsPerformancePage() {
   const completedLessons = mapPerformanceLessons(
     (completedLessonsResult ?? []) as CompletedPerformanceLessonRow[],
   );
-  const weekStart = startOfWeek(today);
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const yearLessons = completedLessons.filter(
+  const firstLessonDate = completedLessons[0]
+    ? parseLessonDate(completedLessons[0].lessonDate)
+    : null;
+  const currentYearLessons = completedLessons.filter(
     (lesson) =>
-      parseLessonDate(lesson.lessonDate).getTime() >= yearStart.getTime(),
+      parseLessonDate(lesson.lessonDate).getTime() >= currentYearStart.getTime(),
   );
-  const assignedStudentYearLessons = yearLessons.filter(hasAssignedStudent);
+  const assignedStudentCurrentYearLessons = currentYearLessons.filter(
+    hasAssignedStudent,
+  );
   const weeklyTrend = buildWeeklyTrend(completedLessons, today);
   const monthlyTrend = buildMonthlyTrend(completedLessons, today);
   const dailyTrend = buildDailyTrend(completedLessons, today);
-  const weekCount = countLessonsInRange(completedLessons, weekStart, today);
-  const monthCount = countLessonsInRange(completedLessons, monthStart, today);
-  const yearCount = yearLessons.length;
-  const monthLessons = completedLessons.filter(
-    (lesson) =>
-      parseLessonDate(lesson.lessonDate).getTime() >= monthStart.getTime(),
+  const weekCount = countLessonsInRange(
+    completedLessons,
+    selectedWeekStart,
+    selectedWeekEnd,
+  );
+  const monthCount = countLessonsInRange(
+    completedLessons,
+    selectedMonthStart,
+    selectedMonthEnd,
+  );
+  const yearCount = countLessonsInRange(
+    completedLessons,
+    selectedYearStart,
+    selectedYearEnd,
   );
   const weekEarningsCents = sumLessonEarningsInRange(
     completedLessons,
-    weekStart,
-    today,
+    selectedWeekStart,
+    selectedWeekEnd,
   );
   const monthEarningsCents = sumLessonEarningsInRange(
     completedLessons,
-    monthStart,
-    today,
+    selectedMonthStart,
+    selectedMonthEnd,
   );
   const yearEarningsCents = sumLessonEarningsInRange(
-    yearLessons,
-    yearStart,
-    today,
+    completedLessons,
+    selectedYearStart,
+    selectedYearEnd,
   );
   const topStudents = Array.from(
-    assignedStudentYearLessons.reduce((map, lesson) => {
+    assignedStudentCurrentYearLessons.reduce((map, lesson) => {
       const current = map.get(lesson.studentId);
       if (current) {
         current.lessons += 1;
@@ -363,8 +483,10 @@ export default async function LessonsPerformancePage() {
     .map(([, value]) => ({
       ...value,
       share:
-        assignedStudentYearLessons.length > 0
-          ? Math.round((value.lessons / assignedStudentYearLessons.length) * 100)
+        assignedStudentCurrentYearLessons.length > 0
+          ? Math.round(
+              (value.lessons / assignedStudentCurrentYearLessons.length) * 100,
+            )
           : 0,
     }))
     .sort(
@@ -391,7 +513,7 @@ export default async function LessonsPerformancePage() {
     },
   );
   const activeStudentsCount = new Set(
-    assignedStudentYearLessons.map((lesson) => lesson.studentId),
+    assignedStudentCurrentYearLessons.map((lesson) => lesson.studentId),
   ).size;
   const rollingWeeklyAverage =
     weeklyTrend.length > 0
@@ -401,27 +523,70 @@ export default async function LessonsPerformancePage() {
         ).toFixed(1)
       : "0.0";
   const monthTotalHours = sumLessonHoursInRange(
-    monthLessons,
-    monthStart,
+    completedLessons,
+    selectedMonthStart,
+    selectedMonthEnd,
+  );
+  const selectedYearTotalHours = sumLessonHoursInRange(
+    completedLessons,
+    selectedYearStart,
+    selectedYearEnd,
+  );
+  const currentYearTotalHours = sumLessonHoursInRange(
+    completedLessons,
+    currentYearStart,
     today,
   );
-  const yearTotalHours = sumLessonHoursInRange(yearLessons, yearStart, today);
-  const daysSinceMonthStart = countDaysInRange(monthStart, today);
-  const daysSinceYearStart = countDaysInRange(yearStart, today);
-  const workdaysSinceMonthStart = countWeekdaysInRange(monthStart, today);
-  const workdaysSinceYearStart = countWeekdaysInRange(yearStart, today);
+  const daysSinceMonthStart = countDaysInRange(
+    selectedMonthStart,
+    selectedMonthEnd,
+  );
+  const daysInSelectedYear = countDaysInRange(selectedYearStart, selectedYearEnd);
+  const daysSinceCurrentYearStart = countDaysInRange(currentYearStart, today);
+  const workdaysSinceMonthStart = countWeekdaysInRange(
+    selectedMonthStart,
+    selectedMonthEnd,
+  );
+  const workdaysInSelectedYear = countWeekdaysInRange(
+    selectedYearStart,
+    selectedYearEnd,
+  );
+  const workdaysSinceCurrentYearStart = countWeekdaysInRange(
+    currentYearStart,
+    today,
+  );
   const averageLessonsPerMonthWeek =
     daysSinceMonthStart > 0 ? (monthCount * 7) / daysSinceMonthStart : 0;
   const averageLessonsPerYearWeek =
-    daysSinceYearStart > 0 ? (yearCount * 7) / daysSinceYearStart : 0;
+    daysInSelectedYear > 0 ? (yearCount * 7) / daysInSelectedYear : 0;
   const averageMonthHoursPerDay =
     daysSinceMonthStart > 0 ? monthTotalHours / daysSinceMonthStart : 0;
   const averageMonthHoursPerWorkday =
     workdaysSinceMonthStart > 0 ? monthTotalHours / workdaysSinceMonthStart : 0;
+  const selectedYearAverageHoursPerDay =
+    daysInSelectedYear > 0 ? selectedYearTotalHours / daysInSelectedYear : 0;
+  const selectedYearAverageHoursPerWorkday =
+    workdaysInSelectedYear > 0
+      ? selectedYearTotalHours / workdaysInSelectedYear
+      : 0;
   const averageHoursPerDay =
-    daysSinceYearStart > 0 ? yearTotalHours / daysSinceYearStart : 0;
+    daysSinceCurrentYearStart > 0
+      ? currentYearTotalHours / daysSinceCurrentYearStart
+      : 0;
   const averageHoursPerWorkday =
-    workdaysSinceYearStart > 0 ? yearTotalHours / workdaysSinceYearStart : 0;
+    workdaysSinceCurrentYearStart > 0
+      ? currentYearTotalHours / workdaysSinceCurrentYearStart
+      : 0;
+  const performancePathname = "/lessons/performance";
+  const canGoToPreviousWeek = firstLessonDate
+    ? selectedWeekStart.getTime() > startOfWeek(firstLessonDate).getTime()
+    : false;
+  const canGoToPreviousMonth = firstLessonDate
+    ? selectedMonthStart.getTime() > startOfMonth(firstLessonDate).getTime()
+    : false;
+  const canGoToPreviousYear = firstLessonDate
+    ? selectedYearStart.getTime() > startOfYear(firstLessonDate).getTime()
+    : false;
 
   return (
     <div className="space-y-6">
@@ -444,20 +609,58 @@ export default async function LessonsPerformancePage() {
       <TutorPerformanceDashboard
         periodMetrics={[
           {
-            label: "This Week",
+            label: `${formatShortDate(selectedWeekStart)} - ${formatShortDate(selectedWeekEnd)}`,
             value: weekCount,
             earningsCents: weekEarningsCents,
-            helper: `${formatShortDate(weekStart)} - ${formatShortDate(today)}`,
+            helper: getMetricLabel("week"),
             iconKey: "week",
             accentClassName: "bg-[var(--color-chart-1)]/18",
+            previousHref: canGoToPreviousWeek
+              ? buildPerformancePageHref(
+                  performancePathname,
+                  resolvedSearchParams,
+                  "weekOffset",
+                  weekOffset - 1,
+                )
+              : undefined,
+            nextHref:
+              weekOffset < 0
+                ? buildPerformancePageHref(
+                    performancePathname,
+                    resolvedSearchParams,
+                    "weekOffset",
+                    Math.min(weekOffset + 1, 0),
+                  )
+                : undefined,
+            previousAriaLabel: "View previous week",
+            nextAriaLabel: "View next week",
           },
           {
-            label: "This Month",
+            label: formatLongMonthLabel(selectedMonthStart),
             value: monthCount,
             earningsCents: monthEarningsCents,
-            helper: formatLongMonthLabel(monthStart),
+            helper: getMetricLabel("month"),
             iconKey: "month",
             accentClassName: "bg-[var(--color-chart-2)]/18",
+            previousHref: canGoToPreviousMonth
+              ? buildPerformancePageHref(
+                  performancePathname,
+                  resolvedSearchParams,
+                  "monthOffset",
+                  monthOffset - 1,
+                )
+              : undefined,
+            nextHref:
+              monthOffset < 0
+                ? buildPerformancePageHref(
+                    performancePathname,
+                    resolvedSearchParams,
+                    "monthOffset",
+                    Math.min(monthOffset + 1, 0),
+                  )
+                : undefined,
+            previousAriaLabel: "View previous month",
+            nextAriaLabel: "View next month",
             stats: [
               {
                 label: "Avg / week",
@@ -474,12 +677,31 @@ export default async function LessonsPerformancePage() {
             ],
           },
           {
-            label: "This Year",
+            label: String(selectedYearStart.getFullYear()),
             value: yearCount,
             earningsCents: yearEarningsCents,
-            helper: String(today.getFullYear()),
+            helper: getMetricLabel("year"),
             iconKey: "year",
             accentClassName: "bg-[var(--color-chart-3)]/18",
+            previousHref: canGoToPreviousYear
+              ? buildPerformancePageHref(
+                  performancePathname,
+                  resolvedSearchParams,
+                  "yearOffset",
+                  yearOffset - 1,
+                )
+              : undefined,
+            nextHref:
+              yearOffset < 0
+                ? buildPerformancePageHref(
+                    performancePathname,
+                    resolvedSearchParams,
+                    "yearOffset",
+                    Math.min(yearOffset + 1, 0),
+                  )
+                : undefined,
+            previousAriaLabel: "View previous year",
+            nextAriaLabel: "View next year",
             stats: [
               {
                 label: "Avg / week",
@@ -487,11 +709,11 @@ export default async function LessonsPerformancePage() {
               },
               {
                 label: "Avg hrs / day",
-                value: formatHours(averageHoursPerDay),
+                value: formatHours(selectedYearAverageHoursPerDay),
               },
               {
                 label: "5-day avg",
-                value: formatHours(averageHoursPerWorkday),
+                value: formatHours(selectedYearAverageHoursPerWorkday),
               },
             ],
           },
@@ -534,10 +756,10 @@ export default async function LessonsPerformancePage() {
         ]}
         formulaMetrics={{
           yearLabel: today.getFullYear(),
-          rangeLabel: `${formatFormulaDate(yearStart)} - ${formatFormulaDate(today)}`,
-          totalHoursLabel: formatHours(yearTotalHours),
-          calendarDays: daysSinceYearStart,
-          weekdayDays: workdaysSinceYearStart,
+          rangeLabel: `${formatFormulaDate(currentYearStart)} - ${formatFormulaDate(today)}`,
+          totalHoursLabel: formatHours(currentYearTotalHours),
+          calendarDays: daysSinceCurrentYearStart,
+          weekdayDays: workdaysSinceCurrentYearStart,
           averageHoursPerDayLabel: formatHours(averageHoursPerDay),
           averageHoursPerWorkdayLabel: formatHours(averageHoursPerWorkday),
         }}

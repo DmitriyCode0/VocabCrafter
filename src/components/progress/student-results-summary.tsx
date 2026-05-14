@@ -19,6 +19,7 @@ import {
 
 interface StudentResultsSummaryProps {
   snapshot: StudentProgressSnapshot;
+  showCefrGuidedHoursCard?: boolean;
 }
 
 function formatHours(value: number) {
@@ -40,6 +41,7 @@ function formatSignedHours(value: number) {
 
 export function StudentResultsSummary({
   snapshot,
+  showCefrGuidedHoursCard = true,
 }: StudentResultsSummaryProps) {
   const componentRows = [
     {
@@ -180,66 +182,68 @@ export function StudentResultsSummary({
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">CEFR Guided Hours</CardTitle>
-            <CardDescription>
-              Approximate cumulative guided hours from beginner level based on
-              Cambridge English guidance.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              {snapshot.cefrGuidedHours.levels.map((level) => {
-                const isCurrent =
-                  level.level === snapshot.cefrGuidedHours.currentLevel.level;
+        {showCefrGuidedHoursCard ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">CEFR Guided Hours</CardTitle>
+              <CardDescription>
+                Approximate cumulative guided hours from beginner level based on
+                Cambridge English guidance.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                {snapshot.cefrGuidedHours.levels.map((level) => {
+                  const isCurrent =
+                    level.level === snapshot.cefrGuidedHours.currentLevel.level;
 
-                return (
-                  <div
-                    key={level.level}
-                    className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
-                      isCurrent
-                        ? "border-primary/30 bg-primary/5"
-                        : "bg-background"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-foreground">
-                        {level.level}
-                      </span>
-                      {isCurrent ? (
-                        <Badge variant="secondary">Current target</Badge>
-                      ) : null}
+                  return (
+                    <div
+                      key={level.level}
+                      className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
+                        isCurrent
+                          ? "border-primary/30 bg-primary/5"
+                          : "bg-background"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground">
+                          {level.level}
+                        </span>
+                        {isCurrent ? (
+                          <Badge variant="secondary">Current target</Badge>
+                        ) : null}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-foreground">
+                          {formatHourRange(level.minHours, level.maxHours)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          about {level.averageHours} h average
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium text-foreground">
-                        {formatHourRange(level.minHours, level.maxHours)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        about {level.averageHours} h average
-                      </p>
-                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="rounded-xl border bg-muted/30 p-4 text-xs text-muted-foreground">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                  <div className="space-y-1">
+                    <p>{snapshot.cefrGuidedHours.source}</p>
+                    <p>
+                      Cambridge English also notes that moving from one CEFR band
+                      to the next often takes roughly 200 guided hours, but real
+                      progress depends on study intensity, previous exposure, and
+                      learning outside lessons.
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-
-            <div className="rounded-xl border bg-muted/30 p-4 text-xs text-muted-foreground">
-              <div className="flex items-start gap-2">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                <div className="space-y-1">
-                  <p>{snapshot.cefrGuidedHours.source}</p>
-                  <p>
-                    Cambridge English also notes that moving from one CEFR band
-                    to the next often takes roughly 200 guided hours, but real
-                    progress depends on study intensity, previous exposure, and
-                    learning outside lessons.
-                  </p>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </div>
   );

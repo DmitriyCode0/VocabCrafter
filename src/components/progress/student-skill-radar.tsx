@@ -382,58 +382,67 @@ export function StudentSkillRadar({
             >
               {(() => {
                 const previousAxis = previousAxisMap?.get(axis.key) ?? null;
-                const scoreDelta = previousAxis ? axis.score - previousAxis.score : 0;
+                const scoreDelta = previousAxis
+                  ? axis.score - previousAxis.score
+                  : 0;
 
                 return (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold">{axis.label}</p>
-                  {axis.beta && (
-                    <Badge
-                      variant="secondary"
-                      className="text-[11px] uppercase tracking-wide"
-                    >
-                      Beta
-                    </Badge>
-                  )}
-                </div>
-                {editable ? (
-                  <div className="flex items-center gap-1.5">
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={axis.score}
-                      onChange={(event) =>
-                        onAxisChange?.(axis.key, "score", event.target.value)
-                      }
-                      className="h-7 w-16 text-right text-sm font-semibold"
-                    />
-                    <span className="text-sm text-muted-foreground">/100</span>
-                  </div>
-                ) : (
-                  <div className="text-right">
-                    <p
-                      className={cn(
-                        "text-sm font-semibold",
-                        getScoreTone(axis.score),
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold">{axis.label}</p>
+                      {axis.beta && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[11px] uppercase tracking-wide"
+                        >
+                          Beta
+                        </Badge>
                       )}
-                    >
-                      {axis.score}/100
-                    </p>
-                    {previousAxis ? (
-                      <p className="text-[11px] text-muted-foreground">
-                        {comparison?.previousLabel}: {previousAxis.score}/100
-                        {scoreDelta === 0
-                          ? ""
-                          : scoreDelta > 0
-                            ? ` (+${scoreDelta})`
-                            : ` (${scoreDelta})`}
-                      </p>
-                    ) : null}
+                    </div>
+                    {editable ? (
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={axis.score}
+                          onChange={(event) =>
+                            onAxisChange?.(
+                              axis.key,
+                              "score",
+                              event.target.value,
+                            )
+                          }
+                          className="h-7 w-16 text-right text-sm font-semibold"
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          /100
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-right">
+                        <p
+                          className={cn(
+                            "text-sm font-semibold",
+                            getScoreTone(axis.score),
+                          )}
+                        >
+                          {axis.score}/100
+                        </p>
+                        {previousAxis ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            {comparison?.previousLabel}: {previousAxis.score}
+                            /100
+                            {scoreDelta === 0
+                              ? ""
+                              : scoreDelta > 0
+                                ? ` (+${scoreDelta})`
+                                : ` (${scoreDelta})`}
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
                 );
               })()}
 
@@ -467,13 +476,15 @@ export function StudentSkillRadar({
                 </>
               )}
 
-              {axis.key === "grammar_variety" && grammarTopics && !comparison && (
-                <GrammarTopicsDropdown
-                  topics={grammarTopics}
-                  editable={editable}
-                  onToggle={onGrammarTopicToggle}
-                />
-              )}
+              {axis.key === "grammar_variety" &&
+                grammarTopics &&
+                !comparison && (
+                  <GrammarTopicsDropdown
+                    topics={grammarTopics}
+                    editable={editable}
+                    onToggle={onGrammarTopicToggle}
+                  />
+                )}
 
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                 <motion.div

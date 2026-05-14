@@ -177,7 +177,10 @@ async function ProgressBody({
   return (
     <>
       {chartView === "overall" ? (
-        <StudentResultsSummary snapshot={effectiveSnapshot} />
+        <StudentResultsSummary
+          snapshot={effectiveSnapshot}
+          showCefrGuidedHoursCard={false}
+        />
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">

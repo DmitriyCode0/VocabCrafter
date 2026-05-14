@@ -3,6 +3,18 @@
 import { motion } from "motion/react";
 import Link from "next/link";
 import {
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+import {
+  type MouseEvent,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
+import {
   Area,
   AreaChart,
   Bar,
@@ -28,6 +40,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import {
   ChartContainer,
   ChartTooltip,
@@ -69,6 +88,110 @@ interface PeriodMetric {
   }>;
   iconKey: "week" | "month" | "year";
   accentClassName: string;
+  previousHref?: string;
+  nextHref?: string;
+  previousAriaLabel: string;
+  nextAriaLabel: string;
+}
+
+const PERIOD_METRICS_CACHE_KEY =
+  "vocab-crafter.lessons-performance.period-metrics";
+const PERIOD_METRICS_CACHE_TTL_MS = 1000 * 60 * 15;
+const PERIOD_METRICS_CACHE_MAX_ENTRIES = 24;
+
+interface PeriodMetricsCacheEntry {
+  cachedAt: number;
+  periodMetrics: PeriodMetric[];
+}
+
+function sanitizePeriodMetricsCache(
+  value: unknown,
+): Record<string, PeriodMetricsCacheEntry> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const now = Date.now();
+  const sanitizedEntries: Array<[string, PeriodMetricsCacheEntry]> =
+    Object.entries(value as Record<string, unknown>).flatMap(([href, entry]) => {
+      if (!entry || typeof entry !== "object") {
+        return [];
+      }
+
+      const cachedAt = (entry as { cachedAt?: unknown }).cachedAt;
+      const periodMetrics = (entry as { periodMetrics?: unknown }).periodMetrics;
+
+      if (
+        typeof cachedAt !== "number" ||
+        now - cachedAt > PERIOD_METRICS_CACHE_TTL_MS ||
+        !Array.isArray(periodMetrics)
+      ) {
+        return [];
+      }
+
+      return [
+        [href, { cachedAt, periodMetrics: periodMetrics as PeriodMetric[] }],
+      ];
+    });
+
+  return Object.fromEntries(
+    sanitizedEntries
+      .sort((left, right) => right[1].cachedAt - left[1].cachedAt)
+      .slice(0, PERIOD_METRICS_CACHE_MAX_ENTRIES),
+  );
+}
+
+function readPeriodMetricsCache() {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(PERIOD_METRICS_CACHE_KEY);
+
+    if (!storedValue) {
+      return {};
+    }
+
+    const parsedValue = JSON.parse(storedValue) as unknown;
+    const sanitizedValue = sanitizePeriodMetricsCache(parsedValue);
+
+    if (JSON.stringify(parsedValue) !== JSON.stringify(sanitizedValue)) {
+      window.localStorage.setItem(
+        PERIOD_METRICS_CACHE_KEY,
+        JSON.stringify(sanitizedValue),
+      );
+    }
+
+    return sanitizedValue;
+  } catch {
+    return {};
+  }
+}
+
+function getCachedPeriodMetrics(href: string) {
+  return readPeriodMetricsCache()[href]?.periodMetrics;
+}
+
+function storeCachedPeriodMetrics(href: string, periodMetrics: PeriodMetric[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const nextCache = readPeriodMetricsCache();
+    nextCache[href] = {
+      cachedAt: Date.now(),
+      periodMetrics,
+    };
+
+    window.localStorage.setItem(
+      PERIOD_METRICS_CACHE_KEY,
+      JSON.stringify(sanitizePeriodMetricsCache(nextCache)),
+    );
+  } catch {
+    // Ignore storage failures and keep the live dashboard responsive.
+  }
 }
 
 interface TrendPoint {
@@ -113,9 +236,13 @@ interface TutorPerformanceDashboardProps {
 function MetricCard({
   metric,
   index,
+  isPending,
+  onNavigate,
 }: {
   metric: PeriodMetric;
   index: number;
+  isPending: boolean;
+  onNavigate: (event: MouseEvent<HTMLAnchorElement>, href?: string) => void;
 }) {
   const Icon =
     metric.iconKey === "week"
@@ -140,7 +267,7 @@ function MetricCard({
           />
           <div className="relative flex items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="max-w-[14rem] text-sm font-medium text-muted-foreground sm:max-w-[16rem]">
                 {metric.label}
               </CardTitle>
               <div className="mt-2 text-4xl font-semibold tracking-tight">
@@ -150,8 +277,46 @@ function MetricCard({
                 Earned {formatLessonCurrency(metric.earningsCents)}
               </p>
             </div>
-            <div className="rounded-2xl border border-border/60 bg-background/80 p-3 shadow-sm backdrop-blur-sm">
-              <Icon className="h-5 w-5 text-foreground" />
+            <div className="flex flex-col items-end gap-3">
+              <div className="rounded-2xl border border-border/60 bg-background/80 p-3 shadow-sm backdrop-blur-sm">
+                <Icon className="h-5 w-5 text-foreground" />
+              </div>
+              <Pagination
+                aria-busy={isPending}
+                className={cn(
+                  "mx-0 w-auto justify-end transition-opacity",
+                  isPending && "pointer-events-none opacity-60",
+                )}
+              >
+                <PaginationContent className="gap-1">
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href={metric.previousHref}
+                      onClick={(event) => onNavigate(event, metric.previousHref)}
+                      aria-label={metric.previousAriaLabel}
+                      aria-disabled={!metric.previousHref}
+                      tabIndex={metric.previousHref ? undefined : -1}
+                      className={cn(
+                        "h-8 w-8 min-w-8 px-0 [&_span]:hidden",
+                        !metric.previousHref && "pointer-events-none opacity-40",
+                      )}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      href={metric.nextHref}
+                      onClick={(event) => onNavigate(event, metric.nextHref)}
+                      aria-label={metric.nextAriaLabel}
+                      aria-disabled={!metric.nextHref}
+                      tabIndex={metric.nextHref ? undefined : -1}
+                      className={cn(
+                        "h-8 w-8 min-w-8 px-0 [&_span]:hidden",
+                        !metric.nextHref && "pointer-events-none opacity-40",
+                      )}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
           </div>
         </CardHeader>
@@ -239,11 +404,84 @@ export function TutorPerformanceDashboard({
   formulaMetrics,
   hasCompletedLessons,
 }: TutorPerformanceDashboardProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [optimisticPeriodSnapshot, setOptimisticPeriodSnapshot] = useState<{
+    href: string;
+    periodMetrics: PeriodMetric[];
+  } | null>(null);
+  const searchParamsString = searchParams.toString();
+  const currentHref = useMemo(
+    () =>
+      searchParamsString.length > 0
+        ? `${pathname}?${searchParamsString}`
+        : pathname,
+    [pathname, searchParamsString],
+  );
+  const displayedPeriodMetrics = useMemo(
+    () =>
+      optimisticPeriodSnapshot && optimisticPeriodSnapshot.href !== currentHref
+        ? optimisticPeriodSnapshot.periodMetrics
+        : periodMetrics,
+    [currentHref, optimisticPeriodSnapshot, periodMetrics],
+  );
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    storeCachedPeriodMetrics(currentHref, periodMetrics);
+  }, [currentHref, periodMetrics]);
+
+  useEffect(() => {
+    const uniqueHrefs = new Set(
+      displayedPeriodMetrics.flatMap((metric) =>
+        [metric.previousHref, metric.nextHref].filter(
+          (href): href is string => typeof href === "string" && href.length > 0,
+        ),
+      ),
+    );
+
+    uniqueHrefs.forEach((href) => {
+      router.prefetch(href);
+    });
+  }, [displayedPeriodMetrics, router]);
+
+  function handlePeriodNavigation(
+    event: MouseEvent<HTMLAnchorElement>,
+    href?: string,
+  ) {
+    event.preventDefault();
+
+    if (!href || isPending) {
+      return;
+    }
+
+    const cachedPeriodMetrics = getCachedPeriodMetrics(href);
+
+    if (cachedPeriodMetrics) {
+      setOptimisticPeriodSnapshot({
+        href,
+        periodMetrics: cachedPeriodMetrics,
+      });
+    }
+
+    startTransition(() => {
+      router.prefetch(href);
+      router.replace(href, { scroll: false });
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
-        {periodMetrics.map((metric, index) => (
-          <MetricCard key={metric.label} metric={metric} index={index} />
+        {displayedPeriodMetrics.map((metric, index) => (
+          <MetricCard
+            key={metric.iconKey}
+            metric={metric}
+            index={index}
+            isPending={isPending}
+            onNavigate={handlePeriodNavigation}
+          />
         ))}
       </div>
 

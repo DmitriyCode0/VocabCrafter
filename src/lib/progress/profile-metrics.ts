@@ -31,25 +31,12 @@ import {
   type StudentMonthlyProgressTargetOverrides,
   type StudentMonthlyProgressTargets,
 } from "@/lib/progress/monthly-progress-targets";
+import {
+  CEFR_GUIDED_HOURS,
+  CEFR_GUIDED_HOURS_SOURCE,
+  CEFR_LEVELS,
+} from "@/lib/progress/cefr-guided-hours";
 import type { CEFRLevel } from "@/types/quiz";
-
-const CEFR_LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
-
-export const CEFR_GUIDED_HOURS: Record<
-  CEFRLevel,
-  {
-    minHours: number;
-    maxHours: number;
-    averageHours: number;
-  }
-> = {
-  A1: { minHours: 90, maxHours: 100, averageHours: 95 },
-  A2: { minHours: 180, maxHours: 200, averageHours: 190 },
-  B1: { minHours: 350, maxHours: 400, averageHours: 375 },
-  B2: { minHours: 500, maxHours: 600, averageHours: 550 },
-  C1: { minHours: 700, maxHours: 800, averageHours: 750 },
-  C2: { minHours: 1000, maxHours: 1200, averageHours: 1100 },
-};
 
 /**
  * CEFR-based vocabulary targets.
@@ -95,25 +82,6 @@ export const PASSIVE_VOCAB_TARGETS: Record<CEFRLevel, number> = {
   B2: 8000,
   C1: 15000,
   C2: 25000,
-};
-
-/** Target number of quiz attempts per CEFR level for the engagement metric. */
-const ENGAGEMENT_QUIZ_TARGETS: Record<CEFRLevel, number> = {
-  A1: 30,
-  A2: 50,
-  B1: 80,
-  B2: 120,
-  C1: 180,
-  C2: 250,
-};
-
-const MONTHLY_ACTIVITY_TARGETS: Record<CEFRLevel, number> = {
-  A1: 12,
-  A2: 16,
-  B1: 20,
-  B2: 24,
-  C1: 28,
-  C2: 32,
 };
 
 /**
@@ -475,6 +443,26 @@ function calculateOverallPerformanceScore(
   );
 }
 
+function buildHoursAxis(
+  totalLearningHours: number,
+  guidedHoursTarget: number,
+  cefrLevel: CEFRLevel,
+): StudentProgressAxis {
+  const score =
+    guidedHoursTarget > 0
+      ? clampScore((totalLearningHours / guidedHoursTarget) * 100)
+      : 0;
+
+  return {
+    key: "engagement",
+    label: "Hours",
+    shortLabel: "Hours",
+    score,
+    value: `${roundMetric(totalLearningHours)} / ${guidedHoursTarget.toLocaleString()} guided hours`,
+    helper: `Tracked app study and completed lesson hours against the ${cefrLevel} guided-hours benchmark.`,
+  };
+}
+
 export function applyTutorTimeAdjustmentToSnapshot(
   snapshot: StudentProgressSnapshot,
   timeAdjustmentHours: number,
@@ -501,9 +489,24 @@ export function applyTutorTimeAdjustmentToSnapshot(
   const overallPerformanceScore = calculateOverallPerformanceScore(
     overallPerformanceComponents,
   );
+  const axes = snapshot.axes.map((axis) =>
+    axis.key === "engagement"
+      ? buildHoursAxis(
+          adjustedTotalLearningHoursRaw,
+          snapshot.cefrGuidedHours.currentLevel.averageHours,
+          snapshot.profile.cefrLevel,
+        )
+      : axis,
+  );
 
   return {
     ...snapshot,
+    axes,
+    chartData: axes.map((axis) => ({
+      axis: axis.shortLabel,
+      score: axis.score,
+      fullMark: 100,
+    })),
     timeMetrics: {
       ...snapshot.timeMetrics,
       totalLearningHours: Number(adjustedTotalLearningHoursRaw.toFixed(1)),
@@ -643,14 +646,6 @@ function isIsoDateInWindow(
   return Boolean(
     isoDate && isoDate >= window.periodStart && isoDate <= window.periodEnd,
   );
-}
-
-function buildMonthlyChartDataFromAxes(axes: StudentProgressAxis[]) {
-  return axes.map((axis) => ({
-    axis: axis.shortLabel,
-    score: axis.score,
-    fullMark: 100,
-  }));
 }
 
 function mapPassiveEvidenceRows(
@@ -1502,19 +1497,7 @@ export async function getStudentProgressSnapshot(
     }
   }
   const activeDays30 = activeDaysSet.size;
-  const activeDaysRatio = Math.min(1, activeDays30 / 30);
-  const quizCompletionRatio = Math.min(
-    1,
-    attempts.length / ENGAGEMENT_QUIZ_TARGETS[cefrLevel],
-  );
   const totalWords = words.length;
-  const wordsPracticedRatio = Math.min(
-    1,
-    totalWords / ACTIVE_VOCAB_TARGETS[cefrLevel],
-  );
-  const engagementScore = clampScore(
-    activeDaysRatio * 40 + quizCompletionRatio * 30 + wordsPracticedRatio * 30,
-  );
 
   const masteredWords = words.filter((word) => word.masteryLevel >= 4).length;
   const avgMasteryLevel =
@@ -1677,6 +1660,11 @@ export async function getStudentProgressSnapshot(
   const timeProgressScore = clampScore(
     (totalLearningHoursRaw / currentGuidedHours.averageHours) * 100,
   );
+  const hoursAxis = buildHoursAxis(
+    totalLearningHoursRaw,
+    currentGuidedHours.averageHours,
+    cefrLevel,
+  );
   const activeVocabPerformanceScore = liveLessonActiveVocabScore;
   const overallPerformanceComponents: StudentOverallPerformanceComponents = {
     time: timeProgressScore,
@@ -1708,14 +1696,7 @@ export async function getStudentProgressSnapshot(
       value: `${grammarMasteredCount}/${availableGrammarTopics.length} topics mastered`,
       helper: `A topic is mastered after ${GRAMMAR_MASTERY_MIN_ATTEMPTS} sentence translations scored ${GRAMMAR_MASTERY_MIN_SCORE}%+`,
     },
-    {
-      key: "engagement",
-      label: "Engagement",
-      shortLabel: "Engagement",
-      score: engagementScore,
-      value: `${activeDays30}/30 active days`,
-      helper: "40% active days, 30% quizzes completed, 30% words practiced",
-    },
+    hoursAxis,
     {
       key: "accuracy",
       label: "Accuracy",
@@ -1804,8 +1785,7 @@ export async function getStudentProgressSnapshot(
           : null,
     },
     cefrGuidedHours: {
-      source:
-        "Approximate cumulative guided learning hours based on Cambridge English CEFR guidance from beginner level.",
+      source: CEFR_GUIDED_HOURS_SOURCE,
       levels: CEFR_LEVELS.map((level) => ({
         level,
         minHours: CEFR_GUIDED_HOURS[level].minHours,
