@@ -10,12 +10,13 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, RotateCcw, Search, X, Trash2 } from "lucide-react";
+import { Check, Loader2, Search, X, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import { formatAppDate } from "@/lib/dates";
 import {
   formatPassiveVocabularyPartOfSpeech,
+  getPassiveVocabularyForms,
   getPassiveVocabularyUkrainianTranslation,
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
   type PassiveVocabularyLibraryAttributes,
@@ -26,6 +27,8 @@ import type { PassiveVocabularyLibraryAdminItem } from "@/lib/mastery/passive-vo
 import {
   approvePassiveVocabularyLibrarySuggestion,
   rejectPassiveVocabularyLibrarySuggestion,
+  confirmPassiveVocabularyLibraryItem,
+  rejectPassiveVocabularyLibraryItem,
   deletePassiveVocabularyLibraryItem,
   deletePassiveVocabularyLibraryItems,
 } from "@/app/(platform)/library/actions";
@@ -64,6 +67,40 @@ const CEFR_FILTER_VALUES: Array<"all" | "unknown" | CEFRLevel> = [
   "C1",
   "C2",
 ];
+const APPROVAL_FILTER_VALUES = [
+  "all",
+  "unconfirmed",
+  "confirmed",
+  "rejected",
+] as const;
+
+type DictionaryApprovalFilter = (typeof APPROVAL_FILTER_VALUES)[number];
+
+function getApprovalStatusLabel(status: PassiveVocabularyLibraryAdminItem["approval_status"]) {
+  if (status === "confirmed") {
+    return "Confirmed";
+  }
+
+  if (status === "rejected") {
+    return "Rejected";
+  }
+
+  return "Unconfirmed";
+}
+
+function getApprovalStatusBadgeClassName(
+  status: PassiveVocabularyLibraryAdminItem["approval_status"],
+) {
+  if (status === "confirmed") {
+    return "border-emerald-300 bg-emerald-50 text-emerald-700";
+  }
+
+  if (status === "rejected") {
+    return "border-rose-300 bg-rose-50 text-rose-700";
+  }
+
+  return "border-slate-300 bg-slate-50 text-slate-700";
+}
 
 export interface LibraryDictionaryPendingSuggestion {
   id: string;
@@ -147,29 +184,21 @@ export function LibraryDictionaryBrowser({
   const [cefrFilter, setCefrFilter] = useState<"all" | "unknown" | CEFRLevel>(
     "all",
   );
+  const [approvalFilter, setApprovalFilter] =
+    useState<DictionaryApprovalFilter>("all");
   const [posFilter, setPosFilter] = useState<PassiveVocabularyPartOfSpeech[]>([]);
   const [initialLoading, setInitialLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [retryingItemId, setRetryingItemId] = useState<string | null>(null);
-  const [isBulkRetrying, setIsBulkRetrying] = useState(false);
-  const [bulkRetryProgress, setBulkRetryProgress] = useState<{
-    completed: number;
-    total: number;
-  } | null>(null);
   const [reviewingSuggestionId, setReviewingSuggestionId] = useState<string | null>(null);
+  const [updatingApprovalItemId, setUpdatingApprovalItemId] = useState<string | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
-  const [isBatchReEnriching, setIsBatchReEnriching] = useState(false);
-  const [batchReEnrichProgress, setBatchReEnrichProgress] = useState<{
-    completed: number;
-    total: number;
-  } | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const initialFilterEffectRef = useRef(true);
   const initialLoadingRef = useRef(false);
   const loadingMoreRef = useRef(false);
-  const queryKey = `${searchQuery}:${cefrFilter}:${[...posFilter].sort().join(",")}`;
+  const queryKey = `${searchQuery}:${cefrFilter}:${approvalFilter}:${[...posFilter].sort().join(",")}`;
   const latestQueryKeyRef = useRef(queryKey);
 
   latestQueryKeyRef.current = queryKey;
@@ -205,10 +234,6 @@ export function LibraryDictionaryBrowser({
     () => items.filter((item) => selectedItemIdSet.has(item.id)),
     [items, selectedItemIdSet],
   );
-  const selectedWordItems = useMemo(
-    () => selectedItems.filter((item) => item.item_type === "word"),
-    [selectedItems],
-  );
   const canBatchManage = role === "superadmin" || (role === "tutor" && canDirectlyAdd);
   const allVisibleSelected =
     items.length > 0 && items.every((item) => selectedItemIdSet.has(item.id));
@@ -242,6 +267,10 @@ export function LibraryDictionaryBrowser({
         searchParams.set("pos", posFilter.join(","));
       }
 
+      if (role === "superadmin" && approvalFilter !== "all") {
+        searchParams.set("status", approvalFilter);
+      }
+
       const response = await fetch(
         `/api/mastery/passive-library?${searchParams.toString()}`,
         { cache: "no-store" },
@@ -260,7 +289,7 @@ export function LibraryDictionaryBrowser({
 
       return payload as PassiveLibraryResponse;
     },
-    [cefrFilter, messages.library.dictionary.requestFailed, searchQuery],
+    [approvalFilter, cefrFilter, messages.library.dictionary.requestFailed, posFilter, role, searchQuery],
   );
 
   const reloadItems = useCallback(async () => {
@@ -368,7 +397,7 @@ export function LibraryDictionaryBrowser({
     }
 
     void reloadItems();
-  }, [cefrFilter, reloadItems, searchQuery]);
+  }, [approvalFilter, cefrFilter, posFilter, reloadItems, searchQuery]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -392,112 +421,6 @@ export function LibraryDictionaryBrowser({
       observer.disconnect();
     };
   }, [hasMore, loadMoreItems]);
-
-  const reEnrichItem = useCallback(
-    async (item: PassiveVocabularyLibraryAdminItem) => {
-      const response = await fetch(
-        `/api/mastery/passive-library/${item.id}/re-enrich`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-      const payload = (await response.json().catch(() => null)) as
-        | {
-            error?: string;
-            mergedSourceItemId?: string | null;
-            item?: PassiveVocabularyLibraryAdminItem;
-          }
-        | null;
-
-      if (!response.ok) {
-        throw new Error(
-          payload?.error || messages.library.dictionary.reEnrichFailed,
-        );
-      }
-
-      return {
-        mergedSourceItemId: payload?.mergedSourceItemId ?? null,
-        item: payload?.item ?? item,
-      };
-    },
-    [messages.library.dictionary.reEnrichFailed],
-  );
-
-  const handleRetry = useCallback(
-    async (item: PassiveVocabularyLibraryAdminItem) => {
-      setRetryingItemId(item.id);
-
-      try {
-        const payload = await reEnrichItem(item);
-
-        toast.success(
-          payload.mergedSourceItemId
-            ? messages.library.dictionary.reEnrichedMerged(item.canonical_term)
-            : messages.library.dictionary.reEnrichedSuccess(
-                payload.item?.canonical_term ?? item.canonical_term,
-              ),
-        );
-        await reloadItems();
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : messages.library.dictionary.reEnrichFailed,
-        );
-      } finally {
-        setRetryingItemId(null);
-      }
-    },
-    [messages.library.dictionary, reEnrichItem, reloadItems],
-  );
-
-  const loadedNeedsReviewItems = items.filter(
-    (item) => item.item_type === "word" && item.enrichment_status !== "completed",
-  );
-
-  const handleBulkRetry = useCallback(async () => {
-    if (loadedNeedsReviewItems.length === 0) {
-      return;
-    }
-
-    setIsBulkRetrying(true);
-    setBulkRetryProgress({ completed: 0, total: loadedNeedsReviewItems.length });
-
-    let successCount = 0;
-    let failureCount = 0;
-
-    try {
-      for (let index = 0; index < loadedNeedsReviewItems.length; index += 1) {
-        try {
-          await reEnrichItem(loadedNeedsReviewItems[index]);
-          successCount += 1;
-        } catch {
-          failureCount += 1;
-        }
-
-        setBulkRetryProgress({
-          completed: index + 1,
-          total: loadedNeedsReviewItems.length,
-        });
-      }
-
-      if (failureCount === 0) {
-        toast.success(messages.library.dictionary.bulkRetrySuccess(successCount));
-      } else if (successCount > 0) {
-        toast.success(
-          messages.library.dictionary.bulkRetryPartial(successCount, failureCount),
-        );
-      } else {
-        toast.error(messages.library.dictionary.bulkRetryFailed);
-      }
-
-      await reloadItems();
-    } finally {
-      setIsBulkRetrying(false);
-      setBulkRetryProgress(null);
-    }
-  }, [loadedNeedsReviewItems, messages.library.dictionary, reEnrichItem, reloadItems]);
 
   const handleApproveSuggestion = useCallback(
     async (suggestion: LibraryDictionarySuggestionReviewItem) => {
@@ -559,6 +482,56 @@ export function LibraryDictionaryBrowser({
     }
   };
 
+  const handleConfirmItem = useCallback(
+    async (item: PassiveVocabularyLibraryAdminItem) => {
+      setUpdatingApprovalItemId(item.id);
+
+      try {
+        await confirmPassiveVocabularyLibraryItem(item.id);
+        toast.success(`Confirmed "${item.canonical_term}"`);
+        await reloadItems();
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to confirm dictionary item",
+        );
+      } finally {
+        setUpdatingApprovalItemId(null);
+      }
+    },
+    [reloadItems],
+  );
+
+  const handleRejectItem = useCallback(
+    async (item: PassiveVocabularyLibraryAdminItem) => {
+      const confirmed = window.confirm(
+        `Reject "${item.canonical_term}" globally? Rejected words stay out of vocabulary metrics and non-superadmin dictionary views.`,
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setUpdatingApprovalItemId(item.id);
+
+      try {
+        await rejectPassiveVocabularyLibraryItem(item.id);
+        toast.success(`Rejected "${item.canonical_term}"`);
+        await reloadItems();
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to reject dictionary item",
+        );
+      } finally {
+        setUpdatingApprovalItemId(null);
+      }
+    },
+    [reloadItems],
+  );
+
   const handleSelectVisible = useCallback((checked: boolean) => {
     if (!checked) {
       setSelectedItemIds([]);
@@ -613,52 +586,11 @@ export function LibraryDictionaryBrowser({
     }
   }, [reloadItems, selectedItems]);
 
-  const handleBatchReEnrich = useCallback(async () => {
-    if (selectedWordItems.length === 0) {
-      return;
-    }
-
-    setIsBatchReEnriching(true);
-    setBatchReEnrichProgress({ completed: 0, total: selectedWordItems.length });
-
-    let successCount = 0;
-    let failureCount = 0;
-
-    try {
-      for (let index = 0; index < selectedWordItems.length; index += 1) {
-        try {
-          await reEnrichItem(selectedWordItems[index]);
-          successCount += 1;
-        } catch {
-          failureCount += 1;
-        }
-
-        setBatchReEnrichProgress({
-          completed: index + 1,
-          total: selectedWordItems.length,
-        });
-      }
-
-      if (failureCount === 0) {
-        toast.success(
-          `Re-enriched ${successCount} selected word${successCount === 1 ? "" : "s"}`,
-        );
-      } else if (successCount > 0) {
-        toast.success(
-          `Re-enriched ${successCount}; ${failureCount} failed`,
-        );
-      } else {
-        toast.error("None of the selected words could be re-enriched");
-      }
-
-      await reloadItems();
-    } finally {
-      setIsBatchReEnriching(false);
-      setBatchReEnrichProgress(null);
-    }
-  }, [reloadItems, reEnrichItem, selectedWordItems]);
-
-  const hasActiveFilters = searchQuery.length > 0 || cefrFilter !== "all";
+  const hasActiveFilters =
+    searchQuery.length > 0 ||
+    cefrFilter !== "all" ||
+    posFilter.length > 0 ||
+    approvalFilter !== "all";
 
   return (
     <div className="space-y-6">
@@ -806,7 +738,7 @@ export function LibraryDictionaryBrowser({
               placeholder={messages.library.dictionary.searchPlaceholder}
               aria-label={messages.library.dictionary.searchAriaLabel}
             />
-            <Button type="submit" className="sm:w-auto" disabled={isBulkRetrying}>
+            <Button type="submit" className="sm:w-auto">
               <Search className="mr-2 h-4 w-4" />
               {messages.library.dictionary.searchAction}
             </Button>
@@ -820,39 +752,6 @@ export function LibraryDictionaryBrowser({
             <span>
               {messages.library.dictionary.loadedItems(items.length, searchQuery || undefined)}
             </span>
-
-            {role === "superadmin" && loadedNeedsReviewItems.length > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isBulkRetrying}
-                onClick={() => void handleBulkRetry()}
-              >
-                {isBulkRetrying ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                )}
-                {messages.library.dictionary.retryLoadedNeedsReview}
-              </Button>
-            )}
-
-            {bulkRetryProgress && (
-              <span>
-                {messages.library.dictionary.repairingProgress(
-                  bulkRetryProgress.completed,
-                  bulkRetryProgress.total,
-                )}
-              </span>
-            )}
-
-            {batchReEnrichProgress && (
-              <span>
-                Re-enriching selected: {batchReEnrichProgress.completed}/
-                {batchReEnrichProgress.total}
-              </span>
-            )}
           </div>
         </form>
 
@@ -861,27 +760,11 @@ export function LibraryDictionaryBrowser({
             <Badge variant="outline">
               Selected: {selectedItems.length}
             </Badge>
-            {role === "superadmin" ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={selectedWordItems.length === 0 || isBatchReEnriching || isBatchDeleting}
-                onClick={() => void handleBatchReEnrich()}
-              >
-                {isBatchReEnriching ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                )}
-                Re-enrich selected ({selectedWordItems.length})
-              </Button>
-            ) : null}
             <Button
               type="button"
               variant="destructive"
               size="sm"
-              disabled={selectedItems.length === 0 || isBatchReEnriching || isBatchDeleting}
+              disabled={selectedItems.length === 0 || isBatchDeleting}
               onClick={() => void handleBatchDelete()}
             >
               {isBatchDeleting ? (
@@ -907,6 +790,28 @@ export function LibraryDictionaryBrowser({
             </Button>
           ))}
         </div>
+
+        {role === "superadmin" ? (
+          <div className="flex flex-wrap gap-2">
+            {APPROVAL_FILTER_VALUES.map((value) => (
+              <Button
+                key={value}
+                type="button"
+                variant={approvalFilter === value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setApprovalFilter(value)}
+              >
+                {value === "all"
+                  ? "All statuses"
+                  : value === "unconfirmed"
+                    ? "Unconfirmed"
+                    : value === "confirmed"
+                      ? "Confirmed"
+                      : "Rejected"}
+              </Button>
+            ))}
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           {PASSIVE_VOCABULARY_PARTS_OF_SPEECH.map((pos) => {
@@ -971,9 +876,13 @@ export function LibraryDictionaryBrowser({
               </TableHeader>
               <TableBody>
                 {items.map((item) => {
-                  const isRetrying = retryingItemId === item.id;
+                  const isUpdatingApproval = updatingApprovalItemId === item.id;
                   const ukrainianTranslation = getPassiveVocabularyUkrainianTranslation(
                     item.attributes,
+                  );
+                  const storedSearchForms = getPassiveVocabularyForms(
+                    item.attributes,
+                    item.canonical_term,
                   );
                   const pendingSuggestion = pendingSuggestionByItemId.get(item.id);
 
@@ -1005,6 +914,22 @@ export function LibraryDictionaryBrowser({
                               {ukrainianTranslation}
                             </p>
                           )}
+                          {storedSearchForms.length > 0 ? (
+                            <div className="flex flex-wrap items-center gap-1 pt-1">
+                              <span className="text-[11px] text-muted-foreground">
+                                {messages.library.dictionary.searchFormsLabel}
+                              </span>
+                              {storedSearchForms.map((form) => (
+                                <Badge
+                                  key={`${item.id}-${form}`}
+                                  variant="secondary"
+                                  className="px-1.5 py-0 text-[11px] font-normal"
+                                >
+                                  {form}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell>{item.item_type}</TableCell>
@@ -1014,40 +939,52 @@ export function LibraryDictionaryBrowser({
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={
-                            item.enrichment_status === "completed"
-                              ? "secondary"
-                              : item.enrichment_status === "failed"
-                                ? "destructive"
-                                : "outline"
-                          }
+                          variant="outline"
+                          className={getApprovalStatusBadgeClassName(
+                            item.approval_status,
+                          )}
                         >
-                          {item.enrichment_status}
+                          {getApprovalStatusLabel(item.approval_status)}
                         </Badge>
+                        {item.enrichment_status !== "completed" ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            AI metadata: {item.enrichment_status}
+                          </p>
+                        ) : null}
                       </TableCell>
                       <TableCell>{formatAppDate(item.updated_at)}</TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-2">
                           {role === "superadmin" ? (
                             <>
-                              {item.item_type === "word" && (
+                              {item.approval_status !== "confirmed" ? (
                                 <Button
                                   type="button"
-                                  variant="outline"
                                   size="sm"
-                                  disabled={isRetrying || isBulkRetrying}
-                                  onClick={() => void handleRetry(item)}
+                                  disabled={isUpdatingApproval}
+                                  onClick={() => void handleConfirmItem(item)}
                                 >
-                                  {isRetrying ? (
+                                  {isUpdatingApproval ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                   ) : (
-                                    <RotateCcw className="mr-2 h-4 w-4" />
+                                    <Check className="mr-2 h-4 w-4" />
                                   )}
-                                  {item.enrichment_status === "completed"
-                                    ? messages.library.dictionary.reEnrichAction
-                                    : messages.library.dictionary.retryAiAction}
+                                  Confirm
                                 </Button>
-                              )}
+                              ) : null}
+
+                              {item.approval_status !== "rejected" ? (
+                                <Button
+                                  type="button"
+                                                    variant="destructive"
+                                  size="sm"
+                                  disabled={isUpdatingApproval}
+                                  onClick={() => void handleRejectItem(item)}
+                                >
+                                  <X className="mr-2 h-4 w-4" />
+                                  Reject
+                                </Button>
+                              ) : null}
 
                               <EditPassiveLibraryDialog
                                 item={{
@@ -1056,6 +993,7 @@ export function LibraryDictionaryBrowser({
                                   item_type: item.item_type,
                                   cefr_level: item.cefr_level,
                                   part_of_speech: item.part_of_speech,
+                                  approval_status: item.approval_status,
                                   attributes: item.attributes,
                                 }}
                                 onSaved={async () => {
@@ -1069,6 +1007,7 @@ export function LibraryDictionaryBrowser({
                                 variant="destructive"
                                 size="icon"
                                 className="h-8 w-8"
+                                disabled={isUpdatingApproval}
                                 onClick={() => void handleDeleteItem(item)}
                               >
                                 <Trash2 className="h-4 w-4" />

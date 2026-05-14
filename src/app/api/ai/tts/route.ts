@@ -8,7 +8,11 @@ import {
   normalizeGeminiTtsVoice,
 } from "@/lib/ai/tts-voices";
 import { getGenAI, GEMINI_TTS_MODEL } from "@/lib/gemini/client";
-import { getSpeechLanguageTag } from "@/lib/languages";
+import {
+  ENGLISH_VARIANT_PREFERENCES,
+  getSpeechLanguageTag,
+  normalizeEnglishVariantPreference,
+} from "@/lib/languages";
 
 const SAMPLE_RATE = 24000;
 const CHANNEL_COUNT = 1;
@@ -17,6 +21,7 @@ const BITS_PER_SAMPLE = 16;
 const requestSchema = z.object({
   text: z.string().trim().min(1).max(3000),
   language: z.enum(["english", "spanish", "ukrainian"]).optional(),
+  englishVariantPreference: z.enum(ENGLISH_VARIANT_PREFERENCES).optional(),
   voice: z.string().trim().optional(),
 });
 
@@ -83,10 +88,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const { text, language, voice } = parsed.data;
+    const { text, language, englishVariantPreference, voice } = parsed.data;
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("ai_voice")
+      .select("ai_voice, english_variant_preference")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -100,6 +105,9 @@ export async function POST(request: Request) {
     const voiceName = normalizeGeminiTtsVoice(
       voice ?? profile?.ai_voice ?? DEFAULT_GEMINI_TTS_VOICE,
     );
+    const resolvedEnglishVariantPreference = normalizeEnglishVariantPreference(
+      englishVariantPreference ?? profile?.english_variant_preference,
+    );
     const prompt = buildTtsPrompt(text);
     const response = await getGenAI().models.generateContent({
       model: GEMINI_TTS_MODEL,
@@ -107,7 +115,10 @@ export async function POST(request: Request) {
       config: {
         responseModalities: ["AUDIO"],
         speechConfig: {
-          languageCode: getSpeechLanguageTag(language),
+          languageCode: getSpeechLanguageTag(
+            language,
+            resolvedEnglishVariantPreference,
+          ),
           voiceConfig: {
             prebuiltVoiceConfig: {
               voiceName,

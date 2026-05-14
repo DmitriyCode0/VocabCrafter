@@ -22,6 +22,7 @@ export interface Database {
           cefr_level: string;
           preferred_language: string;
           source_language: string;
+          english_variant_preference: string;
           app_language: string;
           ai_voice: string;
           plan: string;
@@ -40,6 +41,7 @@ export interface Database {
           cefr_level?: string;
           preferred_language?: string;
           source_language?: string;
+          english_variant_preference?: string;
           app_language?: string;
           ai_voice?: string;
           plan?: string;
@@ -58,6 +60,7 @@ export interface Database {
           cefr_level?: string;
           preferred_language?: string;
           source_language?: string;
+          english_variant_preference?: string;
           app_language?: string;
           ai_voice?: string;
           plan?: string;
@@ -1228,9 +1231,13 @@ export interface Database {
           cefr_level: string | null;
           part_of_speech: string | null;
           attributes: Json;
+          approval_status: "unconfirmed" | "confirmed" | "rejected";
+          rejection_reason: string | null;
           enrichment_status: "pending" | "completed" | "failed";
           enrichment_error: string | null;
           created_by: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
           updated_by: string | null;
           created_at: string;
           updated_at: string;
@@ -1243,9 +1250,13 @@ export interface Database {
           cefr_level?: string | null;
           part_of_speech?: string | null;
           attributes?: Json;
+          approval_status?: "unconfirmed" | "confirmed" | "rejected";
+          rejection_reason?: string | null;
           enrichment_status?: "pending" | "completed" | "failed";
           enrichment_error?: string | null;
           created_by?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
           updated_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -1258,9 +1269,13 @@ export interface Database {
           cefr_level?: string | null;
           part_of_speech?: string | null;
           attributes?: Json;
+          approval_status?: "unconfirmed" | "confirmed" | "rejected";
+          rejection_reason?: string | null;
           enrichment_status?: "pending" | "completed" | "failed";
           enrichment_error?: string | null;
           created_by?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
           updated_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -1276,6 +1291,13 @@ export interface Database {
           {
             foreignKeyName: "passive_vocabulary_library_updated_by_fkey";
             columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "passive_vocabulary_library_reviewed_by_fkey";
+            columns: ["reviewed_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];

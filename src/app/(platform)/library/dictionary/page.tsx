@@ -57,17 +57,25 @@ export default async function LibraryDictionaryPage() {
   const role = profile.role;
   const messages = getAppMessages(normalizeAppLanguage(profile.app_language));
   const supabaseAdmin = createAdminClient();
+  let libraryCountQuery = supabaseAdmin
+    .from("passive_vocabulary_library")
+    .select("id", { count: "exact", head: true });
+  let libraryRowsQuery = supabaseAdmin
+    .from("passive_vocabulary_library")
+    .select(
+      "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, reviewed_at, updated_at",
+    )
+    .order("updated_at", { ascending: false })
+    .range(0, LIBRARY_PAGE_SIZE - 1);
+
+  if (role !== "superadmin") {
+    libraryCountQuery = libraryCountQuery.eq("approval_status", "confirmed");
+    libraryRowsQuery = libraryRowsQuery.eq("approval_status", "confirmed");
+  }
+
   const [libraryCountResult, libraryRowsResult, canDirectlyAdd] = await Promise.all([
-    supabaseAdmin
-      .from("passive_vocabulary_library")
-      .select("id", { count: "exact", head: true }),
-    supabaseAdmin
-      .from("passive_vocabulary_library")
-      .select(
-        "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, enrichment_status, enrichment_error, updated_at",
-      )
-      .order("updated_at", { ascending: false })
-      .range(0, LIBRARY_PAGE_SIZE - 1),
+    libraryCountQuery,
+    libraryRowsQuery,
     canUserEditDictionary(user.id, role),
   ]);
 
@@ -209,8 +217,11 @@ export default async function LibraryDictionaryPage() {
           part_of_speech:
             item.part_of_speech as PassiveVocabularyPartOfSpeech | null,
           attributes: normalizePassiveVocabularyLibraryAttributes(item.attributes),
+          approval_status: item.approval_status,
+          rejection_reason: item.rejection_reason,
           enrichment_status: item.enrichment_status,
           enrichment_error: item.enrichment_error,
+          reviewed_at: item.reviewed_at,
           updated_at: item.updated_at,
         }))}
         initialHasMore={(libraryCountResult.count ?? 0) > LIBRARY_PAGE_SIZE}

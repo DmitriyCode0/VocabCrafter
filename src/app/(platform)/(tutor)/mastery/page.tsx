@@ -11,6 +11,7 @@ import {
 import { PagePagination } from "@/components/shared/page-pagination";
 import { StudentMasteryCards } from "@/components/mastery/student-mastery-cards";
 import { StudentVocabularyPageContent } from "@/components/mastery/student-vocabulary-page-content";
+import { hasConfirmedPassiveVocabularyLibraryEntry } from "@/lib/mastery/dictionary-approval";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { Users } from "lucide-react";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
@@ -27,6 +28,9 @@ interface MasteryLevelRow {
 
 interface PassiveEvidenceSummaryRow {
   student_id: string;
+  passive_vocabulary_library: {
+    approval_status: "unconfirmed" | "confirmed" | "rejected";
+  } | null;
 }
 
 interface StudentProfile {
@@ -144,12 +148,14 @@ export async function TutorMasteryPageContent({
 
   const { data: passiveEvidenceRows } = await supabaseAdmin
     .from("passive_vocabulary_evidence")
-    .select("student_id")
+    .select("student_id, passive_vocabulary_library(approval_status)")
     .in("student_id", studentIds);
 
   const visibleMastery = (allMasteryRows ?? []) as MasteryLevelRow[];
-  const visiblePassiveEvidence = (passiveEvidenceRows ??
-    []) as PassiveEvidenceSummaryRow[];
+  const visiblePassiveEvidence = ((passiveEvidenceRows ??
+    []) as PassiveEvidenceSummaryRow[]).filter((row) =>
+    hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library),
+  );
 
   // Group by student for lightweight summary statistics.
   const studentMastery = new Map<string, number[]>();

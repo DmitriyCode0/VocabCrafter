@@ -150,6 +150,25 @@ export async function POST(request: Request) {
       actorUserId: user.id,
       adminClient: supabaseAdmin,
     });
+    const acceptedLibraryItems = libraryItems.filter(
+      (item) => item.approvalStatus !== "rejected",
+    );
+    const rejectedCount = libraryItems.length - acceptedLibraryItems.length;
+
+    if (acceptedLibraryItems.length === 0) {
+      return NextResponse.json({
+        processedCount: items.length,
+        importedCount: 0,
+        createdCount: 0,
+        updatedCount: 0,
+        confirmedCount: 0,
+        pendingCount: 0,
+        rejectedCount,
+        studentId,
+        sourceType,
+      });
+    }
+
     const canonicalItems = new Map<
       string,
       {
@@ -158,10 +177,11 @@ export async function POST(request: Request) {
         normalizedTerm: string;
         itemType: "word" | "phrase";
         libraryItemId: string | null;
+        approvalStatus: "confirmed" | "unconfirmed";
       }
     >();
 
-    for (const libraryItem of libraryItems) {
+    for (const libraryItem of acceptedLibraryItems) {
       const key = getPassiveVocabularyCompositeKey(
         libraryItem.canonicalNormalizedTerm,
         libraryItem.itemType,
@@ -180,10 +200,15 @@ export async function POST(request: Request) {
         normalizedTerm: libraryItem.canonicalNormalizedTerm,
         itemType: libraryItem.itemType,
         libraryItemId: libraryItem.libraryItemId,
+        approvalStatus:
+          libraryItem.approvalStatus === "confirmed" ? "confirmed" : "unconfirmed",
       });
     }
 
     const canonicalItemList = Array.from(canonicalItems.values());
+    const confirmedCount = canonicalItemList.filter(
+      (item) => item.approvalStatus === "confirmed",
+    ).length;
 
     const { data: existingRows, error: existingError } = await supabaseAdmin
       .from("passive_vocabulary_evidence")
@@ -255,9 +280,13 @@ export async function POST(request: Request) {
     ).length;
 
     return NextResponse.json({
+      processedCount: items.length,
       importedCount: canonicalItemList.length,
       createdCount,
       updatedCount: canonicalItemList.length - createdCount,
+      confirmedCount,
+      pendingCount: canonicalItemList.length - confirmedCount,
+      rejectedCount,
       studentId,
       sourceType,
     });

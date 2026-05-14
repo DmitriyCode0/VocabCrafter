@@ -27,12 +27,12 @@ import {
 } from "lucide-react";
 import {
   normalizeLearningLanguage,
-  normalizeSourceLanguage,
 } from "@/lib/languages";
 import {
   PASSIVE_EQUIVALENT_WORDS_EXPLANATION,
   summarizePassiveVocabularyEvidence,
 } from "@/lib/mastery/passive-vocabulary";
+import { hasConfirmedPassiveVocabularyLibraryEntry } from "@/lib/mastery/dictionary-approval";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +77,15 @@ interface PassiveEvidenceRow {
   source_label: string | null;
   import_count: number;
   last_imported_at: string;
+  passive_vocabulary_library: {
+    approval_status: "unconfirmed" | "confirmed" | "rejected";
+  } | null;
+}
+
+function hasPendingPassiveEvidence(
+  libraryItem: PassiveEvidenceRow["passive_vocabulary_library"],
+) {
+  return !libraryItem || libraryItem.approval_status === "unconfirmed";
 }
 
 interface StudentVocabularyPageProps {
@@ -98,12 +107,11 @@ export async function StudentVocabularyPageContent({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("preferred_language, source_language")
+    .select("preferred_language")
     .eq("id", user.id)
     .single();
 
   const targetLanguage = normalizeLearningLanguage(profile?.preferred_language);
-  const sourceLanguage = normalizeSourceLanguage(profile?.source_language);
 
   const supabaseAdmin = createAdminClient();
   const nowIso = new Date().toISOString();
@@ -114,8 +122,7 @@ export async function StudentVocabularyPageContent({
     dueForReviewResult,
     levelRowsResult,
     wordsResult,
-    passiveEvidenceCountResult,
-    passiveEvidenceSummaryRowsResult,
+    passiveEvidenceRowsResult,
   ] = await Promise.all([
     supabaseAdmin
       .from("word_mastery")
@@ -146,12 +153,8 @@ export async function StudentVocabularyPageContent({
       .range(from, to),
     supabaseAdmin
       .from("passive_vocabulary_evidence")
-      .select("id", { count: "exact", head: true })
-      .eq("student_id", user.id),
-    supabaseAdmin
-      .from("passive_vocabulary_evidence")
       .select(
-        "term, definition, item_type, source_type, source_label, import_count, last_imported_at",
+        "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(approval_status)",
       )
       .eq("student_id", user.id),
   ]);
@@ -161,19 +164,25 @@ export async function StudentVocabularyPageContent({
   const dueForReview = dueForReviewResult.count ?? 0;
   const levelRows = levelRowsResult.data ?? [];
   const visibleWords = (wordsResult.data ?? []) as WordMasteryRow[];
-  const passiveEvidenceTotal = passiveEvidenceCountResult.count ?? 0;
+  const allPassiveEvidenceRows =
+    (passiveEvidenceRowsResult.data ?? []) as PassiveEvidenceRow[];
+  const visiblePassiveEvidenceRows = allPassiveEvidenceRows.filter((row) =>
+    hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library),
+  );
+  const pendingPassiveEvidenceCount = allPassiveEvidenceRows.filter((row) =>
+    hasPendingPassiveEvidence(row.passive_vocabulary_library),
+  ).length;
+  const passiveEvidenceTotal = visiblePassiveEvidenceRows.length;
   const passiveEvidenceSummary = summarizePassiveVocabularyEvidence(
-    ((passiveEvidenceSummaryRowsResult.data ?? []) as PassiveEvidenceRow[]).map(
-      (item) => ({
-        term: item.term,
-        definition: item.definition,
-        item_type: item.item_type,
-        source_type: item.source_type,
-        source_label: item.source_label,
-        import_count: item.import_count,
-        last_imported_at: item.last_imported_at,
-      }),
-    ),
+    visiblePassiveEvidenceRows.map((item) => ({
+      term: item.term,
+      definition: item.definition,
+      item_type: item.item_type,
+      source_type: item.source_type,
+      source_label: item.source_label,
+      import_count: item.import_count,
+      last_imported_at: item.last_imported_at,
+    })),
   );
 
   const avgLevel =
@@ -265,7 +274,6 @@ export async function StudentVocabularyPageContent({
 
       <ImportVocabularyCard
         targetLanguage={targetLanguage}
-        sourceLanguage={sourceLanguage}
       />
 
       <Card id="passive-recognition">
@@ -297,8 +305,14 @@ export async function StudentVocabularyPageContent({
           <CardContent>
             <div className="text-2xl font-bold">{passiveEvidenceTotal}</div>
             <p className="text-xs text-muted-foreground">
-              words and phrases tracked as recognition only
+              confirmed words and phrases tracked as recognition only
             </p>
+            {pendingPassiveEvidenceCount > 0 ? (
+              <p className="mt-1 text-xs text-amber-700">
+                {pendingPassiveEvidenceCount} pending review and hidden from
+                vocabulary estimates
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 

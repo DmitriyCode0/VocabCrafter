@@ -77,6 +77,9 @@ function parsePositiveInt(value: string | null, fallback: number) {
   return parsed;
 }
 
+const LIBRARY_ITEM_SELECT_FIELDS =
+  "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, reviewed_at, updated_at";
+
 function toAdminItem(row: {
   id: string;
   canonical_term: string;
@@ -85,8 +88,11 @@ function toAdminItem(row: {
   cefr_level: string | null;
   part_of_speech: string | null;
   attributes: unknown;
+  approval_status: "unconfirmed" | "confirmed" | "rejected";
+  rejection_reason: string | null;
   enrichment_status: string;
   enrichment_error: string | null;
+  reviewed_at: string | null;
   updated_at: string;
 }): PassiveVocabularyLibraryAdminItem {
   return {
@@ -98,12 +104,17 @@ function toAdminItem(row: {
     part_of_speech:
       row.part_of_speech as PassiveVocabularyLibraryAdminItem["part_of_speech"],
     attributes: normalizePassiveVocabularyLibraryAttributes(row.attributes),
+    approval_status: row.approval_status,
+    rejection_reason: row.rejection_reason,
     enrichment_status:
       row.enrichment_status as PassiveVocabularyLibraryAdminItem["enrichment_status"],
     enrichment_error: row.enrichment_error,
+    reviewed_at: row.reviewed_at,
     updated_at: row.updated_at,
   };
 }
+
+type PassiveVocabularyLibraryAdminItemRow = Parameters<typeof toAdminItem>[0];
 
 export async function GET(request: NextRequest) {
   const access = await getCurrentLibraryAccess();
@@ -122,30 +133,106 @@ export async function GET(request: NextRequest) {
   const searchQuery = searchParams.get("q")?.trim() ?? "";
   const cefrFilter = searchParams.get("cefr")?.trim() ?? "all";
   const posFilter = searchParams.get("pos")?.trim();
+  const approvalFilter = searchParams.get("status")?.trim() ?? "all";
 
-  let query = access.adminClient
-    .from("passive_vocabulary_library")
-    .select(
-      "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, enrichment_status, enrichment_error, updated_at",
-    )
-    .order("updated_at", { ascending: false });
+  const createLibraryItemsQuery = () => {
+    let query = access.adminClient
+      .from("passive_vocabulary_library")
+      .select(LIBRARY_ITEM_SELECT_FIELDS)
+      .order("updated_at", { ascending: false });
+
+    if (access.role !== "superadmin") {
+      query = query.eq("approval_status", "confirmed");
+    } else if (
+      approvalFilter === "unconfirmed" ||
+      approvalFilter === "confirmed" ||
+      approvalFilter === "rejected"
+    ) {
+      query = query.eq("approval_status", approvalFilter);
+    }
+
+    if (cefrFilter === "unknown") {
+      query = query.is("cefr_level", null);
+    } else if (PASSIVE_VOCABULARY_CEFR_LEVELS.includes(cefrFilter as never)) {
+      query = query.eq("cefr_level", cefrFilter);
+    }
+
+    if (posFilter) {
+      query = query.in("part_of_speech", posFilter.split(","));
+    }
+
+    return query;
+  };
 
   if (searchQuery) {
-    query = query.ilike("canonical_term", `%${searchQuery}%`);
+    const normalizedSearchQuery = normalizePassiveVocabularyText(searchQuery);
+    const { data: matchingForms, error: matchingFormsError } = await access.adminClient
+      .from("passive_vocabulary_library_forms")
+      .select("library_item_id")
+      .eq("normalized_form", normalizedSearchQuery);
+
+    if (matchingFormsError) {
+      return NextResponse.json(
+        { error: "Failed to load passive vocabulary library items" },
+        { status: 500 },
+      );
+    }
+
+    const matchingLibraryItemIds = Array.from(
+      new Set((matchingForms ?? []).map((row) => row.library_item_id)),
+    );
+
+    const { data: canonicalMatches, error: canonicalMatchesError } =
+      await createLibraryItemsQuery().ilike("canonical_term", `%${searchQuery}%`);
+
+    if (canonicalMatchesError) {
+      return NextResponse.json(
+        { error: "Failed to load passive vocabulary library items" },
+        { status: 500 },
+      );
+    }
+
+    let aliasMatches: PassiveVocabularyLibraryAdminItemRow[] = [];
+
+    if (matchingLibraryItemIds.length > 0) {
+      const { data: matchingAliasRows, error: aliasMatchesError } =
+        await createLibraryItemsQuery().in("id", matchingLibraryItemIds);
+
+      if (aliasMatchesError) {
+        return NextResponse.json(
+          { error: "Failed to load passive vocabulary library items" },
+          { status: 500 },
+        );
+      }
+
+      aliasMatches = matchingAliasRows ?? [];
+    }
+
+    const mergedItemsById = new Map<string, PassiveVocabularyLibraryAdminItemRow>();
+
+    for (const row of canonicalMatches ?? []) {
+      mergedItemsById.set(row.id, row);
+    }
+
+    for (const row of aliasMatches) {
+      mergedItemsById.set(row.id, row);
+    }
+
+    const mergedItems = Array.from(mergedItemsById.values()).sort(
+      (left, right) =>
+        new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime(),
+    );
+    const paginatedItems = mergedItems.slice(offset, offset + limit + 1);
+
+    return NextResponse.json({
+      items: paginatedItems.slice(0, limit).map(toAdminItem),
+      hasMore: paginatedItems.length > limit,
+      availableCefrLevels: PASSIVE_VOCABULARY_CEFR_LEVELS,
+      availablePartsOfSpeech: PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
+    });
   }
 
-  if (cefrFilter === "unknown") {
-    query = query.is("cefr_level", null);
-  } else if (PASSIVE_VOCABULARY_CEFR_LEVELS.includes(cefrFilter as never)) {
-    query = query.eq("cefr_level", cefrFilter);
-  }
-
-  if (posFilter) {
-    const posValues = posFilter.split(",");
-    query = query.in("part_of_speech", posValues);
-  }
-
-  const { data, error } = await query.range(offset, offset + limit);
+  const { data, error } = await createLibraryItemsQuery().range(offset, offset + limit);
 
   if (error) {
     return NextResponse.json(

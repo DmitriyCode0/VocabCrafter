@@ -14,6 +14,7 @@ import {
   PASSIVE_VOCABULARY_CEFR_LEVELS,
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
   getPassiveVocabularyCompositeKey,
+  getPassiveVocabularyGeneratedForms,
   getPassiveVocabularyLookupCandidates,
   normalizePassiveVocabularyLibraryAttributes,
   normalizePassiveVocabularyText,
@@ -23,7 +24,7 @@ import {
   type PassiveVocabularyLibraryCefrLevel,
   type PassiveVocabularyPartOfSpeech,
 } from "./passive-vocabulary";
-import { lookupFreeDictionary } from "@/lib/dictionary/free-dictionary";
+export { syncConfirmedActiveVocabularyToPassiveEvidence } from "./active-vocabulary-evidence";
 
 type AdminClient = SupabaseClient<Database>;
 type LibraryRow =
@@ -55,6 +56,9 @@ export interface PassiveVocabularyLibraryAdminItem {
   cefr_level: PassiveVocabularyLibraryCefrLevel | null;
   part_of_speech: PassiveVocabularyPartOfSpeech | null;
   attributes: PassiveVocabularyLibraryAttributes;
+  approval_status: "unconfirmed" | "confirmed" | "rejected";
+  rejection_reason: string | null;
+  reviewed_at: string | null;
   enrichment_status: "pending" | "completed" | "failed";
   enrichment_error: string | null;
   updated_at: string;
@@ -123,6 +127,7 @@ export interface PassiveVocabularyLibraryResolution {
   requestedNormalizedTerm: string;
   itemType: PassiveVocabularyItemType;
   libraryItemId: string | null;
+  approvalStatus: PassiveVocabularyLibraryAdminItem["approval_status"];
   canonicalTerm: string;
   canonicalNormalizedTerm: string;
   cefrLevel: PassiveVocabularyLibraryCefrLevel | null;
@@ -165,6 +170,7 @@ function buildLibraryResolution(
     requestedNormalizedTerm: input.normalizedTerm,
     itemType: input.itemType,
     libraryItemId: libraryRow.id,
+    approvalStatus: libraryRow.approval_status,
     canonicalTerm: libraryRow.canonical_term,
     canonicalNormalizedTerm: libraryRow.normalized_term,
     cefrLevel:
@@ -185,109 +191,10 @@ function getLookupKey(
 }
 
 function getFallbackCanonicalTerm(input: PassiveVocabularyLibraryInput) {
-  const candidates = getPassiveVocabularyLookupCandidates(
-    input.term,
-    input.itemType,
-  );
-  const canonicalNormalizedTerm = candidates.at(-1) ?? input.normalizedTerm;
-
   return {
-    canonicalTerm: canonicalNormalizedTerm,
-    canonicalNormalizedTerm,
+    canonicalTerm: input.term,
+    canonicalNormalizedTerm: input.normalizedTerm,
   };
-}
-
-const DOMAIN_SPECIFIC_DEFINITION_MARKERS = [
-  "stock exchange",
-  "banking",
-  "finance",
-  "law",
-  "legal",
-  "medical",
-  "medicine",
-  "biology",
-  "chemistry",
-  "physics",
-  "athletics",
-  "track & field",
-  "breeds",
-  "zoology",
-  "linguistics",
-  "computing",
-  "programming",
-  "mathematics",
-  "music",
-  "slang",
-] as const;
-
-function normalizeDefinitionText(value: string) {
-  return value.trim().replace(/\s+/g, " ");
-}
-
-function isLikelyDomainSpecificDefinition(definition: string) {
-  const normalized = definition.toLowerCase();
-  return DOMAIN_SPECIFIC_DEFINITION_MARKERS.some((marker) =>
-    normalized.includes(marker),
-  );
-}
-
-function rankDictionaryDefinitions(
-  dictionaryEntry: Awaited<ReturnType<typeof lookupFreeDictionary>>,
-  preferredPartOfSpeech?: string | null,
-) {
-  if (!dictionaryEntry) {
-    return [] as string[];
-  }
-
-  const flattened = dictionaryEntry.meanings.flatMap((meaning, meaningIndex) =>
-    meaning.definitions.map((definition, definitionIndex) => {
-      const normalizedDefinition = normalizeDefinitionText(definition.definition);
-      const normalizedPartOfSpeech = normalizePassiveVocabularyText(
-        meaning.partOfSpeech,
-      );
-      const normalizedPreferredPartOfSpeech = preferredPartOfSpeech
-        ? normalizePassiveVocabularyText(preferredPartOfSpeech)
-        : null;
-
-      let score = 0;
-
-      // Prefer earlier dictionary senses because they are usually most common.
-      score += Math.max(0, 8 - meaningIndex * 2);
-      score += Math.max(0, 6 - definitionIndex * 2);
-
-      if (
-        normalizedPreferredPartOfSpeech &&
-        normalizedPartOfSpeech === normalizedPreferredPartOfSpeech
-      ) {
-        score += 6;
-      }
-
-      if (definition.example) {
-        score += 2;
-      }
-
-      if (normalizedDefinition.length >= 20 && normalizedDefinition.length <= 140) {
-        score += 2;
-      }
-
-      if (isLikelyDomainSpecificDefinition(normalizedDefinition)) {
-        score -= 8;
-      }
-
-      return {
-        definition: normalizedDefinition,
-        score,
-      };
-    }),
-  );
-
-  return Array.from(
-    new Set(
-      flattened
-        .sort((left, right) => right.score - left.score)
-        .map((item) => item.definition),
-    ),
-  ).slice(0, 3);
 }
 
 function toAdminItem(row: LibraryRow): PassiveVocabularyLibraryAdminItem {
@@ -301,6 +208,9 @@ function toAdminItem(row: LibraryRow): PassiveVocabularyLibraryAdminItem {
     part_of_speech:
       (row.part_of_speech as PassiveVocabularyPartOfSpeech | null) ?? null,
     attributes: asAttributes(row.attributes),
+    approval_status: row.approval_status,
+    rejection_reason: row.rejection_reason,
+    reviewed_at: row.reviewed_at,
     enrichment_status: row.enrichment_status as
       | "pending"
       | "completed"
@@ -348,6 +258,7 @@ async function syncPassiveVocabularyLibraryForms({
   adminClient,
   libraryItemId,
   itemType,
+  partOfSpeech,
   oldCanonicalTerm,
   oldNormalizedTerm,
   canonicalTerm,
@@ -357,6 +268,7 @@ async function syncPassiveVocabularyLibraryForms({
   adminClient: AdminClient;
   libraryItemId: string;
   itemType: PassiveVocabularyItemType;
+  partOfSpeech: PassiveVocabularyPartOfSpeech | null;
   oldCanonicalTerm: string;
   oldNormalizedTerm: string;
   canonicalTerm: string;
@@ -408,6 +320,20 @@ async function syncPassiveVocabularyLibraryForms({
     .eq("normalized_form", canonicalNormalizedTerm)
     .eq("item_type", itemType)
     .eq("is_canonical", false);
+
+  for (const generatedForm of getPassiveVocabularyGeneratedForms(
+    canonicalTerm,
+    partOfSpeech,
+  )) {
+    await upsertPassiveVocabularyLibraryAlias({
+      adminClient,
+      libraryItemId,
+      formTerm: generatedForm,
+      normalizedForm: generatedForm,
+      itemType,
+      nowIso,
+    });
+  }
 }
 
 async function canonicalizePassiveVocabularyEvidenceRows({
@@ -609,7 +535,7 @@ async function findExistingPassiveVocabularyLibraryMatches(
     ? await adminClient
         .from("passive_vocabulary_library")
         .select(
-          "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, enrichment_status, enrichment_error, created_by, updated_by, created_at, updated_at",
+          "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, created_by, reviewed_by, reviewed_at, updated_by, created_at, updated_at",
         )
         .in("id", libraryIds)
     : { data: [] as LibraryRow[], error: null };
@@ -673,13 +599,6 @@ async function enrichPassiveVocabularyWords(
     inputs,
     PASSIVE_VOCABULARY_ENRICHMENT_BATCH_SIZE,
   )) {
-    const dictionaryEntries = await Promise.all(
-      batch.map(async (input) => {
-        const entry = await lookupFreeDictionary(input.term);
-        return { input, entry };
-      })
-    );
-
     const prompt = [
       `Target language: ${targetLanguageLabel}`,
       "For each requested single word, return:",
@@ -688,26 +607,23 @@ async function enrichPassiveVocabularyWords(
       "- cefrLevel as the estimated standalone word difficulty for learners",
       "- partOfSpeech using one of: noun, verb, modal verb, auxiliary, adjective, adverb, pronoun, preposition, conjunction, determiner, interjection, other",
       "- ukrainianTranslation as a concise natural Ukrainian dictionary equivalent",
+      "- attributes may include americanTranscription and britishTranscription as IPA plus englishDefinitions as an array of up to 3 concise English meanings when you are confident",
       "Use modal verb for can, could, may, might, must, shall, should, will, and would.",
       "Use auxiliary when the entry is best labeled as a helping verb rather than a main verb.",
-      "Prefer the most common everyday dictionary sense, not niche technical/legal/financial/sports senses unless the word is primarily used that way.",
+      "Prefer the most common everyday learner-friendly sense, not niche technical/legal/financial/sports senses unless the word is primarily used that way.",
       "For polysemous words, pick the sense most suitable for broad CEFR-oriented learners.",
       "Merge regular noun plurals and regular third-person singular verb forms into the same canonical lemma when appropriate.",
-      "Examples: tables -> table, works -> work, studies -> study.",
+      "Also merge regular past and -ing verb forms when appropriate.",
+      "Examples: tables -> table, works -> work, studies -> study, worked -> work, working -> work.",
       "Never translate the word. Never return multiple words as the canonical form for a single-word input.",
       "If the word is already canonical, keep it unchanged.",
-      'Respond with JSON in this exact shape: { "items": [ { "requestedTerm": "...", "canonicalTerm": "...", "cefrLevel": "A1", "partOfSpeech": "noun", "ukrainianTranslation": "...", "attributes": {} } ] }.',
-      "Requested terms and dictionary context:",
-      ...dictionaryEntries.map(({ input, entry }) => {
-        if (!entry && !input.partOfSpeech) return `- ${input.term}`;
-        const preferredDefinitions = rankDictionaryDefinitions(
-          entry,
-          input.partOfSpeech,
-        );
-        const definition = preferredDefinitions[0] ?? "No definition";
-        const pos = input.partOfSpeech || entry?.meanings[0]?.partOfSpeech || "unknown";
-        return `- ${input.term} (Dictionary context: ${pos} - ${definition})`;
-      }),
+      'Respond with JSON in this exact shape: { "items": [ { "requestedTerm": "...", "canonicalTerm": "...", "cefrLevel": "A1", "partOfSpeech": "noun", "ukrainianTranslation": "...", "attributes": { "americanTranscription": "/.../", "britishTranscription": "/.../", "englishDefinitions": ["..."] } } ] }.',
+      "Requested terms:",
+      ...batch.map((input) =>
+        input.partOfSpeech
+          ? `- ${input.term} (Part-of-speech hint: ${input.partOfSpeech})`
+          : `- ${input.term}`,
+      ),
     ].join("\n");
 
     try {
@@ -734,24 +650,7 @@ async function enrichPassiveVocabularyWords(
       await incrementAICalls(actorUserId);
 
       for (const item of normalizedItems) {
-        const dictionaryContext = dictionaryEntries.find(
-          (d) => normalizePassiveVocabularyText(d.input.term) === normalizePassiveVocabularyText(item.requestedTerm)
-        )?.entry;
-
         const baseAttributes = normalizePassiveVocabularyLibraryAttributes(item.attributes);
-        if (dictionaryContext) {
-          const phonetic = dictionaryContext.phonetics.find(p => p.audio)?.audio;
-          if (phonetic) baseAttributes.phoneticAudioUrl = phonetic;
-
-          const definitions = rankDictionaryDefinitions(
-            dictionaryContext,
-            item.partOfSpeech,
-          );
-          if (definitions.length > 0) {
-            baseAttributes.englishDefinitions = definitions;
-            baseAttributes.englishDefinition = definitions[0] ?? null;
-          }
-        }
 
         enrichmentMap.set(normalizePassiveVocabularyText(item.requestedTerm), {
           requestedTerm: item.requestedTerm,
@@ -776,24 +675,16 @@ async function enrichPassiveVocabularyWords(
 export async function createPassiveVocabularyLibraryEntries(
   adminClient: AdminClient,
   inputs: PassiveVocabularyLibraryInput[],
-  targetLanguage: LearningLanguage,
+  _targetLanguage: LearningLanguage,
   actorUserId: string,
 ) {
   // Filter out non-English words
   const englishInputs = inputs.filter((input) => isEnglishWord(input.term));
-  
+
   if (englishInputs.length === 0) {
     return;
   }
 
-  const wordInputs = englishInputs.filter((input) => input.itemType === "word");
-  const phraseInputs = englishInputs.filter((input) => input.itemType === "phrase");
-  const enrichmentByRequestedTerm = await enrichPassiveVocabularyWords(
-    wordInputs,
-    targetLanguage,
-    actorUserId,
-    adminClient,
-  );
   const libraryGroups = new Map<
     string,
     {
@@ -810,50 +701,37 @@ export async function createPassiveVocabularyLibraryEntries(
     }
   >();
 
-  for (const input of [...wordInputs, ...phraseInputs]) {
-    const enrichment = enrichmentByRequestedTerm.get(input.normalizedTerm);
+  for (const input of englishInputs) {
     const fallback = getFallbackCanonicalTerm(input);
     const isPhrase = input.itemType === "phrase";
-    const canonicalTerm =
-      normalizePassiveVocabularyText(enrichment?.canonicalTerm ?? "") ||
-      fallback.canonicalNormalizedTerm;
-    const canonicalNormalizedTerm =
-      normalizePassiveVocabularyText(canonicalTerm);
+    const partOfSpeech = isPhrase ? "phrase" : null;
+    const canonicalTerm = fallback.canonicalTerm;
+    const canonicalNormalizedTerm = fallback.canonicalNormalizedTerm;
     const groupKey = getLookupKey(canonicalNormalizedTerm, input.itemType);
     const existingGroup = libraryGroups.get(groupKey);
     const candidateForms = new Map<string, string>(
       existingGroup?.candidateForms ?? [],
     );
 
-    for (const candidate of getPassiveVocabularyLookupCandidates(
-      input.term,
-      input.itemType,
-    )) {
-      candidateForms.set(
-        candidate,
-        candidate === input.normalizedTerm ? input.term : candidate,
-      );
-    }
-
+    candidateForms.set(input.normalizedTerm, input.term);
     candidateForms.set(canonicalNormalizedTerm, canonicalTerm);
+
+    for (const generatedForm of getPassiveVocabularyGeneratedForms(
+      canonicalTerm,
+      partOfSpeech,
+    )) {
+      candidateForms.set(generatedForm, generatedForm);
+    }
 
     libraryGroups.set(groupKey, {
       canonicalTerm,
       canonicalNormalizedTerm,
       itemType: input.itemType,
-      cefrLevel: isPhrase ? null : (enrichment?.cefrLevel ?? null),
-      partOfSpeech: isPhrase ? "phrase" : (enrichment?.partOfSpeech ?? null),
-      attributes: isPhrase ? {} : (enrichment?.attributes ?? {}),
-      enrichmentStatus: isPhrase
-        ? "completed"
-        : enrichment?.cefrLevel && enrichment.partOfSpeech
-          ? "completed"
-          : "failed",
-      enrichmentError: isPhrase
-        ? null
-        : enrichment?.cefrLevel && enrichment.partOfSpeech
-          ? null
-          : "Gemini enrichment unavailable or incomplete for this word.",
+      cefrLevel: null,
+      partOfSpeech,
+      attributes: {},
+      enrichmentStatus: "pending",
+      enrichmentError: null,
       inputItems: [...(existingGroup?.inputItems ?? []), input],
       candidateForms,
     });
@@ -886,7 +764,7 @@ export async function createPassiveVocabularyLibraryEntries(
   const { data: libraryRows, error: libraryRowsError } = await adminClient
     .from("passive_vocabulary_library")
     .select(
-      "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, enrichment_status, enrichment_error, created_by, updated_by, created_at, updated_at",
+      "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, created_by, reviewed_by, reviewed_at, updated_by, created_at, updated_at",
     )
     .in(
       "normalized_term",
@@ -1013,6 +891,7 @@ export async function importPassiveVocabularyLibraryItems({
       requestedNormalizedTerm: item.normalizedTerm,
       itemType: item.itemType,
       libraryItemId: null,
+      approvalStatus: "unconfirmed",
       canonicalTerm: fallback.canonicalTerm,
       canonicalNormalizedTerm: fallback.canonicalNormalizedTerm,
       cefrLevel: null,
@@ -1051,7 +930,7 @@ export async function reEnrichPassiveVocabularyLibraryItem({
   const { data: existingItem, error: existingItemError } = await adminClient
     .from("passive_vocabulary_library")
     .select(
-      "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, enrichment_status, enrichment_error, created_by, updated_by, created_at, updated_at",
+      "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, created_by, reviewed_by, reviewed_at, updated_by, created_at, updated_at",
     )
     .eq("id", libraryItemId)
     .maybeSingle();
@@ -1140,7 +1019,7 @@ export async function reEnrichPassiveVocabularyLibraryItem({
     await adminClient
       .from("passive_vocabulary_library")
       .select(
-        "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, enrichment_status, enrichment_error, created_by, updated_by, created_at, updated_at",
+        "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, created_by, reviewed_by, reviewed_at, updated_by, created_at, updated_at",
       )
       .eq("normalized_term", canonicalNormalizedTerm)
       .eq("item_type", existingItem.item_type)
@@ -1173,6 +1052,7 @@ export async function reEnrichPassiveVocabularyLibraryItem({
       adminClient,
       libraryItemId: existingCanonicalRow.id,
       itemType: "word",
+      partOfSpeech: enrichment.partOfSpeech,
       oldCanonicalTerm: existingCanonicalRow.canonical_term,
       oldNormalizedTerm: existingCanonicalRow.normalized_term,
       canonicalTerm,
@@ -1235,6 +1115,7 @@ export async function reEnrichPassiveVocabularyLibraryItem({
     adminClient,
     libraryItemId: existingItem.id,
     itemType: "word",
+    partOfSpeech: enrichment.partOfSpeech,
     oldCanonicalTerm: existingItem.canonical_term,
     oldNormalizedTerm: existingItem.normalized_term,
     canonicalTerm,

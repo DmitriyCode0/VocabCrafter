@@ -50,6 +50,14 @@ const EN_MESSAGES = {
     learningLanguagePlaceholder: "Select a learning language",
     sourceLanguageLabel: "Language You Learn From",
     sourceLanguagePlaceholder: "Select a source language",
+    englishVariantLabel: "English Variant",
+    englishVariantPlaceholder: "Select American or British English",
+    englishVariantDescription:
+      "Choose whether English pronunciation and IPA prefer American or British forms.",
+    englishVariants: {
+      american: "American English",
+      british: "British English",
+    },
     appLanguageLabel: "App Language",
     appLanguageDescription:
       "Choose whether the app interface is shown in English or Ukrainian.",
@@ -297,6 +305,7 @@ const EN_MESSAGES = {
         "No dictionary items match the current search and CEFR filter.",
       noItems: "No dictionary items yet.",
       termColumn: "Term",
+      searchFormsLabel: "Search forms:",
       typeColumn: "Type",
       cefrColumn: "CEFR",
       statusColumn: "Status",
@@ -1449,6 +1458,14 @@ const UK_MESSAGES: AppMessages = {
     learningLanguagePlaceholder: "Оберіть мову навчання",
     sourceLanguageLabel: "Мова, з якої ви вивчаєте",
     sourceLanguagePlaceholder: "Оберіть мову-джерело",
+    englishVariantLabel: "Варіант англійської",
+    englishVariantPlaceholder: "Оберіть американську або британську англійську",
+    englishVariantDescription:
+      "Оберіть, чи застосунок має надавати перевагу американській чи британській вимові та IPA для англійської.",
+    englishVariants: {
+      american: "Американська англійська",
+      british: "Британська англійська",
+    },
     appLanguageLabel: "Мова застосунку",
     appLanguageDescription:
       "Оберіть, якою мовою показувати інтерфейс: англійською чи українською.",
@@ -1702,6 +1719,7 @@ const UK_MESSAGES: AppMessages = {
         "Поточний пошук і фільтр CEFR не дали жодного елемента словника.",
       noItems: "У словнику ще немає елементів.",
       termColumn: "Термін",
+      searchFormsLabel: "Форми пошуку:",
       typeColumn: "Тип",
       cefrColumn: "CEFR",
       statusColumn: "Статус",

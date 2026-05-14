@@ -173,6 +173,9 @@ export function ImportPassiveVocabularyCard({
         importedCount?: number;
         createdCount?: number;
         updatedCount?: number;
+        confirmedCount?: number;
+        pendingCount?: number;
+        rejectedCount?: number;
         existingCount?: number;
       } | null;
 
@@ -187,11 +190,19 @@ export function ImportPassiveVocabularyCard({
 
       if (isLibraryMode) {
         toast.success(
-          `Processed ${data?.processedCount ?? items.length} terms into ${data?.importedCount ?? 0} dictionary entries. Added ${data?.createdCount ?? 0} new and matched ${data?.existingCount ?? 0} existing entries.`,
+          `Processed ${data?.processedCount ?? items.length} terms into ${data?.importedCount ?? 0} dictionary entries. Added ${data?.createdCount ?? 0} new and matched ${data?.existingCount ?? 0} existing entries.${(data?.createdCount ?? 0) > 0 ? " New entries were saved as pending placeholders for review." : ""}`,
         );
       } else {
+        const processedCount = data?.processedCount ?? items.length;
+        const importedCount = data?.importedCount ?? 0;
+        const confirmedCount = data?.confirmedCount ?? importedCount;
+        const pendingCount = data?.pendingCount ?? 0;
+        const createdCount = data?.createdCount ?? importedCount;
+        const updatedCount = data?.updatedCount ?? 0;
+        const rejectedCount = data?.rejectedCount ?? 0;
+
         toast.success(
-          `Imported ${data?.importedCount ?? items.length} passive-recognition items. Added ${data?.createdCount ?? 0} new and updated ${data?.updatedCount ?? 0} existing entries.`,
+          `Processed ${processedCount} words. ${importedCount} matched the shared dictionary, ${confirmedCount} are visible now, ${pendingCount} are pending review, ${createdCount} are new evidence rows, and ${updatedCount} existing rows were refreshed${rejectedCount > 0 ? `. ${rejectedCount} rejected terms were skipped.` : "."}`,
         );
       }
       setItems([]);
@@ -234,8 +245,8 @@ export function ImportPassiveVocabularyCard({
             </CardTitle>
             <CardDescription>
               {isLibraryMode
-                ? "Paste text to extract unique words, or paste one term per line to enrich the shared dictionary in batches."
-                : "Paste a text. It will be split into unique individual words and saved as passive vocabulary."}
+                ? "Paste text to extract unique words, or paste one term per line to create or reuse shared dictionary entries in batches."
+                : "Paste a text. It will be split into unique individual words and applied through the shared Dictionary. Confirmed words become visible immediately; pending words stay hidden until review."}
             </CardDescription>
           </div>
         </div>
@@ -340,7 +351,7 @@ export function ImportPassiveVocabularyCard({
               <p className="text-sm text-muted-foreground">
                 {isLibraryMode
                   ? "Unique-word extraction skips AI parsing. For phrasal verbs or idioms, use one entry per line so multi-word entries stay intact."
-                  : "This does not use the AI parser. It simply splits the text into individual words and deduplicates them."}
+                  : "This does not use the AI parser. It simply splits the text into individual words, sorts them alphabetically, and deduplicates them."}
               </p>
             </div>
           </div>
@@ -355,8 +366,8 @@ export function ImportPassiveVocabularyCard({
             <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <p>
                 {isLibraryMode
-                  ? "These terms create or reuse shared dictionary entries. New ones will be enriched with canonical form, CEFR level, part of speech, and Ukrainian translation."
-                  : "These words increase passive-recognition estimates only. They do not get due dates, review sessions, meanings, or active mastery levels."}
+                  ? "These terms create or reuse shared dictionary entries. New ones are saved as pending placeholders, then reviewed and enriched later from the dictionary workspace."
+                  : "Apply this list through the shared Dictionary. Confirmed words show up immediately in passive evidence; pending words are saved now but stay hidden until reviewed."}
               </p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button

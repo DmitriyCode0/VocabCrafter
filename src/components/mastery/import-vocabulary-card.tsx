@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { BookPlus, RotateCcw } from "lucide-react";
-import type { QuizTerm } from "@/types/quiz";
-import type { LearningLanguage, SourceLanguage } from "@/lib/languages";
-import { WordInput } from "@/components/quiz/word-input";
-import { ParsedWordList } from "@/components/quiz/parsed-word-list";
+import { BookPlus, FileText, RotateCcw } from "lucide-react";
+import type { LearningLanguage } from "@/lib/languages";
+import { ParsedPassiveVocabularyList } from "@/components/mastery/parsed-passive-vocabulary-list";
+import {
+  extractPassiveVocabularyTermsFromText,
+  type PassiveVocabularyItemType,
+} from "@/lib/mastery/passive-vocabulary";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,49 +19,42 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
-const IMPORT_LEVEL_OPTIONS = [
-  { value: 0, label: "New" },
-  { value: 1, label: "Seen" },
-  { value: 2, label: "Learning" },
-  { value: 3, label: "Familiar" },
-  { value: 4, label: "Practiced" },
-  { value: 5, label: "Mastered" },
-] as const;
-
-function getImportLevelLabel(level: number) {
-  return (
-    IMPORT_LEVEL_OPTIONS.find((option) => option.value === level)?.label ??
-    `Level ${level}`
-  );
+interface ActiveVocabularyDraftItem {
+  term: string;
+  itemType?: PassiveVocabularyItemType;
 }
 
 interface ImportVocabularyCardProps {
   targetLanguage: LearningLanguage;
-  sourceLanguage: SourceLanguage;
+  studentId?: string;
 }
 
 export function ImportVocabularyCard({
   targetLanguage,
-  sourceLanguage,
+  studentId,
 }: ImportVocabularyCardProps) {
   const router = useRouter();
-  const [terms, setTerms] = useState<QuizTerm[]>([]);
-  const [startingLevel, setStartingLevel] = useState(2);
-  const [isParseLoading, setIsParseLoading] = useState(false);
+  const [items, setItems] = useState<ActiveVocabularyDraftItem[]>([]);
+  const [rawText, setRawText] = useState("");
+  const [sourceLabel, setSourceLabel] = useState("");
   const [isImporting, setIsImporting] = useState(false);
-  const [inputResetKey, setInputResetKey] = useState(0);
-  const startingLevelLabel = getImportLevelLabel(startingLevel);
+
+  function handleExtractWords() {
+    const extractedTerms = extractPassiveVocabularyTermsFromText(rawText);
+
+    if (extractedTerms.length === 0) {
+      toast.error("No words found in the provided text");
+      return;
+    }
+
+    setItems(extractedTerms.map((term) => ({ term })));
+  }
 
   async function handleImport() {
-    if (terms.length === 0) {
+    if (items.length === 0) {
       return;
     }
 
@@ -69,38 +64,48 @@ export function ImportVocabularyCard({
       const response = await fetch("/api/mastery/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ terms, startingLevel }),
+        body: JSON.stringify({
+          studentId,
+          sourceLabel: sourceLabel.trim() || undefined,
+          items,
+        }),
       });
 
       const data = (await response.json().catch(() => null)) as {
         error?: string;
+        processedCount?: number;
         importedCount?: number;
         createdCount?: number;
         updatedCount?: number;
-        startingLevel?: number;
+        confirmedCount?: number;
+        pendingCount?: number;
+        rejectedCount?: number;
       } | null;
 
       if (!response.ok) {
-        throw new Error(data?.error || "Failed to import vocabulary");
+        throw new Error(data?.error || "Failed to apply active vocabulary");
       }
 
-      const importedCount = data?.importedCount ?? terms.length;
+      const processedCount = data?.processedCount ?? items.length;
+      const importedCount = data?.importedCount ?? 0;
       const createdCount = data?.createdCount ?? importedCount;
       const updatedCount = data?.updatedCount ?? 0;
-      const appliedLevel = data?.startingLevel ?? startingLevel;
-      const appliedLevelLabel = getImportLevelLabel(appliedLevel);
-      const successMessage =
-        updatedCount > 0
-          ? `Imported ${importedCount} words. Added ${createdCount} new and refreshed ${updatedCount} existing entries up to ${appliedLevelLabel} (Level ${appliedLevel}).`
-          : `Imported ${importedCount} words into Mastery at ${appliedLevelLabel} (Level ${appliedLevel}).`;
+      const confirmedCount = data?.confirmedCount ?? importedCount;
+      const pendingCount = data?.pendingCount ?? 0;
+      const rejectedCount = data?.rejectedCount ?? 0;
 
-      toast.success(successMessage);
-      setTerms([]);
-      setInputResetKey((current) => current + 1);
+      toast.success(
+        `Processed ${processedCount} words. ${importedCount} matched the shared dictionary, ${confirmedCount} are visible now, ${pendingCount} are pending review, ${createdCount} are new evidence rows, and ${updatedCount} existing rows were refreshed${rejectedCount > 0 ? `. ${rejectedCount} rejected terms were skipped.` : "."}`,
+      );
+      setItems([]);
+      setRawText("");
+      setSourceLabel("");
       router.refresh();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to import vocabulary",
+        error instanceof Error
+          ? error.message
+          : "Failed to apply active vocabulary",
       );
     } finally {
       setIsImporting(false);
@@ -108,78 +113,84 @@ export function ImportVocabularyCard({
   }
 
   function handleStartOver() {
-    setTerms([]);
-    setInputResetKey((current) => current + 1);
+    setItems([]);
+    setRawText("");
+    setSourceLabel("");
   }
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BookPlus className="h-5 w-5 text-primary" />
-              Import Vocabulary
-            </CardTitle>
-            <CardDescription>
-              Paste a word list, raw text, or screenshots, review the parsed
-              terms, and save them straight into your vocabulary library without
-              creating a quiz.
-            </CardDescription>
-          </div>
-
-          <div className="w-full space-y-2 sm:w-[220px]">
-            <Label
-              htmlFor="import-starting-level"
-              className="text-xs text-muted-foreground"
-            >
-              Starting mastery level
-            </Label>
-            <Select
-              value={String(startingLevel)}
-              onValueChange={(value) => setStartingLevel(Number(value))}
-            >
-              <SelectTrigger
-                id="import-starting-level"
-                className="w-full bg-background"
-              >
-                <SelectValue placeholder="Select a level" />
-              </SelectTrigger>
-              <SelectContent>
-                {IMPORT_LEVEL_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={String(option.value)}>
-                    Level {option.value} - {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-1">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BookPlus className="h-5 w-5 text-primary" />
+            Add Active Vocabulary
+          </CardTitle>
+          <CardDescription>
+            Paste a text, split it into unique words locally, review the list,
+            and apply it through the shared Dictionary. Confirmed words become
+            visible immediately. Pending words stay hidden until superadmin
+            review.
+          </CardDescription>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {terms.length === 0 ? (
-          <WordInput
-            key={inputResetKey}
-            onParsed={setTerms}
-            isLoading={isParseLoading}
-            setIsLoading={setIsParseLoading}
-            targetLanguage={targetLanguage}
-            sourceLanguage={sourceLanguage}
-          />
+        {items.length === 0 ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="active-import-source-label">
+                Source label (optional)
+              </Label>
+              <Input
+                id="active-import-source-label"
+                value={sourceLabel}
+                onChange={(event) => setSourceLabel(event.target.value)}
+                placeholder="e.g., lesson summary / article / workbook page"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="active-import-raw-text">Source text</Label>
+              <Textarea
+                id="active-import-raw-text"
+                value={rawText}
+                onChange={(event) => setRawText(event.target.value)}
+                rows={10}
+                className="font-mono text-sm"
+                placeholder="Paste the text here..."
+              />
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Button
+                type="button"
+                onClick={handleExtractWords}
+                disabled={!rawText.trim()}
+                className="w-full sm:w-auto"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Extract Unique Words
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                This does not use the AI parser. It simply splits the text into
+                individual words, sorts them alphabetically, and deduplicates
+                them.
+              </p>
+            </div>
+          </div>
         ) : (
           <>
-            <ParsedWordList
-              terms={terms}
-              onTermsChange={setTerms}
+            <ParsedPassiveVocabularyList
+              items={items}
+              onItemsChange={setItems}
               targetLanguage={targetLanguage}
-              sourceLanguage={sourceLanguage}
             />
 
             <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <p>
-                Imported words will start at {startingLevelLabel} (Level{" "}
-                {startingLevel}). Existing entries are only promoted up to this
-                level and never downgraded.
+                Apply this list to active vocabulary through the
+                shared Dictionary. Confirmed words show up immediately; pending
+                words stay hidden until reviewed.
               </p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
@@ -193,10 +204,10 @@ export function ImportVocabularyCard({
                 </Button>
                 <Button
                   onClick={handleImport}
-                  disabled={isImporting || terms.length === 0}
+                  disabled={isImporting || items.length === 0}
                   className="w-full sm:w-auto"
                 >
-                  {isImporting ? "Importing..." : "Import to Mastery"}
+                  {isImporting ? "Applying..." : "Apply to Active Vocabulary"}
                 </Button>
               </div>
             </div>

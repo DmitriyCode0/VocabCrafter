@@ -18,6 +18,15 @@ const passiveVocabularyTranslationSchema = z.preprocess((value) => {
   return normalizedValue.length > 0 ? normalizedValue : null;
 }, z.string().max(200).nullable().optional());
 
+const passiveVocabularyOptionalTextSchema = z.preprocess((value) => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const normalizedValue = value.trim().replace(/\s+/g, " ");
+  return normalizedValue.length > 0 ? normalizedValue : null;
+}, z.string().max(200).nullable().optional());
+
 const updatePassiveLibraryItemSchema = z.object({
   canonicalTerm: z.string().trim().min(1).max(200),
   cefrLevel: z.enum(PASSIVE_VOCABULARY_CEFR_LEVELS).nullable().optional(),
@@ -26,6 +35,14 @@ const updatePassiveLibraryItemSchema = z.object({
     .nullable()
     .optional(),
   ukrainianTranslation: passiveVocabularyTranslationSchema,
+  englishDefinitions: z
+    .array(z.string().trim().min(1).max(400))
+    .max(5)
+    .optional(),
+  americanTranscription: passiveVocabularyOptionalTextSchema,
+  britishTranscription: passiveVocabularyOptionalTextSchema,
+  transcription: passiveVocabularyOptionalTextSchema,
+  forms: z.array(z.string().trim().min(1).max(200)).max(50).optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -88,6 +105,11 @@ export async function PATCH(
       cefrLevel: parsed.data.cefrLevel ?? null,
       partOfSpeech: parsed.data.partOfSpeech ?? null,
       ukrainianTranslation: parsed.data.ukrainianTranslation,
+      englishDefinitions: parsed.data.englishDefinitions,
+      americanTranscription: parsed.data.americanTranscription,
+      britishTranscription: parsed.data.britishTranscription,
+      transcription: parsed.data.transcription,
+      forms: parsed.data.forms,
       attributes: normalizePassiveVocabularyLibraryAttributes(
         parsed.data.attributes,
       ),

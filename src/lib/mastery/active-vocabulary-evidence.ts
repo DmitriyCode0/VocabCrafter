@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
-import type { CEFRLevel } from "@/types/quiz";
 import {
   normalizePassiveVocabularyLibraryAttributes,
   normalizePassiveVocabularyText,
@@ -35,6 +34,9 @@ export interface ActiveVocabularySignalSummary {
   cefrCounts: Record<PassiveVocabularyLibraryCefrLevel | "unknown", number>;
 }
 
+const ACTIVE_TO_PASSIVE_SOURCE_LABEL =
+  "Auto-copied from confirmed active vocabulary";
+
 function createActiveVocabularyCefrCounts() {
   return {
     A1: 0,
@@ -65,6 +67,128 @@ export function summarizeActiveVocabularyEvidence(
     ),
     cefrCounts,
   } satisfies ActiveVocabularySignalSummary;
+}
+
+export async function syncConfirmedActiveVocabularyToPassiveEvidence({
+  adminClient,
+  actorUserId,
+  libraryItemIds,
+  studentId,
+}: {
+  adminClient: AdminClient;
+  actorUserId: string;
+  libraryItemIds: string[];
+  studentId?: string;
+}) {
+  const uniqueLibraryItemIds = Array.from(
+    new Set(libraryItemIds.filter(Boolean)),
+  );
+
+  if (uniqueLibraryItemIds.length === 0) {
+    return {
+      createdCount: 0,
+      updatedCount: 0,
+    };
+  }
+
+  let activeRowsQuery = adminClient
+    .from("active_vocabulary_evidence")
+    .select("student_id, library_item_id, term, normalized_term, last_used_at")
+    .in("library_item_id", uniqueLibraryItemIds);
+
+  if (studentId) {
+    activeRowsQuery = activeRowsQuery.eq("student_id", studentId);
+  }
+
+  const { data: activeRows, error: activeRowsError } = await activeRowsQuery;
+
+  if (activeRowsError) {
+    throw new Error("Failed to load confirmed active vocabulary evidence");
+  }
+
+  if (!activeRows || activeRows.length === 0) {
+    return {
+      createdCount: 0,
+      updatedCount: 0,
+    };
+  }
+
+  const studentIds = Array.from(new Set(activeRows.map((row) => row.student_id)));
+  const normalizedTerms = Array.from(
+    new Set(activeRows.map((row) => row.normalized_term)),
+  );
+
+  const { data: existingPassiveRows, error: existingPassiveRowsError } =
+    await adminClient
+      .from("passive_vocabulary_evidence")
+      .select(
+        "student_id, normalized_term, item_type, source_type, source_label, definition, import_count, last_imported_at, library_item_id",
+      )
+      .in("student_id", studentIds)
+      .eq("item_type", "word")
+      .in("normalized_term", normalizedTerms);
+
+  if (existingPassiveRowsError) {
+    throw new Error("Failed to inspect passive vocabulary evidence");
+  }
+
+  const existingPassiveRowsByKey = new Map(
+    (existingPassiveRows ?? []).map((row) => [
+      `${row.student_id}:${row.normalized_term}`,
+      row,
+    ]),
+  );
+
+  const nowIso = new Date().toISOString();
+  const upsertRows = activeRows.map((row) => {
+    const existingRow = existingPassiveRowsByKey.get(
+      `${row.student_id}:${row.normalized_term}`,
+    );
+    const existingTime = existingRow?.last_imported_at
+      ? new Date(existingRow.last_imported_at).getTime()
+      : 0;
+    const activeTime = row.last_used_at
+      ? new Date(row.last_used_at).getTime()
+      : 0;
+
+    return {
+      student_id: row.student_id,
+      imported_by: actorUserId,
+      term: row.term,
+      normalized_term: row.normalized_term,
+      definition: existingRow?.definition ?? null,
+      item_type: "word" as const,
+      source_type: existingRow?.source_type ?? ("curated_list" as const),
+      source_label: existingRow?.source_label ?? ACTIVE_TO_PASSIVE_SOURCE_LABEL,
+      import_count: existingRow?.import_count ?? 1,
+      last_imported_at:
+        existingTime >= activeTime
+          ? existingRow?.last_imported_at ?? row.last_used_at ?? nowIso
+          : row.last_used_at ?? nowIso,
+      library_item_id: row.library_item_id,
+      updated_at: nowIso,
+    };
+  });
+
+  const { error: upsertPassiveError } = await adminClient
+    .from("passive_vocabulary_evidence")
+    .upsert(upsertRows, {
+      onConflict: "student_id,normalized_term,item_type",
+    });
+
+  if (upsertPassiveError) {
+    throw new Error("Failed to sync active vocabulary into passive evidence");
+  }
+
+  const createdCount = upsertRows.filter(
+    (row) =>
+      !existingPassiveRowsByKey.has(`${row.student_id}:${row.normalized_term}`),
+  ).length;
+
+  return {
+    createdCount,
+    updatedCount: upsertRows.length - createdCount,
+  };
 }
 
 export interface UpsertActiveVocabularyEvidenceInput {
@@ -110,6 +234,9 @@ export async function upsertActiveVocabularyEvidence({
       importedCount: 0,
       createdCount: 0,
       updatedCount: 0,
+      confirmedCount: 0,
+      pendingCount: 0,
+      rejectedCount: 0,
     };
   }
 
@@ -124,13 +251,29 @@ export async function upsertActiveVocabularyEvidence({
     })),
   });
 
+  const acceptedResolutions = resolutions.filter(
+    (resolution) => resolution.approvalStatus !== "rejected",
+  );
+  const rejectedCount = resolutions.length - acceptedResolutions.length;
+
+  if (acceptedResolutions.length === 0) {
+    return {
+      importedCount: 0,
+      createdCount: 0,
+      updatedCount: 0,
+      confirmedCount: 0,
+      pendingCount: 0,
+      rejectedCount,
+    };
+  }
+
   const canonicalUsageCounts = new Map<string, number>();
   const canonicalResolutionsByTerm = new Map<
     string,
-    (typeof resolutions)[number]
+    (typeof acceptedResolutions)[number]
   >();
 
-  for (const resolution of resolutions) {
+  for (const resolution of acceptedResolutions) {
     canonicalUsageCounts.set(
       resolution.canonicalNormalizedTerm,
       (canonicalUsageCounts.get(resolution.canonicalNormalizedTerm) ?? 0) +
@@ -195,14 +338,39 @@ export async function upsertActiveVocabularyEvidence({
     throw new Error("Failed to save active vocabulary evidence");
   }
 
+  const confirmedLibraryItemIds = Array.from(
+    new Set(
+      acceptedResolutions.flatMap((resolution) =>
+        resolution.approvalStatus === "confirmed" && resolution.libraryItemId
+          ? [resolution.libraryItemId]
+          : [],
+      ),
+    ),
+  );
+
+  if (confirmedLibraryItemIds.length > 0) {
+    await syncConfirmedActiveVocabularyToPassiveEvidence({
+      adminClient,
+      actorUserId,
+      libraryItemIds: confirmedLibraryItemIds,
+      studentId,
+    });
+  }
+
   const createdCount = rows.filter(
     (row) => !existingRowsByNormalizedTerm.has(row.normalized_term),
+  ).length;
+  const confirmedCount = Array.from(canonicalResolutionsByTerm.values()).filter(
+    (resolution) => resolution.approvalStatus === "confirmed",
   ).length;
 
   return {
     importedCount: rows.length,
     createdCount,
     updatedCount: rows.length - createdCount,
+    confirmedCount,
+    pendingCount: rows.length - confirmedCount,
+    rejectedCount,
   };
 }
 

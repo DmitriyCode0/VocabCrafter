@@ -9,10 +9,13 @@ export const SOURCE_LANGUAGE_OPTIONS = [
   { value: "english", label: "English" },
   { value: "ukrainian", label: "Ukrainian" },
 ] as const;
+export const ENGLISH_VARIANT_PREFERENCES = ["american", "british"] as const;
 
 export type LearningLanguage =
   (typeof TARGET_LANGUAGE_OPTIONS)[number]["value"];
 export type SourceLanguage = (typeof SOURCE_LANGUAGE_OPTIONS)[number]["value"];
+export type EnglishVariantPreference =
+  (typeof ENGLISH_VARIANT_PREFERENCES)[number];
 
 export const ALL_CEFR_LEVELS: CEFRLevel[] = [
   "A1",
@@ -39,6 +42,12 @@ export function normalizeSourceLanguage(value?: string | null): SourceLanguage {
   }
 
   return "ukrainian";
+}
+
+export function normalizeEnglishVariantPreference(
+  value?: string | null,
+): EnglishVariantPreference {
+  return value === "british" || value === "en-GB" ? "british" : "american";
 }
 
 export function getLearningLanguageLabel(value?: string | null) {
@@ -69,7 +78,10 @@ export function getDefaultCefrLevelForLanguage(
   return normalizeLearningLanguage(language) === "spanish" ? "A1" : "B1";
 }
 
-export function getSpeechLanguageTag(language?: string | null) {
+export function getSpeechLanguageTag(
+  language?: string | null,
+  englishVariantPreference?: string | null,
+) {
   if (language === "spanish" || language === "es") {
     return "es-ES";
   }
@@ -78,5 +90,7 @@ export function getSpeechLanguageTag(language?: string | null) {
     return "uk-UA";
   }
 
-  return "en-US";
+  return normalizeEnglishVariantPreference(englishVariantPreference) === "british"
+    ? "en-GB"
+    : "en-US";
 }

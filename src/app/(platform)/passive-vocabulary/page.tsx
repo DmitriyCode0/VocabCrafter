@@ -41,6 +41,7 @@ import {
   type PassiveVocabularyEvidenceRow,
   type PassiveVocabularyPartOfSpeech,
 } from "@/lib/mastery/passive-vocabulary";
+import { hasConfirmedPassiveVocabularyLibraryEntry } from "@/lib/mastery/dictionary-approval";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import type { Role } from "@/types/roles";
 import type { CEFRLevel } from "@/types/quiz";
@@ -68,6 +69,7 @@ interface PassiveEvidenceQueryRow {
   import_count: number;
   last_imported_at: string;
   passive_vocabulary_library: {
+    approval_status: "unconfirmed" | "confirmed" | "rejected";
     cefr_level: string | null;
     part_of_speech: string | null;
   } | null;
@@ -82,6 +84,7 @@ interface ActiveEvidenceQueryRow {
   first_used_at: string;
   last_used_at: string;
   passive_vocabulary_library: {
+    approval_status: "unconfirmed" | "confirmed" | "rejected";
     cefr_level: string | null;
     part_of_speech: PassiveVocabularyPartOfSpeech | null;
   } | null;
@@ -95,6 +98,7 @@ interface PassiveVocabularyWorkspaceData {
   targetLanguageLabel: string;
   cefrLevel: CEFRLevel;
   evidenceTotal: number;
+  pendingReviewCount: number;
   evidenceItems: PassiveEvidenceListItem[];
   summary: ReturnType<typeof summarizePassiveVocabularyEvidence>;
   aboveTargetCount: number;
@@ -169,6 +173,12 @@ function countTaggedActiveVocabularyItems(
   cefrCounts: ActiveVocabularySignalSummary["cefrCounts"],
 ) {
   return CEFR_LEVELS.reduce((sum, level) => sum + cefrCounts[level], 0);
+}
+
+function hasPendingPassiveVocabularyLibraryEntry(
+  libraryItem: PassiveEvidenceQueryRow["passive_vocabulary_library"],
+) {
+  return !libraryItem || libraryItem.approval_status === "unconfirmed";
 }
 
 function resolveVocabularyTab(value?: string) {
@@ -262,12 +272,7 @@ async function loadPassiveVocabularyWorkspace(
 ) {
   const supabaseAdmin = createAdminClient();
   const evidenceRange = getPaginationRange(evidencePage, EVIDENCE_PAGE_SIZE);
-  const [
-    studentProfileResult,
-    evidenceCountResult,
-    summaryRowsResult,
-    evidenceRowsResult,
-  ] = await Promise.all([
+  const [studentProfileResult, evidenceRowsResult] = await Promise.all([
     supabaseAdmin
       .from("profiles")
       .select("full_name, email, preferred_language, cefr_level")
@@ -275,22 +280,11 @@ async function loadPassiveVocabularyWorkspace(
       .single(),
     supabaseAdmin
       .from("passive_vocabulary_evidence")
-      .select("id", { count: "exact", head: true })
-      .eq("student_id", studentId),
-    supabaseAdmin
-      .from("passive_vocabulary_evidence")
       .select(
-        "term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(cefr_level, part_of_speech)",
-      )
-      .eq("student_id", studentId),
-    supabaseAdmin
-      .from("passive_vocabulary_evidence")
-      .select(
-        "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(cefr_level, part_of_speech)",
+        "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(approval_status, cefr_level, part_of_speech)",
       )
       .eq("student_id", studentId)
       .order("last_imported_at", { ascending: false })
-      .range(evidenceRange.from, evidenceRange.to),
   ]);
 
   if (studentProfileResult.error || !studentProfileResult.data) {
@@ -317,15 +311,21 @@ async function loadPassiveVocabularyWorkspace(
         | PassiveVocabularyEvidenceRow["library_part_of_speech"]
         | null) ?? null,
   });
+  const allEvidenceRows =
+    (evidenceRowsResult.data ?? []) as PassiveEvidenceQueryRow[];
+  const visibleEvidenceRows = allEvidenceRows.filter((row) =>
+    hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library),
+  );
+  const pendingReviewCount = allEvidenceRows.filter((row) =>
+    hasPendingPassiveVocabularyLibraryEntry(row.passive_vocabulary_library),
+  ).length;
   const summary = summarizePassiveVocabularyEvidence(
-    ((summaryRowsResult.data ?? []) as PassiveEvidenceQueryRow[]).map(
-      mapSummaryRow,
-    ),
+    visibleEvidenceRows.map(mapSummaryRow),
     cefrLevel,
   );
-  const evidenceItems = (
-    (evidenceRowsResult.data ?? []) as PassiveEvidenceQueryRow[]
-  ).map(
+  const evidenceItems = visibleEvidenceRows
+    .slice(evidenceRange.from, evidenceRange.to + 1)
+    .map(
     (row): PassiveEvidenceListItem => ({
       id: row.id,
       term: row.term,
@@ -362,7 +362,8 @@ async function loadPassiveVocabularyWorkspace(
       studentProfileResult.data.preferred_language,
     ),
     cefrLevel,
-    evidenceTotal: evidenceCountResult.count ?? 0,
+    evidenceTotal: visibleEvidenceRows.length,
+    pendingReviewCount,
     evidenceItems,
     summary,
     aboveTargetCount: countAboveTargetLevels(summary.cefrCounts, cefrLevel),
@@ -375,12 +376,7 @@ async function loadActiveVocabularyWorkspace(
 ) {
   const supabaseAdmin = createAdminClient();
   const evidenceRange = getPaginationRange(evidencePage, EVIDENCE_PAGE_SIZE);
-  const [
-    studentProfileResult,
-    evidenceCountResult,
-    summaryRowsResult,
-    evidenceRowsResult,
-  ] = await Promise.all([
+  const [studentProfileResult, evidenceRowsResult] = await Promise.all([
     supabaseAdmin
       .from("profiles")
       .select("full_name, email, cefr_level")
@@ -388,30 +384,22 @@ async function loadActiveVocabularyWorkspace(
       .single(),
     supabaseAdmin
       .from("active_vocabulary_evidence")
-      .select("id", { count: "exact", head: true })
-      .eq("student_id", studentId),
-    supabaseAdmin
-      .from("active_vocabulary_evidence")
       .select(
-        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(cefr_level, part_of_speech)",
-      )
-      .eq("student_id", studentId),
-    supabaseAdmin
-      .from("active_vocabulary_evidence")
-      .select(
-        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(cefr_level, part_of_speech)",
+        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(approval_status, cefr_level, part_of_speech)",
       )
       .eq("student_id", studentId)
       .order("last_used_at", { ascending: false })
-      .range(evidenceRange.from, evidenceRange.to),
   ]);
 
   if (studentProfileResult.error || !studentProfileResult.data) {
     return null;
   }
 
+  const visibleEvidenceRows = ((evidenceRowsResult.data ?? []) as ActiveEvidenceQueryRow[]).filter(
+    (row) => hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library),
+  );
   const summary = summarizeActiveVocabularyEvidence(
-    ((summaryRowsResult.data ?? []) as ActiveEvidenceQueryRow[]).map((row) => ({
+    visibleEvidenceRows.map((row) => ({
       id: row.id,
       term: row.term,
       source_type: row.source_type,
@@ -433,9 +421,9 @@ async function loadActiveVocabularyWorkspace(
     })),
   );
 
-  const evidenceItems = (
-    (evidenceRowsResult.data ?? []) as ActiveEvidenceQueryRow[]
-  ).map(
+  const evidenceItems = visibleEvidenceRows
+    .slice(evidenceRange.from, evidenceRange.to + 1)
+    .map(
     (row): ActiveEvidenceListItem => ({
       id: row.id,
       term: row.term,
@@ -458,7 +446,7 @@ async function loadActiveVocabularyWorkspace(
       "Student",
     studentEmail: studentProfileResult.data.email,
     cefrLevel: normalizeCefrLevel(studentProfileResult.data.cefr_level),
-    evidenceTotal: evidenceCountResult.count ?? 0,
+    evidenceTotal: visibleEvidenceRows.length,
     evidenceItems,
     summary,
     taggedItemsCount: countTaggedActiveVocabularyItems(summary.cefrCounts),
@@ -564,7 +552,7 @@ export async function PassiveVocabularyPageContent({
           supabaseAdmin
             .from("passive_vocabulary_library")
             .select(
-              "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, enrichment_status, enrichment_error, updated_at",
+              "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, reviewed_at, updated_at",
             )
             .order("updated_at", { ascending: false })
             .range(0, LIBRARY_PAGE_SIZE - 1),
@@ -779,7 +767,7 @@ export async function PassiveVocabularyPageContent({
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Imported Items
+                  Visible Items
                 </CardTitle>
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -791,6 +779,12 @@ export async function PassiveVocabularyPageContent({
                   {passiveWorkspace.summary.wordCount} words and{" "}
                   {passiveWorkspace.summary.phraseCount} phrases
                 </p>
+                {passiveWorkspace.pendingReviewCount > 0 ? (
+                  <p className="mt-1 text-xs text-amber-700">
+                    {passiveWorkspace.pendingReviewCount} pending review and
+                    hidden from this list
+                  </p>
+                ) : null}
               </CardContent>
             </Card>
 
@@ -860,7 +854,11 @@ export async function PassiveVocabularyPageContent({
               </CardTitle>
               <CardDescription>
                 Review imported passive-recognition items, including the shared
-                library CEFR and part-of-speech metadata when available.
+                library CEFR and part-of-speech metadata when available. Only
+                confirmed items are shown here.
+                {passiveWorkspace.pendingReviewCount > 0
+                  ? ` ${passiveWorkspace.pendingReviewCount} pending item${passiveWorkspace.pendingReviewCount === 1 ? " is" : "s are"} hidden until review.`
+                  : ""}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -967,8 +965,11 @@ export async function PassiveVocabularyPageContent({
                   attributes: normalizePassiveVocabularyLibraryAttributes(
                     item.attributes,
                   ),
+                  approval_status: item.approval_status,
+                  rejection_reason: item.rejection_reason,
                   enrichment_status: item.enrichment_status,
                   enrichment_error: item.enrichment_error,
+                  reviewed_at: item.reviewed_at,
                   updated_at: item.updated_at,
                 }))}
                 initialHasMore={

@@ -31,12 +31,15 @@ import {
   type AppLanguage,
 } from "@/lib/i18n/app-language";
 import {
+  ENGLISH_VARIANT_PREFERENCES,
   TARGET_LANGUAGE_OPTIONS,
   SOURCE_LANGUAGE_OPTIONS,
   getAllowedCefrLevels,
   getDefaultCefrLevelForLanguage,
+  normalizeEnglishVariantPreference,
   normalizeLearningLanguage,
   normalizeSourceLanguage,
+  type EnglishVariantPreference,
   type LearningLanguage,
   type SourceLanguage,
 } from "@/lib/languages";
@@ -67,6 +70,7 @@ interface SettingsDraft {
   cefrLevel: string;
   learningLanguage: LearningLanguage;
   sourceLanguage: SourceLanguage;
+  englishVariantPreference: EnglishVariantPreference;
   appLanguage: AppLanguage;
   aiVoice: GeminiTtsVoice;
 }
@@ -86,6 +90,9 @@ export default function SettingsPage() {
   const profileSourceLanguage = normalizeSourceLanguage(
     profile?.source_language,
   );
+  const profileEnglishVariantPreference = normalizeEnglishVariantPreference(
+    profile?.english_variant_preference,
+  );
   const profileAppLanguage = normalizeAppLanguage(profile?.app_language);
   const profileAiVoice = normalizeGeminiTtsVoice(profile?.ai_voice);
   const profileAllowedCefrLevels = getAllowedCefrLevels(
@@ -103,6 +110,7 @@ export default function SettingsPage() {
     cefrLevel: profileCefrLevel,
     learningLanguage: profileLearningLanguage,
     sourceLanguage: profileSourceLanguage,
+    englishVariantPreference: profileEnglishVariantPreference,
     appLanguage: profileAppLanguage,
     aiVoice: profileAiVoice ?? DEFAULT_GEMINI_TTS_VOICE,
   };
@@ -111,6 +119,8 @@ export default function SettingsPage() {
   const learningLanguage =
     draft?.learningLanguage ?? baseDraft.learningLanguage;
   const sourceLanguage = draft?.sourceLanguage ?? baseDraft.sourceLanguage;
+  const englishVariantPreference =
+    draft?.englishVariantPreference ?? baseDraft.englishVariantPreference;
   const appLanguage = draft?.appLanguage ?? baseDraft.appLanguage;
   const aiVoice = draft?.aiVoice ?? baseDraft.aiVoice;
   const rawCefrLevel = draft?.cefrLevel ?? baseDraft.cefrLevel;
@@ -141,6 +151,9 @@ export default function SettingsPage() {
     setSaved(false);
 
     const normalizedAiVoice = normalizeGeminiTtsVoice(aiVoice);
+    const normalizedEnglishVariantPreference = normalizeEnglishVariantPreference(
+      englishVariantPreference,
+    );
 
     const supabase = createClient();
 
@@ -151,6 +164,7 @@ export default function SettingsPage() {
         cefr_level: cefrLevel,
         preferred_language: learningLanguage,
         source_language: sourceLanguage,
+        english_variant_preference: normalizedEnglishVariantPreference,
         app_language: appLanguage,
         ai_voice: normalizedAiVoice,
       })
@@ -159,7 +173,10 @@ export default function SettingsPage() {
     if (updateError) {
       setError(updateError.message);
     } else {
-      if (profileAiVoice !== normalizedAiVoice) {
+      if (
+        profileAiVoice !== normalizedAiVoice ||
+        profileEnglishVariantPreference !== normalizedEnglishVariantPreference
+      ) {
         try {
           await clearGeminiTtsCaches();
         } catch (cacheError) {
@@ -285,6 +302,39 @@ export default function SettingsPage() {
             </Select>
           </div>
 
+          {learningLanguage === "english" ? (
+            <div className="space-y-2">
+              <Label htmlFor="englishVariantPreference">
+                {messages.settings.englishVariantLabel}
+              </Label>
+              <Select
+                value={englishVariantPreference}
+                onValueChange={(value) => {
+                  updateDraft((current) => ({
+                    ...current,
+                    englishVariantPreference: value as EnglishVariantPreference,
+                  }));
+                }}
+              >
+                <SelectTrigger id="englishVariantPreference">
+                  <SelectValue
+                    placeholder={messages.settings.englishVariantPlaceholder}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENGLISH_VARIANT_PREFERENCES.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {messages.settings.englishVariants[value]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {messages.settings.englishVariantDescription}
+              </p>
+            </div>
+          ) : null}
+
           <div className="space-y-2">
             <Label htmlFor="appLanguage">
               {messages.settings.appLanguageLabel}
@@ -393,6 +443,7 @@ export default function SettingsPage() {
                     <BrowserTtsButton
                       text={sample.text}
                       language={learningLanguage}
+                      englishVariantPreference={englishVariantPreference}
                       voice={aiVoice}
                       label={messages.settings.aiVoice.playPreview}
                       className="w-full justify-center"

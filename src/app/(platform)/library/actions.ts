@@ -17,6 +17,7 @@ import {
 import { canUserEditDictionary } from "@/lib/dictionary/dictionary-permissions";
 import {
   createPassiveVocabularyLibraryEntries,
+  syncConfirmedActiveVocabularyToPassiveEvidence,
 } from "@/lib/mastery/passive-vocabulary-library";
 import { updatePassiveVocabularyLibraryItem } from "@/lib/mastery/passive-vocabulary-library-updates";
 import { isMissingPassiveVocabularyLibrarySuggestionsTableError } from "@/lib/mastery/passive-vocabulary-library-suggestions";
@@ -65,6 +66,12 @@ function revalidateLibraryPaths() {
   revalidatePath("/library/dictionary");
   revalidatePath("/vocabulary");
   revalidatePath("/passive-vocabulary");
+  revalidatePath("/mastery");
+  revalidatePath("/dashboard");
+  revalidatePath("/progress");
+  revalidatePath("/progress/monthly");
+  revalidatePath("/results");
+  revalidatePath("/results/monthly");
 }
 
 function normalizeOptionalText(value: string | null | undefined) {
@@ -367,6 +374,57 @@ export async function deletePassiveVocabularyLibraryItems(itemIds: string[]) {
 
   if (error) {
     throw new Error("Failed to delete selected dictionary items");
+  }
+
+  revalidateLibraryPaths();
+}
+
+export async function confirmPassiveVocabularyLibraryItem(itemId: string) {
+  const { adminClient, userId } = await requireLibraryRole(["superadmin"]);
+  const nowIso = new Date().toISOString();
+
+  const { error } = await adminClient
+    .from("passive_vocabulary_library")
+    .update({
+      approval_status: "confirmed",
+      rejection_reason: null,
+      reviewed_by: userId,
+      reviewed_at: nowIso,
+      updated_by: userId,
+      updated_at: nowIso,
+    })
+    .eq("id", itemId);
+
+  if (error) {
+    throw new Error("Failed to confirm dictionary item");
+  }
+
+  await syncConfirmedActiveVocabularyToPassiveEvidence({
+    adminClient,
+    actorUserId: userId,
+    libraryItemIds: [itemId],
+  });
+
+  revalidateLibraryPaths();
+}
+
+export async function rejectPassiveVocabularyLibraryItem(itemId: string) {
+  const { adminClient, userId } = await requireLibraryRole(["superadmin"]);
+  const nowIso = new Date().toISOString();
+
+  const { error } = await adminClient
+    .from("passive_vocabulary_library")
+    .update({
+      approval_status: "rejected",
+      reviewed_by: userId,
+      reviewed_at: nowIso,
+      updated_by: userId,
+      updated_at: nowIso,
+    })
+    .eq("id", itemId);
+
+  if (error) {
+    throw new Error("Failed to reject dictionary item");
   }
 
   revalidateLibraryPaths();

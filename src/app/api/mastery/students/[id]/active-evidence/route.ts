@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { hasConfirmedPassiveVocabularyLibraryEntry } from "@/lib/mastery/dictionary-approval";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
 
 export async function GET(
@@ -55,7 +56,7 @@ export async function GET(
     const { data: items, error } = await supabaseAdmin
       .from("active_vocabulary_evidence")
       .select(
-        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(cefr_level, part_of_speech)",
+        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(approval_status, cefr_level, part_of_speech)",
       )
       .eq("student_id", studentId)
       .order("last_used_at", { ascending: false })
@@ -65,7 +66,11 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ items: items ?? [] });
+    return NextResponse.json({
+      items: (items ?? []).filter((item) =>
+        hasConfirmedPassiveVocabularyLibraryEntry(item.passive_vocabulary_library),
+      ),
+    });
   } catch (error) {
     console.error("Fetch active evidence error:", error);
     return NextResponse.json(

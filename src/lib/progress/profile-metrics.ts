@@ -137,6 +137,7 @@ interface PassiveEvidenceWithLibraryRow {
   last_imported_at: string;
   created_at?: string;
   passive_vocabulary_library: {
+    approval_status: "unconfirmed" | "confirmed" | "rejected";
     cefr_level: string | null;
     part_of_speech: string | null;
     attributes: Record<string, unknown> | null;
@@ -152,6 +153,7 @@ interface ActiveEvidenceWithLibraryRow {
   first_used_at: string;
   last_used_at: string;
   passive_vocabulary_library: {
+    approval_status: "unconfirmed" | "confirmed" | "rejected";
     cefr_level: string | null;
     part_of_speech: string | null;
     attributes: Record<string, unknown> | null;
@@ -648,6 +650,17 @@ function isIsoDateInWindow(
   );
 }
 
+function hasConfirmedDictionaryEntry(
+  library:
+    | {
+        approval_status: "unconfirmed" | "confirmed" | "rejected";
+      }
+    | null
+    | undefined,
+) {
+  return library?.approval_status === "confirmed";
+}
+
 function mapPassiveEvidenceRows(
   rows: PassiveEvidenceWithLibraryRow[],
 ): PassiveVocabularyEvidenceRow[] {
@@ -742,9 +755,11 @@ function buildStudentMonthlyProgressSnapshot({
       word.mastery_level >= 4 &&
       isIsoDateInWindow(getIsoDateFromTimestamp(word.last_practiced), window),
   );
-  const passiveEvidenceInWindow = passiveEvidenceRows.filter((row) =>
-    isIsoDateInWindow(getIsoDateFromTimestamp(row.created_at), window),
-  );
+  const passiveEvidenceInWindow = passiveEvidenceRows
+    .filter((row) => hasConfirmedDictionaryEntry(row.passive_vocabulary_library))
+    .filter((row) =>
+      isIsoDateInWindow(getIsoDateFromTimestamp(row.created_at), window),
+    );
   const lessonsInWindow = lessons.filter((lesson) =>
     isIsoDateInWindow(lesson.lesson_date, window),
   );
@@ -982,7 +997,7 @@ export async function getStudentMonthlyComparisonSnapshot(
     supabaseAdmin
       .from("passive_vocabulary_evidence")
       .select(
-        "term, definition, item_type, source_type, source_label, import_count, last_imported_at, created_at, passive_vocabulary_library(cefr_level, part_of_speech, attributes)",
+        "term, definition, item_type, source_type, source_label, import_count, last_imported_at, created_at, passive_vocabulary_library(approval_status, cefr_level, part_of_speech, attributes)",
       )
       .eq("student_id", userId)
       .gte("created_at", `${previousWindow.periodStart}T00:00:00.000Z`)
@@ -1293,14 +1308,14 @@ export async function getStudentProgressSnapshot(
     supabaseAdmin
       .from("passive_vocabulary_evidence")
       .select(
-        "term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(cefr_level, part_of_speech, attributes)",
+        "term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(approval_status, cefr_level, part_of_speech, attributes)",
       )
       .eq("student_id", userId)
       .order("last_imported_at", { ascending: false }),
     supabaseAdmin
       .from("active_vocabulary_evidence")
       .select(
-        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(cefr_level, part_of_speech, attributes)",
+        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(approval_status, cefr_level, part_of_speech, attributes)",
       )
       .eq("student_id", userId)
       .eq("source_type", "lesson_recording"),
@@ -1374,7 +1389,9 @@ export async function getStudentProgressSnapshot(
         left.term.localeCompare(right.term),
     );
   const passiveEvidenceRows = (
-    (passiveEvidenceResult.data ?? []) as PassiveEvidenceWithLibraryRow[]
+    ((passiveEvidenceResult.data ?? []) as PassiveEvidenceWithLibraryRow[]).filter(
+      (row) => hasConfirmedDictionaryEntry(row.passive_vocabulary_library),
+    )
   ).map(
     (row): PassiveVocabularyEvidenceRow => ({
       term: row.term,
@@ -1399,7 +1416,9 @@ export async function getStudentProgressSnapshot(
   );
   const activeSignals = summarizeActiveVocabularyEvidence(
     mapActiveEvidenceRows(
-      (activeEvidenceResult.data ?? []) as ActiveEvidenceWithLibraryRow[],
+      ((activeEvidenceResult.data ?? []) as ActiveEvidenceWithLibraryRow[]).filter(
+        (row) => hasConfirmedDictionaryEntry(row.passive_vocabulary_library),
+      ),
     ),
   );
   const passiveSignals = summarizePassiveVocabularyEvidence(

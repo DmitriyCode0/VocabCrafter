@@ -7,22 +7,29 @@ import {
   GEMINI_TTS_CACHE_NAME,
   type GeminiTtsVoice,
 } from "@/lib/ai/tts-voices";
-import { getSpeechLanguageTag } from "@/lib/languages";
+import {
+  getSpeechLanguageTag,
+  type EnglishVariantPreference,
+} from "@/lib/languages";
 
 interface BrowserTtsButtonProps {
   text: string;
   language?: string | null;
+  englishVariantPreference?: EnglishVariantPreference | null;
   voice?: GeminiTtsVoice | null;
   label?: string;
   className?: string;
+  browserOnly?: boolean;
 }
 
 export function BrowserTtsButton({
   text,
   language,
+  englishVariantPreference,
   voice,
   label = "Listen",
   className,
+  browserOnly = false,
 }: BrowserTtsButtonProps) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -64,20 +71,138 @@ export function BrowserTtsButton({
     setIsLoading(false);
   }
 
-  function speakWithBrowser(textToSpeak: string) {
+  function isAppleSpeechPlatform() {
+    if (typeof navigator === "undefined") {
+      return false;
+    }
+
+    const platform = navigator.platform ?? "";
+    const userAgent = navigator.userAgent ?? "";
+    return /Mac|iPhone|iPad|iPod/i.test(`${platform} ${userAgent}`);
+  }
+
+  async function getAvailableBrowserVoices() {
+    if (!supportsBrowserSpeech) {
+      return [] as SpeechSynthesisVoice[];
+    }
+
+    const synthesis = window.speechSynthesis;
+    const existingVoices = synthesis.getVoices();
+
+    if (existingVoices.length > 0) {
+      return existingVoices;
+    }
+
+    await new Promise<void>((resolve) => {
+      let settled = false;
+
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        synthesis.removeEventListener("voiceschanged", handleVoicesChanged);
+        window.clearTimeout(timeoutId);
+        resolve();
+      };
+
+      const handleVoicesChanged = () => finish();
+      const timeoutId = window.setTimeout(finish, 400);
+
+      synthesis.addEventListener("voiceschanged", handleVoicesChanged);
+      synthesis.getVoices();
+    });
+
+    return synthesis.getVoices();
+  }
+
+  function pickBestBrowserVoice(
+    voices: SpeechSynthesisVoice[],
+    languageTag: string,
+  ) {
+    const normalizedLanguageTag = languageTag.toLowerCase();
+    const normalizedBaseLanguage =
+      normalizedLanguageTag.split("-")[0] ?? normalizedLanguageTag;
+    const applePlatform = isAppleSpeechPlatform();
+
+    const scoredVoices = voices.map((currentVoice) => {
+      const normalizedVoiceLanguage = currentVoice.lang.toLowerCase();
+      const normalizedVoiceBaseLanguage =
+        normalizedVoiceLanguage.split("-")[0] ?? normalizedVoiceLanguage;
+      const voiceDescriptor = `${currentVoice.name} ${currentVoice.voiceURI}`.toLowerCase();
+      let score = 0;
+
+      if (normalizedVoiceLanguage === normalizedLanguageTag) {
+        score += 300;
+      } else if (normalizedVoiceBaseLanguage === normalizedBaseLanguage) {
+        score += 180;
+      }
+
+      if (currentVoice.default) {
+        score += 40;
+      }
+
+      if (currentVoice.localService) {
+        score += 30;
+      }
+
+      if (applePlatform) {
+        if (/(premium|enhanced|natural)/.test(voiceDescriptor)) {
+          score += 90;
+        }
+
+        if (/compact/.test(voiceDescriptor)) {
+          score -= 70;
+        }
+
+        if (/(alex|daniel|karen|moira|samantha|serena)/.test(voiceDescriptor)) {
+          score += 35;
+        }
+      }
+
+      return { currentVoice, score };
+    });
+
+    scoredVoices.sort((left, right) => right.score - left.score);
+    return scoredVoices[0]?.currentVoice ?? null;
+  }
+
+  async function speakWithBrowser(textToSpeak: string) {
     if (!supportsBrowserSpeech) {
       return;
     }
 
     const synthesis = window.speechSynthesis;
+    const speechLanguageTag = getSpeechLanguageTag(
+      language,
+      englishVariantPreference,
+    );
 
     synthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    utterance.lang = getSpeechLanguageTag(language);
-    utterance.rate = 0.95;
+    utterance.lang = speechLanguageTag;
+    utterance.rate = isAppleSpeechPlatform() ? 0.9 : 0.95;
+    utterance.pitch = 1;
+    utterance.volume = 1;
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
+
+    try {
+      const availableVoices = await getAvailableBrowserVoices();
+      const preferredVoice = pickBestBrowserVoice(
+        availableVoices,
+        speechLanguageTag,
+      );
+
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+        utterance.lang = preferredVoice.lang || speechLanguageTag;
+      }
+    } catch (error) {
+      console.warn("Failed to resolve a preferred browser speech voice.", error);
+    }
 
     setIsSpeaking(true);
     synthesis.speak(utterance);
@@ -101,13 +226,14 @@ export function BrowserTtsButton({
 
   async function createPersistentCacheRequest(textToSpeak: string) {
     const normalizedLanguage = language ?? "default";
+    const normalizedEnglishVariant = englishVariantPreference ?? "profile";
     const normalizedVoice = voice ?? "profile";
     const hashedKey = await hashCacheKey(
-      `${normalizedLanguage}:${normalizedVoice}:${textToSpeak}`,
+      `${normalizedLanguage}:${normalizedEnglishVariant}:${normalizedVoice}:${textToSpeak}`,
     );
 
     return new Request(
-      `/tts-cache/${hashedKey}.wav?lang=${normalizedLanguage}&voice=${normalizedVoice}`,
+      `/tts-cache/${hashedKey}.wav?lang=${normalizedLanguage}&variant=${normalizedEnglishVariant}&voice=${normalizedVoice}`,
       {
         method: "GET",
       },
@@ -166,7 +292,7 @@ export function BrowserTtsButton({
   }
 
   async function fetchGeminiAudio(textToSpeak: string) {
-    const cacheKey = `${language ?? "default"}:${voice ?? "profile"}:${textToSpeak}`;
+    const cacheKey = `${language ?? "default"}:${englishVariantPreference ?? "profile"}:${voice ?? "profile"}:${textToSpeak}`;
 
     if (cachedKeyRef.current === cacheKey && cachedUrlRef.current) {
       return cachedUrlRef.current;
@@ -191,6 +317,7 @@ export function BrowserTtsButton({
       body: JSON.stringify({
         text: textToSpeak,
         language,
+        englishVariantPreference,
         voice,
       }),
     });
@@ -217,6 +344,12 @@ export function BrowserTtsButton({
       return;
     }
 
+    if (browserOnly) {
+      setIsLoading(false);
+      await speakWithBrowser(trimmedText);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -229,7 +362,7 @@ export function BrowserTtsButton({
         error,
       );
       setIsLoading(false);
-      speakWithBrowser(trimmedText);
+      await speakWithBrowser(trimmedText);
     }
   }
 

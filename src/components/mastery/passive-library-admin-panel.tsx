@@ -8,8 +8,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { Loader2, RotateCcw, Search } from "lucide-react";
-import { toast } from "sonner";
+import { Loader2, Search } from "lucide-react";
 import { formatAppDate } from "@/lib/dates";
 import {
   formatPassiveVocabularyPartOfSpeech,
@@ -84,12 +83,6 @@ export function PassiveLibraryAdminPanel({
   const [initialLoading, setInitialLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [retryingItemId, setRetryingItemId] = useState<string | null>(null);
-  const [isBulkRetrying, setIsBulkRetrying] = useState(false);
-  const [bulkRetryProgress, setBulkRetryProgress] = useState<{
-    completed: number;
-    total: number;
-  } | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const initialFilterEffectRef = useRef(true);
   const initialLoadingRef = useRef(false);
@@ -265,108 +258,7 @@ export function PassiveLibraryAdminPanel({
     [reloadItems, searchInput, searchQuery],
   );
 
-  const reEnrichItem = useCallback(
-    async (item: PassiveVocabularyLibraryAdminItem) => {
-      const response = await fetch(
-        `/api/mastery/passive-library/${item.id}/re-enrich`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-      const payload = (await response.json().catch(() => null)) as
-        | {
-            error?: string;
-            mergedSourceItemId?: string | null;
-            item?: PassiveVocabularyLibraryAdminItem;
-          }
-        | null;
-
-      if (!response.ok) {
-        throw new Error(payload?.error || "Failed to re-enrich passive vocabulary item");
-      }
-
-      return {
-        mergedSourceItemId: payload?.mergedSourceItemId ?? null,
-        item: payload?.item ?? item,
-      };
-    },
-    [],
-  );
-
-  const handleRetry = useCallback(
-    async (item: PassiveVocabularyLibraryAdminItem) => {
-      setRetryingItemId(item.id);
-
-      try {
-        const payload = await reEnrichItem(item);
-
-        toast.success(
-          payload.mergedSourceItemId
-            ? `Re-enriched ${item.canonical_term} and merged it into the canonical lemma`
-            : `Re-enriched ${payload.item?.canonical_term ?? item.canonical_term}`,
-        );
-        await reloadItems();
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Failed to re-enrich passive vocabulary item",
-        );
-      } finally {
-        setRetryingItemId(null);
-      }
-    },
-    [reEnrichItem, reloadItems],
-  );
-
   const hasActiveFilters = searchQuery.length > 0 || cefrFilter !== "all";
-  const loadedNeedsReviewItems = items.filter(
-    (item) => item.item_type === "word" && item.enrichment_status !== "completed",
-  );
-
-  const handleBulkRetry = useCallback(async () => {
-    if (loadedNeedsReviewItems.length === 0) {
-      return;
-    }
-
-    setIsBulkRetrying(true);
-    setBulkRetryProgress({ completed: 0, total: loadedNeedsReviewItems.length });
-
-    let successCount = 0;
-    let failureCount = 0;
-
-    try {
-      for (let index = 0; index < loadedNeedsReviewItems.length; index += 1) {
-        try {
-          await reEnrichItem(loadedNeedsReviewItems[index]);
-          successCount += 1;
-        } catch {
-          failureCount += 1;
-        }
-
-        setBulkRetryProgress({
-          completed: index + 1,
-          total: loadedNeedsReviewItems.length,
-        });
-      }
-
-      if (failureCount === 0) {
-        toast.success(`Retried ${successCount} loaded item${successCount !== 1 ? "s" : ""}`);
-      } else if (successCount > 0) {
-        toast.success(
-          `Retried ${successCount} item${successCount !== 1 ? "s" : ""}; ${failureCount} still need review`,
-        );
-      } else {
-        toast.error("None of the loaded items could be re-enriched");
-      }
-
-      await reloadItems();
-    } finally {
-      setIsBulkRetrying(false);
-      setBulkRetryProgress(null);
-    }
-  }, [loadedNeedsReviewItems, reEnrichItem, reloadItems]);
 
   return (
     <div className="space-y-4">
@@ -381,7 +273,7 @@ export function PassiveLibraryAdminPanel({
             placeholder="Search canonical terms"
             aria-label="Search passive vocabulary library"
           />
-          <Button type="submit" className="sm:w-auto" disabled={isBulkRetrying}>
+          <Button type="submit" className="sm:w-auto">
             <Search className="mr-2 h-4 w-4" />
             Search
           </Button>
@@ -392,29 +284,6 @@ export function PassiveLibraryAdminPanel({
             Loaded {items.length} item{items.length !== 1 ? "s" : ""}
             {searchQuery ? ` for \"${searchQuery}\"` : ""}
           </span>
-
-          {loadedNeedsReviewItems.length > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isBulkRetrying}
-              onClick={() => void handleBulkRetry()}
-            >
-              {isBulkRetrying ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RotateCcw className="mr-2 h-4 w-4" />
-              )}
-              Retry loaded needs review
-            </Button>
-          )}
-
-          {bulkRetryProgress && (
-            <span>
-              Repairing {bulkRetryProgress.completed}/{bulkRetryProgress.total}
-            </span>
-          )}
         </div>
       </form>
 
@@ -461,7 +330,6 @@ export function PassiveLibraryAdminPanel({
             </TableHeader>
             <TableBody>
               {items.map((item) => {
-                const isRetrying = retryingItemId === item.id;
                 const ukrainianTranslation = getPassiveVocabularyUkrainianTranslation(
                   item.attributes,
                 );
@@ -499,25 +367,6 @@ export function PassiveLibraryAdminPanel({
                     <TableCell>{formatAppDate(item.updated_at)}</TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-2">
-                        {item.item_type === "word" && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={isRetrying || isBulkRetrying}
-                            onClick={() => void handleRetry(item)}
-                          >
-                            {isRetrying ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <RotateCcw className="mr-2 h-4 w-4" />
-                            )}
-                            {item.enrichment_status === "completed"
-                              ? "Re-enrich"
-                              : "Retry AI"}
-                          </Button>
-                        )}
-
                         <EditPassiveLibraryDialog
                           item={{
                             id: item.id,
@@ -525,6 +374,7 @@ export function PassiveLibraryAdminPanel({
                             item_type: item.item_type,
                             cefr_level: item.cefr_level,
                             part_of_speech: item.part_of_speech,
+                            approval_status: item.approval_status,
                             attributes: item.attributes,
                           }}
                           onSaved={reloadItems}
