@@ -37,6 +37,10 @@ export const PASSIVE_VOCABULARY_PARTS_OF_SPEECH = [
   "idiom",
   "other",
 ] as const;
+export const PASSIVE_VOCABULARY_NOUN_COUNTABILITY = [
+  "countable",
+  "uncountable",
+] as const;
 
 export type PassiveVocabularyItemType =
   (typeof PASSIVE_VOCABULARY_ITEM_TYPES)[number];
@@ -46,6 +50,8 @@ export type PassiveVocabularyLibraryCefrLevel =
   (typeof PASSIVE_VOCABULARY_CEFR_LEVELS)[number];
 export type PassiveVocabularyPartOfSpeech =
   (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number];
+export type PassiveVocabularyNounCountability =
+  (typeof PASSIVE_VOCABULARY_NOUN_COUNTABILITY)[number];
 
 export interface PassiveVocabularyEditableFormValues {
   plural: string | null;
@@ -76,7 +82,87 @@ export interface PassiveVocabularyLibraryAttributes extends Record<
   transcription?: string | null;
   americanTranscription?: string | null;
   britishTranscription?: string | null;
+  nounCountability?: PassiveVocabularyNounCountability[];
   forms?: string[];
+}
+
+function addPassiveVocabularyNounCountabilityValue(
+  values: Set<PassiveVocabularyNounCountability>,
+  candidate: unknown,
+) {
+  const normalizedCandidate = normalizePassiveVocabularyText(
+    String(candidate ?? ""),
+  );
+
+  if (!normalizedCandidate) {
+    return;
+  }
+
+  if (
+    normalizedCandidate === "both" ||
+    normalizedCandidate === "countable and uncountable" ||
+    normalizedCandidate === "uncountable and countable" ||
+    normalizedCandidate === "countable/uncountable" ||
+    normalizedCandidate === "uncountable/countable"
+  ) {
+    values.add("countable");
+    values.add("uncountable");
+    return;
+  }
+
+  if (
+    PASSIVE_VOCABULARY_NOUN_COUNTABILITY.includes(
+      normalizedCandidate as PassiveVocabularyNounCountability,
+    )
+  ) {
+    values.add(normalizedCandidate as PassiveVocabularyNounCountability);
+  }
+}
+
+function normalizePassiveVocabularyNounCountability(
+  value: unknown,
+  flags?: {
+    countable?: unknown;
+    uncountable?: unknown;
+  },
+) {
+  const values = new Set<PassiveVocabularyNounCountability>();
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      addPassiveVocabularyNounCountabilityValue(values, entry);
+    }
+  } else if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    if (record.countable === true) {
+      values.add("countable");
+    }
+
+    if (record.uncountable === true) {
+      values.add("uncountable");
+    }
+
+    if (Array.isArray(record.values)) {
+      for (const entry of record.values) {
+        addPassiveVocabularyNounCountabilityValue(values, entry);
+      }
+    }
+  } else {
+    addPassiveVocabularyNounCountabilityValue(values, value);
+  }
+
+  if (flags?.countable === true) {
+    values.add("countable");
+  }
+
+  if (flags?.uncountable === true) {
+    values.add("uncountable");
+  }
+
+  return PASSIVE_VOCABULARY_NOUN_COUNTABILITY.filter((entry) =>
+    values.has(entry),
+  );
 }
 
 function normalizePassiveVocabularyManagedForms(
@@ -166,6 +252,15 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
       attributes.transcriptionBritish ??
       attributes.transcription_british,
   );
+  const nounCountability = normalizePassiveVocabularyNounCountability(
+    attributes.nounCountability ??
+      attributes.noun_countability ??
+      attributes.countability,
+    {
+      countable: attributes.countable,
+      uncountable: attributes.uncountable,
+    },
+  );
   const forms = normalizePassiveVocabularyManagedForms(
     attributes.forms,
     typeof attributes.canonicalTerm === "string"
@@ -185,6 +280,10 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
   delete attributes.british_transcription;
   delete attributes.transcriptionBritish;
   delete attributes.transcription_british;
+  delete attributes.noun_countability;
+  delete attributes.countability;
+  delete attributes.countable;
+  delete attributes.uncountable;
 
   if (ukrainianTranslation) {
     attributes.ukrainianTranslation = ukrainianTranslation;
@@ -219,6 +318,12 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
     attributes.transcription = transcription;
   } else {
     delete attributes.transcription;
+  }
+
+  if (nounCountability.length > 0) {
+    attributes.nounCountability = nounCountability;
+  } else {
+    delete attributes.nounCountability;
   }
 
   if (forms.length > 0) {
@@ -374,6 +479,36 @@ export function withPassiveVocabularyTranscriptions(
   return nextAttributes;
 }
 
+export function getPassiveVocabularyNounCountability(
+  attributes?: PassiveVocabularyLibraryAttributes | null,
+) {
+  return normalizePassiveVocabularyNounCountability(
+    normalizePassiveVocabularyLibraryAttributes(attributes).nounCountability,
+  );
+}
+
+export function withPassiveVocabularyNounCountability(
+  attributes: PassiveVocabularyLibraryAttributes | null | undefined,
+  nounCountability:
+    | PassiveVocabularyNounCountability[]
+    | null
+    | undefined,
+) {
+  const nextAttributes =
+    normalizePassiveVocabularyLibraryAttributes(attributes);
+  const normalizedNounCountability = normalizePassiveVocabularyNounCountability(
+    nounCountability,
+  );
+
+  if (normalizedNounCountability.length > 0) {
+    nextAttributes.nounCountability = normalizedNounCountability;
+  } else {
+    delete nextAttributes.nounCountability;
+  }
+
+  return nextAttributes;
+}
+
 export function getPassiveVocabularyForms(
   attributes?: PassiveVocabularyLibraryAttributes | null,
   canonicalTerm?: string | null,
@@ -416,6 +551,7 @@ export function getPassiveVocabularyCustomAttributes(
   delete customAttributes.transcription;
   delete customAttributes.americanTranscription;
   delete customAttributes.britishTranscription;
+  delete customAttributes.nounCountability;
   delete customAttributes.forms;
 
   return customAttributes;
@@ -830,10 +966,11 @@ export function getPassiveVocabularyEditableFormValues(
   partOfSpeech?: PassiveVocabularyPartOfSpeech | null,
   explicitForms?: string[] | null,
 ): PassiveVocabularyEditableFormValues {
-  const normalizedText = normalizePassiveVocabularyText(value);
+  const headword = getPassiveVocabularyCanonicalHeadword(value, partOfSpeech);
+  const normalizedText = normalizePassiveVocabularyText(headword);
   const normalizedExplicitForms = normalizePassiveVocabularyManagedForms(
     explicitForms,
-    value,
+    headword,
   );
   const emptyValues = createEmptyPassiveVocabularyEditableFormValues();
 
@@ -1064,18 +1201,98 @@ export function normalizePassiveVocabularyText(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function getPassiveVocabularyIndefiniteArticle(value: string) {
+  return /^[aeiou]/i.test(value.trim()) ? "an" : "a";
+}
+
+export function getPassiveVocabularyCanonicalHeadword(
+  value: string,
+  partOfSpeech?: PassiveVocabularyPartOfSpeech | null,
+) {
+  const normalizedValue = value.trim().replace(/\s+/g, " ");
+  const normalizedLookupValue = normalizePassiveVocabularyText(normalizedValue);
+
+  if (!normalizedLookupValue) {
+    return "";
+  }
+
+  if (partOfSpeech === "verb" && normalizedLookupValue.startsWith("to ")) {
+    return normalizedValue.slice(3).trim();
+  }
+
+  if (
+    partOfSpeech === "noun" &&
+    (normalizedLookupValue.startsWith("a ") || normalizedLookupValue.startsWith("an "))
+  ) {
+    return normalizedLookupValue.startsWith("an ")
+      ? normalizedValue.slice(3).trim()
+      : normalizedValue.slice(2).trim();
+  }
+
+  return normalizedValue;
+}
+
+export function formatPassiveVocabularyCanonicalTerm(
+  value: string,
+  partOfSpeech?: PassiveVocabularyPartOfSpeech | null,
+  nounCountability?: PassiveVocabularyNounCountability[] | null,
+) {
+  const headword = getPassiveVocabularyCanonicalHeadword(value, partOfSpeech);
+
+  if (!headword) {
+    return "";
+  }
+
+  if (partOfSpeech === "verb") {
+    return `to ${headword}`;
+  }
+
+  if (partOfSpeech === "noun" && nounCountability?.includes("countable")) {
+    return `${getPassiveVocabularyIndefiniteArticle(headword)} ${headword}`;
+  }
+
+  return headword;
+}
+
 export function getPassiveVocabularyLookupCandidates(
   value: string,
   itemType: PassiveVocabularyItemType,
+  partOfSpeech?: PassiveVocabularyPartOfSpeech | null,
 ) {
-  const normalizedText = normalizePassiveVocabularyText(value);
-  if (!normalizedText) {
+  const headword = getPassiveVocabularyCanonicalHeadword(value, partOfSpeech);
+  const normalizedHeadword = normalizePassiveVocabularyText(headword);
+
+  if (!normalizedHeadword) {
     return [];
   }
 
-  return itemType === "word" && !normalizedText.includes(" ")
-    ? [normalizedText]
-    : [normalizedText];
+  const candidates: string[] = [];
+  const addCandidate = (candidate: string) => {
+    const normalizedCandidate = normalizePassiveVocabularyText(candidate);
+
+    if (!normalizedCandidate || candidates.includes(normalizedCandidate)) {
+      return;
+    }
+
+    candidates.push(normalizedCandidate);
+  };
+
+  if (itemType === "word") {
+    if (partOfSpeech === "verb") {
+      addCandidate(formatPassiveVocabularyCanonicalTerm(headword, "verb"));
+    }
+
+    if (partOfSpeech === "noun") {
+      addCandidate(`a ${headword}`);
+      addCandidate(`an ${headword}`);
+    }
+  }
+
+  addCandidate(headword);
+
+  return itemType === "word" && !normalizedHeadword.includes(" ")
+    ? candidates
+    : candidates;
 }
 
 export function extractPassiveVocabularyTermsFromText(text: string) {

@@ -2,11 +2,14 @@ import { redirect } from "next/navigation";
 import { LibraryPageHeader } from "@/components/library/library-page-header";
 import {
   LibraryDictionaryBrowser,
+  type LibraryDictionaryFacetCounts,
   type LibraryDictionaryPendingSuggestion,
   type LibraryDictionarySuggestionReviewItem,
 } from "@/components/library/library-dictionary-browser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  PASSIVE_VOCABULARY_CEFR_LEVELS,
+  PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
   normalizePassiveVocabularyLibraryAttributes,
   type PassiveVocabularyLibraryCefrLevel,
   type PassiveVocabularyPartOfSpeech,
@@ -31,6 +34,63 @@ interface DictionarySuggestionRow {
   suggestion_note: string | null;
   created_at: string;
   created_by: string;
+}
+
+interface DictionaryFacetRow {
+  cefr_level: string | null;
+  part_of_speech: string | null;
+  approval_status: "unconfirmed" | "confirmed" | "rejected";
+}
+
+function createEmptyFacetCounts(): LibraryDictionaryFacetCounts {
+  return {
+    cefr: {
+      all: 0,
+      unknown: 0,
+      A1: 0,
+      A2: 0,
+      B1: 0,
+      B2: 0,
+      C1: 0,
+      C2: 0,
+    },
+    approval: {
+      all: 0,
+      unconfirmed: 0,
+      confirmed: 0,
+      rejected: 0,
+    },
+    partOfSpeech: Object.fromEntries(
+      PASSIVE_VOCABULARY_PARTS_OF_SPEECH.map((value) => [value, 0]),
+    ) as LibraryDictionaryFacetCounts["partOfSpeech"],
+  };
+}
+
+function buildFacetCounts(rows: DictionaryFacetRow[]): LibraryDictionaryFacetCounts {
+  const counts = createEmptyFacetCounts();
+
+  counts.cefr.all = rows.length;
+  counts.approval.all = rows.length;
+
+  for (const row of rows) {
+    counts.approval[row.approval_status] += 1;
+
+    if (!row.cefr_level) {
+      counts.cefr.unknown += 1;
+    } else if (PASSIVE_VOCABULARY_CEFR_LEVELS.includes(row.cefr_level as never)) {
+      counts.cefr[row.cefr_level as keyof LibraryDictionaryFacetCounts["cefr"]] += 1;
+    } else {
+      counts.cefr.unknown += 1;
+    }
+
+    if (PASSIVE_VOCABULARY_PARTS_OF_SPEECH.includes(row.part_of_speech as never)) {
+      counts.partOfSpeech[
+        row.part_of_speech as keyof LibraryDictionaryFacetCounts["partOfSpeech"]
+      ] += 1;
+    }
+  }
+
+  return counts;
 }
 
 export default async function LibraryDictionaryPage() {
@@ -60,6 +120,9 @@ export default async function LibraryDictionaryPage() {
   let libraryCountQuery = supabaseAdmin
     .from("passive_vocabulary_library")
     .select("id", { count: "exact", head: true });
+  let libraryFacetCountsQuery = supabaseAdmin
+    .from("passive_vocabulary_library")
+    .select("cefr_level, part_of_speech, approval_status");
   let libraryRowsQuery = supabaseAdmin
     .from("passive_vocabulary_library")
     .select(
@@ -70,18 +133,24 @@ export default async function LibraryDictionaryPage() {
 
   if (role !== "superadmin") {
     libraryCountQuery = libraryCountQuery.eq("approval_status", "confirmed");
+    libraryFacetCountsQuery = libraryFacetCountsQuery.eq("approval_status", "confirmed");
     libraryRowsQuery = libraryRowsQuery.eq("approval_status", "confirmed");
   }
 
-  const [libraryCountResult, libraryRowsResult, canDirectlyAdd] = await Promise.all([
+  const [libraryCountResult, libraryFacetCountsResult, libraryRowsResult, canDirectlyAdd] = await Promise.all([
     libraryCountQuery,
+    libraryFacetCountsQuery,
     libraryRowsQuery,
     canUserEditDictionary(user.id, role),
   ]);
 
-  if (libraryRowsResult.error) {
+  if (libraryRowsResult.error || libraryFacetCountsResult.error) {
     throw new Error("Failed to load shared dictionary items");
   }
+
+  const initialFacetCounts = buildFacetCounts(
+    (libraryFacetCountsResult.data ?? []) as DictionaryFacetRow[],
+  );
 
   let pendingSuggestions: LibraryDictionarySuggestionReviewItem[] = [];
   let myPendingSuggestions: LibraryDictionaryPendingSuggestion[] = [];
@@ -225,6 +294,7 @@ export default async function LibraryDictionaryPage() {
           updated_at: item.updated_at,
         }))}
         initialHasMore={(libraryCountResult.count ?? 0) > LIBRARY_PAGE_SIZE}
+        initialFacetCounts={initialFacetCounts}
         totalItems={libraryCountResult.count ?? 0}
         canDirectlyAdd={canDirectlyAdd}
         pendingSuggestions={pendingSuggestions}

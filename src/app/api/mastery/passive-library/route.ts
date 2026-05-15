@@ -17,6 +17,12 @@ import { importPassiveVocabularyLibraryItems as importPassiveVocabularyLibraryBa
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
+const APPROVAL_FACET_VALUES = [
+  "all",
+  "unconfirmed",
+  "confirmed",
+  "rejected",
+] as const;
 
 async function getCurrentLibraryAccess() {
   const supabase = await createClient();
@@ -79,6 +85,94 @@ function parsePositiveInt(value: string | null, fallback: number) {
 
 const LIBRARY_ITEM_SELECT_FIELDS =
   "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, reviewed_at, updated_at";
+const LIBRARY_FACET_SELECT_FIELDS =
+  "id, cefr_level, part_of_speech, approval_status, updated_at";
+
+type LibraryApprovalFacetValue = (typeof APPROVAL_FACET_VALUES)[number];
+type LibraryCefrFacetValue =
+  | "all"
+  | "unknown"
+  | (typeof PASSIVE_VOCABULARY_CEFR_LEVELS)[number];
+
+interface PassiveLibraryFacetRow {
+  id: string;
+  cefr_level: string | null;
+  part_of_speech: string | null;
+  approval_status: PassiveVocabularyLibraryAdminItem["approval_status"];
+  updated_at: string;
+}
+
+interface PassiveLibraryFacetCounts {
+  cefr: Record<LibraryCefrFacetValue, number>;
+  approval: Record<LibraryApprovalFacetValue, number>;
+  partOfSpeech: Record<
+    (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number],
+    number
+  >;
+}
+
+function createEmptyFacetCounts(): PassiveLibraryFacetCounts {
+  return {
+    cefr: {
+      all: 0,
+      unknown: 0,
+      A1: 0,
+      A2: 0,
+      B1: 0,
+      B2: 0,
+      C1: 0,
+      C2: 0,
+    },
+    approval: Object.fromEntries(
+      APPROVAL_FACET_VALUES.map((value) => [value, 0]),
+    ) as PassiveLibraryFacetCounts["approval"],
+    partOfSpeech: Object.fromEntries(
+      PASSIVE_VOCABULARY_PARTS_OF_SPEECH.map((value) => [value, 0]),
+    ) as PassiveLibraryFacetCounts["partOfSpeech"],
+  };
+}
+
+function getCefrFacetValue(cefrLevel: string | null): LibraryCefrFacetValue {
+  if (!cefrLevel) {
+    return "unknown";
+  }
+
+  return PASSIVE_VOCABULARY_CEFR_LEVELS.includes(cefrLevel as never)
+    ? (cefrLevel as LibraryCefrFacetValue)
+    : "unknown";
+}
+
+function buildFacetCounts(input: {
+  cefrRows: PassiveLibraryFacetRow[];
+  approvalRows: PassiveLibraryFacetRow[];
+  posRows: PassiveLibraryFacetRow[];
+}): PassiveLibraryFacetCounts {
+  const counts = createEmptyFacetCounts();
+
+  counts.cefr.all = input.cefrRows.length;
+  for (const row of input.cefrRows) {
+    counts.cefr[getCefrFacetValue(row.cefr_level)] += 1;
+  }
+
+  counts.approval.all = input.approvalRows.length;
+  for (const row of input.approvalRows) {
+    counts.approval[row.approval_status] += 1;
+  }
+
+  for (const row of input.posRows) {
+    if (PASSIVE_VOCABULARY_PARTS_OF_SPEECH.includes(row.part_of_speech as never)) {
+      counts.partOfSpeech[
+        row.part_of_speech as (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number]
+      ] += 1;
+    }
+  }
+
+  return counts;
+}
+
+function asRowArray<TRow>(value: unknown): TRow[] {
+  return Array.isArray(value) ? (value as TRow[]) : [];
+}
 
 function toAdminItem(row: {
   id: string;
@@ -116,6 +210,14 @@ function toAdminItem(row: {
 
 type PassiveVocabularyLibraryAdminItemRow = Parameters<typeof toAdminItem>[0];
 
+interface QueryFilterOptions {
+  includeCefrFilter?: boolean;
+  includeApprovalFilter?: boolean;
+  includePosFilter?: boolean;
+  selectFields?: string;
+  orderByUpdatedAt?: boolean;
+}
+
 export async function GET(request: NextRequest) {
   const access = await getCurrentLibraryAccess();
   if ("errorResponse" in access) {
@@ -134,34 +236,71 @@ export async function GET(request: NextRequest) {
   const cefrFilter = searchParams.get("cefr")?.trim() ?? "all";
   const posFilter = searchParams.get("pos")?.trim();
   const approvalFilter = searchParams.get("status")?.trim() ?? "all";
+  const normalizedPosFilters = (posFilter ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(
+      (value): value is (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number] =>
+        PASSIVE_VOCABULARY_PARTS_OF_SPEECH.includes(value as never),
+    );
 
-  const createLibraryItemsQuery = () => {
+  const createLibraryItemsQuery = ({
+    includeCefrFilter = true,
+    includeApprovalFilter = true,
+    includePosFilter = true,
+    selectFields = LIBRARY_ITEM_SELECT_FIELDS,
+    orderByUpdatedAt = false,
+  }: QueryFilterOptions = {}) => {
     let query = access.adminClient
       .from("passive_vocabulary_library")
-      .select(LIBRARY_ITEM_SELECT_FIELDS)
-      .order("updated_at", { ascending: false });
+      .select(selectFields);
+
+    if (orderByUpdatedAt) {
+      query = query.order("updated_at", { ascending: false });
+    }
 
     if (access.role !== "superadmin") {
       query = query.eq("approval_status", "confirmed");
     } else if (
-      approvalFilter === "unconfirmed" ||
-      approvalFilter === "confirmed" ||
-      approvalFilter === "rejected"
+      includeApprovalFilter &&
+      (approvalFilter === "unconfirmed" ||
+        approvalFilter === "confirmed" ||
+        approvalFilter === "rejected")
     ) {
       query = query.eq("approval_status", approvalFilter);
     }
 
-    if (cefrFilter === "unknown") {
+    if (includeCefrFilter && (cefrFilter === "unknown" || cefrFilter === "null")) {
       query = query.is("cefr_level", null);
-    } else if (PASSIVE_VOCABULARY_CEFR_LEVELS.includes(cefrFilter as never)) {
+    } else if (
+      includeCefrFilter &&
+      PASSIVE_VOCABULARY_CEFR_LEVELS.includes(cefrFilter as never)
+    ) {
       query = query.eq("cefr_level", cefrFilter);
     }
 
-    if (posFilter) {
-      query = query.in("part_of_speech", posFilter.split(","));
+    if (includePosFilter && normalizedPosFilters.length > 0) {
+      query = query.in("part_of_speech", normalizedPosFilters);
     }
 
     return query;
+  };
+
+  const mergeRowsById = <TRow extends { id: string }>(
+    rows: TRow[],
+    additionalRows: TRow[],
+  ) => {
+    const rowsById = new Map<string, TRow>();
+
+    for (const row of rows) {
+      rowsById.set(row.id, row);
+    }
+
+    for (const row of additionalRows) {
+      rowsById.set(row.id, row);
+    }
+
+    return Array.from(rowsById.values());
   };
 
   if (searchQuery) {
@@ -182,59 +321,93 @@ export async function GET(request: NextRequest) {
       new Set((matchingForms ?? []).map((row) => row.library_item_id)),
     );
 
-    const { data: canonicalMatches, error: canonicalMatchesError } =
-      await createLibraryItemsQuery().ilike("canonical_term", `%${searchQuery}%`);
+    const loadSearchRows = async (
+      selectFields: string,
+      options: QueryFilterOptions = {},
+    ) => {
+      const [canonicalMatchesResult, aliasMatchesResult] = await Promise.all([
+        createLibraryItemsQuery({ ...options, selectFields }).ilike(
+          "canonical_term",
+          `%${searchQuery}%`,
+        ),
+        matchingLibraryItemIds.length > 0
+          ? createLibraryItemsQuery({ ...options, selectFields }).in(
+              "id",
+              matchingLibraryItemIds,
+            )
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
-    if (canonicalMatchesError) {
+      if (canonicalMatchesResult.error || aliasMatchesResult.error) {
+        throw new Error("Failed to load passive vocabulary library items");
+      }
+
+      return mergeRowsById(
+        asRowArray<{ id: string }>(canonicalMatchesResult.data),
+        asRowArray<{ id: string }>(aliasMatchesResult.data),
+      );
+    };
+
+    try {
+      const [mergedAdminRows, cefrFacetRows, approvalFacetRows, posFacetRows] =
+        await Promise.all([
+          loadSearchRows(LIBRARY_ITEM_SELECT_FIELDS),
+          loadSearchRows(LIBRARY_FACET_SELECT_FIELDS, { includeCefrFilter: false }),
+          loadSearchRows(LIBRARY_FACET_SELECT_FIELDS, { includeApprovalFilter: false }),
+          loadSearchRows(LIBRARY_FACET_SELECT_FIELDS, { includePosFilter: false }),
+        ]);
+
+      const mergedItems = asRowArray<PassiveVocabularyLibraryAdminItemRow>(
+        mergedAdminRows,
+      )
+        .sort(
+          (left, right) =>
+            new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime(),
+        );
+      const paginatedItems = mergedItems.slice(offset, offset + limit + 1);
+
+      return NextResponse.json({
+        items: paginatedItems.slice(0, limit).map(toAdminItem),
+        hasMore: paginatedItems.length > limit,
+        facetCounts: buildFacetCounts({
+          cefrRows: asRowArray<PassiveLibraryFacetRow>(cefrFacetRows),
+          approvalRows: asRowArray<PassiveLibraryFacetRow>(approvalFacetRows),
+          posRows: asRowArray<PassiveLibraryFacetRow>(posFacetRows),
+        }),
+        availableCefrLevels: PASSIVE_VOCABULARY_CEFR_LEVELS,
+        availablePartsOfSpeech: PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
+      });
+    } catch {
       return NextResponse.json(
         { error: "Failed to load passive vocabulary library items" },
         { status: 500 },
       );
     }
-
-    let aliasMatches: PassiveVocabularyLibraryAdminItemRow[] = [];
-
-    if (matchingLibraryItemIds.length > 0) {
-      const { data: matchingAliasRows, error: aliasMatchesError } =
-        await createLibraryItemsQuery().in("id", matchingLibraryItemIds);
-
-      if (aliasMatchesError) {
-        return NextResponse.json(
-          { error: "Failed to load passive vocabulary library items" },
-          { status: 500 },
-        );
-      }
-
-      aliasMatches = matchingAliasRows ?? [];
-    }
-
-    const mergedItemsById = new Map<string, PassiveVocabularyLibraryAdminItemRow>();
-
-    for (const row of canonicalMatches ?? []) {
-      mergedItemsById.set(row.id, row);
-    }
-
-    for (const row of aliasMatches) {
-      mergedItemsById.set(row.id, row);
-    }
-
-    const mergedItems = Array.from(mergedItemsById.values()).sort(
-      (left, right) =>
-        new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime(),
-    );
-    const paginatedItems = mergedItems.slice(offset, offset + limit + 1);
-
-    return NextResponse.json({
-      items: paginatedItems.slice(0, limit).map(toAdminItem),
-      hasMore: paginatedItems.length > limit,
-      availableCefrLevels: PASSIVE_VOCABULARY_CEFR_LEVELS,
-      availablePartsOfSpeech: PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
-    });
   }
 
-  const { data, error } = await createLibraryItemsQuery().range(offset, offset + limit);
+  const [dataResult, cefrFacetResult, approvalFacetResult, posFacetResult] =
+    await Promise.all([
+      createLibraryItemsQuery({ orderByUpdatedAt: true }).range(offset, offset + limit),
+      createLibraryItemsQuery({
+        selectFields: LIBRARY_FACET_SELECT_FIELDS,
+        includeCefrFilter: false,
+      }),
+      createLibraryItemsQuery({
+        selectFields: LIBRARY_FACET_SELECT_FIELDS,
+        includeApprovalFilter: false,
+      }),
+      createLibraryItemsQuery({
+        selectFields: LIBRARY_FACET_SELECT_FIELDS,
+        includePosFilter: false,
+      }),
+    ]);
 
-  if (error) {
+  if (
+    dataResult.error ||
+    cefrFacetResult.error ||
+    approvalFacetResult.error ||
+    posFacetResult.error
+  ) {
     return NextResponse.json(
       { error: "Failed to load passive vocabulary library items" },
       { status: 500 },
@@ -242,8 +415,15 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    items: (data ?? []).slice(0, limit).map(toAdminItem),
-    hasMore: (data ?? []).length > limit,
+    items: asRowArray<PassiveVocabularyLibraryAdminItemRow>(dataResult.data)
+      .slice(0, limit)
+      .map(toAdminItem),
+    hasMore: asRowArray<PassiveVocabularyLibraryAdminItemRow>(dataResult.data).length > limit,
+    facetCounts: buildFacetCounts({
+      cefrRows: asRowArray<PassiveLibraryFacetRow>(cefrFacetResult.data),
+      approvalRows: asRowArray<PassiveLibraryFacetRow>(approvalFacetResult.data),
+      posRows: asRowArray<PassiveLibraryFacetRow>(posFacetResult.data),
+    }),
     availableCefrLevels: PASSIVE_VOCABULARY_CEFR_LEVELS,
     availablePartsOfSpeech: PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
   });

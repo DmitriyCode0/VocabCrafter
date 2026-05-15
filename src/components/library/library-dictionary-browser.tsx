@@ -9,7 +9,6 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { useRouter } from "next/navigation";
 import { Check, Loader2, Search, X, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppI18n } from "@/components/providers/app-language-provider";
@@ -46,6 +45,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -75,6 +75,12 @@ const APPROVAL_FILTER_VALUES = [
 ] as const;
 
 type DictionaryApprovalFilter = (typeof APPROVAL_FILTER_VALUES)[number];
+
+export interface LibraryDictionaryFacetCounts {
+  cefr: Record<"all" | "unknown" | CEFRLevel, number>;
+  approval: Record<DictionaryApprovalFilter, number>;
+  partOfSpeech: Record<PassiveVocabularyPartOfSpeech, number>;
+}
 
 function getApprovalStatusLabel(status: PassiveVocabularyLibraryAdminItem["approval_status"]) {
   if (status === "confirmed") {
@@ -134,12 +140,14 @@ export interface LibraryDictionarySuggestionReviewItem {
 interface PassiveLibraryResponse {
   items: PassiveVocabularyLibraryAdminItem[];
   hasMore: boolean;
+  facetCounts: LibraryDictionaryFacetCounts;
 }
 
 interface LibraryDictionaryBrowserProps {
   role: "tutor" | "superadmin";
   initialItems: PassiveVocabularyLibraryAdminItem[];
   initialHasMore: boolean;
+  initialFacetCounts: LibraryDictionaryFacetCounts;
   totalItems: number;
   canDirectlyAdd: boolean;
   pendingSuggestions?: LibraryDictionarySuggestionReviewItem[];
@@ -170,15 +178,16 @@ export function LibraryDictionaryBrowser({
   role,
   initialItems,
   initialHasMore,
+  initialFacetCounts,
   totalItems,
   canDirectlyAdd,
   pendingSuggestions = [],
   myPendingSuggestions = [],
 }: LibraryDictionaryBrowserProps) {
-  const router = useRouter();
   const { messages } = useAppI18n();
   const [items, setItems] = useState(initialItems);
   const [hasMore, setHasMore] = useState(initialHasMore);
+  const [reviewItems, setReviewItems] = useState(pendingSuggestions);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [cefrFilter, setCefrFilter] = useState<"all" | "unknown" | CEFRLevel>(
@@ -187,6 +196,9 @@ export function LibraryDictionaryBrowser({
   const [approvalFilter, setApprovalFilter] =
     useState<DictionaryApprovalFilter>("all");
   const [posFilter, setPosFilter] = useState<PassiveVocabularyPartOfSpeech[]>([]);
+  const [facetCounts, setFacetCounts] =
+    useState<LibraryDictionaryFacetCounts | null>(initialFacetCounts);
+  const [showFilterCounts, setShowFilterCounts] = useState(true);
   const [initialLoading, setInitialLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -226,6 +238,21 @@ export function LibraryDictionaryBrowser({
       })),
     [messages.library.dictionary.allFilter, messages.library.dictionary.unknownValue],
   );
+  const approvalFilterOptions = useMemo(
+    () =>
+      APPROVAL_FILTER_VALUES.map((value) => ({
+        value,
+        label:
+          value === "all"
+            ? "All statuses"
+            : value === "unconfirmed"
+              ? "Unconfirmed"
+              : value === "confirmed"
+                ? "Confirmed"
+                : "Rejected",
+      })),
+    [],
+  );
   const selectedItemIdSet = useMemo(
     () => new Set(selectedItemIds),
     [selectedItemIds],
@@ -237,12 +264,26 @@ export function LibraryDictionaryBrowser({
   const canBatchManage = role === "superadmin" || (role === "tutor" && canDirectlyAdd);
   const allVisibleSelected =
     items.length > 0 && items.every((item) => selectedItemIdSet.has(item.id));
+  const formatFilterLabel = useCallback(
+    (label: string, count: number | undefined) => {
+      if (!showFilterCounts || facetCounts === null || typeof count !== "number") {
+        return label;
+      }
+
+      return `${label} (${count})`;
+    },
+    [facetCounts, showFilterCounts],
+  );
 
   useEffect(() => {
     setSelectedItemIds((current) =>
       current.filter((id) => items.some((item) => item.id === id)),
     );
   }, [items]);
+
+  useEffect(() => {
+    setReviewItems(pendingSuggestions);
+  }, [pendingSuggestions]);
 
   const fetchLibraryPage = useCallback(
     async (offset: number) => {
@@ -257,7 +298,7 @@ export function LibraryDictionaryBrowser({
 
       if (cefrFilter !== "all") {
         if (cefrFilter === "unknown") {
-          searchParams.set("cefr", "null");
+          searchParams.set("cefr", "unknown");
         } else {
           searchParams.set("cefr", cefrFilter);
         }
@@ -311,6 +352,7 @@ export function LibraryDictionaryBrowser({
         return;
       }
 
+      setFacetCounts(nextPage.facetCounts);
       startTransition(() => {
         setItems(nextPage.items);
         setHasMore(nextPage.hasMore);
@@ -320,6 +362,7 @@ export function LibraryDictionaryBrowser({
         return;
       }
 
+      setFacetCounts(null);
       setItems([]);
       setLoadError(
         error instanceof Error
@@ -352,6 +395,7 @@ export function LibraryDictionaryBrowser({
         return;
       }
 
+      setFacetCounts(nextPage.facetCounts);
       startTransition(() => {
         setItems((currentItems) => mergeLibraryItems(currentItems, nextPage.items));
         setHasMore(nextPage.hasMore);
@@ -431,8 +475,10 @@ export function LibraryDictionaryBrowser({
         toast.success(
           messages.library.dictionary.approvedSuggestion(suggestion.current_term),
         );
+        setReviewItems((current) =>
+          current.filter((item) => item.id !== suggestion.id),
+        );
         await reloadItems();
-        router.refresh();
       } catch (error) {
         toast.error(
           error instanceof Error
@@ -443,7 +489,7 @@ export function LibraryDictionaryBrowser({
         setReviewingSuggestionId(null);
       }
     },
-    [messages.library.dictionary, reloadItems, router],
+    [messages.library.dictionary, reloadItems],
   );
 
   const handleRejectSuggestion = useCallback(
@@ -455,7 +501,9 @@ export function LibraryDictionaryBrowser({
         toast.success(
           messages.library.dictionary.rejectedSuggestion(suggestion.current_term),
         );
-        router.refresh();
+        setReviewItems((current) =>
+          current.filter((item) => item.id !== suggestion.id),
+        );
       } catch (error) {
         toast.error(
           error instanceof Error
@@ -466,7 +514,7 @@ export function LibraryDictionaryBrowser({
         setReviewingSuggestionId(null);
       }
     },
-    [messages.library.dictionary, router],
+    [messages.library.dictionary],
   );
 
   const handleDeleteItem = async (item: PassiveVocabularyLibraryAdminItem) => {
@@ -591,6 +639,15 @@ export function LibraryDictionaryBrowser({
     cefrFilter !== "all" ||
     posFilter.length > 0 ||
     approvalFilter !== "all";
+  const canClearFilters = hasActiveFilters || searchInput.length > 0;
+
+  const handleClearFilters = useCallback(() => {
+    setSearchInput("");
+    setSearchQuery("");
+    setCefrFilter("all");
+    setApprovalFilter("all");
+    setPosFilter([]);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -605,7 +662,7 @@ export function LibraryDictionaryBrowser({
             </p>
           </div>
 
-          {pendingSuggestions.length === 0 ? (
+          {reviewItems.length === 0 ? (
             <Card>
               <CardContent className="py-6 text-sm text-muted-foreground">
                 {messages.library.dictionary.noPendingTutorSuggestions}
@@ -613,7 +670,7 @@ export function LibraryDictionaryBrowser({
             </Card>
           ) : (
             <div className="grid gap-4 xl:grid-cols-2">
-              {pendingSuggestions.map((suggestion) => {
+              {reviewItems.map((suggestion) => {
                 const currentTranslation = getPassiveVocabularyUkrainianTranslation(
                   suggestion.current_attributes,
                 );
@@ -730,7 +787,7 @@ export function LibraryDictionaryBrowser({
         >
           <div className="flex w-full flex-col gap-2 sm:flex-row xl:max-w-2xl">
             {(role === "superadmin" || (role === "tutor" && canDirectlyAdd)) && (
-              <AddDictionaryItemDialog role={role} onAdded={reloadItems} />
+              <AddDictionaryItemDialog onAdded={reloadItems} />
             )}
             <Input
               value={searchInput}
@@ -777,6 +834,29 @@ export function LibraryDictionaryBrowser({
           </div>
         ) : null}
 
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!canClearFilters}
+            onClick={handleClearFilters}
+          >
+            {messages.library.dictionary.clearAllFiltersAction}
+          </Button>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-muted-foreground">
+              {messages.library.dictionary.showFilterCountsLabel}
+            </span>
+            <Switch
+              checked={showFilterCounts}
+              onCheckedChange={setShowFilterCounts}
+              aria-label={messages.library.dictionary.showFilterCountsLabel}
+            />
+          </div>
+        </div>
+
         <div className="flex flex-wrap gap-2">
           {cefrFilterOptions.map((option) => (
             <Button
@@ -786,28 +866,25 @@ export function LibraryDictionaryBrowser({
               size="sm"
               onClick={() => setCefrFilter(option.value)}
             >
-              {option.label}
+              {formatFilterLabel(option.label, facetCounts?.cefr[option.value])}
             </Button>
           ))}
         </div>
 
         {role === "superadmin" ? (
           <div className="flex flex-wrap gap-2">
-            {APPROVAL_FILTER_VALUES.map((value) => (
+            {approvalFilterOptions.map((option) => (
               <Button
-                key={value}
+                key={option.value}
                 type="button"
-                variant={approvalFilter === value ? "default" : "outline"}
+                variant={approvalFilter === option.value ? "default" : "outline"}
                 size="sm"
-                onClick={() => setApprovalFilter(value)}
+                onClick={() => setApprovalFilter(option.value)}
               >
-                {value === "all"
-                  ? "All statuses"
-                  : value === "unconfirmed"
-                    ? "Unconfirmed"
-                    : value === "confirmed"
-                      ? "Confirmed"
-                      : "Rejected"}
+                {formatFilterLabel(
+                  option.label,
+                  facetCounts?.approval[option.value],
+                )}
               </Button>
             ))}
           </div>
@@ -830,7 +907,7 @@ export function LibraryDictionaryBrowser({
                   );
                 }}
               >
-                {pos}
+                {formatFilterLabel(pos, facetCounts?.partOfSpeech[pos])}
               </Button>
             );
           })}
@@ -998,7 +1075,6 @@ export function LibraryDictionaryBrowser({
                                 }}
                                 onSaved={async () => {
                                   await reloadItems();
-                                  router.refresh();
                                 }}
                               />
 

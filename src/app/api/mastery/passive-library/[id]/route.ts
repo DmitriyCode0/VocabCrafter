@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   PASSIVE_VOCABULARY_CEFR_LEVELS,
+  PASSIVE_VOCABULARY_NOUN_COUNTABILITY,
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
   normalizePassiveVocabularyLibraryAttributes,
 } from "@/lib/mastery/passive-vocabulary";
@@ -42,6 +43,10 @@ const updatePassiveLibraryItemSchema = z.object({
   americanTranscription: passiveVocabularyOptionalTextSchema,
   britishTranscription: passiveVocabularyOptionalTextSchema,
   transcription: passiveVocabularyOptionalTextSchema,
+  nounCountability: z
+    .array(z.enum(PASSIVE_VOCABULARY_NOUN_COUNTABILITY))
+    .max(2)
+    .optional(),
   forms: z.array(z.string().trim().min(1).max(200)).max(50).optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),
 });
@@ -109,6 +114,7 @@ export async function PATCH(
       americanTranscription: parsed.data.americanTranscription,
       britishTranscription: parsed.data.britishTranscription,
       transcription: parsed.data.transcription,
+      nounCountability: parsed.data.nounCountability,
       forms: parsed.data.forms,
       attributes: normalizePassiveVocabularyLibraryAttributes(
         parsed.data.attributes,

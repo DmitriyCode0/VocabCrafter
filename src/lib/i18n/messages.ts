@@ -289,6 +289,8 @@ const EN_MESSAGES = {
       searchPlaceholder: "Search canonical terms",
       searchAriaLabel: "Search shared dictionary",
       searchAction: "Search",
+      clearAllFiltersAction: "Clear all filters",
+      showFilterCountsLabel: "Show counts",
       loadedItems: (count: number, query?: string) =>
         query
           ? `Loaded ${count} ${count === 1 ? "item" : "items"} for \"${query}\"`
@@ -1702,6 +1704,8 @@ const UK_MESSAGES: AppMessages = {
       searchPlaceholder: "Шукати канонічні форми",
       searchAriaLabel: "Пошук у спільному словнику",
       searchAction: "Пошук",
+      clearAllFiltersAction: "Очистити всі фільтри",
+      showFilterCountsLabel: "Показувати кількість",
       loadedItems: (count: number, query?: string) =>
         query
           ? `Завантажено ${count} ${formatPluralizedCount("uk", count, { one: "елемент", few: "елементи", many: "елементів" })} для \"${query}\"`

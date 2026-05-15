@@ -28,12 +28,10 @@ import { addManualPassiveVocabularyLibraryItems } from "@/app/(platform)/library
 import { PASSIVE_VOCABULARY_PARTS_OF_SPEECH, type PassiveVocabularyPartOfSpeech } from "@/lib/mastery/passive-vocabulary";
 
 interface AddDictionaryItemDialogProps {
-  role: "tutor" | "superadmin";
   onAdded: () => Promise<void>;
 }
 
 export function AddDictionaryItemDialog({
-  role,
   onAdded,
 }: AddDictionaryItemDialogProps) {
   const { messages } = useAppI18n();

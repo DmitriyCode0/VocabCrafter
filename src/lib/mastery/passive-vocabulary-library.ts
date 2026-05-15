@@ -13,9 +13,12 @@ import type { Database, Json } from "@/types/database";
 import {
   PASSIVE_VOCABULARY_CEFR_LEVELS,
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
+  formatPassiveVocabularyCanonicalTerm,
+  getPassiveVocabularyCanonicalHeadword,
   getPassiveVocabularyCompositeKey,
   getPassiveVocabularyGeneratedForms,
   getPassiveVocabularyLookupCandidates,
+  getPassiveVocabularyNounCountability,
   normalizePassiveVocabularyLibraryAttributes,
   normalizePassiveVocabularyText,
   withPassiveVocabularyUkrainianTranslation,
@@ -190,6 +193,16 @@ function getLookupKey(
   return getPassiveVocabularyCompositeKey(normalizedText, itemType);
 }
 
+function getRequestedLookupKey(input: PassiveVocabularyLibraryInput) {
+  const baseKey = getLookupKey(input.normalizedTerm, input.itemType);
+
+  if (!input.partOfSpeech) {
+    return baseKey;
+  }
+
+  return `${baseKey}::${input.partOfSpeech}`;
+}
+
 function getFallbackCanonicalTerm(input: PassiveVocabularyLibraryInput) {
   return {
     canonicalTerm: input.term,
@@ -235,19 +248,40 @@ async function upsertPassiveVocabularyLibraryAlias({
   itemType: PassiveVocabularyItemType;
   nowIso: string;
 }) {
-  const { error } = await adminClient
+  const { data: existingFormRow, error: existingFormRowError } = await adminClient
     .from("passive_vocabulary_library_forms")
-    .upsert(
-      {
-        library_item_id: libraryItemId,
-        form_term: formTerm,
-        normalized_form: normalizedForm,
-        item_type: itemType,
-        is_canonical: false,
-        updated_at: nowIso,
-      },
-      { onConflict: "normalized_form,item_type" },
-    );
+    .select("id, library_item_id")
+    .eq("normalized_form", normalizedForm)
+    .eq("item_type", itemType)
+    .maybeSingle();
+
+  if (existingFormRowError) {
+    throw new Error("Failed to inspect passive vocabulary library alias");
+  }
+
+  if (existingFormRow && existingFormRow.library_item_id !== libraryItemId) {
+    return;
+  }
+
+  const { error } = existingFormRow
+    ? await adminClient
+        .from("passive_vocabulary_library_forms")
+        .update({
+          form_term: formTerm,
+          is_canonical: false,
+          updated_at: nowIso,
+        })
+        .eq("id", existingFormRow.id)
+    : await adminClient
+        .from("passive_vocabulary_library_forms")
+        .insert({
+          library_item_id: libraryItemId,
+          form_term: formTerm,
+          normalized_form: normalizedForm,
+          item_type: itemType,
+          is_canonical: false,
+          updated_at: nowIso,
+        });
 
   if (error) {
     throw new Error("Failed to save passive vocabulary library alias");
@@ -285,14 +319,20 @@ async function syncPassiveVocabularyLibraryForms({
   }
 
   if (oldNormalizedTerm !== canonicalNormalizedTerm) {
-    await upsertPassiveVocabularyLibraryAlias({
-      adminClient,
-      libraryItemId,
-      formTerm: oldCanonicalTerm,
-      normalizedForm: oldNormalizedTerm,
-      itemType,
-      nowIso,
-    });
+    const canonicalHeadwordNormalized = normalizePassiveVocabularyText(
+      getPassiveVocabularyCanonicalHeadword(canonicalTerm, partOfSpeech),
+    );
+
+    if (oldNormalizedTerm !== canonicalHeadwordNormalized) {
+      await upsertPassiveVocabularyLibraryAlias({
+        adminClient,
+        libraryItemId,
+        formTerm: oldCanonicalTerm,
+        normalizedForm: oldNormalizedTerm,
+        itemType,
+        nowIso,
+      });
+    }
   }
 
   const { error: canonicalError } = await adminClient
@@ -321,8 +361,19 @@ async function syncPassiveVocabularyLibraryForms({
     .eq("item_type", itemType)
     .eq("is_canonical", false);
 
-  for (const generatedForm of getPassiveVocabularyGeneratedForms(
+  const canonicalHeadword = getPassiveVocabularyCanonicalHeadword(
     canonicalTerm,
+    partOfSpeech,
+  );
+  const isDisambiguatedCanonical =
+    normalizePassiveVocabularyText(canonicalHeadword) !== canonicalNormalizedTerm;
+
+  if (isDisambiguatedCanonical) {
+    return;
+  }
+
+  for (const generatedForm of getPassiveVocabularyGeneratedForms(
+    canonicalHeadword,
     partOfSpeech,
   )) {
     await upsertPassiveVocabularyLibraryAlias({
@@ -500,10 +551,11 @@ async function findExistingPassiveVocabularyLibraryMatches(
   const allCandidates = new Set<string>();
 
   for (const input of inputs) {
-    const key = getLookupKey(input.normalizedTerm, input.itemType);
+    const key = getRequestedLookupKey(input);
     const candidates = getPassiveVocabularyLookupCandidates(
       input.term,
       input.itemType,
+      input.partOfSpeech ?? null,
     );
     candidateMap.set(key, candidates);
 
@@ -559,7 +611,7 @@ async function findExistingPassiveVocabularyLibraryMatches(
   const matches = new Map<string, PassiveVocabularyLibraryResolution>();
 
   for (const input of inputs) {
-    const inputKey = getLookupKey(input.normalizedTerm, input.itemType);
+    const inputKey = getRequestedLookupKey(input);
     const candidates = candidateMap.get(inputKey) ?? [];
 
     for (const candidate of candidates) {
@@ -608,6 +660,7 @@ async function enrichPassiveVocabularyWords(
       "- partOfSpeech using one of: noun, verb, modal verb, auxiliary, adjective, adverb, pronoun, preposition, conjunction, determiner, interjection, other",
       "- ukrainianTranslation as a concise natural Ukrainian dictionary equivalent",
       "- attributes may include americanTranscription and britishTranscription as IPA plus englishDefinitions as an array of up to 3 concise English meanings when you are confident",
+      'For nouns, attributes may also include nounCountability as an array containing "countable", "uncountable", or both when you are confident.',
       "Use modal verb for can, could, may, might, must, shall, should, will, and would.",
       "Use auxiliary when the entry is best labeled as a helping verb rather than a main verb.",
       "Prefer the most common everyday learner-friendly sense, not niche technical/legal/financial/sports senses unless the word is primarily used that way.",
@@ -617,7 +670,7 @@ async function enrichPassiveVocabularyWords(
       "Examples: tables -> table, works -> work, studies -> study, worked -> work, working -> work.",
       "Never translate the word. Never return multiple words as the canonical form for a single-word input.",
       "If the word is already canonical, keep it unchanged.",
-      'Respond with JSON in this exact shape: { "items": [ { "requestedTerm": "...", "canonicalTerm": "...", "cefrLevel": "A1", "partOfSpeech": "noun", "ukrainianTranslation": "...", "attributes": { "americanTranscription": "/.../", "britishTranscription": "/.../", "englishDefinitions": ["..."] } } ] }.',
+      'Respond with JSON in this exact shape: { "items": [ { "requestedTerm": "...", "canonicalTerm": "...", "cefrLevel": "A1", "partOfSpeech": "noun", "ukrainianTranslation": "...", "attributes": { "americanTranscription": "/.../", "britishTranscription": "/.../", "englishDefinitions": ["..."], "nounCountability": ["countable"] } } ] }.',
       "Requested terms:",
       ...batch.map((input) =>
         input.partOfSpeech
@@ -704,23 +757,37 @@ export async function createPassiveVocabularyLibraryEntries(
   for (const input of englishInputs) {
     const fallback = getFallbackCanonicalTerm(input);
     const isPhrase = input.itemType === "phrase";
-    const partOfSpeech = isPhrase ? "phrase" : null;
-    const canonicalTerm = fallback.canonicalTerm;
-    const canonicalNormalizedTerm = fallback.canonicalNormalizedTerm;
+    const partOfSpeech = isPhrase ? "phrase" : (input.partOfSpeech ?? null);
+    const canonicalHeadword = getPassiveVocabularyCanonicalHeadword(
+      fallback.canonicalTerm,
+      partOfSpeech,
+    );
+    const canonicalTerm = formatPassiveVocabularyCanonicalTerm(
+      canonicalHeadword,
+      partOfSpeech,
+    );
+    const canonicalNormalizedTerm = normalizePassiveVocabularyText(canonicalTerm);
+    const isDisambiguatedCanonical =
+      normalizePassiveVocabularyText(canonicalHeadword) !== canonicalNormalizedTerm;
     const groupKey = getLookupKey(canonicalNormalizedTerm, input.itemType);
     const existingGroup = libraryGroups.get(groupKey);
     const candidateForms = new Map<string, string>(
       existingGroup?.candidateForms ?? [],
     );
 
-    candidateForms.set(input.normalizedTerm, input.term);
     candidateForms.set(canonicalNormalizedTerm, canonicalTerm);
 
-    for (const generatedForm of getPassiveVocabularyGeneratedForms(
-      canonicalTerm,
-      partOfSpeech,
-    )) {
-      candidateForms.set(generatedForm, generatedForm);
+    if (!isDisambiguatedCanonical) {
+      candidateForms.set(input.normalizedTerm, input.term);
+    }
+
+    if (!isDisambiguatedCanonical) {
+      for (const generatedForm of getPassiveVocabularyGeneratedForms(
+        canonicalHeadword,
+        partOfSpeech,
+      )) {
+        candidateForms.set(generatedForm, generatedForm);
+      }
     }
 
     libraryGroups.set(groupKey, {
@@ -859,8 +926,7 @@ export async function importPassiveVocabularyLibraryItems({
     ),
   );
   const unresolvedItems = items.filter(
-    (item) =>
-      !existingMatches.has(getLookupKey(item.normalizedTerm, item.itemType)),
+    (item) => !existingMatches.has(getRequestedLookupKey(item)),
   );
 
   if (unresolvedItems.length > 0) {
@@ -878,9 +944,7 @@ export async function importPassiveVocabularyLibraryItems({
   );
 
   const resolvedItems = items.map((item) => {
-    const match = finalMatches.get(
-      getLookupKey(item.normalizedTerm, item.itemType),
-    );
+    const match = finalMatches.get(getRequestedLookupKey(item));
     if (match) {
       return match;
     }
@@ -968,10 +1032,17 @@ export async function reEnrichPassiveVocabularyLibraryItem({
   }
 
   const normalizedTargetLanguage = normalizeLearningLanguage(targetLanguage);
+  const existingItemHeadword = getPassiveVocabularyCanonicalHeadword(
+    existingItem.canonical_term,
+    (existingItem.part_of_speech as PassiveVocabularyPartOfSpeech | null) ?? null,
+  );
   const input: PassiveVocabularyLibraryInput = {
-    term: existingItem.canonical_term,
-    normalizedTerm: existingItem.normalized_term,
+    term: existingItemHeadword || existingItem.canonical_term,
+    normalizedTerm:
+      normalizePassiveVocabularyText(existingItemHeadword) || existingItem.normalized_term,
     itemType: "word",
+    partOfSpeech:
+      (existingItem.part_of_speech as PassiveVocabularyPartOfSpeech | null) ?? undefined,
   };
   const enrichmentByRequestedTerm = await enrichPassiveVocabularyWords(
     [input],
@@ -1011,10 +1082,20 @@ export async function reEnrichPassiveVocabularyLibraryItem({
     );
   }
 
+  const enrichmentCanonicalHeadword = getPassiveVocabularyCanonicalHeadword(
+    enrichment.canonicalTerm,
+    enrichment.partOfSpeech,
+  );
   const canonicalTerm =
-    normalizePassiveVocabularyText(enrichment.canonicalTerm) ||
-    existingItem.normalized_term;
+    formatPassiveVocabularyCanonicalTerm(
+      enrichmentCanonicalHeadword,
+      enrichment.partOfSpeech,
+      getPassiveVocabularyNounCountability(enrichment.attributes),
+    ) || existingItem.canonical_term;
   const canonicalNormalizedTerm = normalizePassiveVocabularyText(canonicalTerm);
+  const canonicalHeadwordNormalized = normalizePassiveVocabularyText(
+    enrichmentCanonicalHeadword,
+  );
   const { data: existingCanonicalRow, error: existingCanonicalRowError } =
     await adminClient
       .from("passive_vocabulary_library")
@@ -1060,7 +1141,10 @@ export async function reEnrichPassiveVocabularyLibraryItem({
       nowIso,
     });
 
-    if (existingItem.normalized_term !== canonicalNormalizedTerm) {
+    if (
+      existingItem.normalized_term !== canonicalNormalizedTerm &&
+      existingItem.normalized_term !== canonicalHeadwordNormalized
+    ) {
       await upsertPassiveVocabularyLibraryAlias({
         adminClient,
         libraryItemId: existingCanonicalRow.id,

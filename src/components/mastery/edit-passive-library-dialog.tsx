@@ -9,16 +9,21 @@ import { normalizeEnglishVariantPreference } from "@/lib/languages";
 import { confirmPassiveVocabularyLibraryItem } from "@/app/(platform)/library/actions";
 import {
   PASSIVE_VOCABULARY_CEFR_LEVELS,
+  PASSIVE_VOCABULARY_NOUN_COUNTABILITY,
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
+  getPassiveVocabularyCanonicalHeadword,
   getPassiveVocabularyEditableForms,
   getPassiveVocabularyEnglishDefinitions,
+  getPassiveVocabularyNounCountability,
   getPassiveVocabularyTranscriptions,
   getPassiveVocabularyUkrainianTranslation,
   formatPassiveVocabularyPartOfSpeech,
+  type PassiveVocabularyNounCountability,
   type PassiveVocabularyLibraryAttributes,
 } from "@/lib/mastery/passive-vocabulary";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -68,7 +73,12 @@ export function EditPassiveLibraryDialog({
   const [approvalStatus, setApprovalStatus] = useState<
     "unconfirmed" | "confirmed" | "rejected"
   >(item.approval_status ?? "unconfirmed");
-  const [canonicalTerm, setCanonicalTerm] = useState(item.canonical_term);
+  const [canonicalTerm, setCanonicalTerm] = useState(
+    getPassiveVocabularyCanonicalHeadword(
+      item.canonical_term,
+      item.part_of_speech as typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH[number] | null,
+    ),
+  );
   const [cefrLevel, setCefrLevel] = useState(item.cefr_level ?? "unknown");
   const [partOfSpeech, setPartOfSpeech] = useState(
     item.item_type === "phrase" ? "phrase" : (item.part_of_speech ?? "unknown"),
@@ -86,6 +96,9 @@ export function EditPassiveLibraryDialog({
   const [britishTranscription, setBritishTranscription] = useState(
     initialTranscriptions.british ?? "",
   );
+  const [nounCountability, setNounCountability] = useState<
+    PassiveVocabularyNounCountability[]
+  >(getPassiveVocabularyNounCountability(item.attributes));
   const [formsText, setFormsText] = useState(
     getPassiveVocabularyEditableForms(
       item.canonical_term,
@@ -111,7 +124,12 @@ export function EditPassiveLibraryDialog({
       : americanTranscription || britishTranscription;
 
   function resetForm(nextItem: EditablePassiveLibraryItem) {
-    setCanonicalTerm(nextItem.canonical_term);
+    const canonicalHeadword = getPassiveVocabularyCanonicalHeadword(
+      nextItem.canonical_term,
+      nextItem.part_of_speech as typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH[number] | null,
+    );
+
+    setCanonicalTerm(canonicalHeadword);
     setCefrLevel(nextItem.cefr_level ?? "unknown");
     setPartOfSpeech(
       nextItem.item_type === "phrase"
@@ -129,8 +147,9 @@ export function EditPassiveLibraryDialog({
     );
     setAmericanTranscription(nextTranscriptions.american ?? "");
     setBritishTranscription(nextTranscriptions.british ?? "");
+    setNounCountability(getPassiveVocabularyNounCountability(nextItem.attributes));
     const editableForms = getPassiveVocabularyEditableForms(
-      nextItem.canonical_term,
+      canonicalHeadword,
       nextItem.part_of_speech as typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH[number] | null,
       nextItem.attributes?.forms,
     );
@@ -232,6 +251,10 @@ export function EditPassiveLibraryDialog({
           ),
         )
       : [];
+    const nextNounCountability =
+      currentItem.item_type === "word" && partOfSpeech === "noun"
+        ? nounCountability
+        : [];
 
     setIsSaving(true);
 
@@ -247,6 +270,7 @@ export function EditPassiveLibraryDialog({
           englishDefinitions,
           americanTranscription,
           britishTranscription,
+          nounCountability: nextNounCountability,
           forms,
         }),
       });
@@ -303,6 +327,21 @@ export function EditPassiveLibraryDialog({
     }
   }
 
+  function toggleNounCountability(
+    value: PassiveVocabularyNounCountability,
+    checked: boolean,
+  ) {
+    setNounCountability((current) => {
+      const nextValues = checked
+        ? new Set<PassiveVocabularyNounCountability>([...current, value])
+        : new Set(current.filter((entry) => entry !== value));
+
+      return PASSIVE_VOCABULARY_NOUN_COUNTABILITY.filter((entry) =>
+        nextValues.has(entry),
+      );
+    });
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -311,7 +350,7 @@ export function EditPassiveLibraryDialog({
           <span className="sr-only">Edit {item.canonical_term}</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Edit passive library item</DialogTitle>
           <DialogDescription>
@@ -434,6 +473,33 @@ export function EditPassiveLibraryDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {currentItem.item_type === "word" && partOfSpeech === "noun" ? (
+            <div className="space-y-2 sm:col-span-2">
+              <div className="flex flex-wrap gap-4 pt-1">
+                {PASSIVE_VOCABULARY_NOUN_COUNTABILITY.map((value) => {
+                  const id = `library-noun-countability-${item.id}-${value}`;
+
+                  return (
+                    <label
+                      key={value}
+                      htmlFor={id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Checkbox
+                        id={id}
+                        checked={nounCountability.includes(value)}
+                        onCheckedChange={(checked) =>
+                          toggleNounCountability(value, checked === true)
+                        }
+                      />
+                      <span className="capitalize">{value}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           {(currentItem.item_type === "word" &&
             (partOfSpeech === "noun" ||
