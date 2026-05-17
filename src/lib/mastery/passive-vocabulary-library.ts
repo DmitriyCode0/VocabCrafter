@@ -700,9 +700,17 @@ async function enrichPassiveVocabularyWords(
       "- attributes may also include ukrainianSearchForms as an array of up to 8 Ukrainian lookup forms, including the main translation plus close inflected or aspectual variants that help reverse lookup from Ukrainian to English",
       "- attributes may include americanTranscription and britishTranscription as IPA plus englishDefinitions as an array of up to 3 concise English meanings when you are confident",
       'For nouns, attributes may also include nounCountability as an array containing "countable", "uncountable", or both when you are confident.',
-      'For verbs that commonly take a following verb complement, attributes may also include verbPattern as an array containing "v-ing", "to-v", or both when you are confident.',
-      'Use "v-ing" for verbs like enjoy or avoid, "to-v" for verbs like want or hope, and both when either pattern is common for the everyday learner sense without a strong meaning change.',
-      "If no clear gerund/to-infinitive pattern is relevant for the common learner-facing sense, omit verbPattern.",
+      'For adjectives, attributes may also include adjectiveGradability as an array containing "gradable", "non-gradable", or both when you are confident.',
+      'Use "gradable" for adjectives that naturally combine with degree words like very or quite, and "non-gradable" for adjectives that are usually absolute or extreme in the common learner-facing sense.',
+      'For verbs, attributes may also include verbTransitivity as an array containing "transitive", "intransitive", or both when you are confident.',
+      'Use "transitive" when the common learner-facing sense normally takes a direct object, "intransitive" when it normally does not, and both when both uses are common.',
+      'For verbs and adjectives, attributes should include followedBy as an array of any common typical dependant prepositions from this list when they are part of the everyday learner-facing sense: "on", "at", "of", "for", "with", "in", "to", "about", "from", "by".',
+      'Use followedBy for typical dependant prepositions such as help with, rely on, approve of, interested in, or good at. Include them even when the word also has other uses without a preposition.',
+      'For verbs, do not use followedBy for phrasal verbs such as give up, which should be treated as separate entries. For adjectives, use followedBy only for stable adjective-preposition pairings.',
+      'If a verb or adjective has a common learner-facing pairing from the allowed list, prefer including followedBy rather than omitting it.',
+      'For verbs, attributes may also include verbPattern as an array containing any relevant combination of "v-ing", "to-v", "v", and "not followed" when you are confident.',
+      'Use "v-ing" for verbs like enjoy or avoid, "to-v" for verbs like want or hope, "v" for bare-infinitive patterns such as let or make, and "not followed" when the common learner-facing sense is not typically followed by another verb.',
+      'If multiple patterns are common for the everyday learner sense without a strong meaning change, include all relevant values.',
       'For verbs, attributes may also include verbRegularity as an array containing "regular", "irregular", or both when you are confident.',
       'For verbs, attributes may also include verbState as an array containing "state", "dynamic", or both when you are confident.',
       'Use "state" for stative verbs such as know, belong, or seem, and "dynamic" for actions or processes such as run, write, or change.',
@@ -717,7 +725,7 @@ async function enrichPassiveVocabularyWords(
       "Examples: tables -> table, works -> work, studies -> study, worked -> work, working -> work.",
       "Never translate the word. Never return multiple words as the canonical form for a single-word input.",
       "If the word is already canonical, keep it unchanged.",
-      'Respond with JSON in this exact shape: { "items": [ { "requestedTerm": "...", "canonicalTerm": "...", "cefrLevel": "A1", "partOfSpeech": "noun", "ukrainianTranslation": "...", "attributes": { "ukrainianSearchForms": ["втрачати", "втратити", "втратив", "втратила"], "americanTranscription": "/.../", "britishTranscription": "/.../", "englishDefinitions": ["..."], "nounCountability": ["countable"], "verbPattern": ["to-v"], "verbRegularity": ["irregular"], "verbState": ["dynamic"], "forms": ["hung", "hung", "hanging", "hangs"] } } ] }.',
+      'Respond with JSON in this exact shape: { "items": [ { "requestedTerm": "...", "canonicalTerm": "...", "cefrLevel": "A1", "partOfSpeech": "noun", "ukrainianTranslation": "...", "attributes": { "ukrainianSearchForms": ["втрачати", "втратити", "втратив", "втратила"], "americanTranscription": "/.../", "britishTranscription": "/.../", "englishDefinitions": ["..."], "nounCountability": ["countable"], "adjectiveGradability": ["gradable"], "verbTransitivity": ["transitive"], "followedBy": ["with"], "verbPattern": ["to-v", "not followed"], "verbRegularity": ["irregular"], "verbState": ["dynamic"], "forms": ["hung", "hung", "hanging", "hangs"] } } ] }.',
       "Requested terms:",
       ...batch.map((input) =>
         input.partOfSpeech
@@ -1123,9 +1131,7 @@ export async function reEnrichPassiveVocabularyLibraryItem({
     actorUserId,
     adminClient,
   );
-  const enrichment = enrichmentByRequestedTerm.get(
-    existingItem.normalized_term,
-  );
+  const enrichment = enrichmentByRequestedTerm.get(input.normalizedTerm);
 
   if (!enrichment?.cefrLevel || !enrichment.partOfSpeech) {
     const existingMetadataValidation = getPassiveVocabularyMetadataValidation(

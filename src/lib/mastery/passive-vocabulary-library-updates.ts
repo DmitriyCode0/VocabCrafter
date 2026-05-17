@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import {
+  getPassiveVocabularyFollowedBy,
+  getPassiveVocabularyAdjectiveGradability,
   formatPassiveVocabularyCanonicalTerm,
   getPassiveVocabularyCanonicalHeadword,
   getPassiveVocabularyEnglishDefinitions,
@@ -10,11 +12,14 @@ import {
   getPassiveVocabularyVerbPattern,
   getPassiveVocabularyVerbRegularity,
   getPassiveVocabularyVerbState,
+  getPassiveVocabularyVerbTransitivity,
   getPassiveVocabularyTranscriptions,
   getPassiveVocabularyUkrainianTranslation,
   normalizePassiveVocabularyLibraryAttributes,
   normalizePassiveVocabularyText,
+  withPassiveVocabularyAdjectiveGradability,
   withPassiveVocabularyEnglishDefinitions,
+  withPassiveVocabularyFollowedBy,
   withPassiveVocabularyForms,
   withPassiveVocabularyNounCountability,
   withPassiveVocabularyVerbPattern,
@@ -23,6 +28,9 @@ import {
   withPassiveVocabularyUkrainianTranslation,
   withPassiveVocabularyVerbRegularity,
   withPassiveVocabularyVerbState,
+  withPassiveVocabularyVerbTransitivity,
+  type PassiveVocabularyAdjectiveGradability,
+  type PassiveVocabularyFollowedBy,
   type PassiveVocabularyLibraryAttributes,
   type PassiveVocabularyLibraryCefrLevel,
   type PassiveVocabularyNounCountability,
@@ -30,6 +38,7 @@ import {
   type PassiveVocabularyVerbPattern,
   type PassiveVocabularyVerbRegularity,
   type PassiveVocabularyVerbState,
+  type PassiveVocabularyVerbTransitivity,
 } from "@/lib/mastery/passive-vocabulary";
 import { syncPassiveVocabularyLibraryUkrainianForms } from "@/lib/mastery/passive-vocabulary-library-ukrainian-forms";
 
@@ -50,9 +59,12 @@ interface UpdatePassiveVocabularyLibraryItemInput {
   britishTranscription?: string | null;
   transcription?: string | null;
   nounCountability?: PassiveVocabularyNounCountability[] | null;
+  adjectiveGradability?: PassiveVocabularyAdjectiveGradability[] | null;
+  followedBy?: PassiveVocabularyFollowedBy[] | null;
   verbPattern?: PassiveVocabularyVerbPattern[] | null;
   verbRegularity?: PassiveVocabularyVerbRegularity[] | null;
   verbState?: PassiveVocabularyVerbState[] | null;
+  verbTransitivity?: PassiveVocabularyVerbTransitivity[] | null;
   forms?: string[] | null;
   attributes?: PassiveVocabularyLibraryAttributes | null;
 }
@@ -271,9 +283,12 @@ export async function updatePassiveVocabularyLibraryItem({
   britishTranscription,
   transcription,
   nounCountability,
+  adjectiveGradability,
+  followedBy,
   verbPattern,
   verbRegularity,
   verbState,
+  verbTransitivity,
   forms,
   attributes,
 }: UpdatePassiveVocabularyLibraryItemInput): Promise<PassiveVocabularyLibraryRow> {
@@ -385,8 +400,33 @@ export async function updatePassiveVocabularyLibraryItem({
           : nounCountability
         : [],
     );
+  const nextAttributesWithAdjectiveGradability =
+    withPassiveVocabularyAdjectiveGradability(
+      nextAttributesWithNounCountability,
+      nextPartOfSpeech === "adjective"
+        ? adjectiveGradability === undefined
+          ? getPassiveVocabularyAdjectiveGradability(existingAttributes)
+          : adjectiveGradability
+        : [],
+    );
+  const nextAttributesWithVerbTransitivity = withPassiveVocabularyVerbTransitivity(
+    nextAttributesWithAdjectiveGradability,
+    nextPartOfSpeech === "verb"
+      ? verbTransitivity === undefined
+        ? getPassiveVocabularyVerbTransitivity(existingAttributes)
+        : verbTransitivity
+      : [],
+  );
+  const nextAttributesWithFollowedBy = withPassiveVocabularyFollowedBy(
+    nextAttributesWithVerbTransitivity,
+    nextPartOfSpeech === "verb" || nextPartOfSpeech === "adjective"
+      ? followedBy === undefined
+        ? getPassiveVocabularyFollowedBy(existingAttributes)
+        : followedBy
+      : [],
+  );
   const nextAttributesWithVerbRegularity = withPassiveVocabularyVerbRegularity(
-    nextAttributesWithNounCountability,
+    nextAttributesWithFollowedBy,
     nextPartOfSpeech === "verb"
       ? verbRegularity === undefined
         ? getPassiveVocabularyVerbRegularity(existingAttributes)

@@ -8,27 +8,36 @@ import { useUser } from "@/hooks/use-user";
 import { normalizeEnglishVariantPreference } from "@/lib/languages";
 import { confirmPassiveVocabularyLibraryItem } from "@/app/(platform)/library/actions";
 import {
+  PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY,
   PASSIVE_VOCABULARY_CEFR_LEVELS,
+  PASSIVE_VOCABULARY_FOLLOWED_BY,
   PASSIVE_VOCABULARY_NOUN_COUNTABILITY,
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
   PASSIVE_VOCABULARY_VERB_PATTERN,
   PASSIVE_VOCABULARY_VERB_REGULARITY,
   PASSIVE_VOCABULARY_VERB_STATE,
+  PASSIVE_VOCABULARY_VERB_TRANSITIVITY,
+  getPassiveVocabularyAdjectiveGradability,
   getPassiveVocabularyCanonicalHeadword,
   getPassiveVocabularyEditableForms,
   getPassiveVocabularyEnglishDefinitions,
+  getPassiveVocabularyFollowedBy,
   getPassiveVocabularyNounCountability,
   getPassiveVocabularyTranscriptions,
   getPassiveVocabularyUkrainianTranslation,
   getPassiveVocabularyVerbPattern,
   getPassiveVocabularyVerbRegularity,
   getPassiveVocabularyVerbState,
+  getPassiveVocabularyVerbTransitivity,
   formatPassiveVocabularyPartOfSpeech,
+  type PassiveVocabularyAdjectiveGradability,
+  type PassiveVocabularyFollowedBy,
   type PassiveVocabularyNounCountability,
   type PassiveVocabularyLibraryAttributes,
   type PassiveVocabularyVerbPattern,
   type PassiveVocabularyVerbRegularity,
   type PassiveVocabularyVerbState,
+  type PassiveVocabularyVerbTransitivity,
 } from "@/lib/mastery/passive-vocabulary";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import { Button } from "@/components/ui/button";
@@ -74,6 +83,40 @@ const PASSIVE_VOCABULARY_VERB_PATTERN_LABELS: Record<
 > = {
   "v-ing": "V-ing",
   "to-v": "to V",
+  v: "V",
+  "not followed": "Not followed",
+};
+
+const PASSIVE_VOCABULARY_VERB_TRANSITIVITY_LABELS: Record<
+  PassiveVocabularyVerbTransitivity,
+  string
+> = {
+  transitive: "Transitive",
+  intransitive: "Intransitive",
+};
+
+const PASSIVE_VOCABULARY_FOLLOWED_BY_LABELS: Record<
+  PassiveVocabularyFollowedBy,
+  string
+> = {
+  on: "On",
+  at: "At",
+  of: "Of",
+  for: "For",
+  with: "With",
+  in: "In",
+  to: "To",
+  about: "About",
+  from: "From",
+  by: "By",
+};
+
+const PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY_LABELS: Record<
+  PassiveVocabularyAdjectiveGradability,
+  string
+> = {
+  gradable: "Gradable",
+  "non-gradable": "Non-Gradable",
 };
 
 export function EditPassiveLibraryDialog({
@@ -121,6 +164,9 @@ export function EditPassiveLibraryDialog({
   const [nounCountability, setNounCountability] = useState<
     PassiveVocabularyNounCountability[]
   >(getPassiveVocabularyNounCountability(item.attributes));
+  const [adjectiveGradability, setAdjectiveGradability] = useState<
+    PassiveVocabularyAdjectiveGradability[]
+  >(getPassiveVocabularyAdjectiveGradability(item.attributes));
   const [verbRegularity, setVerbRegularity] = useState<
     PassiveVocabularyVerbRegularity[]
   >(getPassiveVocabularyVerbRegularity(item.attributes));
@@ -129,6 +175,12 @@ export function EditPassiveLibraryDialog({
   >(getPassiveVocabularyVerbPattern(item.attributes));
   const [verbState, setVerbState] = useState<PassiveVocabularyVerbState[]>(
     getPassiveVocabularyVerbState(item.attributes),
+  );
+  const [verbTransitivity, setVerbTransitivity] = useState<
+    PassiveVocabularyVerbTransitivity[]
+  >(getPassiveVocabularyVerbTransitivity(item.attributes));
+  const [followedBy, setFollowedBy] = useState<PassiveVocabularyFollowedBy[]>(
+    getPassiveVocabularyFollowedBy(item.attributes),
   );
   const [formsText, setFormsText] = useState(
     getPassiveVocabularyEditableForms(
@@ -198,12 +250,19 @@ export function EditPassiveLibraryDialog({
     setNounCountability(
       getPassiveVocabularyNounCountability(nextItem.attributes),
     );
+    setAdjectiveGradability(
+      getPassiveVocabularyAdjectiveGradability(nextItem.attributes),
+    );
     const nextVerbRegularity = getPassiveVocabularyVerbRegularity(
       nextItem.attributes,
     );
     setVerbRegularity(nextVerbRegularity);
     setVerbPattern(getPassiveVocabularyVerbPattern(nextItem.attributes));
     setVerbState(getPassiveVocabularyVerbState(nextItem.attributes));
+    setVerbTransitivity(
+      getPassiveVocabularyVerbTransitivity(nextItem.attributes),
+    );
+    setFollowedBy(getPassiveVocabularyFollowedBy(nextItem.attributes));
     const editableForms = getPassiveVocabularyEditableForms(
       canonicalHeadword,
       nextItem.part_of_speech as
@@ -316,6 +375,10 @@ export function EditPassiveLibraryDialog({
       currentItem.item_type === "word" && partOfSpeech === "noun"
         ? nounCountability
         : [];
+    const nextAdjectiveGradability =
+      currentItem.item_type === "word" && partOfSpeech === "adjective"
+        ? adjectiveGradability
+        : [];
     const nextVerbRegularity =
       currentItem.item_type === "word" && partOfSpeech === "verb"
         ? verbRegularity
@@ -327,6 +390,15 @@ export function EditPassiveLibraryDialog({
     const nextVerbState =
       currentItem.item_type === "word" && partOfSpeech === "verb"
         ? verbState
+        : [];
+    const nextVerbTransitivity =
+      currentItem.item_type === "word" && partOfSpeech === "verb"
+        ? verbTransitivity
+        : [];
+    const nextFollowedBy =
+      currentItem.item_type === "word" &&
+      (partOfSpeech === "verb" || partOfSpeech === "adjective")
+        ? followedBy
         : [];
 
     setIsSaving(true);
@@ -346,9 +418,12 @@ export function EditPassiveLibraryDialog({
             americanTranscription,
             britishTranscription,
             nounCountability: nextNounCountability,
+            adjectiveGradability: nextAdjectiveGradability,
+            followedBy: nextFollowedBy,
             verbPattern: nextVerbPattern,
             verbRegularity: nextVerbRegularity,
             verbState: nextVerbState,
+            verbTransitivity: nextVerbTransitivity,
             forms,
           }),
         },
@@ -436,6 +511,21 @@ export function EditPassiveLibraryDialog({
     });
   }
 
+  function toggleVerbTransitivity(
+    value: PassiveVocabularyVerbTransitivity,
+    checked: boolean,
+  ) {
+    setVerbTransitivity((current) => {
+      const nextValues = checked
+        ? new Set<PassiveVocabularyVerbTransitivity>([...current, value])
+        : new Set(current.filter((entry) => entry !== value));
+
+      return PASSIVE_VOCABULARY_VERB_TRANSITIVITY.filter((entry) =>
+        nextValues.has(entry),
+      );
+    });
+  }
+
   function toggleVerbPattern(
     value: PassiveVocabularyVerbPattern,
     checked: boolean,
@@ -451,6 +541,21 @@ export function EditPassiveLibraryDialog({
     });
   }
 
+  function toggleFollowedBy(
+    value: PassiveVocabularyFollowedBy,
+    checked: boolean,
+  ) {
+    setFollowedBy((current) => {
+      const nextValues = checked
+        ? new Set<PassiveVocabularyFollowedBy>([...current, value])
+        : new Set(current.filter((entry) => entry !== value));
+
+      return PASSIVE_VOCABULARY_FOLLOWED_BY.filter((entry) =>
+        nextValues.has(entry),
+      );
+    });
+  }
+
   function toggleVerbState(
     value: PassiveVocabularyVerbState,
     checked: boolean,
@@ -461,6 +566,21 @@ export function EditPassiveLibraryDialog({
         : new Set(current.filter((entry) => entry !== value));
 
       return PASSIVE_VOCABULARY_VERB_STATE.filter((entry) =>
+        nextValues.has(entry),
+      );
+    });
+  }
+
+  function toggleAdjectiveGradability(
+    value: PassiveVocabularyAdjectiveGradability,
+    checked: boolean,
+  ) {
+    setAdjectiveGradability((current) => {
+      const nextValues = checked
+        ? new Set<PassiveVocabularyAdjectiveGradability>([...current, value])
+        : new Set(current.filter((entry) => entry !== value));
+
+      return PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY.filter((entry) =>
         nextValues.has(entry),
       );
     });
@@ -630,6 +750,72 @@ export function EditPassiveLibraryDialog({
 
           {currentItem.item_type === "word" && partOfSpeech === "verb" ? (
             <div className="space-y-2 sm:col-span-2">
+              <Label>Verb transitivity</Label>
+              <p className="text-xs text-muted-foreground">
+                Transitive verbs usually take a direct object, while
+                intransitive verbs usually do not.
+              </p>
+              <div className="flex flex-wrap gap-4 pt-1">
+                {PASSIVE_VOCABULARY_VERB_TRANSITIVITY.map((value) => {
+                  const id = `library-verb-transitivity-${item.id}-${value}`;
+
+                  return (
+                    <label
+                      key={value}
+                      htmlFor={id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Checkbox
+                        id={id}
+                        checked={verbTransitivity.includes(value)}
+                        onCheckedChange={(checked) =>
+                          toggleVerbTransitivity(value, checked === true)
+                        }
+                      />
+                      <span>
+                        {PASSIVE_VOCABULARY_VERB_TRANSITIVITY_LABELS[value]}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {currentItem.item_type === "word" &&
+          (partOfSpeech === "verb" || partOfSpeech === "adjective") ? (
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Followed by</Label>
+              <p className="text-xs text-muted-foreground">
+                Typical dependant prepositions.
+              </p>
+              <div className="flex flex-wrap gap-4 pt-1">
+                {PASSIVE_VOCABULARY_FOLLOWED_BY.map((value) => {
+                  const id = `library-followed-by-${item.id}-${value}`;
+
+                  return (
+                    <label
+                      key={value}
+                      htmlFor={id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Checkbox
+                        id={id}
+                        checked={followedBy.includes(value)}
+                        onCheckedChange={(checked) =>
+                          toggleFollowedBy(value, checked === true)
+                        }
+                      />
+                      <span>{PASSIVE_VOCABULARY_FOLLOWED_BY_LABELS[value]}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {currentItem.item_type === "word" && partOfSpeech === "verb" ? (
+            <div className="space-y-2 sm:col-span-2">
               <Label>Verb pattern</Label>
               <div className="flex flex-wrap gap-4 pt-1">
                 {PASSIVE_VOCABULARY_VERB_PATTERN.map((value) => {
@@ -707,6 +893,46 @@ export function EditPassiveLibraryDialog({
                         }
                       />
                       <span className="capitalize">{value}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {currentItem.item_type === "word" && partOfSpeech === "adjective" ? (
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Adjective gradability</Label>
+              <p className="text-xs text-muted-foreground">
+                Gradable adjectives naturally work with degree words like
+                "very", while non-gradable adjectives are usually absolute or
+                extreme in meaning.
+              </p>
+              <div className="flex flex-wrap gap-4 pt-1">
+                {PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY.map((value) => {
+                  const id =
+                    `library-adjective-gradability-${item.id}-${value}`;
+
+                  return (
+                    <label
+                      key={value}
+                      htmlFor={id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Checkbox
+                        id={id}
+                        checked={adjectiveGradability.includes(value)}
+                        onCheckedChange={(checked) =>
+                          toggleAdjectiveGradability(value, checked === true)
+                        }
+                      />
+                      <span>
+                        {
+                          PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY_LABELS[
+                            value
+                          ]
+                        }
+                      </span>
                     </label>
                   );
                 })}

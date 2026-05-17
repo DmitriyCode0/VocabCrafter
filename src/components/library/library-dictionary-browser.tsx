@@ -9,7 +9,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { Check, Loader2, Search, X, Trash2 } from "lucide-react";
+import { Check, Loader2, Search, Sparkles, X, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import { formatAppDate } from "@/lib/dates";
@@ -27,9 +27,11 @@ import {
   approvePassiveVocabularyLibrarySuggestion,
   rejectPassiveVocabularyLibrarySuggestion,
   confirmPassiveVocabularyLibraryItem,
+  confirmPassiveVocabularyLibraryItems,
   rejectPassiveVocabularyLibraryItem,
   deletePassiveVocabularyLibraryItem,
   deletePassiveVocabularyLibraryItems,
+  reEnrichPassiveVocabularyLibraryItems,
 } from "@/app/(platform)/library/actions";
 import { EditPassiveLibraryDialog } from "@/components/mastery/edit-passive-library-dialog";
 import { SuggestPassiveLibraryChangeDialog } from "@/components/library/suggest-passive-library-change-dialog";
@@ -338,6 +340,8 @@ export function LibraryDictionaryBrowser({
   const [updatingApprovalItemId, setUpdatingApprovalItemId] = useState<string | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+  const [isBatchConfirming, setIsBatchConfirming] = useState(false);
+  const [isBatchGeneratingMetadata, setIsBatchGeneratingMetadata] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const initialFilterEffectRef = useRef(true);
   const initialLoadingRef = useRef(false);
@@ -393,7 +397,18 @@ export function LibraryDictionaryBrowser({
     () => items.filter((item) => selectedItemIdSet.has(item.id)),
     [items, selectedItemIdSet],
   );
+  const selectedWordItems = useMemo(
+    () => selectedItems.filter((item) => item.item_type === "word"),
+    [selectedItems],
+  );
+  const selectedConfirmableItems = useMemo(
+    () =>
+      selectedItems.filter((item) => item.approval_status !== "confirmed"),
+    [selectedItems],
+  );
   const canBatchManage = role === "superadmin" || (role === "tutor" && canDirectlyAdd);
+  const isBatchActionInProgress =
+    isBatchDeleting || isBatchConfirming || isBatchGeneratingMetadata;
   const allVisibleSelected =
     items.length > 0 && items.every((item) => selectedItemIdSet.has(item.id));
   const formatFilterLabel = useCallback(
@@ -842,6 +857,88 @@ export function LibraryDictionaryBrowser({
     }
   }, [removeItemsLocally, selectedItems]);
 
+  const handleBatchConfirm = useCallback(async () => {
+    if (selectedConfirmableItems.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Confirm ${selectedConfirmableItems.length} selected term${selectedConfirmableItems.length === 1 ? "" : "s"}?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsBatchConfirming(true);
+
+    try {
+      const result = await confirmPassiveVocabularyLibraryItems(
+        selectedConfirmableItems.map((item) => item.id),
+      );
+      toast.success(
+        `Confirmed ${result.confirmedCount} selected term${result.confirmedCount === 1 ? "" : "s"}`,
+      );
+      setSelectedItemIds([]);
+      await reloadItems();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to confirm selected dictionary items",
+      );
+    } finally {
+      setIsBatchConfirming(false);
+    }
+  }, [reloadItems, selectedConfirmableItems]);
+
+  const handleBatchGenerateMetadata = useCallback(async () => {
+    if (selectedWordItems.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Generate metadata for ${selectedWordItems.length} selected word${selectedWordItems.length === 1 ? "" : "s"}?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsBatchGeneratingMetadata(true);
+
+    try {
+      const result = await reEnrichPassiveVocabularyLibraryItems(
+        selectedWordItems.map((item) => item.id),
+      );
+
+      if (result.successCount > 0 && result.failureCount === 0) {
+        toast.success(
+          messages.library.dictionary.bulkRetrySuccess(result.successCount),
+        );
+      } else if (result.successCount > 0) {
+        toast.success(
+          messages.library.dictionary.bulkRetryPartial(
+            result.successCount,
+            result.failureCount,
+          ),
+        );
+      } else {
+        toast.error(
+          result.firstErrorMessage ?? messages.library.dictionary.bulkRetryFailed,
+        );
+      }
+
+      await reloadItems();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : messages.library.dictionary.reEnrichFailed,
+      );
+    } finally {
+      setIsBatchGeneratingMetadata(false);
+    }
+  }, [messages.library.dictionary, reloadItems, selectedWordItems]);
+
   const hasActiveFilters =
     searchQuery.length > 0 ||
     cefrFilter !== "all" ||
@@ -1025,11 +1122,42 @@ export function LibraryDictionaryBrowser({
             <Badge variant="outline">
               Selected: {selectedItems.length}
             </Badge>
+            {role === "superadmin" ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={selectedWordItems.length === 0 || isBatchActionInProgress}
+                onClick={() => void handleBatchGenerateMetadata()}
+              >
+                {isBatchGeneratingMetadata ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                Generate metadata ({selectedWordItems.length})
+              </Button>
+            ) : null}
+            {role === "superadmin" ? (
+              <Button
+                type="button"
+                size="sm"
+                disabled={selectedConfirmableItems.length === 0 || isBatchActionInProgress}
+                onClick={() => void handleBatchConfirm()}
+              >
+                {isBatchConfirming ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="mr-2 h-4 w-4" />
+                )}
+                Confirm selected ({selectedConfirmableItems.length})
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="destructive"
               size="sm"
-              disabled={selectedItems.length === 0 || isBatchDeleting}
+              disabled={selectedItems.length === 0 || isBatchActionInProgress}
               onClick={() => void handleBatchDelete()}
             >
               {isBatchDeleting ? (

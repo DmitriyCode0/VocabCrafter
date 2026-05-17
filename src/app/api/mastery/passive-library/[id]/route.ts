@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY,
   PASSIVE_VOCABULARY_CEFR_LEVELS,
+  PASSIVE_VOCABULARY_FOLLOWED_BY,
   PASSIVE_VOCABULARY_NOUN_COUNTABILITY,
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
   PASSIVE_VOCABULARY_VERB_PATTERN,
   PASSIVE_VOCABULARY_VERB_REGULARITY,
   PASSIVE_VOCABULARY_VERB_STATE,
+  PASSIVE_VOCABULARY_VERB_TRANSITIVITY,
   normalizePassiveVocabularyLibraryAttributes,
 } from "@/lib/mastery/passive-vocabulary";
 import { updatePassiveVocabularyLibraryItem } from "@/lib/mastery/passive-vocabulary-library-updates";
@@ -50,15 +53,31 @@ const updatePassiveLibraryItemSchema = z.object({
     .array(z.enum(PASSIVE_VOCABULARY_NOUN_COUNTABILITY))
     .max(2)
     .optional(),
+  adjectiveGradability: z
+    .array(z.enum(PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY))
+    .max(2)
+    .optional(),
   verbPattern: z
     .array(z.enum(PASSIVE_VOCABULARY_VERB_PATTERN))
-    .max(2)
+    .max(4)
     .optional(),
   verbRegularity: z
     .array(z.enum(PASSIVE_VOCABULARY_VERB_REGULARITY))
     .max(2)
     .optional(),
   verbState: z.array(z.enum(PASSIVE_VOCABULARY_VERB_STATE)).max(2).optional(),
+  verbTransitivity: z
+    .array(z.enum(PASSIVE_VOCABULARY_VERB_TRANSITIVITY))
+    .max(2)
+    .optional(),
+  followedBy: z
+    .array(z.enum(PASSIVE_VOCABULARY_FOLLOWED_BY))
+    .max(PASSIVE_VOCABULARY_FOLLOWED_BY.length)
+    .optional(),
+  verbFollowedBy: z
+    .array(z.enum(PASSIVE_VOCABULARY_FOLLOWED_BY))
+    .max(PASSIVE_VOCABULARY_FOLLOWED_BY.length)
+    .optional(),
   forms: z.array(z.string().trim().min(1).max(200)).max(50).optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),
 });
@@ -127,9 +146,12 @@ export async function PATCH(
       britishTranscription: parsed.data.britishTranscription,
       transcription: parsed.data.transcription,
       nounCountability: parsed.data.nounCountability,
+      adjectiveGradability: parsed.data.adjectiveGradability,
+      followedBy: parsed.data.followedBy ?? parsed.data.verbFollowedBy,
       verbPattern: parsed.data.verbPattern,
       verbRegularity: parsed.data.verbRegularity,
       verbState: parsed.data.verbState,
+      verbTransitivity: parsed.data.verbTransitivity,
       forms: parsed.data.forms,
       attributes: normalizePassiveVocabularyLibraryAttributes(
         parsed.data.attributes,

@@ -146,7 +146,7 @@ function getCefrFacetValue(cefrLevel: string | null): LibraryCefrFacetValue {
     : "unknown";
 }
 
-function buildFacetCounts(input: {
+function buildFacetCountsFromRows(input: {
   cefrRows: PassiveLibraryFacetRow[];
   approvalRows: PassiveLibraryFacetRow[];
   posRows: PassiveLibraryFacetRow[];
@@ -331,6 +331,111 @@ export async function GET(request: NextRequest) {
     return query;
   };
 
+  const createLibraryCountQuery = ({
+    includeCefrFilter = true,
+    includeApprovalFilter = true,
+    includePosFilter = true,
+  }: QueryFilterOptions = {}) => {
+    let query = access.adminClient
+      .from("passive_vocabulary_library")
+      .select("id", { count: "exact", head: true });
+
+    if (access.role !== "superadmin") {
+      query = query.eq("approval_status", "confirmed");
+    } else if (
+      includeApprovalFilter &&
+      (approvalFilter === "unconfirmed" ||
+        approvalFilter === "confirmed" ||
+        approvalFilter === "rejected")
+    ) {
+      query = query.eq("approval_status", approvalFilter);
+    }
+
+    if (includeCefrFilter && (cefrFilter === "unknown" || cefrFilter === "null")) {
+      query = query.is("cefr_level", null);
+    } else if (
+      includeCefrFilter &&
+      PASSIVE_VOCABULARY_CEFR_LEVELS.includes(cefrFilter as never)
+    ) {
+      query = query.eq("cefr_level", cefrFilter);
+    }
+
+    if (includePosFilter && normalizedPosFilters.length > 0) {
+      query = query.in("part_of_speech", normalizedPosFilters);
+    }
+
+    return query;
+  };
+
+  const loadExactCount = async (
+    query: PromiseLike<{ count: number | null; error: { message?: string } | null }>,
+  ) => {
+    const { count, error } = await query;
+
+    if (error) {
+      throw new Error(error.message ?? "Failed to load passive vocabulary library items");
+    }
+
+    return count ?? 0;
+  };
+
+  const loadFacetCountsExact = async (): Promise<PassiveLibraryFacetCounts> => {
+    const counts = createEmptyFacetCounts();
+
+    const cefrPromises = [
+      loadExactCount(createLibraryCountQuery({ includeCefrFilter: false })),
+      loadExactCount(
+        createLibraryCountQuery({ includeCefrFilter: false }).is("cefr_level", null),
+      ),
+      ...PASSIVE_VOCABULARY_CEFR_LEVELS.map((level) =>
+        loadExactCount(
+          createLibraryCountQuery({ includeCefrFilter: false }).eq("cefr_level", level),
+        ),
+      ),
+    ];
+    const approvalPromises = [
+      loadExactCount(createLibraryCountQuery({ includeApprovalFilter: false })),
+      ...APPROVAL_FACET_VALUES.filter((value) => value !== "all").map((value) =>
+        loadExactCount(
+          createLibraryCountQuery({ includeApprovalFilter: false }).eq(
+            "approval_status",
+            value,
+          ),
+        ),
+      ),
+    ];
+    const partOfSpeechPromises = PASSIVE_VOCABULARY_PARTS_OF_SPEECH.map((value) =>
+      loadExactCount(
+        createLibraryCountQuery({ includePosFilter: false }).eq("part_of_speech", value),
+      ),
+    );
+
+    const [cefrCounts, approvalCounts, partOfSpeechCounts] = await Promise.all([
+      Promise.all(cefrPromises),
+      Promise.all(approvalPromises),
+      Promise.all(partOfSpeechPromises),
+    ]);
+
+    counts.cefr.all = cefrCounts[0] ?? 0;
+    counts.cefr.unknown = cefrCounts[1] ?? 0;
+    PASSIVE_VOCABULARY_CEFR_LEVELS.forEach((level, index) => {
+      counts.cefr[level] = cefrCounts[index + 2] ?? 0;
+    });
+
+    counts.approval.all = approvalCounts[0] ?? 0;
+    APPROVAL_FACET_VALUES.filter((value) => value !== "all").forEach(
+      (value, index) => {
+        counts.approval[value] = approvalCounts[index + 1] ?? 0;
+      },
+    );
+
+    PASSIVE_VOCABULARY_PARTS_OF_SPEECH.forEach((value, index) => {
+      counts.partOfSpeech[value] = partOfSpeechCounts[index] ?? 0;
+    });
+
+    return counts;
+  };
+
   const mergeRowsById = <TRow extends { id: string }>(
     rows: TRow[],
     additionalRows: TRow[],
@@ -421,7 +526,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         items: paginatedItems.slice(0, limit).map(toAdminItem),
         hasMore: paginatedItems.length > limit,
-        facetCounts: buildFacetCounts({
+        facetCounts: buildFacetCountsFromRows({
           cefrRows: asRowArray<PassiveLibraryFacetRow>(cefrFacetRows),
           approvalRows: asRowArray<PassiveLibraryFacetRow>(approvalFacetRows),
           posRows: asRowArray<PassiveLibraryFacetRow>(posFacetRows),
@@ -437,51 +542,38 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const [dataResult, cefrFacetResult, approvalFacetResult, posFacetResult] =
-    await Promise.all([
+  try {
+    const [dataResult, facetCounts] = await Promise.all([
       createLibraryItemsQuery({ orderAlphabetically: true }).range(
         offset,
         offset + limit,
       ),
-      createLibraryItemsQuery({
-        selectFields: LIBRARY_FACET_SELECT_FIELDS,
-        includeCefrFilter: false,
-      }),
-      createLibraryItemsQuery({
-        selectFields: LIBRARY_FACET_SELECT_FIELDS,
-        includeApprovalFilter: false,
-      }),
-      createLibraryItemsQuery({
-        selectFields: LIBRARY_FACET_SELECT_FIELDS,
-        includePosFilter: false,
-      }),
+      loadFacetCountsExact(),
     ]);
 
-  if (
-    dataResult.error ||
-    cefrFacetResult.error ||
-    approvalFacetResult.error ||
-    posFacetResult.error
-  ) {
+    if (dataResult.error) {
+      return NextResponse.json(
+        { error: "Failed to load passive vocabulary library items" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      items: asRowArray<PassiveVocabularyLibraryAdminItemRow>(dataResult.data)
+        .slice(0, limit)
+        .map(toAdminItem),
+      hasMore:
+        asRowArray<PassiveVocabularyLibraryAdminItemRow>(dataResult.data).length > limit,
+      facetCounts,
+      availableCefrLevels: PASSIVE_VOCABULARY_CEFR_LEVELS,
+      availablePartsOfSpeech: PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
+    });
+  } catch {
     return NextResponse.json(
       { error: "Failed to load passive vocabulary library items" },
       { status: 500 },
     );
   }
-
-  return NextResponse.json({
-    items: asRowArray<PassiveVocabularyLibraryAdminItemRow>(dataResult.data)
-      .slice(0, limit)
-      .map(toAdminItem),
-    hasMore: asRowArray<PassiveVocabularyLibraryAdminItemRow>(dataResult.data).length > limit,
-    facetCounts: buildFacetCounts({
-      cefrRows: asRowArray<PassiveLibraryFacetRow>(cefrFacetResult.data),
-      approvalRows: asRowArray<PassiveLibraryFacetRow>(approvalFacetResult.data),
-      posRows: asRowArray<PassiveLibraryFacetRow>(posFacetResult.data),
-    }),
-    availableCefrLevels: PASSIVE_VOCABULARY_CEFR_LEVELS,
-    availablePartsOfSpeech: PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
-  });
 }
 
 export async function POST(request: NextRequest) {

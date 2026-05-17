@@ -41,12 +41,39 @@ export const PASSIVE_VOCABULARY_NOUN_COUNTABILITY = [
   "countable",
   "uncountable",
 ] as const;
+export const PASSIVE_VOCABULARY_VERB_TRANSITIVITY = [
+  "transitive",
+  "intransitive",
+] as const;
+export const PASSIVE_VOCABULARY_VERB_FOLLOWED_BY = [
+  "on",
+  "at",
+  "of",
+  "for",
+  "with",
+  "in",
+  "to",
+  "about",
+  "from",
+  "by",
+] as const;
+export const PASSIVE_VOCABULARY_FOLLOWED_BY =
+  PASSIVE_VOCABULARY_VERB_FOLLOWED_BY;
 export const PASSIVE_VOCABULARY_VERB_REGULARITY = [
   "regular",
   "irregular",
 ] as const;
 export const PASSIVE_VOCABULARY_VERB_STATE = ["state", "dynamic"] as const;
-export const PASSIVE_VOCABULARY_VERB_PATTERN = ["v-ing", "to-v"] as const;
+export const PASSIVE_VOCABULARY_VERB_PATTERN = [
+  "v-ing",
+  "to-v",
+  "v",
+  "not followed",
+] as const;
+export const PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY = [
+  "gradable",
+  "non-gradable",
+] as const;
 
 export type PassiveVocabularyItemType =
   (typeof PASSIVE_VOCABULARY_ITEM_TYPES)[number];
@@ -58,12 +85,19 @@ export type PassiveVocabularyPartOfSpeech =
   (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number];
 export type PassiveVocabularyNounCountability =
   (typeof PASSIVE_VOCABULARY_NOUN_COUNTABILITY)[number];
+export type PassiveVocabularyVerbTransitivity =
+  (typeof PASSIVE_VOCABULARY_VERB_TRANSITIVITY)[number];
+export type PassiveVocabularyVerbFollowedBy =
+  (typeof PASSIVE_VOCABULARY_VERB_FOLLOWED_BY)[number];
+export type PassiveVocabularyFollowedBy = PassiveVocabularyVerbFollowedBy;
 export type PassiveVocabularyVerbRegularity =
   (typeof PASSIVE_VOCABULARY_VERB_REGULARITY)[number];
 export type PassiveVocabularyVerbState =
   (typeof PASSIVE_VOCABULARY_VERB_STATE)[number];
 export type PassiveVocabularyVerbPattern =
   (typeof PASSIVE_VOCABULARY_VERB_PATTERN)[number];
+export type PassiveVocabularyAdjectiveGradability =
+  (typeof PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY)[number];
 
 export interface PassiveVocabularyEditableFormValues {
   plural: string | null;
@@ -96,9 +130,12 @@ export interface PassiveVocabularyLibraryAttributes extends Record<
   americanTranscription?: string | null;
   britishTranscription?: string | null;
   nounCountability?: PassiveVocabularyNounCountability[];
+  verbTransitivity?: PassiveVocabularyVerbTransitivity[];
+  followedBy?: PassiveVocabularyVerbFollowedBy[];
   verbRegularity?: PassiveVocabularyVerbRegularity[];
   verbState?: PassiveVocabularyVerbState[];
   verbPattern?: PassiveVocabularyVerbPattern[];
+  adjectiveGradability?: PassiveVocabularyAdjectiveGradability[];
   forms?: string[];
 }
 
@@ -177,6 +214,164 @@ function normalizePassiveVocabularyNounCountability(
   }
 
   return PASSIVE_VOCABULARY_NOUN_COUNTABILITY.filter((entry) =>
+    values.has(entry),
+  );
+}
+
+function addPassiveVocabularyVerbTransitivityValue(
+  values: Set<PassiveVocabularyVerbTransitivity>,
+  candidate: unknown,
+) {
+  const normalizedCandidate = normalizePassiveVocabularyText(
+    String(candidate ?? ""),
+  );
+
+  if (!normalizedCandidate) {
+    return;
+  }
+
+  if (
+    normalizedCandidate === "both" ||
+    normalizedCandidate === "transitive and intransitive" ||
+    normalizedCandidate === "intransitive and transitive" ||
+    normalizedCandidate === "transative and intransitive" ||
+    normalizedCandidate === "intransitive and transative" ||
+    normalizedCandidate === "transitive/intransitive" ||
+    normalizedCandidate === "intransitive/transitive" ||
+    normalizedCandidate === "transative/intransitive" ||
+    normalizedCandidate === "intransitive/transative"
+  ) {
+    values.add("transitive");
+    values.add("intransitive");
+    return;
+  }
+
+  if (normalizedCandidate === "transative") {
+    values.add("transitive");
+    return;
+  }
+
+  if (
+    PASSIVE_VOCABULARY_VERB_TRANSITIVITY.includes(
+      normalizedCandidate as PassiveVocabularyVerbTransitivity,
+    )
+  ) {
+    values.add(normalizedCandidate as PassiveVocabularyVerbTransitivity);
+  }
+}
+
+function normalizePassiveVocabularyVerbTransitivity(
+  value: unknown,
+  flags?: {
+    transitive?: unknown;
+    transative?: unknown;
+    intransitive?: unknown;
+  },
+) {
+  const values = new Set<PassiveVocabularyVerbTransitivity>();
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      addPassiveVocabularyVerbTransitivityValue(values, entry);
+    }
+  } else if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    if (record.transitive === true || record.transative === true) {
+      values.add("transitive");
+    }
+
+    if (record.intransitive === true) {
+      values.add("intransitive");
+    }
+
+    if (Array.isArray(record.values)) {
+      for (const entry of record.values) {
+        addPassiveVocabularyVerbTransitivityValue(values, entry);
+      }
+    }
+  } else {
+    addPassiveVocabularyVerbTransitivityValue(values, value);
+  }
+
+  if (flags?.transitive === true || flags?.transative === true) {
+    values.add("transitive");
+  }
+
+  if (flags?.intransitive === true) {
+    values.add("intransitive");
+  }
+
+  return PASSIVE_VOCABULARY_VERB_TRANSITIVITY.filter((entry) =>
+    values.has(entry),
+  );
+}
+
+function addPassiveVocabularyVerbFollowedByValue(
+  values: Set<PassiveVocabularyVerbFollowedBy>,
+  candidate: unknown,
+) {
+  const normalizedCandidate = normalizePassiveVocabularyText(
+    String(candidate ?? ""),
+  );
+
+  if (!normalizedCandidate) {
+    return;
+  }
+
+  const tokens = normalizedCandidate
+    .split(/\s*(?:,|\/|;| and )\s*/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  for (const token of tokens.length > 0 ? tokens : [normalizedCandidate]) {
+    const normalizedToken = token.replace(/^\.+|\.+$/g, "");
+
+    if (
+      PASSIVE_VOCABULARY_VERB_FOLLOWED_BY.includes(
+        normalizedToken as PassiveVocabularyVerbFollowedBy,
+      )
+    ) {
+      values.add(normalizedToken as PassiveVocabularyVerbFollowedBy);
+    }
+  }
+}
+
+function normalizePassiveVocabularyVerbFollowedBy(
+  value: unknown,
+  flags?: Partial<Record<PassiveVocabularyVerbFollowedBy, unknown>>,
+) {
+  const values = new Set<PassiveVocabularyVerbFollowedBy>();
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      addPassiveVocabularyVerbFollowedByValue(values, entry);
+    }
+  } else if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    for (const option of PASSIVE_VOCABULARY_VERB_FOLLOWED_BY) {
+      if (record[option] === true) {
+        values.add(option);
+      }
+    }
+
+    if (Array.isArray(record.values)) {
+      for (const entry of record.values) {
+        addPassiveVocabularyVerbFollowedByValue(values, entry);
+      }
+    }
+  } else {
+    addPassiveVocabularyVerbFollowedByValue(values, value);
+  }
+
+  for (const option of PASSIVE_VOCABULARY_VERB_FOLLOWED_BY) {
+    if (flags?.[option] === true) {
+      values.add(option);
+    }
+  }
+
+  return PASSIVE_VOCABULARY_VERB_FOLLOWED_BY.filter((entry) =>
     values.has(entry),
   );
 }
@@ -359,56 +554,79 @@ function addPassiveVocabularyVerbPatternValue(
     return;
   }
 
-  if (
-    normalizedCandidate === "both" ||
-    normalizedCandidate === "v-ing and to-v" ||
-    normalizedCandidate === "to-v and v-ing" ||
-    normalizedCandidate === "v ing and to v" ||
-    normalizedCandidate === "to v and v ing" ||
-    normalizedCandidate === "gerund and infinitive" ||
-    normalizedCandidate === "infinitive and gerund" ||
-    normalizedCandidate === "gerund and to infinitive" ||
-    normalizedCandidate === "to infinitive and gerund" ||
-    normalizedCandidate === "v-ing/to-v" ||
-    normalizedCandidate === "to-v/v-ing" ||
-    normalizedCandidate === "gerund/infinitive" ||
-    normalizedCandidate === "infinitive/gerund"
-  ) {
-    values.add("v-ing");
-    values.add("to-v");
-    return;
+  const normalizedValues = new Set<PassiveVocabularyVerbPattern>();
+
+  if (normalizedCandidate === "both") {
+    normalizedValues.add("v-ing");
+    normalizedValues.add("to-v");
+  } else {
+    for (const token of normalizedCandidate.split(/\s*(?:\/|,| and )\s*/)) {
+      if (!token) {
+        continue;
+      }
+
+      if (
+        token === "v ing" ||
+        token === "verb ing" ||
+        token === "-ing" ||
+        token === "ing" ||
+        token === "gerund"
+      ) {
+        normalizedValues.add("v-ing");
+        continue;
+      }
+
+      if (
+        token === "to v" ||
+        token === "to+v" ||
+        token === "to verb" ||
+        token === "to infinitive" ||
+        token === "to-infinitive" ||
+        token === "infinitive" ||
+        token === "to + infinitive"
+      ) {
+        normalizedValues.add("to-v");
+        continue;
+      }
+
+      if (
+        token === "v" ||
+        token === "bare infinitive" ||
+        token === "bare-infinitive" ||
+        token === "bare verb" ||
+        token === "base verb" ||
+        token === "base form" ||
+        token === "infinitive without to"
+      ) {
+        normalizedValues.add("v");
+        continue;
+      }
+
+      if (
+        token === "not followed" ||
+        token === "not followed by verb" ||
+        token === "not followed by a verb" ||
+        token === "not followed by another verb" ||
+        token === "no following verb" ||
+        token === "no verb complement" ||
+        token === "none"
+      ) {
+        normalizedValues.add("not followed");
+        continue;
+      }
+
+      if (
+        PASSIVE_VOCABULARY_VERB_PATTERN.includes(
+          token as PassiveVocabularyVerbPattern,
+        )
+      ) {
+        normalizedValues.add(token as PassiveVocabularyVerbPattern);
+      }
+    }
   }
 
-  if (
-    normalizedCandidate === "v ing" ||
-    normalizedCandidate === "verb ing" ||
-    normalizedCandidate === "-ing" ||
-    normalizedCandidate === "ing" ||
-    normalizedCandidate === "gerund"
-  ) {
-    values.add("v-ing");
-    return;
-  }
-
-  if (
-    normalizedCandidate === "to v" ||
-    normalizedCandidate === "to+v" ||
-    normalizedCandidate === "to verb" ||
-    normalizedCandidate === "to infinitive" ||
-    normalizedCandidate === "to-infinitive" ||
-    normalizedCandidate === "infinitive" ||
-    normalizedCandidate === "to + infinitive"
-  ) {
-    values.add("to-v");
-    return;
-  }
-
-  if (
-    PASSIVE_VOCABULARY_VERB_PATTERN.includes(
-      normalizedCandidate as PassiveVocabularyVerbPattern,
-    )
-  ) {
-    values.add(normalizedCandidate as PassiveVocabularyVerbPattern);
+  for (const normalizedValue of normalizedValues) {
+    values.add(normalizedValue);
   }
 }
 
@@ -421,6 +639,10 @@ function normalizePassiveVocabularyVerbPattern(
     toV?: unknown;
     infinitive?: unknown;
     toInfinitive?: unknown;
+    v?: unknown;
+    bareInfinitive?: unknown;
+    notFollowed?: unknown;
+    not_followed?: unknown;
   },
 ) {
   const values = new Set<PassiveVocabularyVerbPattern>();
@@ -444,6 +666,14 @@ function normalizePassiveVocabularyVerbPattern(
       values.add("to-v");
     }
 
+    if (record.v === true || record.bareInfinitive === true) {
+      values.add("v");
+    }
+
+    if (record.notFollowed === true || record.not_followed === true) {
+      values.add("not followed");
+    }
+
     if (Array.isArray(record.values)) {
       for (const entry of record.values) {
         addPassiveVocabularyVerbPatternValue(values, entry);
@@ -465,7 +695,117 @@ function normalizePassiveVocabularyVerbPattern(
     values.add("to-v");
   }
 
+  if (flags?.v === true || flags?.bareInfinitive === true) {
+    values.add("v");
+  }
+
+  if (flags?.notFollowed === true || flags?.not_followed === true) {
+    values.add("not followed");
+  }
+
   return PASSIVE_VOCABULARY_VERB_PATTERN.filter((entry) => values.has(entry));
+}
+
+function addPassiveVocabularyAdjectiveGradabilityValue(
+  values: Set<PassiveVocabularyAdjectiveGradability>,
+  candidate: unknown,
+) {
+  const normalizedCandidate = normalizePassiveVocabularyText(
+    String(candidate ?? ""),
+  );
+
+  if (!normalizedCandidate) {
+    return;
+  }
+
+  if (
+    normalizedCandidate === "both" ||
+    normalizedCandidate === "gradable and non-gradable" ||
+    normalizedCandidate === "non-gradable and gradable" ||
+    normalizedCandidate === "gradable and non gradable" ||
+    normalizedCandidate === "non gradable and gradable" ||
+    normalizedCandidate === "gradable/non-gradable" ||
+    normalizedCandidate === "non-gradable/gradable" ||
+    normalizedCandidate === "gradable/non gradable" ||
+    normalizedCandidate === "non gradable/gradable"
+  ) {
+    values.add("gradable");
+    values.add("non-gradable");
+    return;
+  }
+
+  if (
+    normalizedCandidate === "non gradable" ||
+    normalizedCandidate === "nongradable" ||
+    normalizedCandidate === "non_gradable"
+  ) {
+    values.add("non-gradable");
+    return;
+  }
+
+  if (
+    PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY.includes(
+      normalizedCandidate as PassiveVocabularyAdjectiveGradability,
+    )
+  ) {
+    values.add(normalizedCandidate as PassiveVocabularyAdjectiveGradability);
+  }
+}
+
+function normalizePassiveVocabularyAdjectiveGradability(
+  value: unknown,
+  flags?: {
+    gradable?: unknown;
+    nonGradable?: unknown;
+    non_gradable?: unknown;
+    nongradable?: unknown;
+  },
+) {
+  const values = new Set<PassiveVocabularyAdjectiveGradability>();
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      addPassiveVocabularyAdjectiveGradabilityValue(values, entry);
+    }
+  } else if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    if (record.gradable === true) {
+      values.add("gradable");
+    }
+
+    if (
+      record.nonGradable === true ||
+      record.non_gradable === true ||
+      record.nongradable === true
+    ) {
+      values.add("non-gradable");
+    }
+
+    if (Array.isArray(record.values)) {
+      for (const entry of record.values) {
+        addPassiveVocabularyAdjectiveGradabilityValue(values, entry);
+      }
+    }
+  } else {
+    addPassiveVocabularyAdjectiveGradabilityValue(values, value);
+  }
+
+  if (flags?.gradable === true) {
+    values.add("gradable");
+  }
+
+  if (
+    flags?.nonGradable === true ||
+    flags?.non_gradable === true ||
+    flags?.nongradable === true
+  ) {
+    values.add("non-gradable");
+  }
+
+  return PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY.filter((entry) =>
+    values.has(entry),
+  );
 }
 
 function normalizePassiveVocabularyManagedForms(
@@ -612,6 +952,36 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
       uncountable: attributes.uncountable,
     },
   );
+  const verbTransitivity = normalizePassiveVocabularyVerbTransitivity(
+    attributes.verbTransitivity ??
+      attributes.verb_transitivity ??
+      attributes.transitivity,
+    {
+      transitive: attributes.transitive,
+      transative: attributes.transative,
+      intransitive: attributes.intransitive,
+    },
+  );
+  const verbFollowedBy = normalizePassiveVocabularyVerbFollowedBy(
+    attributes.followedBy ??
+      attributes.followed_by ??
+      attributes.verbFollowedBy ??
+      attributes.verb_followed_by ??
+      attributes.dependentPrepositions ??
+      attributes.dependent_prepositions,
+    {
+      on: attributes.on,
+      at: attributes.at,
+      of: attributes.of,
+      for: attributes.for,
+      with: attributes.with,
+      in: attributes.in,
+      to: attributes.to,
+      about: attributes.about,
+      from: attributes.from,
+      by: attributes.by,
+    },
+  );
   const verbRegularity = normalizePassiveVocabularyVerbRegularity(
     attributes.verbRegularity ??
       attributes.verb_regularity ??
@@ -653,6 +1023,21 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
       toV: attributes.toV,
       infinitive: attributes.infinitive,
       toInfinitive: attributes.toInfinitive,
+      v: attributes.v,
+      bareInfinitive: attributes.bareInfinitive,
+      notFollowed: attributes.notFollowed,
+      not_followed: attributes.not_followed,
+    },
+  );
+  const adjectiveGradability = normalizePassiveVocabularyAdjectiveGradability(
+    attributes.adjectiveGradability ??
+      attributes.adjective_gradability ??
+      attributes.gradability,
+    {
+      gradable: attributes.gradable,
+      nonGradable: attributes.nonGradable,
+      non_gradable: attributes.non_gradable,
+      nongradable: attributes.nongradable,
     },
   );
   const forms = normalizePassiveVocabularyManagedForms(
@@ -679,6 +1064,16 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
   delete attributes.countability;
   delete attributes.countable;
   delete attributes.uncountable;
+  delete attributes.verb_transitivity;
+  delete attributes.transitivity;
+  delete attributes.transitive;
+  delete attributes.transative;
+  delete attributes.intransitive;
+  delete attributes.followed_by;
+  delete attributes.verbFollowedBy;
+  delete attributes.verb_followed_by;
+  delete attributes.dependentPrepositions;
+  delete attributes.dependent_prepositions;
   delete attributes.verb_regularity;
   delete attributes.regularity;
   delete attributes.verbType;
@@ -707,6 +1102,19 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
   delete attributes.toV;
   delete attributes.infinitive;
   delete attributes.toInfinitive;
+  delete attributes.v;
+  delete attributes.bareInfinitive;
+  delete attributes.notFollowed;
+  delete attributes.not_followed;
+  delete attributes.adjective_gradability;
+  delete attributes.gradability;
+  delete attributes.gradable;
+  delete attributes.nonGradable;
+  delete attributes.non_gradable;
+  delete attributes.nongradable;
+  for (const preposition of PASSIVE_VOCABULARY_VERB_FOLLOWED_BY) {
+    delete attributes[preposition];
+  }
 
   if (ukrainianTranslation) {
     attributes.ukrainianTranslation = ukrainianTranslation;
@@ -755,6 +1163,18 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
     delete attributes.nounCountability;
   }
 
+  if (verbTransitivity.length > 0) {
+    attributes.verbTransitivity = verbTransitivity;
+  } else {
+    delete attributes.verbTransitivity;
+  }
+
+  if (verbFollowedBy.length > 0) {
+    attributes.followedBy = verbFollowedBy;
+  } else {
+    delete attributes.followedBy;
+  }
+
   if (verbRegularity.length > 0) {
     attributes.verbRegularity = verbRegularity;
   } else {
@@ -771,6 +1191,12 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
     attributes.verbPattern = verbPattern;
   } else {
     delete attributes.verbPattern;
+  }
+
+  if (adjectiveGradability.length > 0) {
+    attributes.adjectiveGradability = adjectiveGradability;
+  } else {
+    delete attributes.adjectiveGradability;
   }
 
   if (forms.length > 0) {
@@ -996,6 +1422,73 @@ export function withPassiveVocabularyNounCountability(
   return nextAttributes;
 }
 
+export function getPassiveVocabularyVerbTransitivity(
+  attributes?: PassiveVocabularyLibraryAttributes | null,
+) {
+  return normalizePassiveVocabularyVerbTransitivity(
+    normalizePassiveVocabularyLibraryAttributes(attributes).verbTransitivity,
+  );
+}
+
+export function withPassiveVocabularyVerbTransitivity(
+  attributes: PassiveVocabularyLibraryAttributes | null | undefined,
+  verbTransitivity: PassiveVocabularyVerbTransitivity[] | null | undefined,
+) {
+  const nextAttributes =
+    normalizePassiveVocabularyLibraryAttributes(attributes);
+  const normalizedVerbTransitivity = normalizePassiveVocabularyVerbTransitivity(
+    verbTransitivity,
+  );
+
+  if (normalizedVerbTransitivity.length > 0) {
+    nextAttributes.verbTransitivity = normalizedVerbTransitivity;
+  } else {
+    delete nextAttributes.verbTransitivity;
+  }
+
+  return nextAttributes;
+}
+
+export function getPassiveVocabularyVerbFollowedBy(
+  attributes?: PassiveVocabularyLibraryAttributes | null,
+) {
+  return normalizePassiveVocabularyVerbFollowedBy(
+    normalizePassiveVocabularyLibraryAttributes(attributes).followedBy,
+  );
+}
+
+export function getPassiveVocabularyFollowedBy(
+  attributes?: PassiveVocabularyLibraryAttributes | null,
+) {
+  return getPassiveVocabularyVerbFollowedBy(attributes);
+}
+
+export function withPassiveVocabularyVerbFollowedBy(
+  attributes: PassiveVocabularyLibraryAttributes | null | undefined,
+  verbFollowedBy: PassiveVocabularyVerbFollowedBy[] | null | undefined,
+) {
+  const nextAttributes =
+    normalizePassiveVocabularyLibraryAttributes(attributes);
+  const normalizedVerbFollowedBy = normalizePassiveVocabularyVerbFollowedBy(
+    verbFollowedBy,
+  );
+
+  if (normalizedVerbFollowedBy.length > 0) {
+    nextAttributes.followedBy = normalizedVerbFollowedBy;
+  } else {
+    delete nextAttributes.followedBy;
+  }
+
+  return nextAttributes;
+}
+
+export function withPassiveVocabularyFollowedBy(
+  attributes: PassiveVocabularyLibraryAttributes | null | undefined,
+  followedBy: PassiveVocabularyFollowedBy[] | null | undefined,
+) {
+  return withPassiveVocabularyVerbFollowedBy(attributes, followedBy);
+}
+
 export function getPassiveVocabularyVerbRegularity(
   attributes?: PassiveVocabularyLibraryAttributes | null,
 ) {
@@ -1068,6 +1561,35 @@ export function withPassiveVocabularyVerbPattern(
     nextAttributes.verbPattern = normalizedVerbPattern;
   } else {
     delete nextAttributes.verbPattern;
+  }
+
+  return nextAttributes;
+}
+
+export function getPassiveVocabularyAdjectiveGradability(
+  attributes?: PassiveVocabularyLibraryAttributes | null,
+) {
+  return normalizePassiveVocabularyAdjectiveGradability(
+    normalizePassiveVocabularyLibraryAttributes(attributes).adjectiveGradability,
+  );
+}
+
+export function withPassiveVocabularyAdjectiveGradability(
+  attributes: PassiveVocabularyLibraryAttributes | null | undefined,
+  adjectiveGradability:
+    | PassiveVocabularyAdjectiveGradability[]
+    | null
+    | undefined,
+) {
+  const nextAttributes =
+    normalizePassiveVocabularyLibraryAttributes(attributes);
+  const normalizedAdjectiveGradability =
+    normalizePassiveVocabularyAdjectiveGradability(adjectiveGradability);
+
+  if (normalizedAdjectiveGradability.length > 0) {
+    nextAttributes.adjectiveGradability = normalizedAdjectiveGradability;
+  } else {
+    delete nextAttributes.adjectiveGradability;
   }
 
   return nextAttributes;
@@ -1180,9 +1702,12 @@ export function getPassiveVocabularyCustomAttributes(
   delete customAttributes.americanTranscription;
   delete customAttributes.britishTranscription;
   delete customAttributes.nounCountability;
+  delete customAttributes.verbTransitivity;
+  delete customAttributes.followedBy;
   delete customAttributes.verbRegularity;
   delete customAttributes.verbState;
   delete customAttributes.verbPattern;
+  delete customAttributes.adjectiveGradability;
   delete customAttributes.forms;
 
   return customAttributes;

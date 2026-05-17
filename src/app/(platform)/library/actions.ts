@@ -17,6 +17,7 @@ import {
 import { canUserEditDictionary } from "@/lib/dictionary/dictionary-permissions";
 import {
   createPassiveVocabularyLibraryEntries,
+  reEnrichPassiveVocabularyLibraryItem,
   syncConfirmedActiveVocabularyToPassiveEvidence,
 } from "@/lib/mastery/passive-vocabulary-library";
 import { updatePassiveVocabularyLibraryItem } from "@/lib/mastery/passive-vocabulary-library-updates";
@@ -77,6 +78,53 @@ function revalidateLibraryPaths() {
 function normalizeOptionalText(value: string | null | undefined) {
   const normalized = value?.trim();
   return normalized ? normalized : null;
+}
+
+async function resolveTargetLanguageForLibraryItem(
+  adminClient: ReturnType<typeof createAdminClient>,
+  libraryItemId: string,
+) {
+  const { data: evidenceRows, error: evidenceError } = await adminClient
+    .from("passive_vocabulary_evidence")
+    .select("student_id")
+    .eq("library_item_id", libraryItemId)
+    .limit(20);
+
+  if (evidenceError) {
+    throw new Error("Failed to load linked passive vocabulary evidence");
+  }
+
+  const studentIds = Array.from(
+    new Set((evidenceRows ?? []).map((row) => row.student_id).filter(Boolean)),
+  );
+
+  if (studentIds.length === 0) {
+    return normalizeLearningLanguage(null);
+  }
+
+  const { data: profiles, error: profilesError } = await adminClient
+    .from("profiles")
+    .select("preferred_language")
+    .in("id", studentIds);
+
+  if (profilesError) {
+    throw new Error("Failed to resolve passive vocabulary language context");
+  }
+
+  const languageCounts = new Map<string, number>();
+
+  for (const profile of profiles ?? []) {
+    const language = normalizeLearningLanguage(profile.preferred_language);
+    languageCounts.set(language, (languageCounts.get(language) ?? 0) + 1);
+  }
+
+  const mostCommonLanguage = Array.from(languageCounts.entries()).sort(
+    (left, right) => right[1] - left[1],
+  )[0]?.[0];
+
+  return mostCommonLanguage
+    ? normalizeLearningLanguage(mostCommonLanguage)
+    : normalizeLearningLanguage(null);
 }
 
 function toSuggestionActionError(error: unknown) {
@@ -377,6 +425,82 @@ export async function deletePassiveVocabularyLibraryItems(itemIds: string[]) {
   }
 
   revalidateLibraryPaths();
+}
+
+export async function confirmPassiveVocabularyLibraryItems(itemIds: string[]) {
+  const { adminClient, userId } = await requireLibraryRole(["superadmin"]);
+  const uniqueItemIds = Array.from(new Set(itemIds.filter(Boolean)));
+
+  if (uniqueItemIds.length === 0) {
+    return { confirmedCount: 0 };
+  }
+
+  const nowIso = new Date().toISOString();
+  const { error } = await adminClient
+    .from("passive_vocabulary_library")
+    .update({
+      approval_status: "confirmed",
+      rejection_reason: null,
+      reviewed_by: userId,
+      reviewed_at: nowIso,
+      updated_by: userId,
+      updated_at: nowIso,
+    })
+    .in("id", uniqueItemIds);
+
+  if (error) {
+    throw new Error("Failed to confirm selected dictionary items");
+  }
+
+  await syncConfirmedActiveVocabularyToPassiveEvidence({
+    adminClient,
+    actorUserId: userId,
+    libraryItemIds: uniqueItemIds,
+  });
+
+  revalidateLibraryPaths();
+
+  return { confirmedCount: uniqueItemIds.length };
+}
+
+export async function reEnrichPassiveVocabularyLibraryItems(itemIds: string[]) {
+  const { adminClient, userId } = await requireLibraryRole(["superadmin"]);
+  const uniqueItemIds = Array.from(new Set(itemIds.filter(Boolean)));
+
+  if (uniqueItemIds.length === 0) {
+    return { successCount: 0, failureCount: 0, firstErrorMessage: null };
+  }
+
+  let successCount = 0;
+  let failureCount = 0;
+  let firstErrorMessage: string | null = null;
+
+  for (const itemId of uniqueItemIds) {
+    try {
+      const targetLanguage = await resolveTargetLanguageForLibraryItem(
+        adminClient,
+        itemId,
+      );
+
+      await reEnrichPassiveVocabularyLibraryItem({
+        libraryItemId: itemId,
+        targetLanguage,
+        actorUserId: userId,
+        adminClient,
+      });
+
+      successCount += 1;
+    } catch (error) {
+      failureCount += 1;
+      if (!firstErrorMessage && error instanceof Error) {
+        firstErrorMessage = error.message;
+      }
+    }
+  }
+
+  revalidateLibraryPaths();
+
+  return { successCount, failureCount, firstErrorMessage };
 }
 
 export async function confirmPassiveVocabularyLibraryItem(itemId: string) {
