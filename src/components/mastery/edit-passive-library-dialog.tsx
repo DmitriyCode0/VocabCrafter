@@ -83,7 +83,8 @@ export function EditPassiveLibraryDialog({
   const router = useRouter();
   const { profile } = useUser();
   const [open, setOpen] = useState(false);
-  const [currentItem, setCurrentItem] = useState<EditablePassiveLibraryItem>(item);
+  const [currentItem, setCurrentItem] =
+    useState<EditablePassiveLibraryItem>(item);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingMetadata, setIsGeneratingMetadata] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -93,7 +94,9 @@ export function EditPassiveLibraryDialog({
   const [canonicalTerm, setCanonicalTerm] = useState(
     getPassiveVocabularyCanonicalHeadword(
       item.canonical_term,
-      item.part_of_speech as typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH[number] | null,
+      item.part_of_speech as
+        | (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number]
+        | null,
     ),
   );
   const [cefrLevel, setCefrLevel] = useState(item.cefr_level ?? "unknown");
@@ -106,7 +109,9 @@ export function EditPassiveLibraryDialog({
   const [englishDefinitionsText, setEnglishDefinitionsText] = useState(
     getPassiveVocabularyEnglishDefinitions(item.attributes).join("\n"),
   );
-  const initialTranscriptions = getPassiveVocabularyTranscriptions(item.attributes);
+  const initialTranscriptions = getPassiveVocabularyTranscriptions(
+    item.attributes,
+  );
   const [americanTranscription, setAmericanTranscription] = useState(
     initialTranscriptions.american ?? "",
   );
@@ -119,20 +124,21 @@ export function EditPassiveLibraryDialog({
   const [verbRegularity, setVerbRegularity] = useState<
     PassiveVocabularyVerbRegularity[]
   >(getPassiveVocabularyVerbRegularity(item.attributes));
-  const [verbPattern, setVerbPattern] = useState<PassiveVocabularyVerbPattern[]>(
-    getPassiveVocabularyVerbPattern(item.attributes),
-  );
+  const [verbPattern, setVerbPattern] = useState<
+    PassiveVocabularyVerbPattern[]
+  >(getPassiveVocabularyVerbPattern(item.attributes));
   const [verbState, setVerbState] = useState<PassiveVocabularyVerbState[]>(
     getPassiveVocabularyVerbState(item.attributes),
   );
   const [formsText, setFormsText] = useState(
     getPassiveVocabularyEditableForms(
       item.canonical_term,
-      item.part_of_speech as typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH[number] | null,
+      item.part_of_speech as
+        | (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number]
+        | null,
       item.attributes?.forms,
       getPassiveVocabularyVerbRegularity(item.attributes),
-    )
-      .join("\n"),
+    ).join("\n"),
   );
   const availablePartsOfSpeech =
     currentItem.item_type === "phrase"
@@ -144,7 +150,9 @@ export function EditPassiveLibraryDialog({
     profile?.english_variant_preference,
   );
   const preferredEnglishVariantLabel =
-    englishVariantPreference === "british" ? "British English" : "American English";
+    englishVariantPreference === "british"
+      ? "British English"
+      : "American English";
   const preferredTranscription =
     englishVariantPreference === "british"
       ? britishTranscription || americanTranscription
@@ -164,7 +172,9 @@ export function EditPassiveLibraryDialog({
   function resetForm(nextItem: EditablePassiveLibraryItem) {
     const canonicalHeadword = getPassiveVocabularyCanonicalHeadword(
       nextItem.canonical_term,
-      nextItem.part_of_speech as typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH[number] | null,
+      nextItem.part_of_speech as
+        | (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number]
+        | null,
     );
 
     setCanonicalTerm(canonicalHeadword);
@@ -185,7 +195,9 @@ export function EditPassiveLibraryDialog({
     );
     setAmericanTranscription(nextTranscriptions.american ?? "");
     setBritishTranscription(nextTranscriptions.british ?? "");
-    setNounCountability(getPassiveVocabularyNounCountability(nextItem.attributes));
+    setNounCountability(
+      getPassiveVocabularyNounCountability(nextItem.attributes),
+    );
     const nextVerbRegularity = getPassiveVocabularyVerbRegularity(
       nextItem.attributes,
     );
@@ -194,7 +206,9 @@ export function EditPassiveLibraryDialog({
     setVerbState(getPassiveVocabularyVerbState(nextItem.attributes));
     const editableForms = getPassiveVocabularyEditableForms(
       canonicalHeadword,
-      nextItem.part_of_speech as typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH[number] | null,
+      nextItem.part_of_speech as
+        | (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number]
+        | null,
       nextItem.attributes?.forms,
       nextVerbRegularity,
     );
@@ -318,24 +332,27 @@ export function EditPassiveLibraryDialog({
     setIsSaving(true);
 
     try {
-      const response = await fetch(`/api/mastery/passive-library/${currentItem.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          canonicalTerm,
-          cefrLevel: cefrLevel === "unknown" ? null : cefrLevel,
-          partOfSpeech: partOfSpeech === "unknown" ? null : partOfSpeech,
-          ukrainianTranslation,
-          englishDefinitions,
-          americanTranscription,
-          britishTranscription,
-          nounCountability: nextNounCountability,
-          verbPattern: nextVerbPattern,
-          verbRegularity: nextVerbRegularity,
-          verbState: nextVerbState,
-          forms,
-        }),
-      });
+      const response = await fetch(
+        `/api/mastery/passive-library/${currentItem.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            canonicalTerm,
+            cefrLevel: cefrLevel === "unknown" ? null : cefrLevel,
+            partOfSpeech: partOfSpeech === "unknown" ? null : partOfSpeech,
+            ukrainianTranslation,
+            englishDefinitions,
+            americanTranscription,
+            britishTranscription,
+            nounCountability: nextNounCountability,
+            verbPattern: nextVerbPattern,
+            verbRegularity: nextVerbRegularity,
+            verbState: nextVerbState,
+            forms,
+          }),
+        },
+      );
 
       const data = (await response.json().catch(() => null)) as {
         error?: string;
@@ -434,7 +451,10 @@ export function EditPassiveLibraryDialog({
     });
   }
 
-  function toggleVerbState(value: PassiveVocabularyVerbState, checked: boolean) {
+  function toggleVerbState(
+    value: PassiveVocabularyVerbState,
+    checked: boolean,
+  ) {
     setVerbState((current) => {
       const nextValues = checked
         ? new Set<PassiveVocabularyVerbState>([...current, value])
@@ -504,7 +524,9 @@ export function EditPassiveLibraryDialog({
             <Textarea
               id={`library-english-definitions-${item.id}`}
               value={englishDefinitionsText}
-              onChange={(event) => setEnglishDefinitionsText(event.target.value)}
+              onChange={(event) =>
+                setEnglishDefinitionsText(event.target.value)
+              }
               rows={4}
               className="font-mono text-xs"
             />
@@ -534,7 +556,8 @@ export function EditPassiveLibraryDialog({
 
           <div className="sm:col-span-2">
             <p className="text-xs text-muted-foreground">
-              Preferred transcription for your current setting ({preferredEnglishVariantLabel}): {preferredTranscription || "—"}
+              Preferred transcription for your current setting (
+              {preferredEnglishVariantLabel}): {preferredTranscription || "—"}
             </p>
           </div>
 
@@ -625,7 +648,9 @@ export function EditPassiveLibraryDialog({
                           toggleVerbPattern(value, checked === true)
                         }
                       />
-                      <span>{PASSIVE_VOCABULARY_VERB_PATTERN_LABELS[value]}</span>
+                      <span>
+                        {PASSIVE_VOCABULARY_VERB_PATTERN_LABELS[value]}
+                      </span>
                     </label>
                   );
                 })}
@@ -690,27 +715,27 @@ export function EditPassiveLibraryDialog({
           ) : null}
 
           {supportsEditableForms ? (
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor={`library-forms-${item.id}`}>
-              Editable forms
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              {partOfSpeech === "noun"
-                ? "Use one line for the plural form only. Searches for that form resolve to the canonical noun."
-                : partOfSpeech === "adjective"
-                  ? "Use one line each for the comparative and superlative forms. Searches for those forms resolve to the canonical adjective."
-                : partOfSpeech === "verb"
-                  ? "Use one line each for V2, V3, V-ing, and V-(e)s. Searches for those forms resolve to the canonical verb."
-                  : "Use one line each for the object pronoun, possessive adjective, possessive pronoun, and reflexive pronoun. Searches for those forms resolve to the canonical subject pronoun."}
-            </p>
-            <Textarea
-              id={`library-forms-${item.id}`}
-              value={formsText}
-              onChange={(event) => setFormsText(event.target.value)}
-              rows={partOfSpeech === "verb" || partOfSpeech === "pronoun" ? 4 : 2}
-              className="font-mono text-xs"
-            />
-          </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor={`library-forms-${item.id}`}>Editable forms</Label>
+              <p className="text-xs text-muted-foreground">
+                {partOfSpeech === "noun"
+                  ? "Use one line for the plural form only. Searches for that form resolve to the canonical noun."
+                  : partOfSpeech === "adjective"
+                    ? "Use one line each for the comparative and superlative forms. Searches for those forms resolve to the canonical adjective."
+                    : partOfSpeech === "verb"
+                      ? "Use one line each for V2, V3, V-ing, and V-(e)s. Searches for those forms resolve to the canonical verb."
+                      : "Use one line each for the object pronoun, possessive adjective, possessive pronoun, and reflexive pronoun. Searches for those forms resolve to the canonical subject pronoun."}
+              </p>
+              <Textarea
+                id={`library-forms-${item.id}`}
+                value={formsText}
+                onChange={(event) => setFormsText(event.target.value)}
+                rows={
+                  partOfSpeech === "verb" || partOfSpeech === "pronoun" ? 4 : 2
+                }
+                className="font-mono text-xs"
+              />
+            </div>
           ) : null}
         </div>
 

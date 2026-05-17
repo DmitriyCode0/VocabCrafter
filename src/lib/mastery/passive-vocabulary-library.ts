@@ -251,12 +251,13 @@ async function upsertPassiveVocabularyLibraryAlias({
   itemType: PassiveVocabularyItemType;
   nowIso: string;
 }) {
-  const { data: existingFormRow, error: existingFormRowError } = await adminClient
-    .from("passive_vocabulary_library_forms")
-    .select("id, library_item_id")
-    .eq("normalized_form", normalizedForm)
-    .eq("item_type", itemType)
-    .maybeSingle();
+  const { data: existingFormRow, error: existingFormRowError } =
+    await adminClient
+      .from("passive_vocabulary_library_forms")
+      .select("id, library_item_id")
+      .eq("normalized_form", normalizedForm)
+      .eq("item_type", itemType)
+      .maybeSingle();
 
   if (existingFormRowError) {
     throw new Error("Failed to inspect passive vocabulary library alias");
@@ -275,16 +276,14 @@ async function upsertPassiveVocabularyLibraryAlias({
           updated_at: nowIso,
         })
         .eq("id", existingFormRow.id)
-    : await adminClient
-        .from("passive_vocabulary_library_forms")
-        .insert({
-          library_item_id: libraryItemId,
-          form_term: formTerm,
-          normalized_form: normalizedForm,
-          item_type: itemType,
-          is_canonical: false,
-          updated_at: nowIso,
-        });
+    : await adminClient.from("passive_vocabulary_library_forms").insert({
+        library_item_id: libraryItemId,
+        form_term: formTerm,
+        normalized_form: normalizedForm,
+        item_type: itemType,
+        is_canonical: false,
+        updated_at: nowIso,
+      });
 
   if (error) {
     throw new Error("Failed to save passive vocabulary library alias");
@@ -375,7 +374,8 @@ async function syncPassiveVocabularyLibraryForms({
     canonicalHeadword,
     partOfSpeech,
   )) {
-    const normalizedGeneratedForm = normalizePassiveVocabularyText(generatedForm);
+    const normalizedGeneratedForm =
+      normalizePassiveVocabularyText(generatedForm);
 
     if (
       !normalizedGeneratedForm ||
@@ -702,12 +702,12 @@ async function enrichPassiveVocabularyWords(
       'For nouns, attributes may also include nounCountability as an array containing "countable", "uncountable", or both when you are confident.',
       'For verbs that commonly take a following verb complement, attributes may also include verbPattern as an array containing "v-ing", "to-v", or both when you are confident.',
       'Use "v-ing" for verbs like enjoy or avoid, "to-v" for verbs like want or hope, and both when either pattern is common for the everyday learner sense without a strong meaning change.',
-      'If no clear gerund/to-infinitive pattern is relevant for the common learner-facing sense, omit verbPattern.',
+      "If no clear gerund/to-infinitive pattern is relevant for the common learner-facing sense, omit verbPattern.",
       'For verbs, attributes may also include verbRegularity as an array containing "regular", "irregular", or both when you are confident.',
       'For verbs, attributes may also include verbState as an array containing "state", "dynamic", or both when you are confident.',
       'Use "state" for stative verbs such as know, belong, or seem, and "dynamic" for actions or processes such as run, write, or change.',
-      'If a verb is irregular or has a common irregular variant, include attributes.forms in this exact order: V2, V3, V-ing, V-(e)s.',
-      'For irregular verbs, make sure V2 and V3 are correct learner-facing forms for the intended sense of the verb.',
+      "If a verb is irregular or has a common irregular variant, include attributes.forms in this exact order: V2, V3, V-ing, V-(e)s.",
+      "For irregular verbs, make sure V2 and V3 are correct learner-facing forms for the intended sense of the verb.",
       "Use modal verb for can, could, may, might, must, shall, should, will, and would.",
       "Use auxiliary when the entry is best labeled as a helping verb rather than a main verb.",
       "Prefer the most common everyday learner-friendly sense, not niche technical/legal/financial/sports senses unless the word is primarily used that way.",
@@ -750,7 +750,9 @@ async function enrichPassiveVocabularyWords(
       await incrementAICalls(actorUserId);
 
       for (const item of normalizedItems) {
-        const baseAttributes = normalizePassiveVocabularyLibraryAttributes(item.attributes);
+        const baseAttributes = normalizePassiveVocabularyLibraryAttributes(
+          item.attributes,
+        );
 
         enrichmentMap.set(normalizePassiveVocabularyText(item.requestedTerm), {
           requestedTerm: item.requestedTerm,
@@ -813,9 +815,11 @@ export async function createPassiveVocabularyLibraryEntries(
       canonicalHeadword,
       partOfSpeech,
     );
-    const canonicalNormalizedTerm = normalizePassiveVocabularyText(canonicalTerm);
+    const canonicalNormalizedTerm =
+      normalizePassiveVocabularyText(canonicalTerm);
     const isDisambiguatedCanonical =
-      normalizePassiveVocabularyText(canonicalHeadword) !== canonicalNormalizedTerm;
+      normalizePassiveVocabularyText(canonicalHeadword) !==
+      canonicalNormalizedTerm;
     const groupKey = getLookupKey(canonicalNormalizedTerm, input.itemType);
     const existingGroup = libraryGroups.get(groupKey);
     const candidateForms = new Map<string, string>(
@@ -1100,15 +1104,18 @@ export async function reEnrichPassiveVocabularyLibraryItem({
   const normalizedTargetLanguage = normalizeLearningLanguage(targetLanguage);
   const existingItemHeadword = getPassiveVocabularyCanonicalHeadword(
     existingItem.canonical_term,
-    (existingItem.part_of_speech as PassiveVocabularyPartOfSpeech | null) ?? null,
+    (existingItem.part_of_speech as PassiveVocabularyPartOfSpeech | null) ??
+      null,
   );
   const input: PassiveVocabularyLibraryInput = {
     term: existingItemHeadword || existingItem.canonical_term,
     normalizedTerm:
-      normalizePassiveVocabularyText(existingItemHeadword) || existingItem.normalized_term,
+      normalizePassiveVocabularyText(existingItemHeadword) ||
+      existingItem.normalized_term,
     itemType: "word",
     partOfSpeech:
-      (existingItem.part_of_speech as PassiveVocabularyPartOfSpeech | null) ?? undefined,
+      (existingItem.part_of_speech as PassiveVocabularyPartOfSpeech | null) ??
+      undefined,
   };
   const enrichmentByRequestedTerm = await enrichPassiveVocabularyWords(
     [input],

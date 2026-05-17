@@ -50,7 +50,10 @@ const updatePassiveLibraryItemSchema = z.object({
     .array(z.enum(PASSIVE_VOCABULARY_NOUN_COUNTABILITY))
     .max(2)
     .optional(),
-  verbPattern: z.array(z.enum(PASSIVE_VOCABULARY_VERB_PATTERN)).max(2).optional(),
+  verbPattern: z
+    .array(z.enum(PASSIVE_VOCABULARY_VERB_PATTERN))
+    .max(2)
+    .optional(),
   verbRegularity: z
     .array(z.enum(PASSIVE_VOCABULARY_VERB_REGULARITY))
     .max(2)

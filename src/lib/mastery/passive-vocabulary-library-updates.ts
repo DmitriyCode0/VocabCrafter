@@ -72,12 +72,13 @@ async function upsertPassiveVocabularyLibraryAliasIfAvailable({
   itemType: Database["public"]["Tables"]["passive_vocabulary_library"]["Row"]["item_type"];
   nowIso: string;
 }) {
-  const { data: existingFormRow, error: existingFormRowError } = await adminClient
-    .from("passive_vocabulary_library_forms")
-    .select("id, library_item_id")
-    .eq("normalized_form", normalizedForm)
-    .eq("item_type", itemType)
-    .maybeSingle();
+  const { data: existingFormRow, error: existingFormRowError } =
+    await adminClient
+      .from("passive_vocabulary_library_forms")
+      .select("id, library_item_id")
+      .eq("normalized_form", normalizedForm)
+      .eq("item_type", itemType)
+      .maybeSingle();
 
   if (existingFormRowError) {
     throw new Error("Failed to inspect passive vocabulary library alias");
@@ -218,12 +219,13 @@ async function syncPassiveVocabularyLibraryAliases({
     }
   }
 
-  const { data: existingAliasRows, error: existingAliasRowsError } = await adminClient
-    .from("passive_vocabulary_library_forms")
-    .select("id, normalized_form")
-    .eq("library_item_id", libraryItemId)
-    .eq("item_type", itemType)
-    .eq("is_canonical", false);
+  const { data: existingAliasRows, error: existingAliasRowsError } =
+    await adminClient
+      .from("passive_vocabulary_library_forms")
+      .select("id, normalized_form")
+      .eq("library_item_id", libraryItemId)
+      .eq("item_type", itemType)
+      .eq("is_canonical", false);
 
   if (existingAliasRowsError) {
     throw new Error("Failed to inspect passive vocabulary library aliases");
@@ -291,11 +293,12 @@ export async function updatePassiveVocabularyLibraryItem({
     throw new Error("Passive vocabulary library item not found");
   }
 
-    const existingPartOfSpeech =
-      (existingItem.part_of_speech as PassiveVocabularyPartOfSpeech | null) ?? null;
+  const existingPartOfSpeech =
+    (existingItem.part_of_speech as PassiveVocabularyPartOfSpeech | null) ??
+    null;
   const canonicalHeadword = getPassiveVocabularyCanonicalHeadword(
     requestedCanonicalTerm,
-      partOfSpeech ?? existingPartOfSpeech,
+    partOfSpeech ?? existingPartOfSpeech,
   );
 
   if (!canonicalHeadword) {
@@ -344,17 +347,18 @@ export async function updatePassiveVocabularyLibraryItem({
         ? getPassiveVocabularyEnglishDefinitions(existingAttributes)
         : englishDefinitions,
     );
-  const existingTranscriptions = getPassiveVocabularyTranscriptions(
-    existingAttributes,
-  );
+  const existingTranscriptions =
+    getPassiveVocabularyTranscriptions(existingAttributes);
   const nextCefrLevel =
     existingItem.item_type === "phrase"
       ? null
-      : ((cefrLevel ?? existingItem.cefr_level) as PassiveVocabularyLibraryCefrLevel | null);
+      : ((cefrLevel ??
+          existingItem.cefr_level) as PassiveVocabularyLibraryCefrLevel | null);
   const nextPartOfSpeech =
     existingItem.item_type === "phrase"
       ? "phrase"
-      : ((partOfSpeech ?? existingItem.part_of_speech) as PassiveVocabularyPartOfSpeech | null);
+      : ((partOfSpeech ??
+          existingItem.part_of_speech) as PassiveVocabularyPartOfSpeech | null);
   const nextAttributesWithTranscription = withPassiveVocabularyTranscriptions(
     nextAttributesWithEnglishDefinitions,
     {
@@ -372,14 +376,15 @@ export async function updatePassiveVocabularyLibraryItem({
           : britishTranscription,
     },
   );
-  const nextAttributesWithNounCountability = withPassiveVocabularyNounCountability(
-    nextAttributesWithTranscription,
-    nextPartOfSpeech === "noun"
-      ? nounCountability === undefined
-        ? getPassiveVocabularyNounCountability(existingAttributes)
-        : nounCountability
-      : [],
-  );
+  const nextAttributesWithNounCountability =
+    withPassiveVocabularyNounCountability(
+      nextAttributesWithTranscription,
+      nextPartOfSpeech === "noun"
+        ? nounCountability === undefined
+          ? getPassiveVocabularyNounCountability(existingAttributes)
+          : nounCountability
+        : [],
+    );
   const nextAttributesWithVerbRegularity = withPassiveVocabularyVerbRegularity(
     nextAttributesWithNounCountability,
     nextPartOfSpeech === "verb"

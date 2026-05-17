@@ -511,19 +511,25 @@ function normalizePassiveVocabularyUkrainianSearchForms(
   const forms = new Map<string, string>();
 
   const addCandidate = (candidate: unknown) => {
-    const normalizedCandidate = normalizePassiveVocabularyAttributeText(candidate);
+    const normalizedCandidate =
+      normalizePassiveVocabularyAttributeText(candidate);
 
     if (!normalizedCandidate) {
       return;
     }
 
     for (const segment of normalizedCandidate.split(/[\n,;/]+/)) {
-      const normalizedSegment = normalizePassiveVocabularyAttributeText(segment);
+      const normalizedSegment =
+        normalizePassiveVocabularyAttributeText(segment);
       const normalizedLookupSegment = normalizePassiveVocabularyText(
         normalizedSegment ?? "",
       );
 
-      if (!normalizedSegment || !normalizedLookupSegment || forms.has(normalizedLookupSegment)) {
+      if (
+        !normalizedSegment ||
+        !normalizedLookupSegment ||
+        forms.has(normalizedLookupSegment)
+      ) {
         continue;
       }
 
@@ -903,7 +909,9 @@ export function getPassiveVocabularyTranscription(
 ) {
   const transcriptions = getPassiveVocabularyTranscriptions(attributes);
 
-  if (normalizeEnglishVariantPreference(englishVariantPreference) === "british") {
+  if (
+    normalizeEnglishVariantPreference(englishVariantPreference) === "british"
+  ) {
     return transcriptions.british ?? transcriptions.american;
   }
 
@@ -920,8 +928,7 @@ export function getPassiveVocabularyTranscriptions(
   return {
     american:
       normalizedAttributes.americanTranscription ?? fallbackTranscription,
-    british:
-      normalizedAttributes.britishTranscription ?? fallbackTranscription,
+    british: normalizedAttributes.britishTranscription ?? fallbackTranscription,
   };
 }
 
@@ -941,12 +948,10 @@ export function withPassiveVocabularyTranscriptions(
 ) {
   const nextAttributes =
     normalizePassiveVocabularyLibraryAttributes(attributes);
-  const normalizedAmericanTranscription = normalizePassiveVocabularyAttributeText(
-    transcriptions?.american,
-  );
-  const normalizedBritishTranscription = normalizePassiveVocabularyAttributeText(
-    transcriptions?.british,
-  );
+  const normalizedAmericanTranscription =
+    normalizePassiveVocabularyAttributeText(transcriptions?.american);
+  const normalizedBritishTranscription =
+    normalizePassiveVocabularyAttributeText(transcriptions?.british);
 
   if (normalizedAmericanTranscription) {
     nextAttributes.americanTranscription = normalizedAmericanTranscription;
@@ -975,16 +980,12 @@ export function getPassiveVocabularyNounCountability(
 
 export function withPassiveVocabularyNounCountability(
   attributes: PassiveVocabularyLibraryAttributes | null | undefined,
-  nounCountability:
-    | PassiveVocabularyNounCountability[]
-    | null
-    | undefined,
+  nounCountability: PassiveVocabularyNounCountability[] | null | undefined,
 ) {
   const nextAttributes =
     normalizePassiveVocabularyLibraryAttributes(attributes);
-  const normalizedNounCountability = normalizePassiveVocabularyNounCountability(
-    nounCountability,
-  );
+  const normalizedNounCountability =
+    normalizePassiveVocabularyNounCountability(nounCountability);
 
   if (normalizedNounCountability.length > 0) {
     nextAttributes.nounCountability = normalizedNounCountability;
@@ -1005,16 +1006,12 @@ export function getPassiveVocabularyVerbRegularity(
 
 export function withPassiveVocabularyVerbRegularity(
   attributes: PassiveVocabularyLibraryAttributes | null | undefined,
-  verbRegularity:
-    | PassiveVocabularyVerbRegularity[]
-    | null
-    | undefined,
+  verbRegularity: PassiveVocabularyVerbRegularity[] | null | undefined,
 ) {
   const nextAttributes =
     normalizePassiveVocabularyLibraryAttributes(attributes);
-  const normalizedVerbRegularity = normalizePassiveVocabularyVerbRegularity(
-    verbRegularity,
-  );
+  const normalizedVerbRegularity =
+    normalizePassiveVocabularyVerbRegularity(verbRegularity);
 
   if (normalizedVerbRegularity.length > 0) {
     nextAttributes.verbRegularity = normalizedVerbRegularity;
@@ -1064,9 +1061,8 @@ export function withPassiveVocabularyVerbPattern(
 ) {
   const nextAttributes =
     normalizePassiveVocabularyLibraryAttributes(attributes);
-  const normalizedVerbPattern = normalizePassiveVocabularyVerbPattern(
-    verbPattern,
-  );
+  const normalizedVerbPattern =
+    normalizePassiveVocabularyVerbPattern(verbPattern);
 
   if (normalizedVerbPattern.length > 0) {
     nextAttributes.verbPattern = normalizedVerbPattern;
@@ -1118,8 +1114,13 @@ export function getPassiveVocabularyMetadataValidation(
     missingRequirements.push("part of speech");
   }
 
-  if (partOfSpeech === "verb" && getPassiveVocabularyVerbState(attributes).length === 0) {
-    missingRequirements.push('verb state classification ("state", "dynamic", or both)');
+  if (
+    partOfSpeech === "verb" &&
+    getPassiveVocabularyVerbState(attributes).length === 0
+  ) {
+    missingRequirements.push(
+      'verb state classification ("state", "dynamic", or both)',
+    );
   }
 
   if (missingRequirements.length === 0) {
@@ -1495,11 +1496,7 @@ function hasShortAdjectiveConsonantVowelConsonantEnding(value: string) {
 }
 
 function canAutoGenerateRegularAdjectiveForms(value: string) {
-  return (
-    value.length <= 5 ||
-    endsWithConsonantY(value) ||
-    value.endsWith("e")
-  );
+  return value.length <= 5 || endsWithConsonantY(value) || value.endsWith("e");
 }
 
 function buildRegularAdjectiveComparativeForm(value: string) {
@@ -1627,7 +1624,9 @@ export function getPassiveVocabularyEditableFormValues(
   }
 
   if (partOfSpeech === "pronoun") {
-    const suggestedPronounForms = SUBJECT_PRONOUN_FORM_MAP.get(normalizedText) ?? {
+    const suggestedPronounForms = SUBJECT_PRONOUN_FORM_MAP.get(
+      normalizedText,
+    ) ?? {
       objectPronoun: null,
       possessiveAdjective: null,
       possessivePronoun: null,
@@ -1668,11 +1667,12 @@ export function getPassiveVocabularyEditableFormValues(
   }
 
   if (partOfSpeech === "adjective") {
-    const suggestedAdjectiveForms =
-      IRREGULAR_ADJECTIVE_FORM_MAP.get(normalizedText) ?? {
-        comparative: buildRegularAdjectiveComparativeForm(normalizedText),
-        superlative: buildRegularAdjectiveSuperlativeForm(normalizedText),
-      };
+    const suggestedAdjectiveForms = IRREGULAR_ADJECTIVE_FORM_MAP.get(
+      normalizedText,
+    ) ?? {
+      comparative: buildRegularAdjectiveComparativeForm(normalizedText),
+      superlative: buildRegularAdjectiveSuperlativeForm(normalizedText),
+    };
     const remainingExplicitForms = [...normalizedExplicitForms];
     const takeExplicitForm = (preferredValue: string | null) => {
       if (preferredValue) {
@@ -1705,9 +1705,8 @@ export function getPassiveVocabularyEditableFormValues(
     return emptyValues;
   }
 
-  const normalizedVerbRegularity = normalizePassiveVocabularyVerbRegularity(
-    verbRegularity,
-  );
+  const normalizedVerbRegularity =
+    normalizePassiveVocabularyVerbRegularity(verbRegularity);
   const shouldForceRegularForms =
     normalizedVerbRegularity.includes("regular") &&
     !normalizedVerbRegularity.includes("irregular");
@@ -1720,22 +1719,27 @@ export function getPassiveVocabularyEditableFormValues(
   const regularGerund = buildRegularIngForms(normalizedText)[0] ?? null;
   const suggestedThirdPersonSingular =
     irregularVariants.find(
-      (form) => normalizePassiveVocabularyText(form) === regularThirdPersonSingular,
+      (form) =>
+        normalizePassiveVocabularyText(form) === regularThirdPersonSingular,
     ) ?? regularThirdPersonSingular;
   const suggestedGerund =
-    irregularVariants.find((form) => /ing$/.test(normalizePassiveVocabularyText(form))) ??
-    regularGerund;
+    irregularVariants.find((form) =>
+      /ing$/.test(normalizePassiveVocabularyText(form)),
+    ) ?? regularGerund;
   const remainingIrregularForms = irregularVariants.filter((form) => {
     const normalizedForm = normalizePassiveVocabularyText(form);
     return (
-      normalizedForm !== normalizePassiveVocabularyText(suggestedThirdPersonSingular) &&
+      normalizedForm !==
+        normalizePassiveVocabularyText(suggestedThirdPersonSingular) &&
       normalizedForm !== normalizePassiveVocabularyText(suggestedGerund ?? "")
     );
   });
   const suggestedPastSimple = remainingIrregularForms[0] ?? regularPast;
   const suggestedPastParticiple =
     remainingIrregularForms[1] ??
-    (remainingIrregularForms.length === 1 ? remainingIrregularForms[0] : regularPast);
+    (remainingIrregularForms.length === 1
+      ? remainingIrregularForms[0]
+      : regularPast);
 
   const remainingExplicitForms = [...normalizedExplicitForms];
   const takeExplicitForm = (
@@ -1874,7 +1878,8 @@ export function getPassiveVocabularyCanonicalHeadword(
 
   if (
     partOfSpeech === "noun" &&
-    (normalizedLookupValue.startsWith("a ") || normalizedLookupValue.startsWith("an "))
+    (normalizedLookupValue.startsWith("a ") ||
+      normalizedLookupValue.startsWith("an "))
   ) {
     return normalizedLookupValue.startsWith("an ")
       ? normalizedValue.slice(3).trim()
