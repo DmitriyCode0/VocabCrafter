@@ -1436,9 +1436,8 @@ export function withPassiveVocabularyVerbTransitivity(
 ) {
   const nextAttributes =
     normalizePassiveVocabularyLibraryAttributes(attributes);
-  const normalizedVerbTransitivity = normalizePassiveVocabularyVerbTransitivity(
-    verbTransitivity,
-  );
+  const normalizedVerbTransitivity =
+    normalizePassiveVocabularyVerbTransitivity(verbTransitivity);
 
   if (normalizedVerbTransitivity.length > 0) {
     nextAttributes.verbTransitivity = normalizedVerbTransitivity;
@@ -1469,9 +1468,8 @@ export function withPassiveVocabularyVerbFollowedBy(
 ) {
   const nextAttributes =
     normalizePassiveVocabularyLibraryAttributes(attributes);
-  const normalizedVerbFollowedBy = normalizePassiveVocabularyVerbFollowedBy(
-    verbFollowedBy,
-  );
+  const normalizedVerbFollowedBy =
+    normalizePassiveVocabularyVerbFollowedBy(verbFollowedBy);
 
   if (normalizedVerbFollowedBy.length > 0) {
     nextAttributes.followedBy = normalizedVerbFollowedBy;
@@ -1570,7 +1568,8 @@ export function getPassiveVocabularyAdjectiveGradability(
   attributes?: PassiveVocabularyLibraryAttributes | null,
 ) {
   return normalizePassiveVocabularyAdjectiveGradability(
-    normalizePassiveVocabularyLibraryAttributes(attributes).adjectiveGradability,
+    normalizePassiveVocabularyLibraryAttributes(attributes)
+      .adjectiveGradability,
   );
 }
 

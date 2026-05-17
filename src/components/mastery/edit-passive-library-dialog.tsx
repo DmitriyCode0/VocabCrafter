@@ -806,7 +806,9 @@ export function EditPassiveLibraryDialog({
                           toggleFollowedBy(value, checked === true)
                         }
                       />
-                      <span>{PASSIVE_VOCABULARY_FOLLOWED_BY_LABELS[value]}</span>
+                      <span>
+                        {PASSIVE_VOCABULARY_FOLLOWED_BY_LABELS[value]}
+                      </span>
                     </label>
                   );
                 })}
@@ -910,8 +912,7 @@ export function EditPassiveLibraryDialog({
               </p>
               <div className="flex flex-wrap gap-4 pt-1">
                 {PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY.map((value) => {
-                  const id =
-                    `library-adjective-gradability-${item.id}-${value}`;
+                  const id = `library-adjective-gradability-${item.id}-${value}`;
 
                   return (
                     <label
@@ -927,11 +928,7 @@ export function EditPassiveLibraryDialog({
                         }
                       />
                       <span>
-                        {
-                          PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY_LABELS[
-                            value
-                          ]
-                        }
+                        {PASSIVE_VOCABULARY_ADJECTIVE_GRADABILITY_LABELS[value]}
                       </span>
                     </label>
                   );

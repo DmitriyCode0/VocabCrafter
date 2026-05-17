@@ -96,56 +96,71 @@ export default async function LibraryDictionaryPage() {
     return query;
   };
   const loadExactCount = async (
-    query: PromiseLike<{ count: number | null; error: { message?: string } | null }>,
+    query: PromiseLike<{
+      count: number | null;
+      error: { message?: string } | null;
+    }>,
   ) => {
     const { count, error } = await query;
 
     if (error) {
-      throw new Error(error.message ?? "Failed to load shared dictionary items");
+      throw new Error(
+        error.message ?? "Failed to load shared dictionary items",
+      );
     }
 
     return count ?? 0;
   };
-  const loadInitialFacetCounts = async (): Promise<LibraryDictionaryFacetCounts> => {
-    const counts = createEmptyFacetCounts();
-    const [cefrCounts, approvalCounts, partOfSpeechCounts] = await Promise.all([
-      Promise.all([
-        loadExactCount(createLibraryCountQuery()),
-        loadExactCount(createLibraryCountQuery().is("cefr_level", null)),
-        ...PASSIVE_VOCABULARY_CEFR_LEVELS.map((level) =>
-          loadExactCount(createLibraryCountQuery().eq("cefr_level", level)),
-        ),
-      ]),
-      Promise.all([
-        loadExactCount(createLibraryCountQuery()),
-        loadExactCount(createLibraryCountQuery().eq("approval_status", "unconfirmed")),
-        loadExactCount(createLibraryCountQuery().eq("approval_status", "confirmed")),
-        loadExactCount(createLibraryCountQuery().eq("approval_status", "rejected")),
-      ]),
-      Promise.all(
-        PASSIVE_VOCABULARY_PARTS_OF_SPEECH.map((value) =>
-          loadExactCount(createLibraryCountQuery().eq("part_of_speech", value)),
-        ),
-      ),
-    ]);
+  const loadInitialFacetCounts =
+    async (): Promise<LibraryDictionaryFacetCounts> => {
+      const counts = createEmptyFacetCounts();
+      const [cefrCounts, approvalCounts, partOfSpeechCounts] =
+        await Promise.all([
+          Promise.all([
+            loadExactCount(createLibraryCountQuery()),
+            loadExactCount(createLibraryCountQuery().is("cefr_level", null)),
+            ...PASSIVE_VOCABULARY_CEFR_LEVELS.map((level) =>
+              loadExactCount(createLibraryCountQuery().eq("cefr_level", level)),
+            ),
+          ]),
+          Promise.all([
+            loadExactCount(createLibraryCountQuery()),
+            loadExactCount(
+              createLibraryCountQuery().eq("approval_status", "unconfirmed"),
+            ),
+            loadExactCount(
+              createLibraryCountQuery().eq("approval_status", "confirmed"),
+            ),
+            loadExactCount(
+              createLibraryCountQuery().eq("approval_status", "rejected"),
+            ),
+          ]),
+          Promise.all(
+            PASSIVE_VOCABULARY_PARTS_OF_SPEECH.map((value) =>
+              loadExactCount(
+                createLibraryCountQuery().eq("part_of_speech", value),
+              ),
+            ),
+          ),
+        ]);
 
-    counts.cefr.all = cefrCounts[0] ?? 0;
-    counts.cefr.unknown = cefrCounts[1] ?? 0;
-    PASSIVE_VOCABULARY_CEFR_LEVELS.forEach((level, index) => {
-      counts.cefr[level] = cefrCounts[index + 2] ?? 0;
-    });
+      counts.cefr.all = cefrCounts[0] ?? 0;
+      counts.cefr.unknown = cefrCounts[1] ?? 0;
+      PASSIVE_VOCABULARY_CEFR_LEVELS.forEach((level, index) => {
+        counts.cefr[level] = cefrCounts[index + 2] ?? 0;
+      });
 
-    counts.approval.all = approvalCounts[0] ?? 0;
-    counts.approval.unconfirmed = approvalCounts[1] ?? 0;
-    counts.approval.confirmed = approvalCounts[2] ?? 0;
-    counts.approval.rejected = approvalCounts[3] ?? 0;
+      counts.approval.all = approvalCounts[0] ?? 0;
+      counts.approval.unconfirmed = approvalCounts[1] ?? 0;
+      counts.approval.confirmed = approvalCounts[2] ?? 0;
+      counts.approval.rejected = approvalCounts[3] ?? 0;
 
-    PASSIVE_VOCABULARY_PARTS_OF_SPEECH.forEach((value, index) => {
-      counts.partOfSpeech[value] = partOfSpeechCounts[index] ?? 0;
-    });
+      PASSIVE_VOCABULARY_PARTS_OF_SPEECH.forEach((value, index) => {
+        counts.partOfSpeech[value] = partOfSpeechCounts[index] ?? 0;
+      });
 
-    return counts;
-  };
+      return counts;
+    };
   let libraryCountQuery = supabaseAdmin
     .from("passive_vocabulary_library")
     .select("id", { count: "exact", head: true });
@@ -165,7 +180,12 @@ export default async function LibraryDictionaryPage() {
     libraryRowsQuery = libraryRowsQuery.eq("approval_status", "confirmed");
   }
 
-  const [libraryCountResult, initialFacetCounts, libraryRowsResult, canDirectlyAdd] = await Promise.all([
+  const [
+    libraryCountResult,
+    initialFacetCounts,
+    libraryRowsResult,
+    canDirectlyAdd,
+  ] = await Promise.all([
     libraryCountQuery,
     loadInitialFacetCounts(),
     libraryRowsQuery,
@@ -188,11 +208,16 @@ export default async function LibraryDictionaryPage() {
     .order("created_at", { ascending: true });
 
   if (suggestionRowsResult.error) {
-    if (!isMissingPassiveVocabularyLibrarySuggestionsTableError(suggestionRowsResult.error)) {
+    if (
+      !isMissingPassiveVocabularyLibrarySuggestionsTableError(
+        suggestionRowsResult.error,
+      )
+    ) {
       throw new Error("Failed to load passive dictionary suggestions");
     }
   } else {
-    const suggestionRows = (suggestionRowsResult.data ?? []) as DictionarySuggestionRow[];
+    const suggestionRows = (suggestionRowsResult.data ??
+      []) as DictionarySuggestionRow[];
 
     if (role === "superadmin" && suggestionRows.length > 0) {
       const libraryItemIds = Array.from(
@@ -201,18 +226,19 @@ export default async function LibraryDictionaryPage() {
       const submitterIds = Array.from(
         new Set(suggestionRows.map((suggestion) => suggestion.created_by)),
       );
-      const [relatedLibraryItemsResult, submitterProfilesResult] = await Promise.all([
-        supabaseAdmin
-          .from("passive_vocabulary_library")
-          .select(
-            "id, canonical_term, item_type, cefr_level, part_of_speech, attributes",
-          )
-          .in("id", libraryItemIds),
-        supabaseAdmin
-          .from("profiles")
-          .select("id, full_name, email")
-          .in("id", submitterIds),
-      ]);
+      const [relatedLibraryItemsResult, submitterProfilesResult] =
+        await Promise.all([
+          supabaseAdmin
+            .from("passive_vocabulary_library")
+            .select(
+              "id, canonical_term, item_type, cefr_level, part_of_speech, attributes",
+            )
+            .in("id", libraryItemIds),
+          supabaseAdmin
+            .from("profiles")
+            .select("id, full_name, email")
+            .in("id", submitterIds),
+        ]);
 
       if (relatedLibraryItemsResult.error || submitterProfilesResult.error) {
         throw new Error("Failed to load passive dictionary review details");
@@ -309,7 +335,9 @@ export default async function LibraryDictionaryPage() {
             | null,
           part_of_speech:
             item.part_of_speech as PassiveVocabularyPartOfSpeech | null,
-          attributes: normalizePassiveVocabularyLibraryAttributes(item.attributes),
+          attributes: normalizePassiveVocabularyLibraryAttributes(
+            item.attributes,
+          ),
           approval_status: item.approval_status,
           rejection_reason: item.rejection_reason,
           enrichment_status: item.enrichment_status,

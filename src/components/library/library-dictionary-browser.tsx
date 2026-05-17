@@ -89,7 +89,9 @@ export interface LibraryDictionaryFacetCounts {
   partOfSpeech: Record<PassiveVocabularyPartOfSpeech, number>;
 }
 
-function getApprovalStatusLabel(status: PassiveVocabularyLibraryAdminItem["approval_status"]) {
+function getApprovalStatusLabel(
+  status: PassiveVocabularyLibraryAdminItem["approval_status"],
+) {
   if (status === "confirmed") {
     return "Confirmed";
   }
@@ -244,10 +246,7 @@ function updateFacetCountsForItemRemoval(
     0,
     nextFacetCounts.cefr[cefrFacetValue] - 1,
   );
-  nextFacetCounts.approval.all = Math.max(
-    0,
-    nextFacetCounts.approval.all - 1,
-  );
+  nextFacetCounts.approval.all = Math.max(0, nextFacetCounts.approval.all - 1);
   nextFacetCounts.approval[item.approval_status] = Math.max(
     0,
     nextFacetCounts.approval[item.approval_status] - 1,
@@ -329,19 +328,26 @@ export function LibraryDictionaryBrowser({
   );
   const [approvalFilter, setApprovalFilter] =
     useState<DictionaryApprovalFilter>("all");
-  const [posFilter, setPosFilter] = useState<PassiveVocabularyPartOfSpeech[]>([]);
+  const [posFilter, setPosFilter] = useState<PassiveVocabularyPartOfSpeech[]>(
+    [],
+  );
   const [facetCounts, setFacetCounts] =
     useState<LibraryDictionaryFacetCounts | null>(initialFacetCounts);
   const [showFilterCounts, setShowFilterCounts] = useState(true);
   const [initialLoading, setInitialLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [reviewingSuggestionId, setReviewingSuggestionId] = useState<string | null>(null);
-  const [updatingApprovalItemId, setUpdatingApprovalItemId] = useState<string | null>(null);
+  const [reviewingSuggestionId, setReviewingSuggestionId] = useState<
+    string | null
+  >(null);
+  const [updatingApprovalItemId, setUpdatingApprovalItemId] = useState<
+    string | null
+  >(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [isBatchConfirming, setIsBatchConfirming] = useState(false);
-  const [isBatchGeneratingMetadata, setIsBatchGeneratingMetadata] = useState(false);
+  const [isBatchGeneratingMetadata, setIsBatchGeneratingMetadata] =
+    useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const initialFilterEffectRef = useRef(true);
   const initialLoadingRef = useRef(false);
@@ -372,7 +378,10 @@ export function LibraryDictionaryBrowser({
               ? messages.library.dictionary.unknownValue
               : value,
       })),
-    [messages.library.dictionary.allFilter, messages.library.dictionary.unknownValue],
+    [
+      messages.library.dictionary.allFilter,
+      messages.library.dictionary.unknownValue,
+    ],
   );
   const approvalFilterOptions = useMemo(
     () =>
@@ -402,18 +411,22 @@ export function LibraryDictionaryBrowser({
     [selectedItems],
   );
   const selectedConfirmableItems = useMemo(
-    () =>
-      selectedItems.filter((item) => item.approval_status !== "confirmed"),
+    () => selectedItems.filter((item) => item.approval_status !== "confirmed"),
     [selectedItems],
   );
-  const canBatchManage = role === "superadmin" || (role === "tutor" && canDirectlyAdd);
+  const canBatchManage =
+    role === "superadmin" || (role === "tutor" && canDirectlyAdd);
   const isBatchActionInProgress =
     isBatchDeleting || isBatchConfirming || isBatchGeneratingMetadata;
   const allVisibleSelected =
     items.length > 0 && items.every((item) => selectedItemIdSet.has(item.id));
   const formatFilterLabel = useCallback(
     (label: string, count: number | undefined) => {
-      if (!showFilterCounts || facetCounts === null || typeof count !== "number") {
+      if (
+        !showFilterCounts ||
+        facetCounts === null ||
+        typeof count !== "number"
+      ) {
         return label;
       }
 
@@ -477,7 +490,14 @@ export function LibraryDictionaryBrowser({
 
       return payload as PassiveLibraryResponse;
     },
-    [approvalFilter, cefrFilter, messages.library.dictionary.requestFailed, posFilter, role, searchQuery],
+    [
+      approvalFilter,
+      cefrFilter,
+      messages.library.dictionary.requestFailed,
+      posFilter,
+      role,
+      searchQuery,
+    ],
   );
 
   const reloadItems = useCallback(async () => {
@@ -568,7 +588,8 @@ export function LibraryDictionaryBrowser({
       const shouldKeepVisible =
         role !== "superadmin"
           ? nextItem.approval_status === "confirmed"
-          : approvalFilter === "all" || approvalFilter === nextItem.approval_status;
+          : approvalFilter === "all" ||
+            approvalFilter === nextItem.approval_status;
 
       setFacetCounts((currentFacetCounts) =>
         updateFacetCountsForApprovalChange(
@@ -581,7 +602,9 @@ export function LibraryDictionaryBrowser({
       startTransition(() => {
         setItems((currentItems) => {
           if (!shouldKeepVisible) {
-            return currentItems.filter((currentItem) => currentItem.id !== item.id);
+            return currentItems.filter(
+              (currentItem) => currentItem.id !== item.id,
+            );
           }
 
           return sortLibraryItemsAlphabetically(
@@ -615,7 +638,9 @@ export function LibraryDictionaryBrowser({
 
       setFacetCounts(nextPage.facetCounts);
       startTransition(() => {
-        setItems((currentItems) => mergeLibraryItems(currentItems, nextPage.items));
+        setItems((currentItems) =>
+          mergeLibraryItems(currentItems, nextPage.items),
+        );
         setHasMore(nextPage.hasMore);
       });
     } catch (error) {
@@ -634,7 +659,13 @@ export function LibraryDictionaryBrowser({
         setIsLoadingMore(false);
       }
     }
-  }, [fetchLibraryPage, hasMore, items.length, messages.library.dictionary.requestFailed, queryKey]);
+  }, [
+    fetchLibraryPage,
+    hasMore,
+    items.length,
+    messages.library.dictionary.requestFailed,
+    queryKey,
+  ]);
 
   const handleSearchSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
@@ -691,7 +722,9 @@ export function LibraryDictionaryBrowser({
       try {
         await approvePassiveVocabularyLibrarySuggestion(suggestion.id);
         toast.success(
-          messages.library.dictionary.approvedSuggestion(suggestion.current_term),
+          messages.library.dictionary.approvedSuggestion(
+            suggestion.current_term,
+          ),
         );
         setReviewItems((current) =>
           current.filter((item) => item.id !== suggestion.id),
@@ -717,7 +750,9 @@ export function LibraryDictionaryBrowser({
       try {
         await rejectPassiveVocabularyLibrarySuggestion(suggestion.id);
         toast.success(
-          messages.library.dictionary.rejectedSuggestion(suggestion.current_term),
+          messages.library.dictionary.rejectedSuggestion(
+            suggestion.current_term,
+          ),
         );
         setReviewItems((current) =>
           current.filter((item) => item.id !== suggestion.id),
@@ -736,7 +771,11 @@ export function LibraryDictionaryBrowser({
   );
 
   const handleDeleteItem = async (item: PassiveVocabularyLibraryAdminItem) => {
-    if (!window.confirm(`Are you sure you want to delete "${item.canonical_term}"?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete "${item.canonical_term}"?`,
+      )
+    ) {
       return;
     }
 
@@ -747,7 +786,9 @@ export function LibraryDictionaryBrowser({
       toast.success(`Deleted "${item.canonical_term}"`);
       removeItemsLocally([item]);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete item");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete item",
+      );
     } finally {
       setUpdatingApprovalItemId(null);
     }
@@ -803,14 +844,17 @@ export function LibraryDictionaryBrowser({
     [applyLocalApprovalStatus],
   );
 
-  const handleSelectVisible = useCallback((checked: boolean) => {
-    if (!checked) {
-      setSelectedItemIds([]);
-      return;
-    }
+  const handleSelectVisible = useCallback(
+    (checked: boolean) => {
+      if (!checked) {
+        setSelectedItemIds([]);
+        return;
+      }
 
-    setSelectedItemIds(items.map((item) => item.id));
-  }, [items]);
+      setSelectedItemIds(items.map((item) => item.id));
+    },
+    [items],
+  );
 
   const handleToggleItemSelection = useCallback(
     (itemId: string, checked: boolean) => {
@@ -840,7 +884,9 @@ export function LibraryDictionaryBrowser({
     setIsBatchDeleting(true);
 
     try {
-      await deletePassiveVocabularyLibraryItems(selectedItems.map((item) => item.id));
+      await deletePassiveVocabularyLibraryItems(
+        selectedItems.map((item) => item.id),
+      );
       toast.success(
         `Deleted ${selectedItems.length} item${selectedItems.length === 1 ? "" : "s"}`,
       );
@@ -923,7 +969,8 @@ export function LibraryDictionaryBrowser({
         );
       } else {
         toast.error(
-          result.firstErrorMessage ?? messages.library.dictionary.bulkRetryFailed,
+          result.firstErrorMessage ??
+            messages.library.dictionary.bulkRetryFailed,
         );
       }
 
@@ -976,12 +1023,14 @@ export function LibraryDictionaryBrowser({
           ) : (
             <div className="grid gap-4 xl:grid-cols-2">
               {reviewItems.map((suggestion) => {
-                const currentTranslation = getPassiveVocabularyUkrainianTranslation(
-                  suggestion.current_attributes,
-                );
-                const proposedTranslation = getPassiveVocabularyUkrainianTranslation(
-                  suggestion.proposed_attributes,
-                );
+                const currentTranslation =
+                  getPassiveVocabularyUkrainianTranslation(
+                    suggestion.current_attributes,
+                  );
+                const proposedTranslation =
+                  getPassiveVocabularyUkrainianTranslation(
+                    suggestion.proposed_attributes,
+                  );
                 const isReviewing = reviewingSuggestionId === suggestion.id;
 
                 return (
@@ -1016,15 +1065,24 @@ export function LibraryDictionaryBrowser({
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             {messages.library.dictionary.currentLabel}
                           </p>
-                          <p className="mt-2 font-medium">{suggestion.current_term}</p>
+                          <p className="mt-2 font-medium">
+                            {suggestion.current_term}
+                          </p>
                           <p className="text-sm text-muted-foreground">
-                            {currentTranslation ?? messages.library.dictionary.noUkrainianTranslation}
+                            {currentTranslation ??
+                              messages.library.dictionary
+                                .noUkrainianTranslation}
                           </p>
                           <p className="mt-2 text-sm text-muted-foreground">
-                            {messages.library.dictionary.cefrLabel}: {suggestion.current_cefr_level ?? messages.library.dictionary.unknownValue}
+                            {messages.library.dictionary.cefrLabel}:{" "}
+                            {suggestion.current_cefr_level ??
+                              messages.library.dictionary.unknownValue}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {messages.library.dictionary.partOfSpeechLabel}: {formatPassiveVocabularyPartOfSpeech(suggestion.current_part_of_speech)}
+                            {messages.library.dictionary.partOfSpeechLabel}:{" "}
+                            {formatPassiveVocabularyPartOfSpeech(
+                              suggestion.current_part_of_speech,
+                            )}
                           </p>
                         </div>
 
@@ -1032,15 +1090,24 @@ export function LibraryDictionaryBrowser({
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             {messages.library.dictionary.proposedLabel}
                           </p>
-                          <p className="mt-2 font-medium">{suggestion.proposed_canonical_term}</p>
+                          <p className="mt-2 font-medium">
+                            {suggestion.proposed_canonical_term}
+                          </p>
                           <p className="text-sm text-muted-foreground">
-                            {proposedTranslation ?? messages.library.dictionary.noUkrainianTranslation}
+                            {proposedTranslation ??
+                              messages.library.dictionary
+                                .noUkrainianTranslation}
                           </p>
                           <p className="mt-2 text-sm text-muted-foreground">
-                            {messages.library.dictionary.cefrLabel}: {suggestion.proposed_cefr_level ?? messages.library.dictionary.unknownValue}
+                            {messages.library.dictionary.cefrLabel}:{" "}
+                            {suggestion.proposed_cefr_level ??
+                              messages.library.dictionary.unknownValue}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {messages.library.dictionary.partOfSpeechLabel}: {formatPassiveVocabularyPartOfSpeech(suggestion.proposed_part_of_speech)}
+                            {messages.library.dictionary.partOfSpeechLabel}:{" "}
+                            {formatPassiveVocabularyPartOfSpeech(
+                              suggestion.proposed_part_of_speech,
+                            )}
                           </p>
                         </div>
                       </div>
@@ -1056,7 +1123,9 @@ export function LibraryDictionaryBrowser({
                           type="button"
                           size="sm"
                           disabled={isReviewing}
-                          onClick={() => void handleApproveSuggestion(suggestion)}
+                          onClick={() =>
+                            void handleApproveSuggestion(suggestion)
+                          }
                         >
                           {isReviewing ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1070,7 +1139,9 @@ export function LibraryDictionaryBrowser({
                           size="sm"
                           variant="outline"
                           disabled={isReviewing}
-                          onClick={() => void handleRejectSuggestion(suggestion)}
+                          onClick={() =>
+                            void handleRejectSuggestion(suggestion)
+                          }
                         >
                           <X className="mr-2 h-4 w-4" />
                           {messages.library.dictionary.rejectAction}
@@ -1091,7 +1162,8 @@ export function LibraryDictionaryBrowser({
           onSubmit={handleSearchSubmit}
         >
           <div className="flex w-full flex-col gap-2 sm:flex-row xl:max-w-2xl">
-            {(role === "superadmin" || (role === "tutor" && canDirectlyAdd)) && (
+            {(role === "superadmin" ||
+              (role === "tutor" && canDirectlyAdd)) && (
               <AddDictionaryItemDialog onAdded={reloadItems} />
             )}
             <Input
@@ -1112,22 +1184,25 @@ export function LibraryDictionaryBrowser({
             </span>
             <span className="text-muted-foreground/40">•</span>
             <span>
-              {messages.library.dictionary.loadedItems(items.length, searchQuery || undefined)}
+              {messages.library.dictionary.loadedItems(
+                items.length,
+                searchQuery || undefined,
+              )}
             </span>
           </div>
         </form>
 
         {canBatchManage && items.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">
-              Selected: {selectedItems.length}
-            </Badge>
+            <Badge variant="outline">Selected: {selectedItems.length}</Badge>
             {role === "superadmin" ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={selectedWordItems.length === 0 || isBatchActionInProgress}
+                disabled={
+                  selectedWordItems.length === 0 || isBatchActionInProgress
+                }
                 onClick={() => void handleBatchGenerateMetadata()}
               >
                 {isBatchGeneratingMetadata ? (
@@ -1142,7 +1217,10 @@ export function LibraryDictionaryBrowser({
               <Button
                 type="button"
                 size="sm"
-                disabled={selectedConfirmableItems.length === 0 || isBatchActionInProgress}
+                disabled={
+                  selectedConfirmableItems.length === 0 ||
+                  isBatchActionInProgress
+                }
                 onClick={() => void handleBatchConfirm()}
               >
                 {isBatchConfirming ? (
@@ -1213,7 +1291,9 @@ export function LibraryDictionaryBrowser({
               <Button
                 key={option.value}
                 type="button"
-                variant={approvalFilter === option.value ? "default" : "outline"}
+                variant={
+                  approvalFilter === option.value ? "default" : "outline"
+                }
                 size="sm"
                 onClick={() => setApprovalFilter(option.value)}
               >
@@ -1239,7 +1319,7 @@ export function LibraryDictionaryBrowser({
                   setPosFilter((current) =>
                     isSelected
                       ? current.filter((p) => p !== pos)
-                      : [...current, pos]
+                      : [...current, pos],
                   );
                 }}
               >
@@ -1271,17 +1351,31 @@ export function LibraryDictionaryBrowser({
                     <TableHead className="w-[56px]">
                       <Checkbox
                         checked={allVisibleSelected}
-                        onCheckedChange={(checked) => handleSelectVisible(checked === true)}
+                        onCheckedChange={(checked) =>
+                          handleSelectVisible(checked === true)
+                        }
                         aria-label="Select all loaded words"
                       />
                     </TableHead>
                   ) : null}
-                  <TableHead>{messages.library.dictionary.termColumn}</TableHead>
-                  <TableHead>{messages.library.dictionary.typeColumn}</TableHead>
-                  <TableHead>{messages.library.dictionary.cefrColumn}</TableHead>
-                  <TableHead>{messages.library.dictionary.partOfSpeechLabel}</TableHead>
-                  <TableHead>{messages.library.dictionary.statusColumn}</TableHead>
-                  <TableHead>{messages.library.dictionary.updatedColumn}</TableHead>
+                  <TableHead>
+                    {messages.library.dictionary.termColumn}
+                  </TableHead>
+                  <TableHead>
+                    {messages.library.dictionary.typeColumn}
+                  </TableHead>
+                  <TableHead>
+                    {messages.library.dictionary.cefrColumn}
+                  </TableHead>
+                  <TableHead>
+                    {messages.library.dictionary.partOfSpeechLabel}
+                  </TableHead>
+                  <TableHead>
+                    {messages.library.dictionary.statusColumn}
+                  </TableHead>
+                  <TableHead>
+                    {messages.library.dictionary.updatedColumn}
+                  </TableHead>
                   <TableHead className="w-[220px] text-right">
                     {messages.library.dictionary.actionsColumn}
                   </TableHead>
@@ -1290,14 +1384,15 @@ export function LibraryDictionaryBrowser({
               <TableBody>
                 {items.map((item) => {
                   const isUpdatingApproval = updatingApprovalItemId === item.id;
-                  const ukrainianTranslation = getPassiveVocabularyUkrainianTranslation(
-                    item.attributes,
-                  );
+                  const ukrainianTranslation =
+                    getPassiveVocabularyUkrainianTranslation(item.attributes);
                   const storedSearchForms = getPassiveVocabularyForms(
                     item.attributes,
                     item.canonical_term,
                   );
-                  const pendingSuggestion = pendingSuggestionByItemId.get(item.id);
+                  const pendingSuggestion = pendingSuggestionByItemId.get(
+                    item.id,
+                  );
 
                   return (
                     <TableRow key={item.id}>
@@ -1306,7 +1401,10 @@ export function LibraryDictionaryBrowser({
                           <Checkbox
                             checked={selectedItemIdSet.has(item.id)}
                             onCheckedChange={(checked) =>
-                              handleToggleItemSelection(item.id, checked === true)
+                              handleToggleItemSelection(
+                                item.id,
+                                checked === true,
+                              )
                             }
                             aria-label={`Select ${item.canonical_term}`}
                           />
@@ -1318,7 +1416,10 @@ export function LibraryDictionaryBrowser({
                             <p className="font-medium">{item.canonical_term}</p>
                             {role === "tutor" && pendingSuggestion ? (
                               <Badge variant="outline">
-                                {messages.library.dictionary.pendingSuggestionBadge}
+                                {
+                                  messages.library.dictionary
+                                    .pendingSuggestionBadge
+                                }
                               </Badge>
                             ) : null}
                           </div>
@@ -1348,7 +1449,9 @@ export function LibraryDictionaryBrowser({
                       <TableCell>{item.item_type}</TableCell>
                       <TableCell>{item.cefr_level ?? "—"}</TableCell>
                       <TableCell>
-                        {formatPassiveVocabularyPartOfSpeech(item.part_of_speech)}
+                        {formatPassiveVocabularyPartOfSpeech(
+                          item.part_of_speech,
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -1389,7 +1492,7 @@ export function LibraryDictionaryBrowser({
                               {item.approval_status !== "rejected" ? (
                                 <Button
                                   type="button"
-                                                    variant="destructive"
+                                  variant="destructive"
                                   size="sm"
                                   disabled={isUpdatingApproval}
                                   onClick={() => void handleRejectItem(item)}

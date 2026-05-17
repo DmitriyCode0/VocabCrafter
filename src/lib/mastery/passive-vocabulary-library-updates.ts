@@ -409,14 +409,15 @@ export async function updatePassiveVocabularyLibraryItem({
           : adjectiveGradability
         : [],
     );
-  const nextAttributesWithVerbTransitivity = withPassiveVocabularyVerbTransitivity(
-    nextAttributesWithAdjectiveGradability,
-    nextPartOfSpeech === "verb"
-      ? verbTransitivity === undefined
-        ? getPassiveVocabularyVerbTransitivity(existingAttributes)
-        : verbTransitivity
-      : [],
-  );
+  const nextAttributesWithVerbTransitivity =
+    withPassiveVocabularyVerbTransitivity(
+      nextAttributesWithAdjectiveGradability,
+      nextPartOfSpeech === "verb"
+        ? verbTransitivity === undefined
+          ? getPassiveVocabularyVerbTransitivity(existingAttributes)
+          : verbTransitivity
+        : [],
+    );
   const nextAttributesWithFollowedBy = withPassiveVocabularyFollowedBy(
     nextAttributesWithVerbTransitivity,
     nextPartOfSpeech === "verb" || nextPartOfSpeech === "adjective"

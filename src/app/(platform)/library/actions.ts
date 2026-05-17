@@ -345,22 +345,30 @@ export async function rejectPassiveVocabularyLibrarySuggestion(
   revalidateLibraryPaths();
 }
 
-export async function addManualPassiveVocabularyLibraryItems(items: Array<{
-  term: string;
-  itemType: "word" | "phrase";
-  partOfSpeech?: PassiveVocabularyPartOfSpeech;
-}>) {
-  const { userId, role, adminClient } = await requireLibraryRole(["tutor", "superadmin"]);
-  
+export async function addManualPassiveVocabularyLibraryItems(
+  items: Array<{
+    term: string;
+    itemType: "word" | "phrase";
+    partOfSpeech?: PassiveVocabularyPartOfSpeech;
+  }>,
+) {
+  const { userId, role, adminClient } = await requireLibraryRole([
+    "tutor",
+    "superadmin",
+  ]);
+
   const canEdit = await canUserEditDictionary(userId, role);
   if (!canEdit) {
-    throw new Error("You do not have permission to directly add words to the dictionary.");
+    throw new Error(
+      "You do not have permission to directly add words to the dictionary.",
+    );
   }
 
   const validItems = items.map((item) => {
     const normalizedTerm = normalizePassiveVocabularyText(item.term);
     if (!normalizedTerm) throw new Error(`Invalid term: ${item.term}`);
-    if (!isEnglishWord(item.term)) throw new Error(`Non-English term not allowed: ${item.term}`);
+    if (!isEnglishWord(item.term))
+      throw new Error(`Non-English term not allowed: ${item.term}`);
     return { ...item, term: item.term.trim(), normalizedTerm };
   });
 
@@ -375,7 +383,9 @@ export async function addManualPassiveVocabularyLibraryItems(items: Array<{
     );
   } catch (error) {
     throw new Error(
-      error instanceof Error ? error.message : "Failed to add manual library items",
+      error instanceof Error
+        ? error.message
+        : "Failed to add manual library items",
     );
   }
 
@@ -383,7 +393,10 @@ export async function addManualPassiveVocabularyLibraryItems(items: Array<{
 }
 
 export async function deletePassiveVocabularyLibraryItem(itemId: string) {
-  const { adminClient, userId, role } = await requireLibraryRole(["tutor", "superadmin"]);
+  const { adminClient, userId, role } = await requireLibraryRole([
+    "tutor",
+    "superadmin",
+  ]);
 
   const canEdit = await canUserEditDictionary(userId, role);
   if (!canEdit) {
@@ -403,7 +416,10 @@ export async function deletePassiveVocabularyLibraryItem(itemId: string) {
 }
 
 export async function deletePassiveVocabularyLibraryItems(itemIds: string[]) {
-  const { adminClient, userId, role } = await requireLibraryRole(["tutor", "superadmin"]);
+  const { adminClient, userId, role } = await requireLibraryRole([
+    "tutor",
+    "superadmin",
+  ]);
 
   const canEdit = await canUserEditDictionary(userId, role);
   if (!canEdit) {

@@ -32,7 +32,10 @@ async function getCurrentLibraryAccess() {
 
   if (!user) {
     return {
-      errorResponse: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      errorResponse: NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      ),
     };
   }
 
@@ -164,7 +167,9 @@ function buildFacetCountsFromRows(input: {
   }
 
   for (const row of input.posRows) {
-    if (PASSIVE_VOCABULARY_PARTS_OF_SPEECH.includes(row.part_of_speech as never)) {
+    if (
+      PASSIVE_VOCABULARY_PARTS_OF_SPEECH.includes(row.part_of_speech as never)
+    ) {
       counts.partOfSpeech[
         row.part_of_speech as (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number]
       ] += 1;
@@ -198,7 +203,8 @@ function toAdminItem(row: {
     canonical_term: row.canonical_term,
     normalized_term: row.normalized_term,
     item_type: row.item_type as PassiveVocabularyItemType,
-    cefr_level: row.cefr_level as PassiveVocabularyLibraryAdminItem["cefr_level"],
+    cefr_level:
+      row.cefr_level as PassiveVocabularyLibraryAdminItem["cefr_level"],
     part_of_speech:
       row.part_of_speech as PassiveVocabularyLibraryAdminItem["part_of_speech"],
     attributes: normalizePassiveVocabularyLibraryAttributes(row.attributes),
@@ -271,8 +277,14 @@ export async function GET(request: NextRequest) {
 
   const searchParams = request.nextUrl.searchParams;
   const offset = parsePositiveInt(searchParams.get("offset"), 0);
-  const requestedLimit = parsePositiveInt(searchParams.get("limit"), DEFAULT_LIMIT);
-  const limit = Math.min(Math.max(requestedLimit || DEFAULT_LIMIT, 1), MAX_LIMIT);
+  const requestedLimit = parsePositiveInt(
+    searchParams.get("limit"),
+    DEFAULT_LIMIT,
+  );
+  const limit = Math.min(
+    Math.max(requestedLimit || DEFAULT_LIMIT, 1),
+    MAX_LIMIT,
+  );
   const searchQuery = searchParams.get("q")?.trim() ?? "";
   const cefrFilter = searchParams.get("cefr")?.trim() ?? "all";
   const posFilter = searchParams.get("pos")?.trim();
@@ -315,7 +327,10 @@ export async function GET(request: NextRequest) {
       query = query.eq("approval_status", approvalFilter);
     }
 
-    if (includeCefrFilter && (cefrFilter === "unknown" || cefrFilter === "null")) {
+    if (
+      includeCefrFilter &&
+      (cefrFilter === "unknown" || cefrFilter === "null")
+    ) {
       query = query.is("cefr_level", null);
     } else if (
       includeCefrFilter &&
@@ -351,7 +366,10 @@ export async function GET(request: NextRequest) {
       query = query.eq("approval_status", approvalFilter);
     }
 
-    if (includeCefrFilter && (cefrFilter === "unknown" || cefrFilter === "null")) {
+    if (
+      includeCefrFilter &&
+      (cefrFilter === "unknown" || cefrFilter === "null")
+    ) {
       query = query.is("cefr_level", null);
     } else if (
       includeCefrFilter &&
@@ -368,12 +386,17 @@ export async function GET(request: NextRequest) {
   };
 
   const loadExactCount = async (
-    query: PromiseLike<{ count: number | null; error: { message?: string } | null }>,
+    query: PromiseLike<{
+      count: number | null;
+      error: { message?: string } | null;
+    }>,
   ) => {
     const { count, error } = await query;
 
     if (error) {
-      throw new Error(error.message ?? "Failed to load passive vocabulary library items");
+      throw new Error(
+        error.message ?? "Failed to load passive vocabulary library items",
+      );
     }
 
     return count ?? 0;
@@ -385,11 +408,17 @@ export async function GET(request: NextRequest) {
     const cefrPromises = [
       loadExactCount(createLibraryCountQuery({ includeCefrFilter: false })),
       loadExactCount(
-        createLibraryCountQuery({ includeCefrFilter: false }).is("cefr_level", null),
+        createLibraryCountQuery({ includeCefrFilter: false }).is(
+          "cefr_level",
+          null,
+        ),
       ),
       ...PASSIVE_VOCABULARY_CEFR_LEVELS.map((level) =>
         loadExactCount(
-          createLibraryCountQuery({ includeCefrFilter: false }).eq("cefr_level", level),
+          createLibraryCountQuery({ includeCefrFilter: false }).eq(
+            "cefr_level",
+            level,
+          ),
         ),
       ),
     ];
@@ -404,10 +433,14 @@ export async function GET(request: NextRequest) {
         ),
       ),
     ];
-    const partOfSpeechPromises = PASSIVE_VOCABULARY_PARTS_OF_SPEECH.map((value) =>
-      loadExactCount(
-        createLibraryCountQuery({ includePosFilter: false }).eq("part_of_speech", value),
-      ),
+    const partOfSpeechPromises = PASSIVE_VOCABULARY_PARTS_OF_SPEECH.map(
+      (value) =>
+        loadExactCount(
+          createLibraryCountQuery({ includePosFilter: false }).eq(
+            "part_of_speech",
+            value,
+          ),
+        ),
     );
 
     const [cefrCounts, approvalCounts, partOfSpeechCounts] = await Promise.all([
@@ -455,16 +488,17 @@ export async function GET(request: NextRequest) {
 
   if (searchQuery) {
     const normalizedSearchQuery = normalizePassiveVocabularyText(searchQuery);
-    const [matchingFormsResult, matchingUkrainianFormsResult] = await Promise.all([
-      access.adminClient
-        .from("passive_vocabulary_library_forms")
-        .select("library_item_id")
-        .eq("normalized_form", normalizedSearchQuery),
-      access.adminClient
-        .from("passive_vocabulary_library_ukrainian_forms")
-        .select("library_item_id")
-        .eq("normalized_form", normalizedSearchQuery),
-    ]);
+    const [matchingFormsResult, matchingUkrainianFormsResult] =
+      await Promise.all([
+        access.adminClient
+          .from("passive_vocabulary_library_forms")
+          .select("library_item_id")
+          .eq("normalized_form", normalizedSearchQuery),
+        access.adminClient
+          .from("passive_vocabulary_library_ukrainian_forms")
+          .select("library_item_id")
+          .eq("normalized_form", normalizedSearchQuery),
+      ]);
 
     if (matchingFormsResult.error || matchingUkrainianFormsResult.error) {
       return NextResponse.json(
@@ -513,9 +547,15 @@ export async function GET(request: NextRequest) {
       const [mergedAdminRows, cefrFacetRows, approvalFacetRows, posFacetRows] =
         await Promise.all([
           loadSearchRows(LIBRARY_ITEM_SELECT_FIELDS),
-          loadSearchRows(LIBRARY_FACET_SELECT_FIELDS, { includeCefrFilter: false }),
-          loadSearchRows(LIBRARY_FACET_SELECT_FIELDS, { includeApprovalFilter: false }),
-          loadSearchRows(LIBRARY_FACET_SELECT_FIELDS, { includePosFilter: false }),
+          loadSearchRows(LIBRARY_FACET_SELECT_FIELDS, {
+            includeCefrFilter: false,
+          }),
+          loadSearchRows(LIBRARY_FACET_SELECT_FIELDS, {
+            includeApprovalFilter: false,
+          }),
+          loadSearchRows(LIBRARY_FACET_SELECT_FIELDS, {
+            includePosFilter: false,
+          }),
         ]);
 
       const mergedItems = asRowArray<PassiveVocabularyLibraryAdminItemRow>(
@@ -563,7 +603,8 @@ export async function GET(request: NextRequest) {
         .slice(0, limit)
         .map(toAdminItem),
       hasMore:
-        asRowArray<PassiveVocabularyLibraryAdminItemRow>(dataResult.data).length > limit,
+        asRowArray<PassiveVocabularyLibraryAdminItemRow>(dataResult.data)
+          .length > limit,
       facetCounts,
       availableCefrLevels: PASSIVE_VOCABULARY_CEFR_LEVELS,
       availablePartsOfSpeech: PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
@@ -610,7 +651,8 @@ export async function POST(request: NextRequest) {
     }
 
     const itemType =
-      rawItem.itemType === "phrase" || inferPassiveVocabularyItemType(trimmedTerm) === "phrase"
+      rawItem.itemType === "phrase" ||
+      inferPassiveVocabularyItemType(trimmedTerm) === "phrase"
         ? "phrase"
         : "word";
     const key = getPassiveVocabularyCompositeKey(normalizedTerm, itemType);
