@@ -11,15 +11,18 @@ import {
   PASSIVE_VOCABULARY_CEFR_LEVELS,
   PASSIVE_VOCABULARY_NOUN_COUNTABILITY,
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
+  PASSIVE_VOCABULARY_VERB_REGULARITY,
   getPassiveVocabularyCanonicalHeadword,
   getPassiveVocabularyEditableForms,
   getPassiveVocabularyEnglishDefinitions,
   getPassiveVocabularyNounCountability,
   getPassiveVocabularyTranscriptions,
   getPassiveVocabularyUkrainianTranslation,
+  getPassiveVocabularyVerbRegularity,
   formatPassiveVocabularyPartOfSpeech,
   type PassiveVocabularyNounCountability,
   type PassiveVocabularyLibraryAttributes,
+  type PassiveVocabularyVerbRegularity,
 } from "@/lib/mastery/passive-vocabulary";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import { Button } from "@/components/ui/button";
@@ -99,11 +102,15 @@ export function EditPassiveLibraryDialog({
   const [nounCountability, setNounCountability] = useState<
     PassiveVocabularyNounCountability[]
   >(getPassiveVocabularyNounCountability(item.attributes));
+  const [verbRegularity, setVerbRegularity] = useState<
+    PassiveVocabularyVerbRegularity[]
+  >(getPassiveVocabularyVerbRegularity(item.attributes));
   const [formsText, setFormsText] = useState(
     getPassiveVocabularyEditableForms(
       item.canonical_term,
       item.part_of_speech as typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH[number] | null,
       item.attributes?.forms,
+      getPassiveVocabularyVerbRegularity(item.attributes),
     )
       .join("\n"),
   );
@@ -122,6 +129,17 @@ export function EditPassiveLibraryDialog({
     englishVariantPreference === "british"
       ? britishTranscription || americanTranscription
       : americanTranscription || britishTranscription;
+  const hasOnlyUncountableNounCountability =
+    currentItem.item_type === "word" &&
+    partOfSpeech === "noun" &&
+    nounCountability.length === 1 &&
+    nounCountability[0] === "uncountable";
+  const supportsEditableForms =
+    currentItem.item_type === "word" &&
+    (partOfSpeech === "adjective" ||
+      partOfSpeech === "verb" ||
+      partOfSpeech === "pronoun" ||
+      (partOfSpeech === "noun" && !hasOnlyUncountableNounCountability));
 
   function resetForm(nextItem: EditablePassiveLibraryItem) {
     const canonicalHeadword = getPassiveVocabularyCanonicalHeadword(
@@ -148,10 +166,15 @@ export function EditPassiveLibraryDialog({
     setAmericanTranscription(nextTranscriptions.american ?? "");
     setBritishTranscription(nextTranscriptions.british ?? "");
     setNounCountability(getPassiveVocabularyNounCountability(nextItem.attributes));
+    const nextVerbRegularity = getPassiveVocabularyVerbRegularity(
+      nextItem.attributes,
+    );
+    setVerbRegularity(nextVerbRegularity);
     const editableForms = getPassiveVocabularyEditableForms(
       canonicalHeadword,
       nextItem.part_of_speech as typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH[number] | null,
       nextItem.attributes?.forms,
+      nextVerbRegularity,
     );
     setFormsText(editableForms.join("\n"));
   }
@@ -168,6 +191,14 @@ export function EditPassiveLibraryDialog({
 
     resetForm(currentItem);
   }, [currentItem, open]);
+
+  useEffect(() => {
+    if (!hasOnlyUncountableNounCountability || formsText.length === 0) {
+      return;
+    }
+
+    setFormsText("");
+  }, [formsText, hasOnlyUncountableNounCountability]);
 
   async function handleGenerateMetadata() {
     if (currentItem.item_type !== "word") {
@@ -235,12 +266,6 @@ export function EditPassiveLibraryDialog({
           .filter(Boolean),
       ),
     );
-    const supportsEditableForms =
-      currentItem.item_type === "word" &&
-      (partOfSpeech === "noun" ||
-        partOfSpeech === "adjective" ||
-        partOfSpeech === "verb" ||
-        partOfSpeech === "pronoun");
     const forms = supportsEditableForms
       ? Array.from(
           new Set(
@@ -254,6 +279,10 @@ export function EditPassiveLibraryDialog({
     const nextNounCountability =
       currentItem.item_type === "word" && partOfSpeech === "noun"
         ? nounCountability
+        : [];
+    const nextVerbRegularity =
+      currentItem.item_type === "word" && partOfSpeech === "verb"
+        ? verbRegularity
         : [];
 
     setIsSaving(true);
@@ -271,6 +300,7 @@ export function EditPassiveLibraryDialog({
           americanTranscription,
           britishTranscription,
           nounCountability: nextNounCountability,
+          verbRegularity: nextVerbRegularity,
           forms,
         }),
       });
@@ -337,6 +367,21 @@ export function EditPassiveLibraryDialog({
         : new Set(current.filter((entry) => entry !== value));
 
       return PASSIVE_VOCABULARY_NOUN_COUNTABILITY.filter((entry) =>
+        nextValues.has(entry),
+      );
+    });
+  }
+
+  function toggleVerbRegularity(
+    value: PassiveVocabularyVerbRegularity,
+    checked: boolean,
+  ) {
+    setVerbRegularity((current) => {
+      const nextValues = checked
+        ? new Set<PassiveVocabularyVerbRegularity>([...current, value])
+        : new Set(current.filter((entry) => entry !== value));
+
+      return PASSIVE_VOCABULARY_VERB_REGULARITY.filter((entry) =>
         nextValues.has(entry),
       );
     });
@@ -501,11 +546,34 @@ export function EditPassiveLibraryDialog({
             </div>
           ) : null}
 
-          {(currentItem.item_type === "word" &&
-            (partOfSpeech === "noun" ||
-              partOfSpeech === "adjective" ||
-              partOfSpeech === "verb" ||
-              partOfSpeech === "pronoun")) ? (
+          {currentItem.item_type === "word" && partOfSpeech === "verb" ? (
+            <div className="space-y-2 sm:col-span-2">
+              <div className="flex flex-wrap gap-4 pt-1">
+                {PASSIVE_VOCABULARY_VERB_REGULARITY.map((value) => {
+                  const id = `library-verb-regularity-${item.id}-${value}`;
+
+                  return (
+                    <label
+                      key={value}
+                      htmlFor={id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Checkbox
+                        id={id}
+                        checked={verbRegularity.includes(value)}
+                        onCheckedChange={(checked) =>
+                          toggleVerbRegularity(value, checked === true)
+                        }
+                      />
+                      <span className="capitalize">{value}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {supportsEditableForms ? (
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor={`library-forms-${item.id}`}>
               Editable forms

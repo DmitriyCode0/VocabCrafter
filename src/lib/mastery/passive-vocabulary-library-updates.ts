@@ -6,6 +6,7 @@ import {
   getPassiveVocabularyEnglishDefinitions,
   getPassiveVocabularyForms,
   getPassiveVocabularyNounCountability,
+  getPassiveVocabularyVerbRegularity,
   getPassiveVocabularyTranscriptions,
   getPassiveVocabularyUkrainianTranslation,
   normalizePassiveVocabularyLibraryAttributes,
@@ -14,12 +15,16 @@ import {
   withPassiveVocabularyForms,
   withPassiveVocabularyNounCountability,
   withPassiveVocabularyTranscriptions,
+  withPassiveVocabularyUkrainianSearchForms,
   withPassiveVocabularyUkrainianTranslation,
+  withPassiveVocabularyVerbRegularity,
   type PassiveVocabularyLibraryAttributes,
   type PassiveVocabularyLibraryCefrLevel,
   type PassiveVocabularyNounCountability,
   type PassiveVocabularyPartOfSpeech,
+  type PassiveVocabularyVerbRegularity,
 } from "@/lib/mastery/passive-vocabulary";
+import { syncPassiveVocabularyLibraryUkrainianForms } from "@/lib/mastery/passive-vocabulary-library-ukrainian-forms";
 
 type AdminClient = SupabaseClient<Database>;
 type PassiveVocabularyLibraryRow =
@@ -38,6 +43,7 @@ interface UpdatePassiveVocabularyLibraryItemInput {
   britishTranscription?: string | null;
   transcription?: string | null;
   nounCountability?: PassiveVocabularyNounCountability[] | null;
+  verbRegularity?: PassiveVocabularyVerbRegularity[] | null;
   forms?: string[] | null;
   attributes?: PassiveVocabularyLibraryAttributes | null;
 }
@@ -254,6 +260,7 @@ export async function updatePassiveVocabularyLibraryItem({
   britishTranscription,
   transcription,
   nounCountability,
+  verbRegularity,
   forms,
   attributes,
 }: UpdatePassiveVocabularyLibraryItemInput): Promise<PassiveVocabularyLibraryRow> {
@@ -288,17 +295,40 @@ export async function updatePassiveVocabularyLibraryItem({
   const existingAttributes = normalizePassiveVocabularyLibraryAttributes(
     existingItem.attributes,
   );
-  const nextAttributes = withPassiveVocabularyUkrainianTranslation(
+  const normalizedInputAttributes =
     attributes === undefined || attributes === null
-      ? existingAttributes
-      : normalizePassiveVocabularyLibraryAttributes(attributes),
+      ? null
+      : normalizePassiveVocabularyLibraryAttributes(attributes);
+  const nextUkrainianTranslation =
     ukrainianTranslation === undefined
       ? getPassiveVocabularyUkrainianTranslation(existingAttributes)
-      : ukrainianTranslation,
+      : ukrainianTranslation;
+  const translationChanged =
+    nextUkrainianTranslation !==
+    getPassiveVocabularyUkrainianTranslation(existingAttributes);
+  const nextAttributeSeed = {
+    ...(normalizedInputAttributes ?? existingAttributes),
+  };
+
+  if (translationChanged && !normalizedInputAttributes?.ukrainianSearchForms) {
+    delete nextAttributeSeed.ukrainianSearchForms;
+  }
+
+  const nextAttributes = withPassiveVocabularyUkrainianTranslation(
+    nextAttributeSeed,
+    nextUkrainianTranslation,
   );
+  const nextAttributesWithUkrainianSearchForms =
+    normalizedInputAttributes?.ukrainianSearchForms
+      ? withPassiveVocabularyUkrainianSearchForms(
+          nextAttributes,
+          normalizedInputAttributes.ukrainianSearchForms,
+          nextUkrainianTranslation,
+        )
+      : nextAttributes;
   const nextAttributesWithEnglishDefinitions =
     withPassiveVocabularyEnglishDefinitions(
-      nextAttributes,
+      nextAttributesWithUkrainianSearchForms,
       englishDefinitions === undefined
         ? getPassiveVocabularyEnglishDefinitions(existingAttributes)
         : englishDefinitions,
@@ -339,6 +369,14 @@ export async function updatePassiveVocabularyLibraryItem({
         : nounCountability
       : [],
   );
+  const nextAttributesWithVerbRegularity = withPassiveVocabularyVerbRegularity(
+    nextAttributesWithNounCountability,
+    nextPartOfSpeech === "verb"
+      ? verbRegularity === undefined
+        ? getPassiveVocabularyVerbRegularity(existingAttributes)
+        : verbRegularity
+      : [],
+  );
   const canonicalTerm = formatPassiveVocabularyCanonicalTerm(
     canonicalHeadword,
     nextPartOfSpeech,
@@ -350,7 +388,7 @@ export async function updatePassiveVocabularyLibraryItem({
       ? getPassiveVocabularyForms(existingAttributes, canonicalHeadword)
       : forms;
   const nextAttributesWithForms = withPassiveVocabularyForms(
-    nextAttributesWithNounCountability,
+    nextAttributesWithVerbRegularity,
     explicitForms,
     canonicalHeadword,
   );
@@ -403,6 +441,13 @@ export async function updatePassiveVocabularyLibraryItem({
       nextAttributesWithForms,
       canonicalHeadword,
     ),
+    nowIso,
+  });
+
+  await syncPassiveVocabularyLibraryUkrainianForms({
+    adminClient,
+    libraryItemId,
+    attributes: nextAttributesWithForms,
     nowIso,
   });
 

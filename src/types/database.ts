@@ -1345,6 +1345,41 @@ export interface Database {
           },
         ];
       };
+      passive_vocabulary_library_ukrainian_forms: {
+        Row: {
+          id: string;
+          library_item_id: string;
+          form_term: string;
+          normalized_form: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          library_item_id: string;
+          form_term: string;
+          normalized_form: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          library_item_id?: string;
+          form_term?: string;
+          normalized_form?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "passive_vocabulary_library_ukrainian_forms_library_item_id_fkey";
+            columns: ["library_item_id"];
+            isOneToOne: false;
+            referencedRelation: "passive_vocabulary_library";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       passive_vocabulary_library_suggestions: {
         Row: {
           id: string;

@@ -128,7 +128,10 @@ export default async function LibraryDictionaryPage() {
     .select(
       "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, reviewed_at, updated_at",
     )
-    .order("updated_at", { ascending: false })
+    .order("normalized_term", { ascending: true })
+    .order("canonical_term", { ascending: true })
+    .order("item_type", { ascending: true })
+    .order("id", { ascending: true })
     .range(0, LIBRARY_PAGE_SIZE - 1);
 
   if (role !== "superadmin") {

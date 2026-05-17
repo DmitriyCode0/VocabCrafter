@@ -11,6 +11,7 @@ import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
 import { StudentProgressOverviewCards } from "@/components/progress/student-progress-overview-cards";
 import { StudentResultsSummary } from "@/components/progress/student-results-summary";
 import { TutorTimeAdjustmentCard } from "@/components/progress/tutor-time-adjustment-card";
+import { TutorStudentVocabularyDistribution } from "@/components/progress/tutor-student-vocabulary-distribution";
 import { getAppMessages } from "@/lib/i18n/messages";
 import type { StudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 
@@ -84,6 +85,11 @@ export function TutorStudentResultsPanel({
             cefrLevel={snapshot.profile.cefrLevel}
             grammarNotice={snapshot.grammar.betaNotice}
             grammarTopics={snapshot.grammarTopicMastery}
+          />
+
+          <TutorStudentVocabularyDistribution
+            activeCounts={snapshot.activeSignals.cefrCounts}
+            passiveCounts={snapshot.passiveSignals.cefrCounts}
           />
 
           <StudentProgressOverviewCards snapshot={snapshot} />

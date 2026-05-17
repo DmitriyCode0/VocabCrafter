@@ -5,6 +5,7 @@ import {
   PASSIVE_VOCABULARY_CEFR_LEVELS,
   PASSIVE_VOCABULARY_NOUN_COUNTABILITY,
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
+  PASSIVE_VOCABULARY_VERB_REGULARITY,
   normalizePassiveVocabularyLibraryAttributes,
 } from "@/lib/mastery/passive-vocabulary";
 import { updatePassiveVocabularyLibraryItem } from "@/lib/mastery/passive-vocabulary-library-updates";
@@ -45,6 +46,10 @@ const updatePassiveLibraryItemSchema = z.object({
   transcription: passiveVocabularyOptionalTextSchema,
   nounCountability: z
     .array(z.enum(PASSIVE_VOCABULARY_NOUN_COUNTABILITY))
+    .max(2)
+    .optional(),
+  verbRegularity: z
+    .array(z.enum(PASSIVE_VOCABULARY_VERB_REGULARITY))
     .max(2)
     .optional(),
   forms: z.array(z.string().trim().min(1).max(200)).max(50).optional(),
@@ -115,6 +120,7 @@ export async function PATCH(
       britishTranscription: parsed.data.britishTranscription,
       transcription: parsed.data.transcription,
       nounCountability: parsed.data.nounCountability,
+      verbRegularity: parsed.data.verbRegularity,
       forms: parsed.data.forms,
       attributes: normalizePassiveVocabularyLibraryAttributes(
         parsed.data.attributes,

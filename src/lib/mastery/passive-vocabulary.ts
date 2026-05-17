@@ -41,6 +41,10 @@ export const PASSIVE_VOCABULARY_NOUN_COUNTABILITY = [
   "countable",
   "uncountable",
 ] as const;
+export const PASSIVE_VOCABULARY_VERB_REGULARITY = [
+  "regular",
+  "irregular",
+] as const;
 
 export type PassiveVocabularyItemType =
   (typeof PASSIVE_VOCABULARY_ITEM_TYPES)[number];
@@ -52,6 +56,8 @@ export type PassiveVocabularyPartOfSpeech =
   (typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH)[number];
 export type PassiveVocabularyNounCountability =
   (typeof PASSIVE_VOCABULARY_NOUN_COUNTABILITY)[number];
+export type PassiveVocabularyVerbRegularity =
+  (typeof PASSIVE_VOCABULARY_VERB_REGULARITY)[number];
 
 export interface PassiveVocabularyEditableFormValues {
   plural: string | null;
@@ -77,12 +83,14 @@ export interface PassiveVocabularyLibraryAttributes extends Record<
   Json | undefined
 > {
   ukrainianTranslation?: string | null;
+  ukrainianSearchForms?: string[];
   englishDefinition?: string | null;
   englishDefinitions?: string[];
   transcription?: string | null;
   americanTranscription?: string | null;
   britishTranscription?: string | null;
   nounCountability?: PassiveVocabularyNounCountability[];
+  verbRegularity?: PassiveVocabularyVerbRegularity[];
   forms?: string[];
 }
 
@@ -165,6 +173,85 @@ function normalizePassiveVocabularyNounCountability(
   );
 }
 
+function addPassiveVocabularyVerbRegularityValue(
+  values: Set<PassiveVocabularyVerbRegularity>,
+  candidate: unknown,
+) {
+  const normalizedCandidate = normalizePassiveVocabularyText(
+    String(candidate ?? ""),
+  );
+
+  if (!normalizedCandidate) {
+    return;
+  }
+
+  if (
+    normalizedCandidate === "both" ||
+    normalizedCandidate === "regular and irregular" ||
+    normalizedCandidate === "irregular and regular" ||
+    normalizedCandidate === "regular/irregular" ||
+    normalizedCandidate === "irregular/regular"
+  ) {
+    values.add("regular");
+    values.add("irregular");
+    return;
+  }
+
+  if (
+    PASSIVE_VOCABULARY_VERB_REGULARITY.includes(
+      normalizedCandidate as PassiveVocabularyVerbRegularity,
+    )
+  ) {
+    values.add(normalizedCandidate as PassiveVocabularyVerbRegularity);
+  }
+}
+
+function normalizePassiveVocabularyVerbRegularity(
+  value: unknown,
+  flags?: {
+    regular?: unknown;
+    irregular?: unknown;
+  },
+) {
+  const values = new Set<PassiveVocabularyVerbRegularity>();
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      addPassiveVocabularyVerbRegularityValue(values, entry);
+    }
+  } else if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    if (record.regular === true) {
+      values.add("regular");
+    }
+
+    if (record.irregular === true) {
+      values.add("irregular");
+    }
+
+    if (Array.isArray(record.values)) {
+      for (const entry of record.values) {
+        addPassiveVocabularyVerbRegularityValue(values, entry);
+      }
+    }
+  } else {
+    addPassiveVocabularyVerbRegularityValue(values, value);
+  }
+
+  if (flags?.regular === true) {
+    values.add("regular");
+  }
+
+  if (flags?.irregular === true) {
+    values.add("irregular");
+  }
+
+  return PASSIVE_VOCABULARY_VERB_REGULARITY.filter((entry) =>
+    values.has(entry),
+  );
+}
+
 function normalizePassiveVocabularyManagedForms(
   value: unknown,
   canonicalTerm?: string | null,
@@ -201,6 +288,44 @@ function normalizePassiveVocabularyManagedForms(
   return Array.from(forms.values());
 }
 
+function normalizePassiveVocabularyUkrainianSearchForms(
+  value: unknown,
+  ukrainianTranslation?: string | null,
+) {
+  const forms = new Map<string, string>();
+
+  const addCandidate = (candidate: unknown) => {
+    const normalizedCandidate = normalizePassiveVocabularyAttributeText(candidate);
+
+    if (!normalizedCandidate) {
+      return;
+    }
+
+    for (const segment of normalizedCandidate.split(/[\n,;/]+/)) {
+      const normalizedSegment = normalizePassiveVocabularyAttributeText(segment);
+      const normalizedLookupSegment = normalizePassiveVocabularyText(
+        normalizedSegment ?? "",
+      );
+
+      if (!normalizedSegment || !normalizedLookupSegment || forms.has(normalizedLookupSegment)) {
+        continue;
+      }
+
+      forms.set(normalizedLookupSegment, normalizedSegment);
+    }
+  };
+
+  addCandidate(ukrainianTranslation);
+
+  if (Array.isArray(value)) {
+    for (const form of value) {
+      addCandidate(form);
+    }
+  }
+
+  return Array.from(forms.values()).slice(0, 24);
+}
+
 function normalizePassiveVocabularyAttributeText(value: unknown) {
   if (typeof value !== "string") {
     return null;
@@ -220,6 +345,10 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
   } as PassiveVocabularyLibraryAttributes;
   const ukrainianTranslation = normalizePassiveVocabularyAttributeText(
     attributes.ukrainianTranslation ?? attributes.ukrainian_translation,
+  );
+  const ukrainianSearchForms = normalizePassiveVocabularyUkrainianSearchForms(
+    attributes.ukrainianSearchForms ?? attributes.ukrainian_search_forms,
+    ukrainianTranslation,
   );
   const englishDefinition = normalizePassiveVocabularyAttributeText(
     attributes.englishDefinition ?? attributes.english_definition,
@@ -261,6 +390,17 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
       uncountable: attributes.uncountable,
     },
   );
+  const verbRegularity = normalizePassiveVocabularyVerbRegularity(
+    attributes.verbRegularity ??
+      attributes.verb_regularity ??
+      attributes.regularity ??
+      attributes.verbType ??
+      attributes.verb_type,
+    {
+      regular: attributes.regular,
+      irregular: attributes.irregular,
+    },
+  );
   const forms = normalizePassiveVocabularyManagedForms(
     attributes.forms,
     typeof attributes.canonicalTerm === "string"
@@ -269,6 +409,7 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
   );
 
   delete attributes.ukrainian_translation;
+  delete attributes.ukrainian_search_forms;
   delete attributes.english_definition;
   delete attributes.english_definitions;
   delete attributes.ipa_transcription;
@@ -284,11 +425,23 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
   delete attributes.countability;
   delete attributes.countable;
   delete attributes.uncountable;
+  delete attributes.verb_regularity;
+  delete attributes.regularity;
+  delete attributes.verbType;
+  delete attributes.verb_type;
+  delete attributes.regular;
+  delete attributes.irregular;
 
   if (ukrainianTranslation) {
     attributes.ukrainianTranslation = ukrainianTranslation;
   } else {
     delete attributes.ukrainianTranslation;
+  }
+
+  if (ukrainianSearchForms.length > 0) {
+    attributes.ukrainianSearchForms = ukrainianSearchForms;
+  } else {
+    delete attributes.ukrainianSearchForms;
   }
 
   if (englishDefinitions.length > 0) {
@@ -326,6 +479,12 @@ export function normalizePassiveVocabularyLibraryAttributes(value: unknown) {
     delete attributes.nounCountability;
   }
 
+  if (verbRegularity.length > 0) {
+    attributes.verbRegularity = verbRegularity;
+  } else {
+    delete attributes.verbRegularity;
+  }
+
   if (forms.length > 0) {
     attributes.forms = forms;
   } else {
@@ -357,6 +516,51 @@ export function withPassiveVocabularyUkrainianTranslation(
     nextAttributes.ukrainianTranslation = normalizedTranslation;
   } else {
     delete nextAttributes.ukrainianTranslation;
+  }
+
+  const normalizedSearchForms = normalizePassiveVocabularyUkrainianSearchForms(
+    nextAttributes.ukrainianSearchForms,
+    normalizedTranslation,
+  );
+
+  if (normalizedSearchForms.length > 0) {
+    nextAttributes.ukrainianSearchForms = normalizedSearchForms;
+  } else {
+    delete nextAttributes.ukrainianSearchForms;
+  }
+
+  return nextAttributes;
+}
+
+export function getPassiveVocabularyUkrainianSearchForms(
+  attributes?: PassiveVocabularyLibraryAttributes | null,
+  ukrainianTranslation?: string | null,
+) {
+  const normalizedAttributes =
+    normalizePassiveVocabularyLibraryAttributes(attributes);
+
+  return normalizePassiveVocabularyUkrainianSearchForms(
+    normalizedAttributes.ukrainianSearchForms,
+    ukrainianTranslation ?? normalizedAttributes.ukrainianTranslation ?? null,
+  );
+}
+
+export function withPassiveVocabularyUkrainianSearchForms(
+  attributes: PassiveVocabularyLibraryAttributes | null | undefined,
+  ukrainianSearchForms: string[] | null | undefined,
+  ukrainianTranslation?: string | null,
+) {
+  const nextAttributes =
+    normalizePassiveVocabularyLibraryAttributes(attributes);
+  const normalizedSearchForms = normalizePassiveVocabularyUkrainianSearchForms(
+    ukrainianSearchForms,
+    ukrainianTranslation ?? nextAttributes.ukrainianTranslation ?? null,
+  );
+
+  if (normalizedSearchForms.length > 0) {
+    nextAttributes.ukrainianSearchForms = normalizedSearchForms;
+  } else {
+    delete nextAttributes.ukrainianSearchForms;
   }
 
   return nextAttributes;
@@ -509,6 +713,36 @@ export function withPassiveVocabularyNounCountability(
   return nextAttributes;
 }
 
+export function getPassiveVocabularyVerbRegularity(
+  attributes?: PassiveVocabularyLibraryAttributes | null,
+) {
+  return normalizePassiveVocabularyVerbRegularity(
+    normalizePassiveVocabularyLibraryAttributes(attributes).verbRegularity,
+  );
+}
+
+export function withPassiveVocabularyVerbRegularity(
+  attributes: PassiveVocabularyLibraryAttributes | null | undefined,
+  verbRegularity:
+    | PassiveVocabularyVerbRegularity[]
+    | null
+    | undefined,
+) {
+  const nextAttributes =
+    normalizePassiveVocabularyLibraryAttributes(attributes);
+  const normalizedVerbRegularity = normalizePassiveVocabularyVerbRegularity(
+    verbRegularity,
+  );
+
+  if (normalizedVerbRegularity.length > 0) {
+    nextAttributes.verbRegularity = normalizedVerbRegularity;
+  } else {
+    delete nextAttributes.verbRegularity;
+  }
+
+  return nextAttributes;
+}
+
 export function getPassiveVocabularyForms(
   attributes?: PassiveVocabularyLibraryAttributes | null,
   canonicalTerm?: string | null,
@@ -546,12 +780,14 @@ export function getPassiveVocabularyCustomAttributes(
   const customAttributes =
     normalizePassiveVocabularyLibraryAttributes(attributes);
   delete customAttributes.ukrainianTranslation;
+  delete customAttributes.ukrainianSearchForms;
   delete customAttributes.englishDefinition;
   delete customAttributes.englishDefinitions;
   delete customAttributes.transcription;
   delete customAttributes.americanTranscription;
   delete customAttributes.britishTranscription;
   delete customAttributes.nounCountability;
+  delete customAttributes.verbRegularity;
   delete customAttributes.forms;
 
   return customAttributes;
@@ -965,6 +1201,7 @@ export function getPassiveVocabularyEditableFormValues(
   value: string,
   partOfSpeech?: PassiveVocabularyPartOfSpeech | null,
   explicitForms?: string[] | null,
+  verbRegularity?: PassiveVocabularyVerbRegularity[] | null,
 ): PassiveVocabularyEditableFormValues {
   const headword = getPassiveVocabularyCanonicalHeadword(value, partOfSpeech);
   const normalizedText = normalizePassiveVocabularyText(headword);
@@ -1074,8 +1311,15 @@ export function getPassiveVocabularyEditableFormValues(
     return emptyValues;
   }
 
-  const irregularVariants =
-    IRREGULAR_PASSIVE_VOCABULARY_FORM_MAP.get(normalizedText) ?? [];
+  const normalizedVerbRegularity = normalizePassiveVocabularyVerbRegularity(
+    verbRegularity,
+  );
+  const shouldForceRegularForms =
+    normalizedVerbRegularity.includes("regular") &&
+    !normalizedVerbRegularity.includes("irregular");
+  const irregularVariants = shouldForceRegularForms
+    ? []
+    : (IRREGULAR_PASSIVE_VOCABULARY_FORM_MAP.get(normalizedText) ?? []);
   const regularThirdPersonSingular =
     buildRegularThirdPersonSingularForm(normalizedText);
   const regularPast = buildRegularPastForms(normalizedText)[0] ?? null;
@@ -1164,9 +1408,15 @@ export function getPassiveVocabularyEditableForms(
   value: string,
   partOfSpeech?: PassiveVocabularyPartOfSpeech | null,
   explicitForms?: string[] | null,
+  verbRegularity?: PassiveVocabularyVerbRegularity[] | null,
 ) {
   return getPassiveVocabularyUniqueForms(
-    getPassiveVocabularyEditableFormValues(value, partOfSpeech, explicitForms),
+    getPassiveVocabularyEditableFormValues(
+      value,
+      partOfSpeech,
+      explicitForms,
+      verbRegularity,
+    ),
     value,
   );
 }
@@ -1174,10 +1424,13 @@ export function getPassiveVocabularyEditableForms(
 export function getPassiveVocabularyGeneratedForms(
   value: string,
   partOfSpeech?: PassiveVocabularyPartOfSpeech | null,
+  verbRegularity?: PassiveVocabularyVerbRegularity[] | null,
 ) {
   return getPassiveVocabularyEditableForms(
     value,
     partOfSpeech,
+    undefined,
+    verbRegularity,
   );
 }
 
@@ -1198,7 +1451,12 @@ function roundRecognitionWeight(value: number) {
 }
 
 export function normalizePassiveVocabularyText(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
+  return value
+    .normalize("NFC")
+    .replace(/[’ʼ`]/g, "'")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 }
 
 function getPassiveVocabularyIndefiniteArticle(value: string) {

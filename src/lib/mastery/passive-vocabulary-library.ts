@@ -16,6 +16,7 @@ import {
   formatPassiveVocabularyCanonicalTerm,
   getPassiveVocabularyCanonicalHeadword,
   getPassiveVocabularyCompositeKey,
+  getPassiveVocabularyForms,
   getPassiveVocabularyGeneratedForms,
   getPassiveVocabularyLookupCandidates,
   getPassiveVocabularyNounCountability,
@@ -27,6 +28,7 @@ import {
   type PassiveVocabularyLibraryCefrLevel,
   type PassiveVocabularyPartOfSpeech,
 } from "./passive-vocabulary";
+import { syncPassiveVocabularyLibraryUkrainianForms } from "./passive-vocabulary-library-ukrainian-forms";
 export { syncConfirmedActiveVocabularyToPassiveEvidence } from "./active-vocabulary-evidence";
 
 type AdminClient = SupabaseClient<Database>;
@@ -297,6 +299,7 @@ async function syncPassiveVocabularyLibraryForms({
   oldNormalizedTerm,
   canonicalTerm,
   canonicalNormalizedTerm,
+  explicitForms,
   nowIso,
 }: {
   adminClient: AdminClient;
@@ -307,6 +310,7 @@ async function syncPassiveVocabularyLibraryForms({
   oldNormalizedTerm: string;
   canonicalTerm: string;
   canonicalNormalizedTerm: string;
+  explicitForms: string[];
   nowIso: string;
 }) {
   const { error: resetError } = await adminClient
@@ -365,22 +369,45 @@ async function syncPassiveVocabularyLibraryForms({
     canonicalTerm,
     partOfSpeech,
   );
-  const isDisambiguatedCanonical =
-    normalizePassiveVocabularyText(canonicalHeadword) !== canonicalNormalizedTerm;
-
-  if (isDisambiguatedCanonical) {
-    return;
-  }
 
   for (const generatedForm of getPassiveVocabularyGeneratedForms(
     canonicalHeadword,
     partOfSpeech,
   )) {
+    const normalizedGeneratedForm = normalizePassiveVocabularyText(generatedForm);
+
+    if (
+      !normalizedGeneratedForm ||
+      normalizedGeneratedForm === canonicalNormalizedTerm
+    ) {
+      continue;
+    }
+
     await upsertPassiveVocabularyLibraryAlias({
       adminClient,
       libraryItemId,
       formTerm: generatedForm,
-      normalizedForm: generatedForm,
+      normalizedForm: normalizedGeneratedForm,
+      itemType,
+      nowIso,
+    });
+  }
+
+  for (const explicitForm of explicitForms) {
+    const normalizedExplicitForm = normalizePassiveVocabularyText(explicitForm);
+
+    if (
+      !normalizedExplicitForm ||
+      normalizedExplicitForm === canonicalNormalizedTerm
+    ) {
+      continue;
+    }
+
+    await upsertPassiveVocabularyLibraryAlias({
+      adminClient,
+      libraryItemId,
+      formTerm: explicitForm,
+      normalizedForm: normalizedExplicitForm,
       itemType,
       nowIso,
     });
@@ -540,6 +567,13 @@ async function updatePassiveVocabularyLibraryItem({
     throw new Error("Failed to update passive vocabulary library item");
   }
 
+  await syncPassiveVocabularyLibraryUkrainianForms({
+    adminClient,
+    libraryItemId,
+    attributes: asAttributes(data.attributes),
+    nowIso,
+  });
+
   return data as LibraryRow;
 }
 
@@ -659,8 +693,12 @@ async function enrichPassiveVocabularyWords(
       "- cefrLevel as the estimated standalone word difficulty for learners",
       "- partOfSpeech using one of: noun, verb, modal verb, auxiliary, adjective, adverb, pronoun, preposition, conjunction, determiner, interjection, other",
       "- ukrainianTranslation as a concise natural Ukrainian dictionary equivalent",
+      "- attributes may also include ukrainianSearchForms as an array of up to 8 Ukrainian lookup forms, including the main translation plus close inflected or aspectual variants that help reverse lookup from Ukrainian to English",
       "- attributes may include americanTranscription and britishTranscription as IPA plus englishDefinitions as an array of up to 3 concise English meanings when you are confident",
       'For nouns, attributes may also include nounCountability as an array containing "countable", "uncountable", or both when you are confident.',
+      'For verbs, attributes may also include verbRegularity as an array containing "regular", "irregular", or both when you are confident.',
+      'If a verb is irregular or has a common irregular variant, include attributes.forms in this exact order: V2, V3, V-ing, V-(e)s.',
+      'For irregular verbs, make sure V2 and V3 are correct learner-facing forms for the intended sense of the verb.',
       "Use modal verb for can, could, may, might, must, shall, should, will, and would.",
       "Use auxiliary when the entry is best labeled as a helping verb rather than a main verb.",
       "Prefer the most common everyday learner-friendly sense, not niche technical/legal/financial/sports senses unless the word is primarily used that way.",
@@ -670,7 +708,7 @@ async function enrichPassiveVocabularyWords(
       "Examples: tables -> table, works -> work, studies -> study, worked -> work, working -> work.",
       "Never translate the word. Never return multiple words as the canonical form for a single-word input.",
       "If the word is already canonical, keep it unchanged.",
-      'Respond with JSON in this exact shape: { "items": [ { "requestedTerm": "...", "canonicalTerm": "...", "cefrLevel": "A1", "partOfSpeech": "noun", "ukrainianTranslation": "...", "attributes": { "americanTranscription": "/.../", "britishTranscription": "/.../", "englishDefinitions": ["..."], "nounCountability": ["countable"] } } ] }.',
+      'Respond with JSON in this exact shape: { "items": [ { "requestedTerm": "...", "canonicalTerm": "...", "cefrLevel": "A1", "partOfSpeech": "noun", "ukrainianTranslation": "...", "attributes": { "ukrainianSearchForms": ["втрачати", "втратити", "втратив", "втратила"], "americanTranscription": "/.../", "britishTranscription": "/.../", "englishDefinitions": ["..."], "nounCountability": ["countable"], "verbRegularity": ["irregular"], "forms": ["hung", "hung", "hanging", "hangs"] } } ] }.',
       "Requested terms:",
       ...batch.map((input) =>
         input.partOfSpeech
@@ -881,6 +919,27 @@ export async function createPassiveVocabularyLibraryEntries(
       throw new Error("Failed to save passive vocabulary library forms");
     }
   }
+
+  await Promise.all(
+    Array.from(libraryGroups.values()).flatMap((group) => {
+      const libraryItemId = libraryIdByGroupKey.get(
+        getLookupKey(group.canonicalNormalizedTerm, group.itemType),
+      );
+
+      if (!libraryItemId) {
+        return [];
+      }
+
+      return [
+        syncPassiveVocabularyLibraryUkrainianForms({
+          adminClient,
+          libraryItemId,
+          attributes: group.attributes,
+          nowIso,
+        }),
+      ];
+    }),
+  );
 }
 
 export async function resolvePassiveVocabularyLibraryItems({
@@ -1138,6 +1197,10 @@ export async function reEnrichPassiveVocabularyLibraryItem({
       oldNormalizedTerm: existingCanonicalRow.normalized_term,
       canonicalTerm,
       canonicalNormalizedTerm,
+      explicitForms: getPassiveVocabularyForms(
+        enrichment.attributes,
+        enrichmentCanonicalHeadword,
+      ),
       nowIso,
     });
 
@@ -1204,6 +1267,10 @@ export async function reEnrichPassiveVocabularyLibraryItem({
     oldNormalizedTerm: existingItem.normalized_term,
     canonicalTerm,
     canonicalNormalizedTerm,
+    explicitForms: getPassiveVocabularyForms(
+      enrichment.attributes,
+      enrichmentCanonicalHeadword,
+    ),
     nowIso,
   });
 

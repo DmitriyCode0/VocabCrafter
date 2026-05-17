@@ -93,6 +93,10 @@ type LibraryCefrFacetValue =
   | "all"
   | "unknown"
   | (typeof PASSIVE_VOCABULARY_CEFR_LEVELS)[number];
+type PassiveVocabularyLibrarySortableRow = Pick<
+  PassiveVocabularyLibraryAdminItemRow,
+  "id" | "canonical_term" | "normalized_term" | "item_type"
+>;
 
 interface PassiveLibraryFacetRow {
   id: string;
@@ -210,12 +214,49 @@ function toAdminItem(row: {
 
 type PassiveVocabularyLibraryAdminItemRow = Parameters<typeof toAdminItem>[0];
 
+function compareLibraryRowsAlphabetically(
+  left: PassiveVocabularyLibrarySortableRow,
+  right: PassiveVocabularyLibrarySortableRow,
+) {
+  const normalizedTermComparison = left.normalized_term.localeCompare(
+    right.normalized_term,
+    undefined,
+    { numeric: true, sensitivity: "base" },
+  );
+
+  if (normalizedTermComparison !== 0) {
+    return normalizedTermComparison;
+  }
+
+  const canonicalTermComparison = left.canonical_term.localeCompare(
+    right.canonical_term,
+    undefined,
+    { numeric: true, sensitivity: "base" },
+  );
+
+  if (canonicalTermComparison !== 0) {
+    return canonicalTermComparison;
+  }
+
+  const itemTypeComparison = left.item_type.localeCompare(
+    right.item_type,
+    undefined,
+    { numeric: true, sensitivity: "base" },
+  );
+
+  if (itemTypeComparison !== 0) {
+    return itemTypeComparison;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
 interface QueryFilterOptions {
   includeCefrFilter?: boolean;
   includeApprovalFilter?: boolean;
   includePosFilter?: boolean;
   selectFields?: string;
-  orderByUpdatedAt?: boolean;
+  orderAlphabetically?: boolean;
 }
 
 export async function GET(request: NextRequest) {
@@ -249,14 +290,18 @@ export async function GET(request: NextRequest) {
     includeApprovalFilter = true,
     includePosFilter = true,
     selectFields = LIBRARY_ITEM_SELECT_FIELDS,
-    orderByUpdatedAt = false,
+    orderAlphabetically = false,
   }: QueryFilterOptions = {}) => {
     let query = access.adminClient
       .from("passive_vocabulary_library")
       .select(selectFields);
 
-    if (orderByUpdatedAt) {
-      query = query.order("updated_at", { ascending: false });
+    if (orderAlphabetically) {
+      query = query
+        .order("normalized_term", { ascending: true })
+        .order("canonical_term", { ascending: true })
+        .order("item_type", { ascending: true })
+        .order("id", { ascending: true });
     }
 
     if (access.role !== "superadmin") {
@@ -305,12 +350,18 @@ export async function GET(request: NextRequest) {
 
   if (searchQuery) {
     const normalizedSearchQuery = normalizePassiveVocabularyText(searchQuery);
-    const { data: matchingForms, error: matchingFormsError } = await access.adminClient
-      .from("passive_vocabulary_library_forms")
-      .select("library_item_id")
-      .eq("normalized_form", normalizedSearchQuery);
+    const [matchingFormsResult, matchingUkrainianFormsResult] = await Promise.all([
+      access.adminClient
+        .from("passive_vocabulary_library_forms")
+        .select("library_item_id")
+        .eq("normalized_form", normalizedSearchQuery),
+      access.adminClient
+        .from("passive_vocabulary_library_ukrainian_forms")
+        .select("library_item_id")
+        .eq("normalized_form", normalizedSearchQuery),
+    ]);
 
-    if (matchingFormsError) {
+    if (matchingFormsResult.error || matchingUkrainianFormsResult.error) {
       return NextResponse.json(
         { error: "Failed to load passive vocabulary library items" },
         { status: 500 },
@@ -318,7 +369,12 @@ export async function GET(request: NextRequest) {
     }
 
     const matchingLibraryItemIds = Array.from(
-      new Set((matchingForms ?? []).map((row) => row.library_item_id)),
+      new Set([
+        ...(matchingFormsResult.data ?? []).map((row) => row.library_item_id),
+        ...(matchingUkrainianFormsResult.data ?? []).map(
+          (row) => row.library_item_id,
+        ),
+      ]),
     );
 
     const loadSearchRows = async (
@@ -359,11 +415,7 @@ export async function GET(request: NextRequest) {
 
       const mergedItems = asRowArray<PassiveVocabularyLibraryAdminItemRow>(
         mergedAdminRows,
-      )
-        .sort(
-          (left, right) =>
-            new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime(),
-        );
+      ).sort(compareLibraryRowsAlphabetically);
       const paginatedItems = mergedItems.slice(offset, offset + limit + 1);
 
       return NextResponse.json({
@@ -387,7 +439,10 @@ export async function GET(request: NextRequest) {
 
   const [dataResult, cefrFacetResult, approvalFacetResult, posFacetResult] =
     await Promise.all([
-      createLibraryItemsQuery({ orderByUpdatedAt: true }).range(offset, offset + limit),
+      createLibraryItemsQuery({ orderAlphabetically: true }).range(
+        offset,
+        offset + limit,
+      ),
       createLibraryItemsQuery({
         selectFields: LIBRARY_FACET_SELECT_FIELDS,
         includeCefrFilter: false,

@@ -286,7 +286,7 @@ const EN_MESSAGES = {
       rejectedSuggestion: (term: string) => `Rejected suggestion for ${term}`,
       approveSuggestionFailed: "Failed to approve suggestion",
       rejectSuggestionFailed: "Failed to reject suggestion",
-      searchPlaceholder: "Search canonical terms",
+      searchPlaceholder: "Search English words, forms, or Ukrainian translations",
       searchAriaLabel: "Search shared dictionary",
       searchAction: "Search",
       clearAllFiltersAction: "Clear all filters",
@@ -1020,6 +1020,24 @@ const EN_MESSAGES = {
     monthlyChartTitle: "Monthly activity mix",
     monthlyChartDescription: (startLabel: string, endLabel: string) =>
       `Completed quizzes and lessons from ${startLabel} to ${endLabel}.`,
+    vocabularyDistributionTitle: "Vocabulary CEFR distribution",
+    vocabularyDistributionDescription:
+      "See how the student's confirmed active and passive vocabulary is distributed across dictionary CEFR levels.",
+    activeVocabularyDistributionTitle: "Active vocabulary by CEFR",
+    activeVocabularyDistributionDescription:
+      "Unique confirmed active vocabulary items grouped by dictionary CEFR level.",
+    passiveVocabularyDistributionTitle: "Passive vocabulary by CEFR",
+    passiveVocabularyDistributionDescription:
+      "Unique confirmed passive vocabulary items grouped by dictionary CEFR level.",
+    vocabularyItemsLabel: "Items",
+    vocabularyKnownCountLabel: (count: number) =>
+      `${count.toLocaleString()} classified`,
+    vocabularyUnknownCountLabel: (count: number) =>
+      `${count.toLocaleString()} uncategorized`,
+    noActiveVocabularyDistribution:
+      "No active vocabulary items are classified by CEFR level yet.",
+    noPassiveVocabularyDistribution:
+      "No passive vocabulary items are classified by CEFR level yet.",
     completedQuizzes: "Completed quizzes",
     completedLessons: "Completed lessons",
     activeDays: "Active days",
@@ -1701,7 +1719,7 @@ const UK_MESSAGES: AppMessages = {
       rejectedSuggestion: (term: string) => `Пропозицію для ${term} відхилено`,
       approveSuggestionFailed: "Не вдалося затвердити пропозицію",
       rejectSuggestionFailed: "Не вдалося відхилити пропозицію",
-      searchPlaceholder: "Шукати канонічні форми",
+      searchPlaceholder: "Шукати англійські слова, форми або українські переклади",
       searchAriaLabel: "Пошук у спільному словнику",
       searchAction: "Пошук",
       clearAllFiltersAction: "Очистити всі фільтри",
@@ -2450,6 +2468,24 @@ const UK_MESSAGES: AppMessages = {
     monthlyChartTitle: "Місячна структура активності",
     monthlyChartDescription: (startLabel: string, endLabel: string) =>
       `Завершені вікторини та уроки з ${startLabel} до ${endLabel}.`,
+    vocabularyDistributionTitle: "Розподіл словника за CEFR",
+    vocabularyDistributionDescription:
+      "Переглядайте, як підтверджений активний і пасивний словниковий запас студента розподіляється за рівнями CEFR у словнику.",
+    activeVocabularyDistributionTitle: "Активний словник за CEFR",
+    activeVocabularyDistributionDescription:
+      "Унікальні підтверджені одиниці активного словника, згруповані за словниковим рівнем CEFR.",
+    passiveVocabularyDistributionTitle: "Пасивний словник за CEFR",
+    passiveVocabularyDistributionDescription:
+      "Унікальні підтверджені одиниці пасивного словника, згруповані за словниковим рівнем CEFR.",
+    vocabularyItemsLabel: "Одиниці",
+    vocabularyKnownCountLabel: (count: number) =>
+      `${count.toLocaleString()} класифіковано`,
+    vocabularyUnknownCountLabel: (count: number) =>
+      `${count.toLocaleString()} без категорії`,
+    noActiveVocabularyDistribution:
+      "Ще немає одиниць активного словника, класифікованих за рівнем CEFR.",
+    noPassiveVocabularyDistribution:
+      "Ще немає одиниць пасивного словника, класифікованих за рівнем CEFR.",
     completedQuizzes: "Завершені вікторини",
     completedLessons: "Завершені уроки",
     activeDays: "Активні дні",

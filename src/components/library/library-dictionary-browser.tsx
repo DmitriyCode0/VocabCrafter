@@ -76,6 +76,11 @@ const APPROVAL_FILTER_VALUES = [
 
 type DictionaryApprovalFilter = (typeof APPROVAL_FILTER_VALUES)[number];
 
+const LIBRARY_TERM_COLLATOR = new Intl.Collator(undefined, {
+  sensitivity: "base",
+  numeric: true,
+});
+
 export interface LibraryDictionaryFacetCounts {
   cefr: Record<"all" | "unknown" | CEFRLevel, number>;
   approval: Record<DictionaryApprovalFilter, number>;
@@ -168,10 +173,134 @@ function mergeLibraryItems(
     itemById.set(item.id, item);
   }
 
-  return Array.from(itemById.values()).sort(
-    (left, right) =>
-      new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime(),
+  return sortLibraryItemsAlphabetically(Array.from(itemById.values()));
+}
+
+function compareLibraryItemsAlphabetically(
+  left: PassiveVocabularyLibraryAdminItem,
+  right: PassiveVocabularyLibraryAdminItem,
+) {
+  const normalizedTermComparison = LIBRARY_TERM_COLLATOR.compare(
+    left.normalized_term,
+    right.normalized_term,
   );
+
+  if (normalizedTermComparison !== 0) {
+    return normalizedTermComparison;
+  }
+
+  const canonicalTermComparison = LIBRARY_TERM_COLLATOR.compare(
+    left.canonical_term,
+    right.canonical_term,
+  );
+
+  if (canonicalTermComparison !== 0) {
+    return canonicalTermComparison;
+  }
+
+  const itemTypeComparison = LIBRARY_TERM_COLLATOR.compare(
+    left.item_type,
+    right.item_type,
+  );
+
+  if (itemTypeComparison !== 0) {
+    return itemTypeComparison;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+function sortLibraryItemsAlphabetically(
+  items: PassiveVocabularyLibraryAdminItem[],
+) {
+  return [...items].sort(compareLibraryItemsAlphabetically);
+}
+
+function getItemCefrFacetValue(
+  cefrLevel: PassiveVocabularyLibraryAdminItem["cefr_level"],
+): "unknown" | CEFRLevel {
+  return cefrLevel ?? "unknown";
+}
+
+function updateFacetCountsForItemRemoval(
+  currentFacetCounts: LibraryDictionaryFacetCounts | null,
+  item: PassiveVocabularyLibraryAdminItem,
+) {
+  if (!currentFacetCounts) {
+    return currentFacetCounts;
+  }
+
+  const nextFacetCounts: LibraryDictionaryFacetCounts = {
+    cefr: { ...currentFacetCounts.cefr },
+    approval: { ...currentFacetCounts.approval },
+    partOfSpeech: { ...currentFacetCounts.partOfSpeech },
+  };
+  const cefrFacetValue = getItemCefrFacetValue(item.cefr_level);
+
+  nextFacetCounts.cefr.all = Math.max(0, nextFacetCounts.cefr.all - 1);
+  nextFacetCounts.cefr[cefrFacetValue] = Math.max(
+    0,
+    nextFacetCounts.cefr[cefrFacetValue] - 1,
+  );
+  nextFacetCounts.approval.all = Math.max(
+    0,
+    nextFacetCounts.approval.all - 1,
+  );
+  nextFacetCounts.approval[item.approval_status] = Math.max(
+    0,
+    nextFacetCounts.approval[item.approval_status] - 1,
+  );
+
+  if (item.part_of_speech) {
+    nextFacetCounts.partOfSpeech[item.part_of_speech] = Math.max(
+      0,
+      nextFacetCounts.partOfSpeech[item.part_of_speech] - 1,
+    );
+  }
+
+  return nextFacetCounts;
+}
+
+function updateFacetCountsForApprovalChange(
+  currentFacetCounts: LibraryDictionaryFacetCounts | null,
+  item: PassiveVocabularyLibraryAdminItem,
+  nextApprovalStatus: PassiveVocabularyLibraryAdminItem["approval_status"],
+  approvalFilter: DictionaryApprovalFilter,
+) {
+  if (!currentFacetCounts || item.approval_status === nextApprovalStatus) {
+    return currentFacetCounts;
+  }
+
+  const nextFacetCounts: LibraryDictionaryFacetCounts = {
+    cefr: { ...currentFacetCounts.cefr },
+    approval: { ...currentFacetCounts.approval },
+    partOfSpeech: { ...currentFacetCounts.partOfSpeech },
+  };
+
+  nextFacetCounts.approval[item.approval_status] = Math.max(
+    0,
+    nextFacetCounts.approval[item.approval_status] - 1,
+  );
+  nextFacetCounts.approval[nextApprovalStatus] += 1;
+
+  if (approvalFilter !== "all" && approvalFilter !== nextApprovalStatus) {
+    const cefrFacetValue = getItemCefrFacetValue(item.cefr_level);
+
+    nextFacetCounts.cefr.all = Math.max(0, nextFacetCounts.cefr.all - 1);
+    nextFacetCounts.cefr[cefrFacetValue] = Math.max(
+      0,
+      nextFacetCounts.cefr[cefrFacetValue] - 1,
+    );
+
+    if (item.part_of_speech) {
+      nextFacetCounts.partOfSpeech[item.part_of_speech] = Math.max(
+        0,
+        nextFacetCounts.partOfSpeech[item.part_of_speech] - 1,
+      );
+    }
+  }
+
+  return nextFacetCounts;
 }
 
 export function LibraryDictionaryBrowser({
@@ -185,8 +314,11 @@ export function LibraryDictionaryBrowser({
   myPendingSuggestions = [],
 }: LibraryDictionaryBrowserProps) {
   const { messages } = useAppI18n();
-  const [items, setItems] = useState(initialItems);
+  const [items, setItems] = useState(() =>
+    sortLibraryItemsAlphabetically(initialItems),
+  );
   const [hasMore, setHasMore] = useState(initialHasMore);
+  const [totalItemCount, setTotalItemCount] = useState(totalItems);
   const [reviewItems, setReviewItems] = useState(pendingSuggestions);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -377,6 +509,77 @@ export function LibraryDictionaryBrowser({
     }
   }, [fetchLibraryPage, messages.library.dictionary.requestFailed, queryKey]);
 
+  const removeItemsLocally = useCallback(
+    (removedItems: PassiveVocabularyLibraryAdminItem[]) => {
+      if (removedItems.length === 0) {
+        return;
+      }
+
+      const removedItemIds = new Set(removedItems.map((item) => item.id));
+
+      setFacetCounts((currentFacetCounts) =>
+        removedItems.reduce(
+          (nextFacetCounts, item) =>
+            updateFacetCountsForItemRemoval(nextFacetCounts, item),
+          currentFacetCounts,
+        ),
+      );
+      setTotalItemCount((currentTotal) =>
+        Math.max(0, currentTotal - removedItems.length),
+      );
+      startTransition(() => {
+        setItems((currentItems) =>
+          currentItems.filter((item) => !removedItemIds.has(item.id)),
+        );
+      });
+    },
+    [],
+  );
+
+  const applyLocalApprovalStatus = useCallback(
+    (
+      item: PassiveVocabularyLibraryAdminItem,
+      nextApprovalStatus: PassiveVocabularyLibraryAdminItem["approval_status"],
+    ) => {
+      const nowIso = new Date().toISOString();
+      const nextItem: PassiveVocabularyLibraryAdminItem = {
+        ...item,
+        approval_status: nextApprovalStatus,
+        rejection_reason:
+          nextApprovalStatus === "confirmed" ? null : item.rejection_reason,
+        reviewed_at: nowIso,
+        updated_at: nowIso,
+      };
+      const shouldKeepVisible =
+        role !== "superadmin"
+          ? nextItem.approval_status === "confirmed"
+          : approvalFilter === "all" || approvalFilter === nextItem.approval_status;
+
+      setFacetCounts((currentFacetCounts) =>
+        updateFacetCountsForApprovalChange(
+          currentFacetCounts,
+          item,
+          nextApprovalStatus,
+          approvalFilter,
+        ),
+      );
+      startTransition(() => {
+        setItems((currentItems) => {
+          if (!shouldKeepVisible) {
+            return currentItems.filter((currentItem) => currentItem.id !== item.id);
+          }
+
+          return sortLibraryItemsAlphabetically(
+            currentItems.map((currentItem) =>
+              currentItem.id === item.id ? nextItem : currentItem,
+            ),
+          );
+        });
+      });
+    },
+    [approvalFilter, role],
+  );
+
   const loadMoreItems = useCallback(async () => {
     if (!hasMore || initialLoadingRef.current || loadingMoreRef.current) {
       return;
@@ -521,12 +724,17 @@ export function LibraryDictionaryBrowser({
     if (!window.confirm(`Are you sure you want to delete "${item.canonical_term}"?`)) {
       return;
     }
+
+    setUpdatingApprovalItemId(item.id);
+
     try {
       await deletePassiveVocabularyLibraryItem(item.id);
       toast.success(`Deleted "${item.canonical_term}"`);
-      await reloadItems();
+      removeItemsLocally([item]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete item");
+    } finally {
+      setUpdatingApprovalItemId(null);
     }
   };
 
@@ -537,7 +745,7 @@ export function LibraryDictionaryBrowser({
       try {
         await confirmPassiveVocabularyLibraryItem(item.id);
         toast.success(`Confirmed "${item.canonical_term}"`);
-        await reloadItems();
+        applyLocalApprovalStatus(item, "confirmed");
       } catch (error) {
         toast.error(
           error instanceof Error
@@ -548,7 +756,7 @@ export function LibraryDictionaryBrowser({
         setUpdatingApprovalItemId(null);
       }
     },
-    [reloadItems],
+    [applyLocalApprovalStatus],
   );
 
   const handleRejectItem = useCallback(
@@ -566,7 +774,7 @@ export function LibraryDictionaryBrowser({
       try {
         await rejectPassiveVocabularyLibraryItem(item.id);
         toast.success(`Rejected "${item.canonical_term}"`);
-        await reloadItems();
+        applyLocalApprovalStatus(item, "rejected");
       } catch (error) {
         toast.error(
           error instanceof Error
@@ -577,7 +785,7 @@ export function LibraryDictionaryBrowser({
         setUpdatingApprovalItemId(null);
       }
     },
-    [reloadItems],
+    [applyLocalApprovalStatus],
   );
 
   const handleSelectVisible = useCallback((checked: boolean) => {
@@ -622,7 +830,7 @@ export function LibraryDictionaryBrowser({
         `Deleted ${selectedItems.length} item${selectedItems.length === 1 ? "" : "s"}`,
       );
       setSelectedItemIds([]);
-      await reloadItems();
+      removeItemsLocally(selectedItems);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -632,7 +840,7 @@ export function LibraryDictionaryBrowser({
     } finally {
       setIsBatchDeleting(false);
     }
-  }, [reloadItems, selectedItems]);
+  }, [removeItemsLocally, selectedItems]);
 
   const hasActiveFilters =
     searchQuery.length > 0 ||
@@ -803,7 +1011,7 @@ export function LibraryDictionaryBrowser({
 
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">
-              {totalItems} total words
+              {totalItemCount} total words
             </span>
             <span className="text-muted-foreground/40">•</span>
             <span>
