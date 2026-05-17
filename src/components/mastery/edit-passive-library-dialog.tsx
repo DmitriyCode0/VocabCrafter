@@ -11,18 +11,24 @@ import {
   PASSIVE_VOCABULARY_CEFR_LEVELS,
   PASSIVE_VOCABULARY_NOUN_COUNTABILITY,
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
+  PASSIVE_VOCABULARY_VERB_PATTERN,
   PASSIVE_VOCABULARY_VERB_REGULARITY,
+  PASSIVE_VOCABULARY_VERB_STATE,
   getPassiveVocabularyCanonicalHeadword,
   getPassiveVocabularyEditableForms,
   getPassiveVocabularyEnglishDefinitions,
   getPassiveVocabularyNounCountability,
   getPassiveVocabularyTranscriptions,
   getPassiveVocabularyUkrainianTranslation,
+  getPassiveVocabularyVerbPattern,
   getPassiveVocabularyVerbRegularity,
+  getPassiveVocabularyVerbState,
   formatPassiveVocabularyPartOfSpeech,
   type PassiveVocabularyNounCountability,
   type PassiveVocabularyLibraryAttributes,
+  type PassiveVocabularyVerbPattern,
   type PassiveVocabularyVerbRegularity,
+  type PassiveVocabularyVerbState,
 } from "@/lib/mastery/passive-vocabulary";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import { Button } from "@/components/ui/button";
@@ -61,6 +67,14 @@ interface EditPassiveLibraryDialogProps {
 }
 
 type EditablePassiveLibraryItem = EditPassiveLibraryDialogProps["item"];
+
+const PASSIVE_VOCABULARY_VERB_PATTERN_LABELS: Record<
+  PassiveVocabularyVerbPattern,
+  string
+> = {
+  "v-ing": "V-ing",
+  "to-v": "to V",
+};
 
 export function EditPassiveLibraryDialog({
   item,
@@ -105,6 +119,12 @@ export function EditPassiveLibraryDialog({
   const [verbRegularity, setVerbRegularity] = useState<
     PassiveVocabularyVerbRegularity[]
   >(getPassiveVocabularyVerbRegularity(item.attributes));
+  const [verbPattern, setVerbPattern] = useState<PassiveVocabularyVerbPattern[]>(
+    getPassiveVocabularyVerbPattern(item.attributes),
+  );
+  const [verbState, setVerbState] = useState<PassiveVocabularyVerbState[]>(
+    getPassiveVocabularyVerbState(item.attributes),
+  );
   const [formsText, setFormsText] = useState(
     getPassiveVocabularyEditableForms(
       item.canonical_term,
@@ -170,6 +190,8 @@ export function EditPassiveLibraryDialog({
       nextItem.attributes,
     );
     setVerbRegularity(nextVerbRegularity);
+    setVerbPattern(getPassiveVocabularyVerbPattern(nextItem.attributes));
+    setVerbState(getPassiveVocabularyVerbState(nextItem.attributes));
     const editableForms = getPassiveVocabularyEditableForms(
       canonicalHeadword,
       nextItem.part_of_speech as typeof PASSIVE_VOCABULARY_PARTS_OF_SPEECH[number] | null,
@@ -284,6 +306,14 @@ export function EditPassiveLibraryDialog({
       currentItem.item_type === "word" && partOfSpeech === "verb"
         ? verbRegularity
         : [];
+    const nextVerbPattern =
+      currentItem.item_type === "word" && partOfSpeech === "verb"
+        ? verbPattern
+        : [];
+    const nextVerbState =
+      currentItem.item_type === "word" && partOfSpeech === "verb"
+        ? verbState
+        : [];
 
     setIsSaving(true);
 
@@ -300,7 +330,9 @@ export function EditPassiveLibraryDialog({
           americanTranscription,
           britishTranscription,
           nounCountability: nextNounCountability,
+          verbPattern: nextVerbPattern,
           verbRegularity: nextVerbRegularity,
+          verbState: nextVerbState,
           forms,
         }),
       });
@@ -382,6 +414,33 @@ export function EditPassiveLibraryDialog({
         : new Set(current.filter((entry) => entry !== value));
 
       return PASSIVE_VOCABULARY_VERB_REGULARITY.filter((entry) =>
+        nextValues.has(entry),
+      );
+    });
+  }
+
+  function toggleVerbPattern(
+    value: PassiveVocabularyVerbPattern,
+    checked: boolean,
+  ) {
+    setVerbPattern((current) => {
+      const nextValues = checked
+        ? new Set<PassiveVocabularyVerbPattern>([...current, value])
+        : new Set(current.filter((entry) => entry !== value));
+
+      return PASSIVE_VOCABULARY_VERB_PATTERN.filter((entry) =>
+        nextValues.has(entry),
+      );
+    });
+  }
+
+  function toggleVerbState(value: PassiveVocabularyVerbState, checked: boolean) {
+    setVerbState((current) => {
+      const nextValues = checked
+        ? new Set<PassiveVocabularyVerbState>([...current, value])
+        : new Set(current.filter((entry) => entry !== value));
+
+      return PASSIVE_VOCABULARY_VERB_STATE.filter((entry) =>
         nextValues.has(entry),
       );
     });
@@ -548,6 +607,35 @@ export function EditPassiveLibraryDialog({
 
           {currentItem.item_type === "word" && partOfSpeech === "verb" ? (
             <div className="space-y-2 sm:col-span-2">
+              <Label>Verb pattern</Label>
+              <div className="flex flex-wrap gap-4 pt-1">
+                {PASSIVE_VOCABULARY_VERB_PATTERN.map((value) => {
+                  const id = `library-verb-pattern-${item.id}-${value}`;
+
+                  return (
+                    <label
+                      key={value}
+                      htmlFor={id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Checkbox
+                        id={id}
+                        checked={verbPattern.includes(value)}
+                        onCheckedChange={(checked) =>
+                          toggleVerbPattern(value, checked === true)
+                        }
+                      />
+                      <span>{PASSIVE_VOCABULARY_VERB_PATTERN_LABELS[value]}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {currentItem.item_type === "word" && partOfSpeech === "verb" ? (
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Verb regularity</Label>
               <div className="flex flex-wrap gap-4 pt-1">
                 {PASSIVE_VOCABULARY_VERB_REGULARITY.map((value) => {
                   const id = `library-verb-regularity-${item.id}-${value}`;
@@ -563,6 +651,34 @@ export function EditPassiveLibraryDialog({
                         checked={verbRegularity.includes(value)}
                         onCheckedChange={(checked) =>
                           toggleVerbRegularity(value, checked === true)
+                        }
+                      />
+                      <span className="capitalize">{value}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {currentItem.item_type === "word" && partOfSpeech === "verb" ? (
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Verb state</Label>
+              <div className="flex flex-wrap gap-4 pt-1">
+                {PASSIVE_VOCABULARY_VERB_STATE.map((value) => {
+                  const id = `library-verb-state-${item.id}-${value}`;
+
+                  return (
+                    <label
+                      key={value}
+                      htmlFor={id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Checkbox
+                        id={id}
+                        checked={verbState.includes(value)}
+                        onCheckedChange={(checked) =>
+                          toggleVerbState(value, checked === true)
                         }
                       />
                       <span className="capitalize">{value}</span>

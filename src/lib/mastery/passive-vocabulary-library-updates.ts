@@ -5,8 +5,11 @@ import {
   getPassiveVocabularyCanonicalHeadword,
   getPassiveVocabularyEnglishDefinitions,
   getPassiveVocabularyForms,
+  getPassiveVocabularyMetadataValidation,
   getPassiveVocabularyNounCountability,
+  getPassiveVocabularyVerbPattern,
   getPassiveVocabularyVerbRegularity,
+  getPassiveVocabularyVerbState,
   getPassiveVocabularyTranscriptions,
   getPassiveVocabularyUkrainianTranslation,
   normalizePassiveVocabularyLibraryAttributes,
@@ -14,15 +17,19 @@ import {
   withPassiveVocabularyEnglishDefinitions,
   withPassiveVocabularyForms,
   withPassiveVocabularyNounCountability,
+  withPassiveVocabularyVerbPattern,
   withPassiveVocabularyTranscriptions,
   withPassiveVocabularyUkrainianSearchForms,
   withPassiveVocabularyUkrainianTranslation,
   withPassiveVocabularyVerbRegularity,
+  withPassiveVocabularyVerbState,
   type PassiveVocabularyLibraryAttributes,
   type PassiveVocabularyLibraryCefrLevel,
   type PassiveVocabularyNounCountability,
   type PassiveVocabularyPartOfSpeech,
+  type PassiveVocabularyVerbPattern,
   type PassiveVocabularyVerbRegularity,
+  type PassiveVocabularyVerbState,
 } from "@/lib/mastery/passive-vocabulary";
 import { syncPassiveVocabularyLibraryUkrainianForms } from "@/lib/mastery/passive-vocabulary-library-ukrainian-forms";
 
@@ -43,7 +50,9 @@ interface UpdatePassiveVocabularyLibraryItemInput {
   britishTranscription?: string | null;
   transcription?: string | null;
   nounCountability?: PassiveVocabularyNounCountability[] | null;
+  verbPattern?: PassiveVocabularyVerbPattern[] | null;
   verbRegularity?: PassiveVocabularyVerbRegularity[] | null;
+  verbState?: PassiveVocabularyVerbState[] | null;
   forms?: string[] | null;
   attributes?: PassiveVocabularyLibraryAttributes | null;
 }
@@ -260,7 +269,9 @@ export async function updatePassiveVocabularyLibraryItem({
   britishTranscription,
   transcription,
   nounCountability,
+  verbPattern,
   verbRegularity,
+  verbState,
   forms,
   attributes,
 }: UpdatePassiveVocabularyLibraryItemInput): Promise<PassiveVocabularyLibraryRow> {
@@ -339,7 +350,7 @@ export async function updatePassiveVocabularyLibraryItem({
   const nextCefrLevel =
     existingItem.item_type === "phrase"
       ? null
-      : (cefrLevel ?? existingItem.cefr_level);
+      : ((cefrLevel ?? existingItem.cefr_level) as PassiveVocabularyLibraryCefrLevel | null);
   const nextPartOfSpeech =
     existingItem.item_type === "phrase"
       ? "phrase"
@@ -377,6 +388,22 @@ export async function updatePassiveVocabularyLibraryItem({
         : verbRegularity
       : [],
   );
+  const nextAttributesWithVerbState = withPassiveVocabularyVerbState(
+    nextAttributesWithVerbRegularity,
+    nextPartOfSpeech === "verb"
+      ? verbState === undefined
+        ? getPassiveVocabularyVerbState(existingAttributes)
+        : verbState
+      : [],
+  );
+  const nextAttributesWithVerbPattern = withPassiveVocabularyVerbPattern(
+    nextAttributesWithVerbState,
+    nextPartOfSpeech === "verb"
+      ? verbPattern === undefined
+        ? getPassiveVocabularyVerbPattern(existingAttributes)
+        : verbPattern
+      : [],
+  );
   const canonicalTerm = formatPassiveVocabularyCanonicalTerm(
     canonicalHeadword,
     nextPartOfSpeech,
@@ -388,9 +415,15 @@ export async function updatePassiveVocabularyLibraryItem({
       ? getPassiveVocabularyForms(existingAttributes, canonicalHeadword)
       : forms;
   const nextAttributesWithForms = withPassiveVocabularyForms(
-    nextAttributesWithVerbRegularity,
+    nextAttributesWithVerbPattern,
     explicitForms,
     canonicalHeadword,
+  );
+  const metadataValidation = getPassiveVocabularyMetadataValidation(
+    existingItem.item_type,
+    nextCefrLevel,
+    nextPartOfSpeech,
+    nextAttributesWithForms,
   );
 
   const { data: updatedItem, error: updateError } = await adminClient
@@ -401,16 +434,8 @@ export async function updatePassiveVocabularyLibraryItem({
       cefr_level: nextCefrLevel,
       part_of_speech: nextPartOfSpeech,
       attributes: nextAttributesWithForms,
-      enrichment_status:
-        existingItem.item_type === "phrase" ||
-        (nextCefrLevel && nextPartOfSpeech)
-          ? "completed"
-          : "failed",
-      enrichment_error:
-        existingItem.item_type === "phrase" ||
-        (nextCefrLevel && nextPartOfSpeech)
-          ? null
-          : "Metadata still needs a CEFR level and part of speech.",
+      enrichment_status: metadataValidation.status,
+      enrichment_error: metadataValidation.error,
       updated_by: updatedBy,
       updated_at: nowIso,
     })

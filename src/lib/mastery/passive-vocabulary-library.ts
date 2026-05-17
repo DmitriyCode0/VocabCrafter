@@ -19,6 +19,7 @@ import {
   getPassiveVocabularyForms,
   getPassiveVocabularyGeneratedForms,
   getPassiveVocabularyLookupCandidates,
+  getPassiveVocabularyMetadataValidation,
   getPassiveVocabularyNounCountability,
   normalizePassiveVocabularyLibraryAttributes,
   normalizePassiveVocabularyText,
@@ -527,8 +528,6 @@ async function updatePassiveVocabularyLibraryItem({
   cefrLevel,
   partOfSpeech,
   attributes,
-  enrichmentStatus,
-  enrichmentError,
   nowIso,
 }: {
   adminClient: AdminClient;
@@ -540,10 +539,15 @@ async function updatePassiveVocabularyLibraryItem({
   cefrLevel: PassiveVocabularyLibraryCefrLevel | null;
   partOfSpeech: PassiveVocabularyPartOfSpeech | null;
   attributes: PassiveVocabularyLibraryAttributes;
-  enrichmentStatus: "pending" | "completed" | "failed";
-  enrichmentError: string | null;
   nowIso: string;
 }) {
+  const metadataValidation = getPassiveVocabularyMetadataValidation(
+    itemType,
+    cefrLevel,
+    partOfSpeech,
+    attributes,
+  );
+
   const { data, error } = await adminClient
     .from("passive_vocabulary_library")
     .update({
@@ -552,8 +556,8 @@ async function updatePassiveVocabularyLibraryItem({
       cefr_level: itemType === "phrase" ? null : cefrLevel,
       part_of_speech: itemType === "phrase" ? "phrase" : partOfSpeech,
       attributes,
-      enrichment_status: enrichmentStatus,
-      enrichment_error: enrichmentError,
+      enrichment_status: metadataValidation.status,
+      enrichment_error: metadataValidation.error,
       updated_by: actorUserId,
       updated_at: nowIso,
     })
@@ -696,7 +700,12 @@ async function enrichPassiveVocabularyWords(
       "- attributes may also include ukrainianSearchForms as an array of up to 8 Ukrainian lookup forms, including the main translation plus close inflected or aspectual variants that help reverse lookup from Ukrainian to English",
       "- attributes may include americanTranscription and britishTranscription as IPA plus englishDefinitions as an array of up to 3 concise English meanings when you are confident",
       'For nouns, attributes may also include nounCountability as an array containing "countable", "uncountable", or both when you are confident.',
+      'For verbs that commonly take a following verb complement, attributes may also include verbPattern as an array containing "v-ing", "to-v", or both when you are confident.',
+      'Use "v-ing" for verbs like enjoy or avoid, "to-v" for verbs like want or hope, and both when either pattern is common for the everyday learner sense without a strong meaning change.',
+      'If no clear gerund/to-infinitive pattern is relevant for the common learner-facing sense, omit verbPattern.',
       'For verbs, attributes may also include verbRegularity as an array containing "regular", "irregular", or both when you are confident.',
+      'For verbs, attributes may also include verbState as an array containing "state", "dynamic", or both when you are confident.',
+      'Use "state" for stative verbs such as know, belong, or seem, and "dynamic" for actions or processes such as run, write, or change.',
       'If a verb is irregular or has a common irregular variant, include attributes.forms in this exact order: V2, V3, V-ing, V-(e)s.',
       'For irregular verbs, make sure V2 and V3 are correct learner-facing forms for the intended sense of the verb.',
       "Use modal verb for can, could, may, might, must, shall, should, will, and would.",
@@ -708,7 +717,7 @@ async function enrichPassiveVocabularyWords(
       "Examples: tables -> table, works -> work, studies -> study, worked -> work, working -> work.",
       "Never translate the word. Never return multiple words as the canonical form for a single-word input.",
       "If the word is already canonical, keep it unchanged.",
-      'Respond with JSON in this exact shape: { "items": [ { "requestedTerm": "...", "canonicalTerm": "...", "cefrLevel": "A1", "partOfSpeech": "noun", "ukrainianTranslation": "...", "attributes": { "ukrainianSearchForms": ["втрачати", "втратити", "втратив", "втратила"], "americanTranscription": "/.../", "britishTranscription": "/.../", "englishDefinitions": ["..."], "nounCountability": ["countable"], "verbRegularity": ["irregular"], "forms": ["hung", "hung", "hanging", "hangs"] } } ] }.',
+      'Respond with JSON in this exact shape: { "items": [ { "requestedTerm": "...", "canonicalTerm": "...", "cefrLevel": "A1", "partOfSpeech": "noun", "ukrainianTranslation": "...", "attributes": { "ukrainianSearchForms": ["втрачати", "втратити", "втратив", "втратила"], "americanTranscription": "/.../", "britishTranscription": "/.../", "englishDefinitions": ["..."], "nounCountability": ["countable"], "verbPattern": ["to-v"], "verbRegularity": ["irregular"], "verbState": ["dynamic"], "forms": ["hung", "hung", "hanging", "hangs"] } } ] }.',
       "Requested terms:",
       ...batch.map((input) =>
         input.partOfSpeech
@@ -1079,8 +1088,6 @@ export async function reEnrichPassiveVocabularyLibraryItem({
       cefrLevel: null,
       partOfSpeech: "phrase",
       attributes: asAttributes(existingItem.attributes),
-      enrichmentStatus: "completed",
-      enrichmentError: null,
       nowIso,
     });
 
@@ -1114,7 +1121,16 @@ export async function reEnrichPassiveVocabularyLibraryItem({
   );
 
   if (!enrichment?.cefrLevel || !enrichment.partOfSpeech) {
-    if (!existingItem.cefr_level || !existingItem.part_of_speech) {
+    const existingMetadataValidation = getPassiveVocabularyMetadataValidation(
+      existingItem.item_type,
+      (existingItem.cefr_level as PassiveVocabularyLibraryCefrLevel | null) ??
+        null,
+      (existingItem.part_of_speech as PassiveVocabularyPartOfSpeech | null) ??
+        null,
+      asAttributes(existingItem.attributes),
+    );
+
+    if (existingMetadataValidation.status === "failed") {
       await updatePassiveVocabularyLibraryItem({
         adminClient,
         libraryItemId,
@@ -1129,9 +1145,6 @@ export async function reEnrichPassiveVocabularyLibraryItem({
           (existingItem.part_of_speech as PassiveVocabularyPartOfSpeech | null) ??
           null,
         attributes: asAttributes(existingItem.attributes),
-        enrichmentStatus: "failed",
-        enrichmentError:
-          "Gemini enrichment unavailable or incomplete for this word.",
         nowIso,
       });
     }
@@ -1183,8 +1196,6 @@ export async function reEnrichPassiveVocabularyLibraryItem({
       cefrLevel: enrichment.cefrLevel,
       partOfSpeech: enrichment.partOfSpeech,
       attributes: enrichment.attributes ?? {},
-      enrichmentStatus: "completed",
-      enrichmentError: null,
       nowIso,
     });
 
@@ -1253,8 +1264,6 @@ export async function reEnrichPassiveVocabularyLibraryItem({
     cefrLevel: enrichment.cefrLevel,
     partOfSpeech: enrichment.partOfSpeech,
     attributes: enrichment.attributes ?? {},
-    enrichmentStatus: "completed",
-    enrichmentError: null,
     nowIso,
   });
 
