@@ -8,6 +8,10 @@ import {
   type PassiveVocabularyPartOfSpeech,
 } from "@/lib/mastery/passive-vocabulary";
 import { resolvePassiveVocabularyLibraryItems } from "@/lib/mastery/passive-vocabulary-library";
+import {
+  syncStudentVocabularyStateFromActiveEvidence,
+  syncStudentVocabularyStateFromPassiveEvidence,
+} from "@/lib/mastery/student-vocabulary-state";
 import { normalizeLearningLanguage } from "@/lib/languages";
 
 type AdminClient = SupabaseClient<Database>;
@@ -180,6 +184,27 @@ export async function syncConfirmedActiveVocabularyToPassiveEvidence({
     throw new Error("Failed to sync active vocabulary into passive evidence");
   }
 
+  const upsertRowsByStudentId = new Map<string, typeof upsertRows>();
+
+  for (const row of upsertRows) {
+    const existingRows = upsertRowsByStudentId.get(row.student_id) ?? [];
+    existingRows.push(row);
+    upsertRowsByStudentId.set(row.student_id, existingRows);
+  }
+
+  for (const [currentStudentId, rowsForStudent] of upsertRowsByStudentId) {
+    await syncStudentVocabularyStateFromPassiveEvidence({
+      adminClient,
+      studentId: currentStudentId,
+      items: rowsForStudent.map((row) => ({
+        term: row.term,
+        normalizedTerm: row.normalized_term,
+        itemType: row.item_type,
+        libraryItemId: row.library_item_id,
+      })),
+    });
+  }
+
   const createdCount = upsertRows.filter(
     (row) =>
       !existingPassiveRowsByKey.has(`${row.student_id}:${row.normalized_term}`),
@@ -337,6 +362,17 @@ export async function upsertActiveVocabularyEvidence({
   if (upsertResult.error) {
     throw new Error("Failed to save active vocabulary evidence");
   }
+
+  await syncStudentVocabularyStateFromActiveEvidence({
+    adminClient,
+    studentId,
+    items: rows.map((row) => ({
+      term: row.term,
+      normalizedTerm: row.normalized_term,
+      itemType: "word",
+      libraryItemId: row.library_item_id,
+    })),
+  });
 
   const confirmedLibraryItemIds = Array.from(
     new Set(

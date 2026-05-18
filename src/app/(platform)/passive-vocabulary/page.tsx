@@ -42,6 +42,10 @@ import {
   type PassiveVocabularyPartOfSpeech,
 } from "@/lib/mastery/passive-vocabulary";
 import { hasConfirmedPassiveVocabularyLibraryEntry } from "@/lib/mastery/dictionary-approval";
+import {
+  createStudentVocabularyStateKey,
+  getStudentLearningVocabularyKeySet,
+} from "@/lib/mastery/student-vocabulary-state";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import type { Role } from "@/types/roles";
 import type { CEFRLevel } from "@/types/quiz";
@@ -63,6 +67,7 @@ interface PassiveEvidenceQueryRow {
   id: string;
   term: string;
   definition: string | null;
+  normalized_term: string;
   item_type: "word" | "phrase";
   source_type: "full_text" | "manual_list" | "curated_list";
   source_label: string | null;
@@ -78,6 +83,7 @@ interface PassiveEvidenceQueryRow {
 interface ActiveEvidenceQueryRow {
   id: string;
   term: string;
+  normalized_term: string;
   source_type: "lesson_recording" | "manual_list" | "other";
   source_label: string | null;
   usage_count: number;
@@ -178,7 +184,7 @@ function countTaggedActiveVocabularyItems(
 function hasPendingPassiveVocabularyLibraryEntry(
   libraryItem: PassiveEvidenceQueryRow["passive_vocabulary_library"],
 ) {
-  return !libraryItem || libraryItem.approval_status === "unconfirmed";
+  return libraryItem?.approval_status === "unconfirmed";
 }
 
 function resolveVocabularyTab(value?: string) {
@@ -272,7 +278,7 @@ async function loadPassiveVocabularyWorkspace(
 ) {
   const supabaseAdmin = createAdminClient();
   const evidenceRange = getPaginationRange(evidencePage, EVIDENCE_PAGE_SIZE);
-  const [studentProfileResult, evidenceRowsResult] = await Promise.all([
+  const [studentProfileResult, evidenceRowsResult, learningVocabularyKeySet] = await Promise.all([
     supabaseAdmin
       .from("profiles")
       .select("full_name, email, preferred_language, cefr_level")
@@ -281,10 +287,14 @@ async function loadPassiveVocabularyWorkspace(
     supabaseAdmin
       .from("passive_vocabulary_evidence")
       .select(
-        "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(approval_status, cefr_level, part_of_speech)",
+        "id, term, definition, normalized_term, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(approval_status, cefr_level, part_of_speech)",
       )
       .eq("student_id", studentId)
-      .order("last_imported_at", { ascending: false })
+      .order("last_imported_at", { ascending: false }),
+    getStudentLearningVocabularyKeySet({
+      adminClient: supabaseAdmin,
+      studentId,
+    }),
   ]);
 
   if (studentProfileResult.error || !studentProfileResult.data) {
@@ -314,10 +324,16 @@ async function loadPassiveVocabularyWorkspace(
   const allEvidenceRows =
     (evidenceRowsResult.data ?? []) as PassiveEvidenceQueryRow[];
   const visibleEvidenceRows = allEvidenceRows.filter((row) =>
-    hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library),
+    hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library) &&
+      !learningVocabularyKeySet.has(
+        createStudentVocabularyStateKey(row.normalized_term, row.item_type),
+      ),
   );
   const pendingReviewCount = allEvidenceRows.filter((row) =>
-    hasPendingPassiveVocabularyLibraryEntry(row.passive_vocabulary_library),
+    hasPendingPassiveVocabularyLibraryEntry(row.passive_vocabulary_library) &&
+      !learningVocabularyKeySet.has(
+        createStudentVocabularyStateKey(row.normalized_term, row.item_type),
+      ),
   ).length;
   const summary = summarizePassiveVocabularyEvidence(
     visibleEvidenceRows.map(mapSummaryRow),
@@ -376,7 +392,7 @@ async function loadActiveVocabularyWorkspace(
 ) {
   const supabaseAdmin = createAdminClient();
   const evidenceRange = getPaginationRange(evidencePage, EVIDENCE_PAGE_SIZE);
-  const [studentProfileResult, evidenceRowsResult] = await Promise.all([
+  const [studentProfileResult, evidenceRowsResult, learningVocabularyKeySet] = await Promise.all([
     supabaseAdmin
       .from("profiles")
       .select("full_name, email, cefr_level")
@@ -385,18 +401,28 @@ async function loadActiveVocabularyWorkspace(
     supabaseAdmin
       .from("active_vocabulary_evidence")
       .select(
-        "id, term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(approval_status, cefr_level, part_of_speech)",
+        "id, term, normalized_term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(approval_status, cefr_level, part_of_speech)",
       )
       .eq("student_id", studentId)
-      .order("last_used_at", { ascending: false })
+      .order("last_used_at", { ascending: false }),
+    getStudentLearningVocabularyKeySet({
+      adminClient: supabaseAdmin,
+      studentId,
+    }),
   ]);
 
   if (studentProfileResult.error || !studentProfileResult.data) {
     return null;
   }
 
-  const visibleEvidenceRows = ((evidenceRowsResult.data ?? []) as ActiveEvidenceQueryRow[]).filter(
-    (row) => hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library),
+  const visibleEvidenceRows = (
+    (evidenceRowsResult.data ?? []) as ActiveEvidenceQueryRow[]
+  ).filter(
+    (row) =>
+      hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library) &&
+      !learningVocabularyKeySet.has(
+        createStudentVocabularyStateKey(row.normalized_term, "word"),
+      ),
   );
   const summary = summarizeActiveVocabularyEvidence(
     visibleEvidenceRows.map((row) => ({

@@ -1022,22 +1022,29 @@ const EN_MESSAGES = {
       `Completed quizzes and lessons from ${startLabel} to ${endLabel}.`,
     vocabularyDistributionTitle: "Vocabulary CEFR distribution",
     vocabularyDistributionDescription:
-      "See how the student's confirmed active and passive vocabulary is distributed across dictionary CEFR levels.",
+      "See how the student's active, passive, and learning vocabulary is distributed across dictionary CEFR levels.",
     activeVocabularyDistributionTitle: "Active vocabulary by CEFR",
     activeVocabularyDistributionDescription:
       "Unique confirmed active vocabulary items grouped by dictionary CEFR level.",
     passiveVocabularyDistributionTitle: "Passive vocabulary by CEFR",
     passiveVocabularyDistributionDescription:
       "Unique confirmed passive vocabulary items grouped by dictionary CEFR level.",
+    learningVocabularyDistributionTitle: "Learning vocabulary by CEFR",
+    learningVocabularyDistributionDescription:
+      "Unique current learning words grouped by dictionary CEFR level.",
     vocabularyItemsLabel: "Items",
     vocabularyKnownCountLabel: (count: number) =>
       `${count.toLocaleString()} classified`,
+    vocabularyPendingReviewCountLabel: (count: number) =>
+      `${count.toLocaleString()} pending review`,
     vocabularyUnknownCountLabel: (count: number) =>
       `${count.toLocaleString()} uncategorized`,
     noActiveVocabularyDistribution:
       "No active vocabulary items are classified by CEFR level yet.",
     noPassiveVocabularyDistribution:
       "No passive vocabulary items are classified by CEFR level yet.",
+    noLearningVocabularyDistribution:
+      "No learning vocabulary items are classified by CEFR level yet.",
     completedQuizzes: "Completed quizzes",
     completedLessons: "Completed lessons",
     activeDays: "Active days",
@@ -2470,22 +2477,29 @@ const UK_MESSAGES: AppMessages = {
       `Завершені вікторини та уроки з ${startLabel} до ${endLabel}.`,
     vocabularyDistributionTitle: "Розподіл словника за CEFR",
     vocabularyDistributionDescription:
-      "Переглядайте, як підтверджений активний і пасивний словниковий запас студента розподіляється за рівнями CEFR у словнику.",
+      "Переглядайте, як активний, пасивний і навчальний словниковий запас студента розподіляється за рівнями CEFR у словнику.",
     activeVocabularyDistributionTitle: "Активний словник за CEFR",
     activeVocabularyDistributionDescription:
       "Унікальні підтверджені одиниці активного словника, згруповані за словниковим рівнем CEFR.",
     passiveVocabularyDistributionTitle: "Пасивний словник за CEFR",
     passiveVocabularyDistributionDescription:
       "Унікальні підтверджені одиниці пасивного словника, згруповані за словниковим рівнем CEFR.",
+    learningVocabularyDistributionTitle: "Навчальний словник за CEFR",
+    learningVocabularyDistributionDescription:
+      "Унікальні поточні слова в навчанні, згруповані за словниковим рівнем CEFR.",
     vocabularyItemsLabel: "Одиниці",
     vocabularyKnownCountLabel: (count: number) =>
       `${count.toLocaleString()} класифіковано`,
+    vocabularyPendingReviewCountLabel: (count: number) =>
+      `${count.toLocaleString()} очікують перевірки`,
     vocabularyUnknownCountLabel: (count: number) =>
       `${count.toLocaleString()} без категорії`,
     noActiveVocabularyDistribution:
       "Ще немає одиниць активного словника, класифікованих за рівнем CEFR.",
     noPassiveVocabularyDistribution:
       "Ще немає одиниць пасивного словника, класифікованих за рівнем CEFR.",
+    noLearningVocabularyDistribution:
+      "Ще немає одиниць навчального словника, класифікованих за рівнем CEFR.",
     completedQuizzes: "Завершені вікторини",
     completedLessons: "Завершені уроки",
     activeDays: "Активні дні",

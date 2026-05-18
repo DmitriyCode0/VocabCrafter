@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractWordResults, upsertWordMastery } from "@/lib/mastery/engine";
+import {
+  syncStudentVocabularyStateFromActiveEvidence,
+  syncStudentVocabularyStateFromPassiveEvidence,
+} from "@/lib/mastery/student-vocabulary-state";
 import { parseQuizSnapshot } from "@/lib/quiz-snapshot";
 
 /**
@@ -52,17 +56,100 @@ export async function POST() {
       return NextResponse.json({ processed: 0, skipped: 0 });
     }
 
-    const { error: resetError } = await supabaseAdmin
-      .from("word_mastery")
-      .delete()
-      .not("id", "is", null);
+    const [{ error: resetMasteryError }, { error: resetStateError }] =
+      await Promise.all([
+        supabaseAdmin.from("word_mastery").delete().not("id", "is", null),
+        supabaseAdmin
+          .from("student_vocabulary_items")
+          .delete()
+          .not("id", "is", null),
+      ]);
 
-    if (resetError) {
-      console.error("Backfill: failed to reset word_mastery", resetError);
+    if (resetMasteryError || resetStateError) {
+      console.error("Backfill: failed to reset mastery/state tables", {
+        resetMasteryError,
+        resetStateError,
+      });
       return NextResponse.json(
-        { error: "Failed to reset word mastery" },
+        { error: "Failed to reset mastery state" },
         { status: 500 },
       );
+    }
+
+    const [passiveEvidenceResult, activeEvidenceResult] = await Promise.all([
+      supabaseAdmin
+        .from("passive_vocabulary_evidence")
+        .select("student_id, term, normalized_term, item_type, library_item_id"),
+      supabaseAdmin
+        .from("active_vocabulary_evidence")
+        .select("student_id, term, normalized_term, library_item_id"),
+    ]);
+
+    if (passiveEvidenceResult.error || activeEvidenceResult.error) {
+      console.error("Backfill: failed to load evidence rows", {
+        passiveEvidenceError: passiveEvidenceResult.error,
+        activeEvidenceError: activeEvidenceResult.error,
+      });
+      return NextResponse.json(
+        { error: "Failed to load vocabulary evidence" },
+        { status: 500 },
+      );
+    }
+
+    const passiveRowsByStudent = new Map<
+      string,
+      Array<{
+        term: string;
+        normalizedTerm: string;
+        itemType: "word" | "phrase";
+        libraryItemId: string | null;
+      }>
+    >();
+    for (const row of passiveEvidenceResult.data ?? []) {
+      const studentRows = passiveRowsByStudent.get(row.student_id) ?? [];
+      studentRows.push({
+        term: row.term,
+        normalizedTerm: row.normalized_term,
+        itemType: row.item_type,
+        libraryItemId: row.library_item_id,
+      });
+      passiveRowsByStudent.set(row.student_id, studentRows);
+    }
+
+    for (const [studentId, items] of passiveRowsByStudent) {
+      await syncStudentVocabularyStateFromPassiveEvidence({
+        adminClient: supabaseAdmin,
+        studentId,
+        items,
+      });
+    }
+
+    const activeRowsByStudent = new Map<
+      string,
+      Array<{
+        term: string;
+        normalizedTerm: string;
+        itemType: "word";
+        libraryItemId: string | null;
+      }>
+    >();
+    for (const row of activeEvidenceResult.data ?? []) {
+      const studentRows = activeRowsByStudent.get(row.student_id) ?? [];
+      studentRows.push({
+        term: row.term,
+        normalizedTerm: row.normalized_term,
+        itemType: "word",
+        libraryItemId: row.library_item_id,
+      });
+      activeRowsByStudent.set(row.student_id, studentRows);
+    }
+
+    for (const [studentId, items] of activeRowsByStudent) {
+      await syncStudentVocabularyStateFromActiveEvidence({
+        adminClient: supabaseAdmin,
+        studentId,
+        items,
+      });
     }
 
     // Pre-fetch all quizzes we need

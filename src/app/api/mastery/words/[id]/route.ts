@@ -3,6 +3,10 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
+import {
+  restoreStudentVocabularyStateAfterLearningRemoval,
+  syncStudentVocabularyStateFromWordMastery,
+} from "@/lib/mastery/student-vocabulary-state";
 
 const updateMasterySchema = z
   .object({
@@ -37,7 +41,7 @@ export async function DELETE(
     const supabaseAdmin = createAdminClient();
     const { data: masteryRow, error: masteryError } = await supabaseAdmin
       .from("word_mastery")
-      .select("id, student_id")
+      .select("id, student_id, term")
       .eq("id", id)
       .maybeSingle();
 
@@ -96,6 +100,12 @@ export async function DELETE(
     if (deleteError) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
     }
+
+    await restoreStudentVocabularyStateAfterLearningRemoval({
+      adminClient: supabaseAdmin,
+      studentId: masteryRow.student_id,
+      terms: [masteryRow.term],
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -201,6 +211,18 @@ export async function PATCH(
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
+
+    await syncStudentVocabularyStateFromWordMastery({
+      adminClient: supabaseAdmin,
+      studentId: masteryRow.student_id,
+      items: [
+        {
+          term: updatedRow.term,
+          masteryLevel: updatedRow.mastery_level,
+          practicedAt: updatedRow.last_practiced,
+        },
+      ],
+    });
 
     return NextResponse.json({ word: updatedRow });
   } catch (error) {

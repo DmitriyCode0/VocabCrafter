@@ -35,6 +35,8 @@ export function TutorStudentResultsPanel({
     snapshot.overview.totalAttempts > 0 ||
     snapshot.overview.totalWords > 0 ||
     snapshot.passiveSignals.uniqueItems > 0 ||
+    snapshot.learningSignals.uniqueItems > 0 ||
+    snapshot.learningSignals.pendingReviewCount > 0 ||
     snapshot.timeMetrics.completedLessons > 0 ||
     snapshot.timeMetrics.timeAdjustmentHours !== 0;
 
@@ -88,8 +90,9 @@ export function TutorStudentResultsPanel({
           />
 
           <TutorStudentVocabularyDistribution
-            activeCounts={snapshot.activeSignals.cefrCounts}
-            passiveCounts={snapshot.passiveSignals.cefrCounts}
+            activeSignals={snapshot.activeSignals}
+            passiveSignals={snapshot.passiveSignals}
+            learningSignals={snapshot.learningSignals}
           />
 
           <StudentProgressOverviewCards snapshot={snapshot} />

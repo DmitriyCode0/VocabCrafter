@@ -1146,6 +1146,69 @@ export interface Database {
           },
         ];
       };
+      student_vocabulary_items: {
+        Row: {
+          id: string;
+          student_id: string;
+          library_item_id: string | null;
+          term: string;
+          normalized_term: string;
+          item_type: "word" | "phrase";
+          current_state: "passive_only" | "active_and_passive" | "learning";
+          has_active_evidence: boolean;
+          has_passive_evidence: boolean;
+          moved_to_learning_at: string | null;
+          learning_archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          library_item_id?: string | null;
+          term: string;
+          normalized_term: string;
+          item_type: "word" | "phrase";
+          current_state: "passive_only" | "active_and_passive" | "learning";
+          has_active_evidence?: boolean;
+          has_passive_evidence?: boolean;
+          moved_to_learning_at?: string | null;
+          learning_archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          library_item_id?: string | null;
+          term?: string;
+          normalized_term?: string;
+          item_type?: "word" | "phrase";
+          current_state?: "passive_only" | "active_and_passive" | "learning";
+          has_active_evidence?: boolean;
+          has_passive_evidence?: boolean;
+          moved_to_learning_at?: string | null;
+          learning_archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "student_vocabulary_items_library_item_id_fkey";
+            columns: ["library_item_id"];
+            isOneToOne: false;
+            referencedRelation: "passive_vocabulary_library";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "student_vocabulary_items_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       passive_vocabulary_evidence: {
         Row: {
           id: string;
@@ -2351,4 +2414,6 @@ export type TutorStudentProgressOverride =
   Database["public"]["Tables"]["tutor_student_progress_overrides"]["Row"];
 export type PassiveVocabularyEvidence =
   Database["public"]["Tables"]["passive_vocabulary_evidence"]["Row"];
+export type StudentVocabularyItem =
+  Database["public"]["Tables"]["student_vocabulary_items"]["Row"];
 export type WordMastery = Database["public"]["Tables"]["word_mastery"]["Row"];

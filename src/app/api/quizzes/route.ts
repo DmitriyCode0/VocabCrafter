@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import {
+  inferPassiveVocabularyItemType,
+  normalizePassiveVocabularyText,
+} from "@/lib/mastery/passive-vocabulary";
+import { resolvePassiveVocabularyLibraryItems } from "@/lib/mastery/passive-vocabulary-library";
+import { markStudentVocabularyStateAsLearning } from "@/lib/mastery/student-vocabulary-state";
+import { normalizeLearningLanguage } from "@/lib/languages";
 import { z } from "zod";
 
 const PASSING_SCORE_PERCENT = 80;
@@ -38,6 +45,7 @@ const createQuizSchema = z.object({
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
+    const supabaseAdmin = createAdminClient();
 
     const {
       data: { user },
@@ -67,6 +75,16 @@ export async function POST(request: Request) {
       isPublic,
     } = parsed.data;
 
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role, preferred_language")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { data: quiz, error: insertError } = await supabase
       .from("quizzes")
       .insert({
@@ -91,6 +109,73 @@ export async function POST(request: Request) {
         { error: "Failed to save quiz" },
         { status: 500 },
       );
+    }
+
+    const requestedItems = vocabularyTerms
+      .map((item) => {
+        const trimmedTerm = item.term.trim().replace(/\s+/g, " ");
+        const normalizedTerm = normalizePassiveVocabularyText(trimmedTerm);
+
+        if (!trimmedTerm || !normalizedTerm) {
+          return null;
+        }
+
+        return {
+          term: trimmedTerm,
+          normalizedTerm,
+          itemType: inferPassiveVocabularyItemType(trimmedTerm),
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+
+    if (requestedItems.length > 0) {
+      try {
+        const resolvedItems = await resolvePassiveVocabularyLibraryItems({
+          adminClient: supabaseAdmin,
+          actorUserId: user.id,
+          targetLanguage: normalizeLearningLanguage(profile.preferred_language),
+          items: requestedItems,
+        });
+
+        if (profile.role === "student") {
+          const dedupedVocabularyItems = new Map<
+            string,
+            {
+              term: string;
+              normalizedTerm: string;
+              itemType: "word" | "phrase";
+              libraryItemId: string | null;
+            }
+          >();
+
+          for (const item of resolvedItems) {
+            const key = `${item.itemType}:${item.canonicalNormalizedTerm}`;
+            if (dedupedVocabularyItems.has(key)) {
+              continue;
+            }
+
+            dedupedVocabularyItems.set(key, {
+              term: item.canonicalTerm,
+              normalizedTerm: item.canonicalNormalizedTerm,
+              itemType: item.itemType,
+              libraryItemId: item.libraryItemId,
+            });
+          }
+
+          await markStudentVocabularyStateAsLearning({
+            adminClient: supabaseAdmin,
+            studentId: user.id,
+            items: Array.from(dedupedVocabularyItems.values()),
+          });
+        }
+      } catch (vocabularySyncError) {
+        await supabase.from("quizzes").delete().eq("id", quiz.id);
+        console.error("Quiz vocabulary sync error:", vocabularySyncError);
+        return NextResponse.json(
+          { error: "Failed to initialize quiz vocabulary" },
+          { status: 500 },
+        );
+      }
     }
 
     return NextResponse.json({ quiz });

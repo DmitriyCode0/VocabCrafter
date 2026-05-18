@@ -343,6 +343,9 @@ export function LibraryDictionaryBrowser({
   const [updatingApprovalItemId, setUpdatingApprovalItemId] = useState<
     string | null
   >(null);
+  const [reEnrichingItemId, setReEnrichingItemId] = useState<string | null>(
+    null,
+  );
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [isBatchConfirming, setIsBatchConfirming] = useState(false);
@@ -844,6 +847,41 @@ export function LibraryDictionaryBrowser({
     [applyLocalApprovalStatus],
   );
 
+  const handleGenerateMetadataItem = useCallback(
+    async (item: PassiveVocabularyLibraryAdminItem) => {
+      if (item.item_type !== "word") {
+        return;
+      }
+
+      setReEnrichingItemId(item.id);
+
+      try {
+        const result = await reEnrichPassiveVocabularyLibraryItems([item.id]);
+
+        if (result.successCount > 0) {
+          toast.success(
+            messages.library.dictionary.reEnrichedSuccess(item.canonical_term),
+          );
+        } else {
+          toast.error(
+            result.firstErrorMessage ?? messages.library.dictionary.reEnrichFailed,
+          );
+        }
+
+        await reloadItems();
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : messages.library.dictionary.reEnrichFailed,
+        );
+      } finally {
+        setReEnrichingItemId(null);
+      }
+    },
+    [messages.library.dictionary, reloadItems],
+  );
+
   const handleSelectVisible = useCallback(
     (checked: boolean) => {
       if (!checked) {
@@ -1003,7 +1041,7 @@ export function LibraryDictionaryBrowser({
 
   return (
     <div className="space-y-6">
-      {role === "superadmin" ? (
+      {role === "superadmin" && reviewItems.length > 0 ? (
         <div className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">
@@ -1014,145 +1052,130 @@ export function LibraryDictionaryBrowser({
             </p>
           </div>
 
-          {reviewItems.length === 0 ? (
-            <Card>
-              <CardContent className="py-6 text-sm text-muted-foreground">
-                {messages.library.dictionary.noPendingTutorSuggestions}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 xl:grid-cols-2">
-              {reviewItems.map((suggestion) => {
-                const currentTranslation =
-                  getPassiveVocabularyUkrainianTranslation(
-                    suggestion.current_attributes,
-                  );
-                const proposedTranslation =
-                  getPassiveVocabularyUkrainianTranslation(
-                    suggestion.proposed_attributes,
-                  );
-                const isReviewing = reviewingSuggestionId === suggestion.id;
-
-                return (
-                  <Card key={suggestion.id}>
-                    <CardHeader>
-                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                        <div>
-                          <CardTitle className="text-base">
-                            {messages.library.dictionary.suggestionCardTitle(
-                              suggestion.current_term,
-                              suggestion.proposed_canonical_term,
-                            )}
-                          </CardTitle>
-                          <CardDescription>
-                            {messages.library.dictionary.suggestedBy(
-                              suggestion.submitter_name,
-                            )}
-                            {suggestion.submitter_email
-                              ? ` (${suggestion.submitter_email})`
-                              : ""}{" "}
-                            {formatAppDate(suggestion.created_at)}
-                          </CardDescription>
-                        </div>
-                        <Badge variant="outline">
-                          {messages.library.dictionary.pendingStatus}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-lg border px-3 py-3">
-                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            {messages.library.dictionary.currentLabel}
-                          </p>
-                          <p className="mt-2 font-medium">
-                            {suggestion.current_term}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {currentTranslation ??
-                              messages.library.dictionary
-                                .noUkrainianTranslation}
-                          </p>
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {messages.library.dictionary.cefrLabel}:{" "}
-                            {suggestion.current_cefr_level ??
-                              messages.library.dictionary.unknownValue}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {messages.library.dictionary.partOfSpeechLabel}:{" "}
-                            {formatPassiveVocabularyPartOfSpeech(
-                              suggestion.current_part_of_speech,
-                            )}
-                          </p>
-                        </div>
-
-                        <div className="rounded-lg border bg-muted/20 px-3 py-3">
-                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            {messages.library.dictionary.proposedLabel}
-                          </p>
-                          <p className="mt-2 font-medium">
-                            {suggestion.proposed_canonical_term}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {proposedTranslation ??
-                              messages.library.dictionary
-                                .noUkrainianTranslation}
-                          </p>
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {messages.library.dictionary.cefrLabel}:{" "}
-                            {suggestion.proposed_cefr_level ??
-                              messages.library.dictionary.unknownValue}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {messages.library.dictionary.partOfSpeechLabel}:{" "}
-                            {formatPassiveVocabularyPartOfSpeech(
-                              suggestion.proposed_part_of_speech,
-                            )}
-                          </p>
-                        </div>
-                      </div>
-
-                      {suggestion.suggestion_note ? (
-                        <div className="rounded-lg border border-dashed px-3 py-3 text-sm text-muted-foreground">
-                          {suggestion.suggestion_note}
-                        </div>
-                      ) : null}
-
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={isReviewing}
-                          onClick={() =>
-                            void handleApproveSuggestion(suggestion)
-                          }
-                        >
-                          {isReviewing ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Check className="mr-2 h-4 w-4" />
-                          )}
-                          {messages.library.dictionary.approveAction}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={isReviewing}
-                          onClick={() =>
-                            void handleRejectSuggestion(suggestion)
-                          }
-                        >
-                          <X className="mr-2 h-4 w-4" />
-                          {messages.library.dictionary.rejectAction}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {reviewItems.map((suggestion) => {
+              const currentTranslation = getPassiveVocabularyUkrainianTranslation(
+                suggestion.current_attributes,
+              );
+              const proposedTranslation =
+                getPassiveVocabularyUkrainianTranslation(
+                  suggestion.proposed_attributes,
                 );
-              })}
-            </div>
-          )}
+              const isReviewing = reviewingSuggestionId === suggestion.id;
+
+              return (
+                <Card key={suggestion.id}>
+                  <CardHeader>
+                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <CardTitle className="text-base">
+                          {messages.library.dictionary.suggestionCardTitle(
+                            suggestion.current_term,
+                            suggestion.proposed_canonical_term,
+                          )}
+                        </CardTitle>
+                        <CardDescription>
+                          {messages.library.dictionary.suggestedBy(
+                            suggestion.submitter_name,
+                          )}
+                          {suggestion.submitter_email
+                            ? ` (${suggestion.submitter_email})`
+                            : ""}{" "}
+                          {formatAppDate(suggestion.created_at)}
+                        </CardDescription>
+                      </div>
+                      <Badge variant="outline">
+                        {messages.library.dictionary.pendingStatus}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="rounded-lg border px-3 py-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {messages.library.dictionary.currentLabel}
+                        </p>
+                        <p className="mt-2 font-medium">
+                          {suggestion.current_term}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {currentTranslation ??
+                            messages.library.dictionary.noUkrainianTranslation}
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {messages.library.dictionary.cefrLabel}:{" "}
+                          {suggestion.current_cefr_level ??
+                            messages.library.dictionary.unknownValue}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {messages.library.dictionary.partOfSpeechLabel}:{" "}
+                          {formatPassiveVocabularyPartOfSpeech(
+                            suggestion.current_part_of_speech,
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border bg-muted/20 px-3 py-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {messages.library.dictionary.proposedLabel}
+                        </p>
+                        <p className="mt-2 font-medium">
+                          {suggestion.proposed_canonical_term}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {proposedTranslation ??
+                            messages.library.dictionary.noUkrainianTranslation}
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {messages.library.dictionary.cefrLabel}:{" "}
+                          {suggestion.proposed_cefr_level ??
+                            messages.library.dictionary.unknownValue}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {messages.library.dictionary.partOfSpeechLabel}:{" "}
+                          {formatPassiveVocabularyPartOfSpeech(
+                            suggestion.proposed_part_of_speech,
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {suggestion.suggestion_note ? (
+                      <div className="rounded-lg border border-dashed px-3 py-3 text-sm text-muted-foreground">
+                        {suggestion.suggestion_note}
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={isReviewing}
+                        onClick={() => void handleApproveSuggestion(suggestion)}
+                      >
+                        {isReviewing ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="mr-2 h-4 w-4" />
+                        )}
+                        {messages.library.dictionary.approveAction}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={isReviewing}
+                        onClick={() => void handleRejectSuggestion(suggestion)}
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        {messages.library.dictionary.rejectAction}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 
@@ -1384,6 +1407,7 @@ export function LibraryDictionaryBrowser({
               <TableBody>
                 {items.map((item) => {
                   const isUpdatingApproval = updatingApprovalItemId === item.id;
+                  const isGeneratingMetadata = reEnrichingItemId === item.id;
                   const ukrainianTranslation =
                     getPassiveVocabularyUkrainianTranslation(item.attributes);
                   const storedSearchForms = getPassiveVocabularyForms(
@@ -1470,14 +1494,41 @@ export function LibraryDictionaryBrowser({
                       </TableCell>
                       <TableCell>{formatAppDate(item.updated_at)}</TableCell>
                       <TableCell>
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                           {role === "superadmin" ? (
                             <>
+                              {item.item_type === "word" ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={
+                                    isUpdatingApproval ||
+                                    isGeneratingMetadata ||
+                                    isBatchActionInProgress
+                                  }
+                                  onClick={() =>
+                                    void handleGenerateMetadataItem(item)
+                                  }
+                                >
+                                  {isGeneratingMetadata ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="mr-2 h-4 w-4" />
+                                  )}
+                                  Generate Metadata
+                                </Button>
+                              ) : null}
+
                               {item.approval_status !== "confirmed" ? (
                                 <Button
                                   type="button"
                                   size="sm"
-                                  disabled={isUpdatingApproval}
+                                  disabled={
+                                    isUpdatingApproval ||
+                                    isGeneratingMetadata ||
+                                    isBatchActionInProgress
+                                  }
                                   onClick={() => void handleConfirmItem(item)}
                                 >
                                   {isUpdatingApproval ? (
@@ -1494,7 +1545,11 @@ export function LibraryDictionaryBrowser({
                                   type="button"
                                   variant="destructive"
                                   size="sm"
-                                  disabled={isUpdatingApproval}
+                                  disabled={
+                                    isUpdatingApproval ||
+                                    isGeneratingMetadata ||
+                                    isBatchActionInProgress
+                                  }
                                   onClick={() => void handleRejectItem(item)}
                                 >
                                   <X className="mr-2 h-4 w-4" />
@@ -1522,7 +1577,11 @@ export function LibraryDictionaryBrowser({
                                 variant="destructive"
                                 size="icon"
                                 className="h-8 w-8"
-                                disabled={isUpdatingApproval}
+                                disabled={
+                                  isUpdatingApproval ||
+                                  isGeneratingMetadata ||
+                                  isBatchActionInProgress
+                                }
                                 onClick={() => void handleDeleteItem(item)}
                               >
                                 <Trash2 className="h-4 w-4" />

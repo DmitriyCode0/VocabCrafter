@@ -33,6 +33,11 @@ import {
   summarizePassiveVocabularyEvidence,
 } from "@/lib/mastery/passive-vocabulary";
 import { hasConfirmedPassiveVocabularyLibraryEntry } from "@/lib/mastery/dictionary-approval";
+import {
+  createStudentVocabularyStateKey,
+  createStudentVocabularyStateKeyFromTerm,
+  getStudentLearningVocabularyKeySet,
+} from "@/lib/mastery/student-vocabulary-state";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +77,7 @@ interface PassiveEvidenceRow {
   id: string;
   term: string;
   definition: string | null;
+  normalized_term: string;
   item_type: "word" | "phrase";
   source_type: "full_text" | "manual_list" | "curated_list";
   source_label: string | null;
@@ -80,6 +86,14 @@ interface PassiveEvidenceRow {
   passive_vocabulary_library: {
     approval_status: "unconfirmed" | "confirmed" | "rejected";
   } | null;
+}
+
+interface LearningStateRow {
+  term: string;
+  normalized_term: string;
+  item_type: "word" | "phrase";
+  moved_to_learning_at: string | null;
+  learning_archived_at: string | null;
 }
 
 function hasPendingPassiveEvidence(
@@ -121,8 +135,11 @@ export async function StudentVocabularyPageContent({
     masteredCountResult,
     dueForReviewResult,
     levelRowsResult,
+    masteryTermsResult,
     wordsResult,
     passiveEvidenceRowsResult,
+    learningStateRowsResult,
+    learningVocabularyKeySet,
   ] = await Promise.all([
     supabaseAdmin
       .from("word_mastery")
@@ -144,6 +161,7 @@ export async function StudentVocabularyPageContent({
       .from("word_mastery")
       .select("mastery_level")
       .eq("student_id", user.id),
+    supabaseAdmin.from("word_mastery").select("term").eq("student_id", user.id),
     supabaseAdmin
       .from("word_mastery")
       .select("*")
@@ -154,23 +172,59 @@ export async function StudentVocabularyPageContent({
     supabaseAdmin
       .from("passive_vocabulary_evidence")
       .select(
-        "id, term, definition, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(approval_status)",
+        "id, term, definition, normalized_term, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(approval_status)",
       )
       .eq("student_id", user.id),
+    supabaseAdmin
+      .from("student_vocabulary_items")
+      .select(
+        "term, normalized_term, item_type, moved_to_learning_at, learning_archived_at",
+      )
+      .eq("student_id", user.id)
+      .eq("current_state", "learning")
+      .order("moved_to_learning_at", { ascending: false }),
+    getStudentLearningVocabularyKeySet({
+      adminClient: supabaseAdmin,
+      studentId: user.id,
+    }),
   ]);
 
-  const totalWords = totalWordsResult.count ?? 0;
+  const masteryWordCount = totalWordsResult.count ?? 0;
   const masteredCount = masteredCountResult.count ?? 0;
   const dueForReview = dueForReviewResult.count ?? 0;
   const levelRows = levelRowsResult.data ?? [];
+  const masteryTermRows = (masteryTermsResult.data ?? []) as Array<{
+    term: string;
+  }>;
   const visibleWords = (wordsResult.data ?? []) as WordMasteryRow[];
   const allPassiveEvidenceRows =
     (passiveEvidenceRowsResult.data ?? []) as PassiveEvidenceRow[];
+  const learningStateRows =
+    (learningStateRowsResult.data ?? []) as LearningStateRow[];
+  const masteryWordKeySet = new Set(
+    masteryTermRows
+      .map((row) => createStudentVocabularyStateKeyFromTerm(row.term))
+      .filter((key): key is string => key !== null),
+  );
+  const queuedLearningRows = learningStateRows.filter(
+    (row) =>
+      row.learning_archived_at == null &&
+      !masteryWordKeySet.has(
+        createStudentVocabularyStateKey(row.normalized_term, row.item_type),
+      ),
+  );
+  const totalWords = masteryWordCount + queuedLearningRows.length;
   const visiblePassiveEvidenceRows = allPassiveEvidenceRows.filter((row) =>
-    hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library),
+    hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library) &&
+      !learningVocabularyKeySet.has(
+        createStudentVocabularyStateKey(row.normalized_term, row.item_type),
+      ),
   );
   const pendingPassiveEvidenceCount = allPassiveEvidenceRows.filter((row) =>
-    hasPendingPassiveEvidence(row.passive_vocabulary_library),
+    hasPendingPassiveEvidence(row.passive_vocabulary_library) &&
+      !learningVocabularyKeySet.has(
+        createStudentVocabularyStateKey(row.normalized_term, row.item_type),
+      ),
   ).length;
   const passiveEvidenceTotal = visiblePassiveEvidenceRows.length;
   const passiveEvidenceSummary = summarizePassiveVocabularyEvidence(
@@ -186,14 +240,17 @@ export async function StudentVocabularyPageContent({
   );
 
   const avgLevel =
-    levelRows.length > 0
+    levelRows.length + queuedLearningRows.length > 0
       ? (
           levelRows.reduce((sum, row) => sum + (row.mastery_level ?? 0), 0) /
-          levelRows.length
+          (levelRows.length + queuedLearningRows.length)
         ).toFixed(1)
       : "0";
 
   const levelCounts = new Map<number, number>();
+  if (queuedLearningRows.length > 0) {
+    levelCounts.set(0, queuedLearningRows.length);
+  }
   for (const row of levelRows) {
     const level = row.mastery_level ?? 0;
     levelCounts.set(level, (levelCounts.get(level) ?? 0) + 1);
@@ -382,6 +439,62 @@ export async function StudentVocabularyPageContent({
         </Card>
       ) : (
         <div className="space-y-6">
+          {queuedLearningRows.length > 0 ? (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className={`${LEVEL_COLORS[0]} border-0`}
+                    >
+                      Level 0
+                    </Badge>
+                    Queued for Learning
+                  </CardTitle>
+                  <span className="text-sm text-muted-foreground">
+                    {queuedLearningRows.length} word
+                    {queuedLearningRows.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <CardDescription>
+                  Added to learning through quiz creation and waiting for first
+                  practice results.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {queuedLearningRows.map((word) => (
+                    <div
+                      key={`${word.item_type}:${word.normalized_term}`}
+                      className="flex flex-col gap-1 rounded-lg border p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="truncate text-sm font-medium">
+                          {word.term}
+                        </span>
+                        <Badge variant="outline" className="text-xs px-1.5">
+                          Waiting
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {word.item_type === "phrase"
+                          ? "Phrase queued for practice"
+                          : "Word queued for practice"}
+                      </p>
+                      <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>First quiz attempt pending</span>
+                        {word.moved_to_learning_at ? (
+                          <span>{formatAppDate(word.moved_to_learning_at)}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
           {Array.from(wordsByLevel.entries())
             .sort(([leftLevel], [rightLevel]) => leftLevel - rightLevel)
             .map(([level, levelWords]) => (
@@ -473,13 +586,15 @@ export async function StudentVocabularyPageContent({
               </Card>
             ))}
 
-          <PagePagination
-            pathname="/mastery"
-            currentPage={currentPage}
-            pageSize={VOCABULARY_PAGE_SIZE}
-            totalItems={totalWords}
-            searchParams={resolvedSearchParams}
-          />
+          {masteryWordCount > 0 ? (
+            <PagePagination
+              pathname="/mastery"
+              currentPage={currentPage}
+              pageSize={VOCABULARY_PAGE_SIZE}
+              totalItems={masteryWordCount}
+              searchParams={resolvedSearchParams}
+            />
+          ) : null}
         </div>
       )}
     </div>

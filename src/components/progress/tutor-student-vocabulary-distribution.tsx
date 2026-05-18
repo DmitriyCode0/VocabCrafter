@@ -39,12 +39,14 @@ function VocabularyDistributionChart({
   title,
   description,
   counts,
+  pendingReviewCount,
   color,
   emptyTitle,
 }: {
   title: string;
   description: string;
   counts: VocabularyCefrCounts;
+  pendingReviewCount: number;
   color: string;
   emptyTitle: string;
 }) {
@@ -70,6 +72,16 @@ function VocabularyDistributionChart({
             <Badge variant="secondary">
               {messages.tutorProgressPage.vocabularyKnownCountLabel(knownCount)}
             </Badge>
+            {pendingReviewCount > 0 ? (
+              <Badge
+                variant="outline"
+                className="border-amber-200 bg-amber-50 text-amber-800"
+              >
+                {messages.tutorProgressPage.vocabularyPendingReviewCountLabel(
+                  pendingReviewCount,
+                )}
+              </Badge>
+            ) : null}
             {counts.unknown > 0 ? (
               <Badge variant="outline">
                 {messages.tutorProgressPage.vocabularyUnknownCountLabel(
@@ -124,13 +136,15 @@ function VocabularyDistributionChart({
 }
 
 interface TutorStudentVocabularyDistributionProps {
-  activeCounts: StudentProgressSnapshot["activeSignals"]["cefrCounts"];
-  passiveCounts: StudentProgressSnapshot["passiveSignals"]["cefrCounts"];
+  activeSignals: StudentProgressSnapshot["activeSignals"];
+  passiveSignals: StudentProgressSnapshot["passiveSignals"];
+  learningSignals: StudentProgressSnapshot["learningSignals"];
 }
 
 export function TutorStudentVocabularyDistribution({
-  activeCounts,
-  passiveCounts,
+  activeSignals,
+  passiveSignals,
+  learningSignals,
 }: TutorStudentVocabularyDistributionProps) {
   const { messages } = useAppI18n();
 
@@ -152,20 +166,30 @@ export function TutorStudentVocabularyDistribution({
             {messages.tutorProgressPage.vocabularyDistributionDescription}
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 xl:grid-cols-2">
+        <CardContent className="grid gap-4 xl:grid-cols-3">
           <VocabularyDistributionChart
             title={messages.tutorProgressPage.activeVocabularyDistributionTitle}
             description={messages.tutorProgressPage.activeVocabularyDistributionDescription}
-            counts={activeCounts}
+            counts={activeSignals.cefrCounts}
+            pendingReviewCount={activeSignals.pendingReviewCount}
             color="var(--color-chart-1)"
             emptyTitle={messages.tutorProgressPage.noActiveVocabularyDistribution}
           />
           <VocabularyDistributionChart
             title={messages.tutorProgressPage.passiveVocabularyDistributionTitle}
             description={messages.tutorProgressPage.passiveVocabularyDistributionDescription}
-            counts={passiveCounts}
+            counts={passiveSignals.cefrCounts}
+            pendingReviewCount={passiveSignals.pendingReviewCount}
             color="#f59e0b"
             emptyTitle={messages.tutorProgressPage.noPassiveVocabularyDistribution}
+          />
+          <VocabularyDistributionChart
+            title={messages.tutorProgressPage.learningVocabularyDistributionTitle}
+            description={messages.tutorProgressPage.learningVocabularyDistributionDescription}
+            counts={learningSignals.cefrCounts}
+            pendingReviewCount={learningSignals.pendingReviewCount}
+            color="#2563eb"
+            emptyTitle={messages.tutorProgressPage.noLearningVocabularyDistribution}
           />
         </CardContent>
       </Card>

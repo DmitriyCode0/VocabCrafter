@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { syncStudentVocabularyStateFromWordMastery } from "@/lib/mastery/student-vocabulary-state";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -466,5 +467,16 @@ export async function upsertWordMastery(
 
   if (error) {
     console.error("Failed to upsert word mastery:", error);
+    return;
   }
+
+  await syncStudentVocabularyStateFromWordMastery({
+    adminClient: supabaseAdmin,
+    studentId,
+    items: upsertRows.map((row) => ({
+      term: row.term,
+      masteryLevel: row.mastery_level,
+      practicedAt: row.last_practiced,
+    })),
+  });
 }

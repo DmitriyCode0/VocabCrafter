@@ -6,6 +6,7 @@ import {
   passiveVocabularyImportSchema,
 } from "@/lib/mastery/passive-vocabulary";
 import { resolvePassiveVocabularyLibraryItems } from "@/lib/mastery/passive-vocabulary-library";
+import { syncStudentVocabularyStateFromPassiveEvidence } from "@/lib/mastery/student-vocabulary-state";
 import { isEnglishWord } from "@/lib/text/language-detection";
 import { normalizeLearningLanguage } from "@/lib/languages";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
@@ -271,6 +272,17 @@ export async function POST(request: Request) {
         { status: 500 },
       );
     }
+
+    await syncStudentVocabularyStateFromPassiveEvidence({
+      adminClient: supabaseAdmin,
+      studentId,
+      items: canonicalItemList.map((item) => ({
+        term: item.term,
+        normalizedTerm: item.normalizedTerm,
+        itemType: item.itemType,
+        libraryItemId: item.libraryItemId,
+      })),
+    });
 
     const createdCount = canonicalItemList.filter(
       (item) =>
