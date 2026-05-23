@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { StudentProgressAxis } from "@/lib/progress/profile-metrics";
 
 export const progressAxisKeySchema = z.enum([
   "active_vocab",
@@ -49,13 +48,6 @@ export const progressInsightsSchema = z.object({
   nextActions: z.array(z.string().trim().min(1)).max(6),
 });
 
-export const tutorProgressAxisOverrideSchema = z.object({
-  key: progressAxisKeySchema,
-  score: z.number().int().min(0).max(100),
-  value: z.string().trim().min(1),
-  helper: z.string().trim().min(1),
-});
-
 export const tutorTimeAdjustmentHoursSchema = z
   .number()
   .finite()
@@ -63,117 +55,12 @@ export const tutorTimeAdjustmentHoursSchema = z
   .max(5000)
   .default(0);
 
-export const tutorMonthlyProgressTargetsSchema = z.object({
-  transcriptTarget: z.number().int().min(1).max(10000),
-  practiceTarget: z.number().int().min(1).max(10000),
-  passiveTarget: z.number().int().min(1).max(10000),
-  activeDaysTarget: z.number().int().min(1).max(366),
-  activityTarget: z.number().int().min(1).max(10000),
-  grammarTarget: z.number().int().min(1).max(10000),
-});
-
-export const tutorProgressOverrideSchema = z.object({
-  axisOverrides: z.array(tutorProgressAxisOverrideSchema).max(5).default([]),
-  insightsOverride: progressInsightsSchema.nullable().default(null),
-  monthlyTargetOverrides: tutorMonthlyProgressTargetsSchema.nullable().default(null),
-  timeAdjustmentHours: tutorTimeAdjustmentHoursSchema,
-});
-
-export type ProgressAxisKey = z.infer<typeof progressAxisKeySchema>;
 export type ProgressInsights = z.infer<typeof progressInsightsSchema>;
 export type EstimatedBand = z.infer<typeof estimatedBandSchema>;
-export type TutorProgressAxisOverride = z.infer<
-  typeof tutorProgressAxisOverrideSchema
->;
-export type TutorMonthlyProgressTargets = z.infer<
-  typeof tutorMonthlyProgressTargetsSchema
->;
-export type TutorProgressOverride = z.infer<typeof tutorProgressOverrideSchema>;
-
-export const EMPTY_TUTOR_PROGRESS_OVERRIDE: TutorProgressOverride = {
-  axisOverrides: [],
-  insightsOverride: null,
-  monthlyTargetOverrides: null,
-  timeAdjustmentHours: 0,
-};
 
 export function parseProgressInsightsValue(
   input: unknown,
 ): ProgressInsights | null {
   const parsed = progressInsightsSchema.nullable().safeParse(input ?? null);
   return parsed.success ? parsed.data : null;
-}
-
-export function parseTutorProgressOverride(
-  input:
-    | {
-        axis_overrides?: unknown;
-        insights_override?: unknown;
-        monthly_target_overrides?: unknown;
-        time_adjustment_hours?: unknown;
-      }
-    | null
-    | undefined,
-): TutorProgressOverride {
-  if (!input) {
-    return EMPTY_TUTOR_PROGRESS_OVERRIDE;
-  }
-
-  const axisOverrides = z
-    .array(tutorProgressAxisOverrideSchema)
-    .max(5)
-    .safeParse(input.axis_overrides);
-
-  return {
-    axisOverrides: axisOverrides.success ? axisOverrides.data : [],
-    insightsOverride: parseProgressInsightsValue(input.insights_override),
-    monthlyTargetOverrides: tutorMonthlyProgressTargetsSchema
-      .nullable()
-      .catch(null)
-      .parse(input.monthly_target_overrides),
-    timeAdjustmentHours: tutorTimeAdjustmentHoursSchema.catch(0).parse(
-      input.time_adjustment_hours,
-    ),
-  };
-}
-
-export function hasTutorProgressOverrideContent(
-  override: TutorProgressOverride,
-) {
-  return (
-    override.axisOverrides.length > 0 ||
-    override.insightsOverride !== null ||
-    override.monthlyTargetOverrides !== null ||
-    override.timeAdjustmentHours !== 0
-  );
-}
-
-export function applyTutorAxisOverrides(
-  axes: StudentProgressAxis[],
-  axisOverrides: TutorProgressAxisOverride[],
-) {
-  const overrideMap = new Map(axisOverrides.map((axis) => [axis.key, axis]));
-
-  return axes.map((axis) => {
-    const override = overrideMap.get(axis.key);
-
-    if (!override) {
-      return axis;
-    }
-
-    return {
-      ...axis,
-      score: override.score,
-      value: override.value,
-      helper: override.helper,
-    };
-  });
-}
-
-export function buildChartDataFromAxes(axes: StudentProgressAxis[]) {
-  return axes.map((axis) => ({
-    axis: axis.shortLabel,
-    score: axis.score,
-    fullMark: 100,
-  }));
 }

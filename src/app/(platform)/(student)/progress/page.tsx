@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { StudentOverallProgressSections } from "@/components/progress/student-overall-progress-sections";
 import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
 import { StudentProgressInsights } from "@/components/progress/student-progress-insights";
 import { StudentResultsSummary } from "@/components/progress/student-results-summary";
@@ -24,12 +25,8 @@ import {
   getStudentMonthlyComparisonSnapshot,
   getStudentProgressSnapshot,
 } from "@/lib/progress/profile-metrics";
-import {
-  applyTutorAxisOverrides,
-  buildChartDataFromAxes,
-  parseProgressInsightsValue,
-} from "@/lib/progress/contracts";
-import { getPublishedTutorProgressOverride } from "@/lib/progress/published-tutor-override";
+import { parseProgressInsightsValue } from "@/lib/progress/contracts";
+import { getPublishedTutorTimeAdjustment } from "@/lib/progress/published-tutor-time-adjustment";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +96,7 @@ async function ProgressBody({
   const supabase = await createClient();
   const messages = getAppMessages(appLanguage);
 
-  const [snapshot, savedInsightsResult, publishedTutorOverride] =
+  const [snapshot, savedInsightsResult, publishedTutorTimeAdjustment] =
     await Promise.all([
       getStudentProgressSnapshot(userId),
       supabase
@@ -107,42 +104,33 @@ async function ProgressBody({
         .select("insights")
         .eq("user_id", userId)
         .maybeSingle(),
-      getPublishedTutorProgressOverride(userId),
+      getPublishedTutorTimeAdjustment(userId),
     ]);
 
   const monthlyComparison =
     chartView === "monthly"
-      ? await getStudentMonthlyComparisonSnapshot(
-          userId,
-          undefined,
-          publishedTutorOverride?.override.monthlyTargetOverrides,
-        )
+      ? await getStudentMonthlyComparisonSnapshot(userId)
       : null;
 
   const savedInsights = parseProgressInsightsValue(
     savedInsightsResult.data?.insights,
   );
-  const effectiveAxes = publishedTutorOverride
-    ? applyTutorAxisOverrides(
-        snapshot.axes,
-        publishedTutorOverride.override.axisOverrides,
-      )
-    : snapshot.axes;
-  const effectiveSnapshot = publishedTutorOverride
+  const effectiveSnapshot = publishedTutorTimeAdjustment != null
     ? applyTutorTimeAdjustmentToSnapshot(
         snapshot,
-        publishedTutorOverride.override.timeAdjustmentHours,
+        publishedTutorTimeAdjustment,
       )
     : snapshot;
-  const effectiveChartData = buildChartDataFromAxes(effectiveAxes);
-  const displayedInsights =
-    publishedTutorOverride?.override.insightsOverride ?? savedInsights;
   const hasAnyData =
     effectiveSnapshot.overview.totalAttempts > 0 ||
     effectiveSnapshot.timeMetrics.completedLessons > 0 ||
     effectiveSnapshot.overview.totalWords > 0 ||
     effectiveSnapshot.passiveSignals.uniqueItems > 0 ||
-    Boolean(publishedTutorOverride);
+    effectiveSnapshot.timeMetrics.timeAdjustmentHours !== 0;
+
+  if (chartView === "monthly" && !monthlyComparison) {
+    return null;
+  }
 
   if (!hasAnyData) {
     return (
@@ -177,73 +165,59 @@ async function ProgressBody({
   return (
     <>
       {chartView === "overall" ? (
-        <StudentResultsSummary
+        <StudentOverallProgressSections
           snapshot={effectiveSnapshot}
+          radarAside={
+            <StudentProgressInsights
+              hasData={hasAnyData}
+              initialInsights={savedInsights}
+            />
+          }
           showCefrGuidedHoursCard={false}
         />
-      ) : null}
+      ) : (
+        <>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+            <StudentSkillRadar
+              axes={monthlyComparison!.currentMonth.axes}
+              chartData={monthlyComparison!.currentMonth.chartData}
+              cefrLevel={effectiveSnapshot.profile.cefrLevel}
+              grammarNotice={effectiveSnapshot.grammar.betaNotice}
+              grammarTopics={effectiveSnapshot.grammarTopicMastery}
+              title={
+                appLanguage === "uk"
+                  ? "Профіль прогресу за місяць"
+                  : "Monthly Progress Profile"
+              }
+              description={
+                appLanguage === "uk"
+                  ? "Порівняння поточного місяця з попереднім за тими самими п'ятьма осями."
+                  : "Compare the current month with the previous month across the same five axes."
+              }
+              comparison={{
+                currentLabel: formatMonthLabel(
+                  monthlyComparison!.currentMonth.window.reportMonth,
+                  appLanguage,
+                ),
+                previousLabel: formatMonthLabel(
+                  monthlyComparison!.previousMonth.window.reportMonth,
+                  appLanguage,
+                ),
+                previousAxes: monthlyComparison!.previousMonth.axes,
+                previousChartData: monthlyComparison!.previousMonth.chartData,
+              }}
+            />
+            <StudentProgressInsights
+              hasData={hasAnyData}
+              initialInsights={savedInsights}
+            />
+          </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-        <StudentSkillRadar
-          axes={
-            chartView === "monthly" && monthlyComparison
-              ? monthlyComparison.currentMonth.axes
-              : effectiveAxes
-          }
-          chartData={
-            chartView === "monthly" && monthlyComparison
-              ? monthlyComparison.currentMonth.chartData
-              : effectiveChartData
-          }
-          cefrLevel={effectiveSnapshot.profile.cefrLevel}
-          grammarNotice={effectiveSnapshot.grammar.betaNotice}
-          grammarTopics={effectiveSnapshot.grammarTopicMastery}
-          title={
-            chartView === "monthly"
-              ? appLanguage === "uk"
-                ? "Профіль прогресу за місяць"
-                : "Monthly Progress Profile"
-              : undefined
-          }
-          description={
-            chartView === "monthly"
-              ? appLanguage === "uk"
-                ? "Порівняння поточного місяця з попереднім за тими самими п'ятьма осями."
-                : "Compare the current month with the previous month across the same five axes."
-              : undefined
-          }
-          comparison={
-            chartView === "monthly" && monthlyComparison
-              ? {
-                  currentLabel: formatMonthLabel(
-                    monthlyComparison.currentMonth.window.reportMonth,
-                    appLanguage,
-                  ),
-                  previousLabel: formatMonthLabel(
-                    monthlyComparison.previousMonth.window.reportMonth,
-                    appLanguage,
-                  ),
-                  previousAxes: monthlyComparison.previousMonth.axes,
-                  previousChartData: monthlyComparison.previousMonth.chartData,
-                }
-              : undefined
-          }
-        />
-        <StudentProgressInsights
-          hasData={hasAnyData}
-          initialInsights={displayedInsights}
-          isTutorVersion={Boolean(
-            publishedTutorOverride?.override.insightsOverride,
-          )}
-          sourceLabel={publishedTutorOverride?.tutorName}
-        />
-      </div>
+          <StudentResultsSummary snapshot={effectiveSnapshot} />
 
-      {chartView === "monthly" ? (
-        <StudentResultsSummary snapshot={effectiveSnapshot} />
-      ) : null}
-
-      <StudentProgressOverviewCards snapshot={effectiveSnapshot} />
+          <StudentProgressOverviewCards snapshot={effectiveSnapshot} />
+        </>
+      )}
     </>
   );
 }

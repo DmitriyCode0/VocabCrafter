@@ -9,6 +9,10 @@ import {
   type ReportLanguage,
 } from "@/lib/progress/monthly-report-language";
 import {
+  localizeMonthlyReportPentagramSnapshot,
+  type MonthlyPentagramSnapshot,
+} from "@/lib/progress/monthly-pentagram-localization";
+import {
   formatMonthlyReportMonthLabel,
   type StoredMonthlyReport,
 } from "@/lib/progress/monthly-reports";
@@ -338,7 +342,7 @@ function getRadarPoint(
   index: number,
   axisCount: number,
 ) {
-  const angle = -Math.PI / 2 + (Math.PI * 2 * index) / axisCount;
+  const angle = Math.PI / 2 - (Math.PI * 2 * index) / axisCount;
 
   return {
     x: centerX + Math.cos(angle) * radius,
@@ -595,10 +599,6 @@ export async function buildMonthlyReportPdf({
   function drawMetricCardGrid() {
     const metrics = [
       {
-        label: copy.completedQuizzes,
-        value: formatNumber(report.metricsSnapshot.completedQuizzes, 0),
-      },
-      {
         label: copy.sentenceTranslations,
         value: formatMetricProgressValue(
           report.metricsSnapshot.completedSentenceTranslations,
@@ -618,10 +618,6 @@ export async function buildMonthlyReportPdf({
           report.metricsSnapshot.completedLessons,
           report.goalsSnapshot.monthlyCompletedLessonsTarget,
         ),
-      },
-      {
-        label: copy.classroomSessions,
-        value: formatNumber(report.metricsSnapshot.classroomSessions, 0),
       },
       {
         label: copy.appLearningTime,
@@ -712,6 +708,10 @@ export async function buildMonthlyReportPdf({
       StoredMonthlyReport["metricsSnapshot"]["monthlyPentagram"]
     >,
   ) {
+    const localizedPentagram = localizeMonthlyReportPentagramSnapshot(
+      pentagram as MonthlyPentagramSnapshot,
+      reportLanguage,
+    );
     const panelHeight = 318;
     const panelY = cursorY - panelHeight;
     const chartX = PAGE_MARGIN + 18;
@@ -722,17 +722,17 @@ export async function buildMonthlyReportPdf({
     const rightX = chartX + chartWidth + 24;
     const rightWidth = PAGE_MARGIN + CONTENT_WIDTH - rightX - 18;
     const currentLabel = formatMonthlyReportMonthLabel(
-      pentagram.currentMonth.reportMonth,
+      localizedPentagram.currentMonth.reportMonth,
       locale,
     );
     const previousLabel = formatMonthlyReportMonthLabel(
-      pentagram.previousMonth.reportMonth,
+      localizedPentagram.previousMonth.reportMonth,
       locale,
     );
-    const axes = pentagram.currentMonth.axes;
+    const axes = localizedPentagram.currentMonth.axes;
     const axisCount = Math.max(
       axes.length,
-      pentagram.previousMonth.axes.length,
+      localizedPentagram.previousMonth.axes.length,
       0,
     );
 
@@ -790,8 +790,8 @@ export async function buildMonthlyReportPdf({
 
       for (let index = 0; index < axisCount; index += 1) {
         const label =
-          pentagram.currentMonth.axes[index]?.shortLabel ??
-          pentagram.previousMonth.axes[index]?.shortLabel ??
+          localizedPentagram.currentMonth.axes[index]?.shortLabel ??
+          localizedPentagram.previousMonth.axes[index]?.shortLabel ??
           "";
 
         if (!label) {
@@ -816,7 +816,7 @@ export async function buildMonthlyReportPdf({
         });
       }
 
-      const previousPoints = pentagram.previousMonth.chartData.map(
+      const previousPoints = localizedPentagram.previousMonth.chartData.map(
         (item, index) =>
           getRadarPoint(
             chartCenterX,
@@ -826,7 +826,7 @@ export async function buildMonthlyReportPdf({
             axisCount,
           ),
       );
-      const currentPoints = pentagram.currentMonth.chartData.map(
+      const currentPoints = localizedPentagram.currentMonth.chartData.map(
         (item, index) =>
           getRadarPoint(
             chartCenterX,
@@ -902,10 +902,10 @@ export async function buildMonthlyReportPdf({
     rightY -= 24;
 
     const previousAxisMap = new Map(
-      pentagram.previousMonth.axes.map((axis) => [axis.key, axis]),
+      localizedPentagram.previousMonth.axes.map((axis) => [axis.key, axis]),
     );
 
-    for (const axis of pentagram.currentMonth.axes) {
+    for (const axis of localizedPentagram.currentMonth.axes) {
       const previousAxis = previousAxisMap.get(axis.key);
 
       page.drawText(axis.label, {

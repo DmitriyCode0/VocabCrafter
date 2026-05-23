@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  EMPTY_TUTOR_PROGRESS_OVERRIDE,
-  hasTutorProgressOverrideContent,
-  parseTutorProgressOverride,
-  tutorTimeAdjustmentHoursSchema,
-} from "@/lib/progress/contracts";
+import { tutorTimeAdjustmentHoursSchema } from "@/lib/progress/contracts";
 import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
 import { createClient } from "@/lib/supabase/server";
 
@@ -101,9 +96,7 @@ export async function PATCH(
 
   const { data: existingRow, error: existingError } = await access.supabaseAdmin
     .from("tutor_student_progress_overrides")
-    .select(
-      "axis_overrides, insights_override, monthly_target_overrides, time_adjustment_hours",
-    )
+    .select("time_adjustment_hours")
     .eq("tutor_id", access.user.id)
     .eq("student_id", studentId)
     .maybeSingle();
@@ -116,13 +109,7 @@ export async function PATCH(
     );
   }
 
-  const existingOverride = parseTutorProgressOverride(existingRow);
-  const nextOverride = {
-    ...existingOverride,
-    timeAdjustmentHours: parsed.data.timeAdjustmentHours,
-  };
-
-  if (!hasTutorProgressOverrideContent(nextOverride)) {
+  if (parsed.data.timeAdjustmentHours === 0) {
     if (existingRow) {
       const { error: deleteError } = await access.supabaseAdmin
         .from("tutor_student_progress_overrides")
@@ -139,7 +126,7 @@ export async function PATCH(
       }
     }
 
-    return NextResponse.json(EMPTY_TUTOR_PROGRESS_OVERRIDE);
+    return NextResponse.json({ timeAdjustmentHours: 0 });
   }
 
   const { data, error } = await access.supabaseAdmin
@@ -153,9 +140,7 @@ export async function PATCH(
       },
       { onConflict: "tutor_id,student_id" },
     )
-    .select(
-      "axis_overrides, insights_override, monthly_target_overrides, time_adjustment_hours",
-    )
+    .select("time_adjustment_hours")
     .single();
 
   if (error) {
@@ -166,5 +151,5 @@ export async function PATCH(
     );
   }
 
-  return NextResponse.json(parseTutorProgressOverride(data));
+  return NextResponse.json({ timeAdjustmentHours: data.time_adjustment_hours });
 }

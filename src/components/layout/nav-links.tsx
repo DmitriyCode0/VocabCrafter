@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useEffectEvent, useState, type MouseEvent } from "react";
 import { motion } from "motion/react";
 import {
   LayoutDashboard,
@@ -17,7 +17,6 @@ import {
   CreditCard,
   Settings,
   TrendingUp,
-  Zap,
   Brain,
   History,
   UserCheck,
@@ -44,48 +43,62 @@ interface NavItem {
   roles: Role[];
 }
 
+const SHARED_PAGE_ICONS = {
+  dashboard: LayoutDashboard,
+  quizzes: BookOpen,
+  classes: GraduationCap,
+  lessons: CalendarDays,
+  assignments: ClipboardList,
+  mastery: Brain,
+  progress: TrendingUp,
+  vocabulary: BookMarked,
+  library: LibraryBig,
+  billing: CreditCard,
+  settings: Settings,
+} as const;
+
 const NAV_ITEMS: NavItem[] = [
   {
     labelKey: "dashboard",
     href: "/dashboard",
-    icon: LayoutDashboard,
+    icon: SHARED_PAGE_ICONS.dashboard,
     roles: ["student", "tutor", "superadmin"],
   },
   // Student items
   {
     labelKey: "myQuizzes",
     href: "/quizzes",
-    icon: BookOpen,
+    icon: SHARED_PAGE_ICONS.quizzes,
     roles: ["student"],
   },
   {
     labelKey: "myClasses",
     href: "/classes",
-    icon: GraduationCap,
+    icon: SHARED_PAGE_ICONS.classes,
     roles: ["student"],
   },
   {
     labelKey: "lessons",
     href: "/lessons",
-    icon: CalendarDays,
+    icon: SHARED_PAGE_ICONS.lessons,
     roles: ["student", "tutor"],
   },
   {
     labelKey: "assignments",
     href: "/assignments",
-    icon: ClipboardList,
+    icon: SHARED_PAGE_ICONS.assignments,
     roles: ["student"],
   },
   {
     labelKey: "progress",
     href: "/progress",
-    icon: TrendingUp,
+    icon: SHARED_PAGE_ICONS.progress,
     roles: ["student"],
   },
   {
     labelKey: "vocabMastery",
     href: "/mastery",
-    icon: Zap,
+    icon: SHARED_PAGE_ICONS.mastery,
     roles: ["student"],
   },
   {
@@ -104,25 +117,25 @@ const NAV_ITEMS: NavItem[] = [
   {
     labelKey: "myQuizzes",
     href: "/quizzes",
-    icon: BookOpen,
+    icon: SHARED_PAGE_ICONS.quizzes,
     roles: ["tutor"],
   },
   {
     labelKey: "classes",
     href: "/classes",
-    icon: Users,
+    icon: SHARED_PAGE_ICONS.classes,
     roles: ["tutor"],
   },
   {
     labelKey: "assignments",
     href: "/assignments",
-    icon: ClipboardList,
+    icon: SHARED_PAGE_ICONS.assignments,
     roles: ["tutor"],
   },
   {
     labelKey: "vocabMastery",
     href: "/mastery",
-    icon: Brain,
+    icon: SHARED_PAGE_ICONS.mastery,
     roles: ["tutor"],
   },
   {
@@ -134,7 +147,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     labelKey: "progress",
     href: "/results",
-    icon: TrendingUp,
+    icon: SHARED_PAGE_ICONS.progress,
     roles: ["tutor"],
   },
   {
@@ -153,13 +166,13 @@ const NAV_ITEMS: NavItem[] = [
   {
     labelKey: "passiveVocabulary",
     href: "/vocabulary",
-    icon: BookMarked,
+    icon: SHARED_PAGE_ICONS.vocabulary,
     roles: ["student", "tutor", "superadmin"],
   },
   {
     labelKey: "library",
     href: "/library",
-    icon: LibraryBig,
+    icon: SHARED_PAGE_ICONS.library,
     roles: ["tutor", "superadmin"],
   },
   // Admin items
@@ -184,14 +197,14 @@ const NAV_ITEMS: NavItem[] = [
   {
     labelKey: "billing",
     href: "/billing",
-    icon: CreditCard,
+    icon: SHARED_PAGE_ICONS.billing,
     roles: ["student", "tutor", "superadmin"],
   },
   // Shared
   {
     labelKey: "settings",
     href: "/settings",
-    icon: Settings,
+    icon: SHARED_PAGE_ICONS.settings,
     roles: ["student", "tutor", "superadmin"],
   },
 ];
@@ -207,15 +220,22 @@ export function NavLinks({ role, collapsed = false }: NavLinksProps) {
   const { messages } = useAppI18n();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!pendingHref) {
-      return;
-    }
+  const clearPendingHrefForPath = useEffectEvent((nextPathname: string) => {
+    setPendingHref((currentPendingHref) => {
+      if (!currentPendingHref) {
+        return null;
+      }
 
-    if (pathname === pendingHref || pathname.startsWith(`${pendingHref}/`)) {
-      setPendingHref(null);
-    }
-  }, [pathname, pendingHref]);
+      return nextPathname === currentPendingHref ||
+        nextPathname.startsWith(`${currentPendingHref}/`)
+        ? null
+        : currentPendingHref;
+    });
+  });
+
+  useEffect(() => {
+    clearPendingHrefForPath(pathname);
+  }, [pathname]);
 
   const filteredItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
 

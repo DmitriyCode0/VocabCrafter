@@ -9,10 +9,8 @@ import {
   getStudentProgressSnapshot,
 } from "@/lib/progress/profile-metrics";
 import type { StudentMonthlyProgressTargetOverrides } from "@/lib/progress/monthly-progress-targets";
-import {
-  parseTutorProgressOverride,
-  progressAxisKeySchema,
-} from "@/lib/progress/contracts";
+import { progressAxisKeySchema } from "@/lib/progress/contracts";
+import { localizeMonthlyReportPentagramSnapshot } from "@/lib/progress/monthly-pentagram-localization";
 import {
   getReportLanguageLocale,
   getReportLanguagePromptName,
@@ -99,7 +97,7 @@ export const monthlyReportGenerationSourceSchema = z.enum([
 
 export const monthlyReportAiPayloadSchema = z.object({
   title: z.string().trim().min(1).max(120),
-  summary: z.string().trim().min(1).max(1200),
+  conclusions: z.array(z.string().trim().min(1).max(240)).min(1).max(4),
   focusAreas: z.array(z.string().trim().min(1).max(240)).max(5),
   nextSteps: z.array(z.string().trim().min(1).max(240)).min(2).max(5),
 });
@@ -186,18 +184,18 @@ export interface StoredMonthlyReport {
 const MONTHLY_REPORT_SECTION_LABELS: Record<
   ReportLanguage,
   {
-    summary: string;
+    conclusions: string;
     focusAreas: string;
     nextSteps: string;
   }
 > = {
   en: {
-    summary: "Summary",
+    conclusions: "Conclusions",
     focusAreas: "Focus Areas",
     nextSteps: "Next Steps",
   },
   uk: {
-    summary: "Підсумок",
+    conclusions: "Висновки",
     focusAreas: "Зони уваги",
     nextSteps: "Наступні кроки",
   },
@@ -342,6 +340,22 @@ export function formatMonthlyReportMonthLabel(
   }).format(parseUtcDate(reportMonth));
 }
 
+export function resolveMonthlyReportMetricsReferenceDate(
+  reportMonth: string,
+  now: Date = new Date(),
+) {
+  const currentMonthKey = `${now.getUTCFullYear()}-${String(
+    now.getUTCMonth() + 1,
+  ).padStart(2, "0")}-01`;
+
+  if (reportMonth === currentMonthKey) {
+    return now;
+  }
+
+  const [year, month] = reportMonth.split("-").map(Number);
+  return new Date(Date.UTC(year, month, 0));
+}
+
 export async function getTutorStudentMonthlyReportSettings(
   tutorId: string,
   studentId: string,
@@ -400,7 +414,6 @@ export async function getTutorStudentMonthlyReportMetrics(
     practicedWordsResult,
     totalWordsResult,
     connectionsResult,
-    overrideResult,
     monthlyPlanResult,
   ] = await Promise.all([
     admin
@@ -449,14 +462,6 @@ export async function getTutorStudentMonthlyReportMetrics(
           .eq("tutor_id", options.tutorId)
       : admin.from("tutor_students").select("id").eq("student_id", studentId),
     options?.tutorId
-      ? admin
-          .from("tutor_student_progress_overrides")
-          .select("monthly_target_overrides")
-          .eq("tutor_id", options.tutorId)
-          .eq("student_id", studentId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    options?.tutorId
       ? getTutorStudentPlan(options.tutorId, studentId, {
           planMonth: window.reportMonth,
         })
@@ -491,10 +496,6 @@ export async function getTutorStudentMonthlyReportMetrics(
     throw connectionsResult.error;
   }
 
-  if (overrideResult.error) {
-    throw overrideResult.error;
-  }
-
   const connectionIds = (connectionsResult.data ?? []).map(
     (connection) => connection.id,
   );
@@ -519,7 +520,6 @@ export async function getTutorStudentMonthlyReportMetrics(
   let appLearningSeconds = 0;
   let totalHours = 0;
   let classroomDurationSeconds = 0;
-  let tutorSpeakingSeconds = 0;
   let studentSpeakingSeconds = 0;
   let completedSentenceTranslations = 0;
   let completedGapFillExercises = 0;
@@ -546,6 +546,7 @@ export async function getTutorStudentMonthlyReportMetrics(
     }
 
     if (
+      quizType !== "flashcards" &&
       attempt.score != null &&
       attempt.max_score != null &&
       Number(attempt.max_score) > 0
@@ -575,7 +576,6 @@ export async function getTutorStudentMonthlyReportMetrics(
 
   for (const session of classroomSessionsResult.data ?? []) {
     classroomDurationSeconds += Math.max(0, session.duration_seconds ?? 0);
-    tutorSpeakingSeconds += Math.max(0, session.tutor_speaking_seconds ?? 0);
     studentSpeakingSeconds += Math.max(
       0,
       session.student_speaking_seconds ?? 0,
@@ -589,13 +589,8 @@ export async function getTutorStudentMonthlyReportMetrics(
     }
   }
 
-  const totalSpeakingSeconds = tutorSpeakingSeconds + studentSpeakingSeconds;
-
-  const monthlyTargetOverrides = parseTutorProgressOverride(
-    overrideResult.data,
-  ).monthlyTargetOverrides;
   let effectiveMonthlyTargets: StudentMonthlyProgressTargetOverrides | null =
-    monthlyTargetOverrides;
+    null;
 
   if (monthlyPlanResult?.plan) {
     const engagementObjectiveTargets = [
@@ -610,24 +605,17 @@ export async function getTutorStudentMonthlyReportMetrics(
     );
 
     effectiveMonthlyTargets = {
-      ...(monthlyTargetOverrides ?? {}),
       transcriptTarget:
-        monthlyPlanResult.plan.monthlyStudentSpeakingShareTarget ??
-        monthlyTargetOverrides?.transcriptTarget,
-      practiceTarget:
-        monthlyPlanResult.plan.monthlyWordsAddedTarget ??
-        monthlyTargetOverrides?.practiceTarget,
+        monthlyPlanResult.plan.monthlyStudentSpeakingShareTarget ?? undefined,
+      practiceTarget: monthlyPlanResult.plan.monthlyWordsAddedTarget ?? undefined,
       passiveTarget:
-        monthlyPlanResult.plan.monthlyMasteredWordsTarget ??
-        monthlyTargetOverrides?.passiveTarget,
+        monthlyPlanResult.plan.monthlyMasteredWordsTarget ?? undefined,
       activityTarget:
-        activityTargetFromPlan > 0
-          ? activityTargetFromPlan
-          : monthlyTargetOverrides?.activityTarget,
+        activityTargetFromPlan > 0 ? activityTargetFromPlan : undefined,
       grammarTarget:
         monthlyPlanResult.plan.grammarTopicKeys.length > 0
           ? monthlyPlanResult.plan.grammarTopicKeys.length
-          : monthlyTargetOverrides?.grammarTarget,
+          : undefined,
     };
   }
 
@@ -832,35 +820,72 @@ function buildSelectedGrammarTopicLines(
   });
 }
 
-function formatTargetLine(
-  label: string,
+function formatPercentageValue(value: number) {
+  return `${Number.isInteger(value) ? value.toString() : value.toFixed(1).replace(/\.0$/, "")}%`;
+}
+
+function formatMonthlyReportCardValue(
   actual: number | null,
   target: number | null,
-  formatter: (value: number) => string = (value) =>
-    Number.isInteger(value)
-      ? value.toString()
-      : value.toFixed(1).replace(/\.0$/, ""),
+  formatter: (value: number) => string = (value) => value.toString(),
 ) {
   const actualValue = actual == null ? "n/a" : formatter(actual);
 
   if (target == null) {
-    return `${label}: ${actualValue} (no target set)`;
+    return actualValue;
   }
 
-  const targetValue = formatter(target);
+  return `${actualValue} / ${formatter(target)}`;
+}
 
-  if (actual == null) {
-    return `${label}: ${actualValue} vs target ${targetValue}`;
+function buildMonthlyReportCardLines(
+  metrics: MonthlyReportMetrics,
+  goals: MonthlyReportGoals,
+) {
+  return [
+    `- Sentence translation exercises: ${formatMonthlyReportCardValue(metrics.completedSentenceTranslations, goals.monthlySentenceTranslationTarget)}`,
+    `- Gap fill exercises: ${formatMonthlyReportCardValue(metrics.completedGapFillExercises, goals.monthlyGapFillTarget)}`,
+    `- Completed lessons: ${formatMonthlyReportCardValue(metrics.completedLessons, goals.monthlyCompletedLessonsTarget)}`,
+    `- App learning time: ${metrics.appLearningHours == null ? "n/a" : formatHours(metrics.appLearningHours)}`,
+    `- Student speaking time: ${formatHours(metrics.studentSpeakingHours)}`,
+    `- Student speaking share: ${formatMonthlyReportCardValue(metrics.studentSpeakingShare, goals.monthlyStudentSpeakingShareTarget, formatPercentageValue)}`,
+    `- Words added in app: ${formatMonthlyReportCardValue(metrics.newMasteryWords, goals.monthlyWordsAddedTarget)}`,
+    `- Mastered words (levels 4-5): ${formatMonthlyReportCardValue(metrics.masteredWordsLevel45, goals.monthlyMasteredWordsTarget)}`,
+    `- Active days in application: ${metrics.activeDays}`,
+    `- Words reviewed this month: ${metrics.practicedWords}`,
+    `- Average quiz score: ${formatMonthlyReportCardValue(metrics.averageScore, goals.monthlyAverageScoreTarget, formatPercentageValue)}`,
+  ];
+}
+
+function buildMonthlyReportPentagramLines(
+  pentagram: MonthlyReportPentagramSnapshot | null,
+  locale: string,
+) {
+  if (!pentagram) {
+    return ["- Monthly pentagram unavailable."];
   }
 
-  const delta = actual - target;
+  const localizedPentagram = localizeMonthlyReportPentagramSnapshot(
+    pentagram,
+    locale,
+  );
 
-  if (delta === 0) {
-    return `${label}: ${actualValue} vs target ${targetValue} (on target)`;
-  }
+  const previousAxesByKey = new Map(
+    localizedPentagram.previousMonth.axes.map((axis) => [axis.key, axis]),
+  );
 
-  const direction = delta > 0 ? "above" : "below";
-  return `${label}: ${actualValue} vs target ${targetValue} (${formatter(Math.abs(delta))} ${direction})`;
+  return [
+    `- Current month: ${formatMonthlyReportMonthLabel(localizedPentagram.currentMonth.reportMonth, locale)}`,
+    `- Previous month: ${formatMonthlyReportMonthLabel(localizedPentagram.previousMonth.reportMonth, locale)}`,
+    ...localizedPentagram.currentMonth.axes.map((axis) => {
+      const previousAxis = previousAxesByKey.get(axis.key);
+      const previousSummary = previousAxis
+        ? `${previousAxis.score}/100 (${previousAxis.value})`
+        : "n/a";
+
+      return `- ${axis.label}: current ${axis.score}/100 (${axis.value}); previous ${previousSummary}; note ${axis.helper}`;
+    }),
+  ];
 }
 
 function buildMonthlyReportPrompt({
@@ -880,11 +905,8 @@ function buildMonthlyReportPrompt({
 }) {
   const targetLanguage = snapshot.profile.targetLanguageLabel;
   const sourceLanguage = snapshot.profile.sourceLanguageLabel;
-  const scoreLine =
-    metrics.averageScore == null
-      ? "Average scored quiz result this month: n/a"
-      : `Average scored quiz result this month: ${metrics.averageScore}%`;
   const reportLanguageName = getReportLanguagePromptName(goals.reportLanguage);
+  const reportLocale = getReportLanguageLocale(goals.reportLanguage);
   const objectivesLine =
     goals.objectives.length > 0
       ? goals.objectives.map((objective) => `- ${objective}`)
@@ -893,12 +915,20 @@ function buildMonthlyReportPrompt({
     goals.grammarTopicKeys,
     snapshot,
   );
+  const cardMetricLines = buildMonthlyReportCardLines(metrics, goals);
+  const pentagramLines = buildMonthlyReportPentagramLines(
+    metrics.monthlyPentagram,
+    reportLocale,
+  );
 
   return [
     `Write a concise monthly language-learning progress report for ${studentName} for ${monthLabel}.`,
     `The report is created by tutor ${tutorName} and will be visible to the student.`,
-    "Use only the supplied facts. Do not invent lessons, struggles, or achievements.",
+    "Use only the supplied facts. Do not invent lessons, struggles, achievements, or metrics.",
     "Keep the tone encouraging but concrete. Mention missed targets directly if needed.",
+    "The monthly report cards and monthly pentagram below are the canonical source of truth.",
+    "If you mention numbers, copy them exactly from those card and pentagram values.",
+    "Do not mention lifetime totals, dictionary totals, streaks, or any other values not listed below.",
     `Write the title and all report text in ${reportLanguageName}.`,
     "Return JSON only.",
     "",
@@ -906,30 +936,14 @@ function buildMonthlyReportPrompt({
     `- Learning language: ${targetLanguage}`,
     `- Source language: ${sourceLanguage}`,
     `- Target CEFR level: ${snapshot.profile.cefrLevel}`,
-    `- Total tracked words overall: ${snapshot.overview.totalWords}`,
-    `- Mastered words overall: ${snapshot.overview.masteredWords}`,
-    `- Current streak: ${snapshot.overview.streakDays} days`,
-    `- Passive vocabulary evidence items: ${snapshot.passiveSignals.uniqueItems}`,
-    `- Passive equivalent words: ${snapshot.passiveSignals.equivalentWordCount}`,
-    `- Overall average score: ${snapshot.overview.avgScore}%`,
     goals.planTitle ? `- Plan title: ${goals.planTitle}` : null,
     goals.goalSummary ? `- Plan summary: ${goals.goalSummary}` : null,
     "",
-    "This month metrics:",
-    `- Active days in application: ${metrics.activeDays}`,
-    `- Completed quizzes: ${metrics.completedQuizzes}`,
-    `- Completed sentence translation exercises: ${metrics.completedSentenceTranslations}`,
-    `- Completed gap fill exercises: ${metrics.completedGapFillExercises}`,
-    `- Completed lessons: ${metrics.completedLessons}`,
-    `- Classroom sessions: ${metrics.classroomSessions}`,
-    `- Classroom time: ${formatHours(metrics.classroomHours)}`,
-    `- App learning time: ${metrics.appLearningHours == null ? "n/a" : formatHours(metrics.appLearningHours)}`,
-    `- Student speaking time in classroom sessions: ${formatHours(metrics.studentSpeakingHours)}`,
-    `- Student speaking share in classroom sessions: ${metrics.studentSpeakingShare == null ? "n/a" : `${metrics.studentSpeakingShare}%`}`,
-    `- New mastery words: ${metrics.newMasteryWords}`,
-    `- Words reviewed this month: ${metrics.practicedWords}`,
-    `- Words currently in the vocabulary tracker: ${metrics.trackedWordsTotal}`,
-    `- ${scoreLine}`,
+    "Monthly report cards (exact values shown in the UI):",
+    ...cardMetricLines,
+    "",
+    "Monthly pentagram (exact values shown in the UI):",
+    ...pentagramLines,
     "",
     "Current learning plan objectives:",
     ...objectivesLine,
@@ -937,18 +951,14 @@ function buildMonthlyReportPrompt({
     "Selected grammar focus topics:",
     ...grammarTopicLines,
     "",
-    "Targets:",
-    `- ${formatTargetLine("Completed sentence translation exercises", metrics.completedSentenceTranslations, goals.monthlySentenceTranslationTarget)}`,
-    `- ${formatTargetLine("Completed gap fill exercises", metrics.completedGapFillExercises, goals.monthlyGapFillTarget)}`,
-    `- ${formatTargetLine("Completed lessons", metrics.completedLessons, goals.monthlyCompletedLessonsTarget)}`,
-    `- ${formatTargetLine("Words added", metrics.newMasteryWords, goals.monthlyWordsAddedTarget)}`,
-    `- ${formatTargetLine("Average quiz score", metrics.averageScore, goals.monthlyAverageScoreTarget, (value) => `${Number.isInteger(value) ? value.toString() : value.toFixed(1).replace(/\.0$/, "")}%`)}`,
+    "Write only concise conclusion bullets grounded in the supplied evidence.",
+    "Do not write introductory, motivational, or explanatory paragraphs.",
     "",
     "Return JSON with:",
     "- title: short report title",
-    "- summary: 1 short paragraph overview",
-    "- focusAreas: 0 to 5 concise bullet-style sentences",
-    "- nextSteps: 2 to 5 concrete next-step sentences",
+    "- conclusions: 1 to 4 concise evidence-based conclusion bullets",
+    "- focusAreas: 0 to 5 concise evidence-based conclusion bullets",
+    "- nextSteps: 2 to 5 concrete next-step bullets",
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");
@@ -960,7 +970,11 @@ function buildMonthlyReportContent(
 ) {
   const labels =
     MONTHLY_REPORT_SECTION_LABELS[normalizeReportLanguage(reportLanguage)];
-  const sections = [`${labels.summary}\n${payload.summary}`];
+  const sections = [
+    `${labels.conclusions}\n${payload.conclusions
+      .map((item) => `- ${item}`)
+      .join("\n")}`,
+  ];
 
   if (payload.focusAreas.length > 0) {
     sections.push(
@@ -1164,7 +1178,7 @@ export async function generateTutorStudentMonthlyReport({
       {
         prompt,
         systemInstruction:
-          "You write student-facing monthly language progress reports. Use only supplied evidence, keep claims conservative, and return valid JSON only.",
+          "You write student-facing monthly language progress reports using concise conclusions only. Use only supplied evidence, keep claims conservative, avoid narrative paragraphs, and return valid JSON only.",
         temperature: 0.4,
       },
       monthlyReportAiPayloadSchema,

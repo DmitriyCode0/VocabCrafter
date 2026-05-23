@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getTutorStudentMonthlyReportMetrics } from "@/lib/progress/monthly-reports";
+import {
+  getTutorStudentMonthlyReportMetrics,
+  resolveMonthlyReportMetricsReferenceDate,
+} from "@/lib/progress/monthly-reports";
 import {
   getTutorStudentPlan,
   normalizeTutorStudentPlanMonth,
@@ -13,10 +16,6 @@ import { tutorHasStudentAccess } from "@/lib/rbac/tutor-access";
 function resolvePlanMonth(request: NextRequest) {
   const month = request.nextUrl.searchParams.get("month");
   return normalizeTutorStudentPlanMonth(month);
-}
-
-function toReferenceDate(planMonth: string) {
-  return new Date(`${planMonth}T00:00:00.000Z`);
 }
 
 async function requireTutorAccess(studentId: string) {
@@ -81,7 +80,7 @@ export async function GET(
 ) {
   const { studentId } = await params;
   const planMonth = resolvePlanMonth(request);
-  const referenceDate = toReferenceDate(planMonth);
+  const referenceDate = resolveMonthlyReportMetricsReferenceDate(planMonth);
   const access = await requireTutorAccess(studentId);
 
   if ("errorResponse" in access) {
@@ -112,7 +111,7 @@ export async function PATCH(
 ) {
   const { studentId } = await params;
   const planMonth = resolvePlanMonth(request);
-  const referenceDate = toReferenceDate(planMonth);
+  const referenceDate = resolveMonthlyReportMetricsReferenceDate(planMonth);
   const access = await requireTutorAccess(studentId);
 
   if ("errorResponse" in access) {

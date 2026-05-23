@@ -1155,6 +1155,8 @@ export interface Database {
           normalized_term: string;
           item_type: "word" | "phrase";
           current_state: "passive_only" | "active_and_passive" | "learning";
+          group_override: "passive_only" | "active_and_passive" | null;
+          custom_definition: string | null;
           has_active_evidence: boolean;
           has_passive_evidence: boolean;
           moved_to_learning_at: string | null;
@@ -1170,6 +1172,8 @@ export interface Database {
           normalized_term: string;
           item_type: "word" | "phrase";
           current_state: "passive_only" | "active_and_passive" | "learning";
+          group_override?: "passive_only" | "active_and_passive" | null;
+          custom_definition?: string | null;
           has_active_evidence?: boolean;
           has_passive_evidence?: boolean;
           moved_to_learning_at?: string | null;
@@ -1185,6 +1189,8 @@ export interface Database {
           normalized_term?: string;
           item_type?: "word" | "phrase";
           current_state?: "passive_only" | "active_and_passive" | "learning";
+          group_override?: "passive_only" | "active_and_passive" | null;
+          custom_definition?: string | null;
           has_active_evidence?: boolean;
           has_passive_evidence?: boolean;
           moved_to_learning_at?: string | null;

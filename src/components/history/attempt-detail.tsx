@@ -337,15 +337,16 @@ function TranslationDetail({
 }
 
 function FlashcardDetail({ answers }: { answers: Record<string, unknown> }) {
-  const known = answers.known as number | undefined;
-  const total = answers.total as number | undefined;
+  const results = Array.isArray(answers.results) ? answers.results : [];
+  const total =
+    typeof answers.total === "number" ? answers.total : results.length;
 
   return (
     <div className="text-sm text-muted-foreground">
       <p>
         Flashcard session —{" "}
-        {known != null && total != null
-          ? `${known} of ${total} cards marked as known`
+        {total > 0
+          ? `${total} cards reviewed`
           : "completed"}
         .
       </p>

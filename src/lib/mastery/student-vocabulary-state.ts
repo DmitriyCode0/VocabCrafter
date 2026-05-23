@@ -11,6 +11,10 @@ type AdminClient = SupabaseClient<Database>;
 
 export type StudentVocabularyCurrentState =
   Database["public"]["Tables"]["student_vocabulary_items"]["Row"]["current_state"];
+export type StudentVocabularyGroupOverride = Exclude<
+  StudentVocabularyCurrentState,
+  "learning"
+>;
 
 type StudentVocabularyStateRow =
   Database["public"]["Tables"]["student_vocabulary_items"]["Row"];
@@ -59,6 +63,118 @@ function dedupeStudentVocabularyStateInputs(
   return Array.from(deduped.values());
 }
 
+function normalizeStudentVocabularyGroupOverride(
+  value: string | null | undefined,
+): StudentVocabularyGroupOverride | null {
+  return value === "passive_only" || value === "active_and_passive"
+    ? value
+    : null;
+}
+
+function getStudentVocabularyExplicitState(
+  existing?: Pick<
+    StudentVocabularyStateRow,
+    "group_override" | "custom_definition" | "current_state"
+  > | null,
+): StudentVocabularyGroupOverride | null {
+  const groupOverride = normalizeStudentVocabularyGroupOverride(
+    existing?.group_override,
+  );
+
+  if (groupOverride) {
+    return groupOverride;
+  }
+
+  if (existing?.custom_definition?.trim()) {
+    return existing.current_state === "active_and_passive"
+      ? "active_and_passive"
+      : "passive_only";
+  }
+
+  return null;
+}
+
+export function resolveStudentVocabularyCurrentState({
+  existing,
+  hasActiveEvidence,
+  hasPassiveEvidence,
+  isLearning,
+}: {
+  existing?: Pick<
+    StudentVocabularyStateRow,
+    "group_override" | "custom_definition" | "current_state"
+  > | null;
+  hasActiveEvidence: boolean;
+  hasPassiveEvidence: boolean;
+  isLearning: boolean;
+}): StudentVocabularyCurrentState | null {
+  if (isLearning) {
+    return "learning";
+  }
+
+  const explicitState = getStudentVocabularyExplicitState(existing);
+
+  if (explicitState) {
+    return explicitState;
+  }
+
+  if (hasActiveEvidence) {
+    return "active_and_passive";
+  }
+
+  if (hasPassiveEvidence) {
+    return "passive_only";
+  }
+
+  return null;
+}
+
+function buildStudentVocabularyStateUpsertRow({
+  studentId,
+  term,
+  normalizedTerm,
+  itemType,
+  libraryItemId,
+  existing,
+  currentState,
+  hasActiveEvidence,
+  hasPassiveEvidence,
+  movedToLearningAt,
+  learningArchivedAt,
+  nowIso,
+}: {
+  studentId: string;
+  term: string;
+  normalizedTerm: string;
+  itemType: PassiveVocabularyItemType;
+  libraryItemId?: string | null;
+  existing?: StudentVocabularyStateRow;
+  currentState: StudentVocabularyCurrentState;
+  hasActiveEvidence: boolean;
+  hasPassiveEvidence: boolean;
+  movedToLearningAt: string | null;
+  learningArchivedAt: string | null;
+  nowIso: string;
+}) {
+  return {
+    student_id: studentId,
+    library_item_id: libraryItemId ?? existing?.library_item_id ?? null,
+    term,
+    normalized_term: normalizedTerm,
+    item_type: itemType,
+    current_state: currentState,
+    group_override: normalizeStudentVocabularyGroupOverride(
+      existing?.group_override,
+    ),
+    custom_definition: existing?.custom_definition ?? null,
+    has_active_evidence: hasActiveEvidence,
+    has_passive_evidence: hasPassiveEvidence,
+    moved_to_learning_at: movedToLearningAt,
+    learning_archived_at: learningArchivedAt,
+    updated_at: nowIso,
+  } satisfies Database["public"]["Tables"]["student_vocabulary_items"]["Insert"];
+}
+
 async function loadExistingStudentVocabularyStateRows(
   adminClient: AdminClient,
   studentId: string,
@@ -76,7 +192,7 @@ async function loadExistingStudentVocabularyStateRows(
   const { data, error } = await adminClient
     .from("student_vocabulary_items")
     .select(
-      "id, student_id, library_item_id, term, normalized_term, item_type, current_state, has_active_evidence, has_passive_evidence, moved_to_learning_at, learning_archived_at, created_at, updated_at",
+      "id, student_id, library_item_id, term, normalized_term, item_type, current_state, group_override, custom_definition, has_active_evidence, has_passive_evidence, moved_to_learning_at, learning_archived_at, created_at, updated_at",
     )
     .eq("student_id", studentId)
     .in("normalized_term", normalizedTerms)
@@ -130,6 +246,89 @@ async function deleteStudentVocabularyStateRows(
   if (error) {
     throw new Error("Failed to delete student vocabulary state");
   }
+}
+
+async function loadStudentVocabularyStateRowById(
+  adminClient: AdminClient,
+  rowId: string,
+) {
+  const { data, error } = await adminClient
+    .from("student_vocabulary_items")
+    .select(
+      "id, student_id, library_item_id, term, normalized_term, item_type, current_state, group_override, custom_definition, has_active_evidence, has_passive_evidence, moved_to_learning_at, learning_archived_at, created_at, updated_at",
+    )
+    .eq("id", rowId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Failed to load student vocabulary state row");
+  }
+
+  return (data as StudentVocabularyStateRow | null) ?? null;
+}
+
+async function loadStudentWordMasteryRowIdsForVocabularyItem({
+  adminClient,
+  studentId,
+  normalizedTerm,
+  itemType,
+}: {
+  adminClient: AdminClient;
+  studentId: string;
+  normalizedTerm: string;
+  itemType: PassiveVocabularyItemType;
+}) {
+  const { data, error } = await adminClient
+    .from("word_mastery")
+    .select("id, term")
+    .eq("student_id", studentId);
+
+  if (error) {
+    throw new Error("Failed to inspect student word mastery state");
+  }
+
+  const targetKey = createStudentVocabularyStateKey(normalizedTerm, itemType);
+
+  return (data ?? [])
+    .filter((row) => createStudentVocabularyStateKeyFromTerm(row.term) === targetKey)
+    .map((row) => row.id);
+}
+
+async function deleteStudentWordMasteryRowsForVocabularyItem({
+  adminClient,
+  studentId,
+  normalizedTerm,
+  itemType,
+}: {
+  adminClient: AdminClient;
+  studentId: string;
+  normalizedTerm: string;
+  itemType: PassiveVocabularyItemType;
+}) {
+  const rowIds = await loadStudentWordMasteryRowIdsForVocabularyItem({
+    adminClient,
+    studentId,
+    normalizedTerm,
+    itemType,
+  });
+
+  if (rowIds.length === 0) {
+    return;
+  }
+
+  const { error } = await adminClient
+    .from("word_mastery")
+    .delete()
+    .in("id", rowIds);
+
+  if (error) {
+    throw new Error("Failed to delete student word mastery rows");
+  }
+}
+
+function normalizeStudentCustomDefinition(value: string | null | undefined) {
+  const normalizedValue = value?.trim() ?? "";
+  return normalizedValue.length > 0 ? normalizedValue : null;
 }
 
 function dedupeStudentVocabularyMasteryStateInputs(
@@ -216,7 +415,7 @@ export async function syncStudentVocabularyStateFromPassiveEvidence({
 
   await upsertStudentVocabularyStateRows(
     adminClient,
-    dedupedItems.map((item) => {
+    dedupedItems.flatMap((item) => {
       const itemKey = createStudentVocabularyStateKey(
         item.normalizedTerm,
         item.itemType,
@@ -224,25 +423,36 @@ export async function syncStudentVocabularyStateFromPassiveEvidence({
       const existing = existingRowsByKey.get(
         itemKey,
       );
+      const hasActiveEvidence = existing?.has_active_evidence ?? false;
+      const hasPassiveEvidence = true;
+      const currentState = resolveStudentVocabularyCurrentState({
+        existing,
+        hasActiveEvidence,
+        hasPassiveEvidence,
+        isLearning:
+          existing?.current_state === "learning" || masteryKeySet.has(itemKey),
+      });
 
-      return {
-        student_id: studentId,
-        library_item_id: item.libraryItemId ?? existing?.library_item_id ?? null,
-        term: item.term,
-        normalized_term: item.normalizedTerm,
-        item_type: item.itemType,
-        current_state:
-          existing?.current_state === "learning" || masteryKeySet.has(itemKey)
-            ? "learning"
-            : existing?.current_state === "active_and_passive"
-              ? "active_and_passive"
-              : "passive_only",
-        has_active_evidence: existing?.has_active_evidence ?? false,
-        has_passive_evidence: true,
-        moved_to_learning_at: existing?.moved_to_learning_at ?? null,
-        learning_archived_at: existing?.learning_archived_at ?? null,
-        updated_at: nowIso,
-      } satisfies Database["public"]["Tables"]["student_vocabulary_items"]["Insert"];
+      if (!currentState) {
+        return [];
+      }
+
+      return [
+        buildStudentVocabularyStateUpsertRow({
+          studentId,
+          term: item.term,
+          normalizedTerm: item.normalizedTerm,
+          itemType: item.itemType,
+          libraryItemId: item.libraryItemId,
+          existing,
+          currentState,
+          hasActiveEvidence,
+          hasPassiveEvidence,
+          movedToLearningAt: existing?.moved_to_learning_at ?? null,
+          learningArchivedAt: existing?.learning_archived_at ?? null,
+          nowIso,
+        }),
+      ];
     }),
   );
 }
@@ -275,7 +485,7 @@ export async function syncStudentVocabularyStateFromActiveEvidence({
 
   await upsertStudentVocabularyStateRows(
     adminClient,
-    dedupedItems.map((item) => {
+    dedupedItems.flatMap((item) => {
       const itemKey = createStudentVocabularyStateKey(
         item.normalizedTerm,
         item.itemType,
@@ -283,23 +493,36 @@ export async function syncStudentVocabularyStateFromActiveEvidence({
       const existing = existingRowsByKey.get(
         itemKey,
       );
+      const hasActiveEvidence = true;
+      const hasPassiveEvidence = existing?.has_passive_evidence ?? false;
+      const currentState = resolveStudentVocabularyCurrentState({
+        existing,
+        hasActiveEvidence,
+        hasPassiveEvidence,
+        isLearning:
+          existing?.current_state === "learning" || masteryKeySet.has(itemKey),
+      });
 
-      return {
-        student_id: studentId,
-        library_item_id: item.libraryItemId ?? existing?.library_item_id ?? null,
-        term: item.term,
-        normalized_term: item.normalizedTerm,
-        item_type: item.itemType,
-        current_state:
-          existing?.current_state === "learning" || masteryKeySet.has(itemKey)
-            ? "learning"
-            : "active_and_passive",
-        has_active_evidence: true,
-        has_passive_evidence: existing?.has_passive_evidence ?? false,
-        moved_to_learning_at: existing?.moved_to_learning_at ?? null,
-        learning_archived_at: existing?.learning_archived_at ?? null,
-        updated_at: nowIso,
-      } satisfies Database["public"]["Tables"]["student_vocabulary_items"]["Insert"];
+      if (!currentState) {
+        return [];
+      }
+
+      return [
+        buildStudentVocabularyStateUpsertRow({
+          studentId,
+          term: item.term,
+          normalizedTerm: item.normalizedTerm,
+          itemType: item.itemType,
+          libraryItemId: item.libraryItemId,
+          existing,
+          currentState,
+          hasActiveEvidence,
+          hasPassiveEvidence,
+          movedToLearningAt: existing?.moved_to_learning_at ?? null,
+          learningArchivedAt: existing?.learning_archived_at ?? null,
+          nowIso,
+        }),
+      ];
     }),
   );
 }
@@ -333,19 +556,20 @@ export async function markStudentVocabularyStateAsLearning({
         createStudentVocabularyStateKey(item.normalizedTerm, item.itemType),
       );
 
-      return {
-        student_id: studentId,
-        library_item_id: item.libraryItemId ?? existing?.library_item_id ?? null,
+      return buildStudentVocabularyStateUpsertRow({
+        studentId,
         term: item.term,
-        normalized_term: item.normalizedTerm,
-        item_type: item.itemType,
-        current_state: "learning",
-        has_active_evidence: existing?.has_active_evidence ?? false,
-        has_passive_evidence: existing?.has_passive_evidence ?? false,
-        moved_to_learning_at: existing?.moved_to_learning_at ?? nowIso,
-        learning_archived_at: null,
-        updated_at: nowIso,
-      } satisfies Database["public"]["Tables"]["student_vocabulary_items"]["Insert"];
+        normalizedTerm: item.normalizedTerm,
+        itemType: item.itemType,
+        libraryItemId: item.libraryItemId,
+        existing,
+        currentState: "learning",
+        hasActiveEvidence: existing?.has_active_evidence ?? false,
+        hasPassiveEvidence: existing?.has_passive_evidence ?? false,
+        movedToLearningAt: existing?.moved_to_learning_at ?? nowIso,
+        learningArchivedAt: null,
+        nowIso,
+      });
     }),
   );
 }
@@ -380,20 +604,21 @@ export async function syncStudentVocabularyStateFromWordMastery({
       );
       const effectiveTimestamp = item.practicedAt ?? item.createdAt ?? nowIso;
 
-      return {
-        student_id: studentId,
-        library_item_id: existing?.library_item_id ?? null,
+      return buildStudentVocabularyStateUpsertRow({
+        studentId,
         term: item.term,
-        normalized_term: item.normalizedTerm,
-        item_type: item.itemType,
-        current_state: "learning",
-        has_active_evidence: existing?.has_active_evidence ?? false,
-        has_passive_evidence: existing?.has_passive_evidence ?? false,
-        moved_to_learning_at: existing?.moved_to_learning_at ?? effectiveTimestamp,
-        learning_archived_at:
+        normalizedTerm: item.normalizedTerm,
+        itemType: item.itemType,
+        existing,
+        currentState: "learning",
+        hasActiveEvidence: existing?.has_active_evidence ?? false,
+        hasPassiveEvidence: existing?.has_passive_evidence ?? false,
+        movedToLearningAt:
+          existing?.moved_to_learning_at ?? effectiveTimestamp,
+        learningArchivedAt:
           item.masteryLevel >= 5 ? effectiveTimestamp : null,
-        updated_at: nowIso,
-      } satisfies Database["public"]["Tables"]["student_vocabulary_items"]["Insert"];
+        nowIso,
+      });
     }),
   );
 }
@@ -436,36 +661,29 @@ export async function restoreStudentVocabularyStateAfterLearningRemoval({
       continue;
     }
 
-    if (existing.has_active_evidence) {
-      rowsToUpsert.push({
-        student_id: studentId,
-        library_item_id: existing.library_item_id,
-        term: existing.term,
-        normalized_term: existing.normalized_term,
-        item_type: existing.item_type,
-        current_state: "active_and_passive",
-        has_active_evidence: true,
-        has_passive_evidence: existing.has_passive_evidence,
-        moved_to_learning_at: existing.moved_to_learning_at,
-        learning_archived_at: null,
-        updated_at: nowIso,
-      });
-      continue;
-    }
+    const currentState = resolveStudentVocabularyCurrentState({
+      existing,
+      hasActiveEvidence: existing.has_active_evidence,
+      hasPassiveEvidence: existing.has_passive_evidence,
+      isLearning: false,
+    });
 
-    if (existing.has_passive_evidence) {
+    if (currentState) {
       rowsToUpsert.push({
-        student_id: studentId,
-        library_item_id: existing.library_item_id,
-        term: existing.term,
-        normalized_term: existing.normalized_term,
-        item_type: existing.item_type,
-        current_state: "passive_only",
-        has_active_evidence: false,
-        has_passive_evidence: true,
-        moved_to_learning_at: existing.moved_to_learning_at,
-        learning_archived_at: null,
-        updated_at: nowIso,
+        ...buildStudentVocabularyStateUpsertRow({
+          studentId,
+          term: existing.term,
+          normalizedTerm: existing.normalized_term,
+          itemType: existing.item_type,
+          libraryItemId: existing.library_item_id,
+          existing,
+          currentState,
+          hasActiveEvidence: existing.has_active_evidence,
+          hasPassiveEvidence: existing.has_passive_evidence,
+          movedToLearningAt: existing.moved_to_learning_at,
+          learningArchivedAt: null,
+          nowIso,
+        }),
       });
       continue;
     }
@@ -475,6 +693,153 @@ export async function restoreStudentVocabularyStateAfterLearningRemoval({
 
   await upsertStudentVocabularyStateRows(adminClient, rowsToUpsert);
   await deleteStudentVocabularyStateRows(adminClient, rowIdsToDelete);
+}
+
+export async function updateStudentVocabularyItem({
+  adminClient,
+  rowId,
+  group,
+  customDefinition,
+}: {
+  adminClient: AdminClient;
+  rowId: string;
+  group?: StudentVocabularyCurrentState;
+  customDefinition?: string | null;
+}) {
+  const existing = await loadStudentVocabularyStateRowById(adminClient, rowId);
+
+  if (!existing) {
+    throw new Error("Student vocabulary item not found");
+  }
+
+  const nextCustomDefinition =
+    customDefinition === undefined
+      ? existing.custom_definition
+      : normalizeStudentCustomDefinition(customDefinition);
+  const nowIso = new Date().toISOString();
+
+  if (group === "learning") {
+    const { error: updateError } = await adminClient
+      .from("student_vocabulary_items")
+      .update({
+        custom_definition: nextCustomDefinition,
+        updated_at: nowIso,
+      })
+      .eq("id", existing.id);
+
+    if (updateError) {
+      throw new Error("Failed to update student vocabulary item");
+    }
+
+    await markStudentVocabularyStateAsLearning({
+      adminClient,
+      studentId: existing.student_id,
+      items: [
+        {
+          term: existing.term,
+          normalizedTerm: existing.normalized_term,
+          itemType: existing.item_type,
+          libraryItemId: existing.library_item_id,
+        },
+      ],
+    });
+
+    return loadStudentVocabularyStateRowById(adminClient, existing.id);
+  }
+
+  if (group === "passive_only" || group === "active_and_passive") {
+    await deleteStudentWordMasteryRowsForVocabularyItem({
+      adminClient,
+      studentId: existing.student_id,
+      normalizedTerm: existing.normalized_term,
+      itemType: existing.item_type,
+    });
+  }
+
+  const nextGroupOverride =
+    group === undefined
+      ? normalizeStudentVocabularyGroupOverride(existing.group_override)
+      : normalizeStudentVocabularyGroupOverride(group);
+  const nextCurrentState = resolveStudentVocabularyCurrentState({
+    existing: {
+      ...existing,
+      group_override: nextGroupOverride,
+      custom_definition: nextCustomDefinition,
+    },
+    hasActiveEvidence: existing.has_active_evidence,
+    hasPassiveEvidence: existing.has_passive_evidence,
+    isLearning: group === undefined && existing.current_state === "learning",
+  });
+
+  if (!nextCurrentState) {
+    await deleteStudentVocabularyStateRows(adminClient, [existing.id]);
+    return null;
+  }
+
+  const { error: updateError } = await adminClient
+    .from("student_vocabulary_items")
+    .update({
+      current_state: nextCurrentState,
+      group_override: nextGroupOverride,
+      custom_definition: nextCustomDefinition,
+      learning_archived_at: nextCurrentState === "learning"
+        ? existing.learning_archived_at
+        : null,
+      updated_at: nowIso,
+    })
+    .eq("id", existing.id);
+
+  if (updateError) {
+    throw new Error("Failed to update student vocabulary item");
+  }
+
+  return loadStudentVocabularyStateRowById(adminClient, existing.id);
+}
+
+export async function deleteStudentVocabularyItem({
+  adminClient,
+  rowId,
+}: {
+  adminClient: AdminClient;
+  rowId: string;
+}) {
+  const existing = await loadStudentVocabularyStateRowById(adminClient, rowId);
+
+  if (!existing) {
+    throw new Error("Student vocabulary item not found");
+  }
+
+  await deleteStudentWordMasteryRowsForVocabularyItem({
+    adminClient,
+    studentId: existing.student_id,
+    normalizedTerm: existing.normalized_term,
+    itemType: existing.item_type,
+  });
+
+  const { error: passiveEvidenceDeleteError } = await adminClient
+    .from("passive_vocabulary_evidence")
+    .delete()
+    .eq("student_id", existing.student_id)
+    .eq("normalized_term", existing.normalized_term)
+    .eq("item_type", existing.item_type);
+
+  if (passiveEvidenceDeleteError) {
+    throw new Error("Failed to delete passive vocabulary evidence");
+  }
+
+  if (existing.item_type === "word") {
+    const { error: activeEvidenceDeleteError } = await adminClient
+      .from("active_vocabulary_evidence")
+      .delete()
+      .eq("student_id", existing.student_id)
+      .eq("normalized_term", existing.normalized_term);
+
+    if (activeEvidenceDeleteError) {
+      throw new Error("Failed to delete active vocabulary evidence");
+    }
+  }
+
+  await deleteStudentVocabularyStateRows(adminClient, [existing.id]);
 }
 
 export async function getStudentWordMasteryKeySet({

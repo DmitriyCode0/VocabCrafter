@@ -8,7 +8,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { StudentOverallPerformanceCard } from "@/components/progress/student-overall-performance-card";
-import type { StudentProgressSnapshot } from "@/lib/progress/profile-metrics";
+import {
+  PASSIVE_VOCAB_TARGETS,
+  type StudentProgressSnapshot,
+} from "@/lib/progress/profile-metrics";
 import {
   CheckCircle2,
   Clock3,
@@ -43,6 +46,8 @@ export function StudentResultsSummary({
   snapshot,
   showCefrGuidedHoursCard = true,
 }: StudentResultsSummaryProps) {
+  const passiveVocabTarget = PASSIVE_VOCAB_TARGETS[snapshot.profile.cefrLevel];
+
   const componentRows = [
     {
       key: "time",
@@ -54,13 +59,13 @@ export function StudentResultsSummary({
       key: "activeVocab",
       label: "Active Vocab",
       value: snapshot.overallPerformance.components.activeVocab,
-      helper: `${snapshot.activeSignals.uniqueItems}/${snapshot.overview.activeVocabObservedTarget} unique words from live-lesson speech across ${snapshot.activeSignals.totalUsageCount} recorded uses`,
+      helper: `${snapshot.activeSignals.uniqueItems}/${snapshot.overview.activeVocabTarget} tracked active words with ${snapshot.activeSignals.totalUsageCount} lesson-based uses recorded`,
     },
     {
       key: "passiveVocab",
       label: "Passive Vocab",
       value: snapshot.overallPerformance.components.passiveVocab,
-      helper: `${snapshot.passiveSignals.equivalentWordCount} recognition-weighted words against the ${snapshot.profile.cefrLevel} passive target`,
+      helper: `${snapshot.passiveSignals.equivalentWordCount}/${passiveVocabTarget.toLocaleString()} recognition-weighted words against the ${snapshot.profile.cefrLevel} passive target`,
     },
     {
       key: "grammar",
@@ -83,8 +88,9 @@ export function StudentResultsSummary({
             <CardTitle className="text-base">Performance Breakdown</CardTitle>
             <CardDescription>
               This score blends time logged, active vocab, passive vocab, and
-              grammar topics learned. Active vocab is based 100% on unique
-              transcript-derived live-lesson words against the CEFR target.
+              grammar topics learned. Active vocab is based on the student’s
+              current active-word set against the CEFR target, with lesson use
+              counts shown when recorded.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

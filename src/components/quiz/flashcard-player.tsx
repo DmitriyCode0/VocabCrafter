@@ -6,14 +6,10 @@ import { useAppI18n } from "@/components/providers/app-language-provider";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { FlashcardItem, QuizConfig } from "@/types/quiz";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import {
@@ -23,17 +19,12 @@ import {
 
 export interface FlashcardResult {
   term: string;
-  known: boolean;
 }
 
 interface FlashcardPlayerProps {
   cards: FlashcardItem[];
   quizConfig?: QuizConfig;
-  onComplete: (
-    results: FlashcardResult[],
-    known: number,
-    total: number,
-  ) => void;
+  onComplete: (results: FlashcardResult[]) => void;
 }
 
 export function FlashcardPlayer({
@@ -45,29 +36,13 @@ export function FlashcardPlayer({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
-  const [known, setKnown] = useState<Set<number>>(new Set());
-  const [learning, setLearning] = useState<Set<number>>(new Set());
 
   const card = cards[currentIndex];
   const targetLanguage = normalizeLearningLanguage(quizConfig?.targetLanguage);
   const sourceLanguage = normalizeSourceLanguage(quizConfig?.sourceLanguage);
-  const progress = ((known.size + learning.size) / cards.length) * 100;
-  const reviewedCount = known.size + learning.size;
-  const remainingCount = Math.max(0, cards.length - reviewedCount);
-
-  function handleKnow() {
-    setKnown((prev) => new Set(prev).add(currentIndex));
-    learning.delete(currentIndex);
-    setLearning(new Set(learning));
-    goNext();
-  }
-
-  function handleStillLearning() {
-    setLearning((prev) => new Set(prev).add(currentIndex));
-    known.delete(currentIndex);
-    setKnown(new Set(known));
-    goNext();
-  }
+  const progress = (Math.min(currentIndex + 1, cards.length) / cards.length) * 100;
+  const remainingCount = Math.max(0, cards.length - currentIndex - 1);
+  const isLastCard = currentIndex === cards.length - 1;
 
   function goNext() {
     setSlideDirection(1);
@@ -81,41 +56,30 @@ export function FlashcardPlayer({
     setCurrentIndex((index) => (index > 0 ? index - 1 : index));
   }
 
-  function restart() {
-    setCurrentIndex(0);
-    setIsFlipped(false);
-    setKnown(new Set());
-    setLearning(new Set());
+  function handleComplete() {
+    onComplete(
+      cards.map((currentCard) => ({
+        term: currentCard.term,
+      })),
+    );
   }
-
-  const allReviewed = known.size + learning.size === cards.length;
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
       <div className="mx-auto max-w-4xl rounded-2xl border border-border/70 bg-card/50 px-4 py-4 shadow-none backdrop-blur-sm transition-shadow duration-300 hover:shadow-[0_14px_36px_rgba(15,23,42,0.06)] sm:px-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-3 lg:flex-1">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-medium text-foreground">
-                {messages.quizSession.flashcards.progress(
-                  currentIndex + 1,
-                  cards.length,
-                )}
-              </span>
-              <span className="text-muted-foreground">
-                {messages.quizSession.flashcards.remaining(remainingCount)}
-              </span>
-            </div>
-            <Progress value={progress} className="h-2.5" />
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium text-foreground">
+              {messages.quizSession.flashcards.progress(
+                currentIndex + 1,
+                cards.length,
+              )}
+            </span>
+            <span className="text-muted-foreground">
+              {messages.quizSession.flashcards.remaining(remainingCount)}
+            </span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="text-green-600">
-              {messages.quizSession.flashcards.knowCount(known.size)}
-            </Badge>
-            <Badge variant="outline" className="text-orange-600">
-              {messages.quizSession.flashcards.learningCount(learning.size)}
-            </Badge>
-          </div>
+          <Progress value={progress} className="h-2.5" />
         </div>
       </div>
 
@@ -207,89 +171,24 @@ export function FlashcardPlayer({
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 sm:flex-row">
         <Button
           variant="outline"
-          size="sm"
           onClick={goPrev}
           disabled={currentIndex === 0}
-          className="sm:w-11"
+          className="flex-1"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          {messages.quizSession.flashcards.previous}
         </Button>
-
-        {isFlipped && (
-          <>
-            <Button
-              variant="outline"
-              className="flex-1 border-orange-500/25 bg-orange-500/5 text-orange-600 hover:bg-orange-500/10"
-              onClick={handleStillLearning}
-            >
-              {messages.quizSession.flashcards.stillLearning}
-            </Button>
-            <Button
-              className="flex-1 border-primary/25 bg-primary/10 text-primary hover:bg-primary/15"
-              variant="outline"
-              onClick={handleKnow}
-            >
-              {messages.quizSession.flashcards.knowIt}
-            </Button>
-          </>
-        )}
-
-        {!isFlipped && (
-          <Button
-            variant="outline"
-            className="flex-1 border-primary/20 bg-primary/5 hover:bg-primary/10"
-            onClick={() => setIsFlipped(true)}
-          >
-            {messages.quizSession.flashcards.flipCard}
-          </Button>
-        )}
 
         <Button
-          variant="outline"
-          size="sm"
-          onClick={goNext}
-          disabled={currentIndex === cards.length - 1}
-          className="sm:w-11"
+          onClick={isLastCard ? handleComplete : goNext}
+          className="flex-1"
         >
-          <ArrowRight className="h-4 w-4" />
+          {isLastCard
+            ? messages.quizSession.flashcards.finish
+            : messages.quizSession.flashcards.next}
+          {!isLastCard ? <ArrowRight className="ml-2 h-4 w-4" /> : null}
         </Button>
       </div>
-
-      {allReviewed && (
-        <Card>
-          <CardHeader className="text-center">
-            <CardTitle>
-              {messages.quizSession.flashcards.sessionCompleteTitle}
-            </CardTitle>
-            <CardDescription>
-              {messages.quizSession.flashcards.sessionCompleteDescription(
-                known.size,
-                cards.length,
-                learning.size,
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex gap-2 justify-center">
-            <Button onClick={restart}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              {messages.common.restart}
-            </Button>
-            <Button
-              onClick={() => {
-                const results: FlashcardResult[] = cards.map(
-                  (currentCard, idx) => ({
-                    term: currentCard.term,
-                    known: known.has(idx),
-                  }),
-                );
-                onComplete(results, known.size, cards.length);
-              }}
-            >
-              {messages.common.done}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

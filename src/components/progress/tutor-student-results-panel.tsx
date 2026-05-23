@@ -1,17 +1,6 @@
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
-import { StudentProgressOverviewCards } from "@/components/progress/student-progress-overview-cards";
-import { StudentResultsSummary } from "@/components/progress/student-results-summary";
-import { TutorTimeAdjustmentCard } from "@/components/progress/tutor-time-adjustment-card";
-import { TutorStudentVocabularyDistribution } from "@/components/progress/tutor-student-vocabulary-distribution";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StudentOverallProgressSections } from "@/components/progress/student-overall-progress-sections";
 import { getAppMessages } from "@/lib/i18n/messages";
 import type { StudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 
@@ -69,67 +58,13 @@ export function TutorStudentResultsPanel({
           </CardHeader>
         </Card>
       ) : (
-        <>
-          <StudentResultsSummary
-            snapshot={snapshot}
-            showCefrGuidedHoursCard={false}
-          />
-
-          <TutorTimeAdjustmentCard
-            studentId={studentId}
-            initialTimeAdjustmentHours={initialTimeAdjustmentHours}
-            currentTotalLearningHours={snapshot.timeMetrics.totalLearningHours}
-          />
-
-          <StudentSkillRadar
-            axes={snapshot.axes}
-            chartData={snapshot.chartData}
-            cefrLevel={snapshot.profile.cefrLevel}
-            grammarNotice={snapshot.grammar.betaNotice}
-            grammarTopics={snapshot.grammarTopicMastery}
-          />
-
-          <TutorStudentVocabularyDistribution
-            activeSignals={snapshot.activeSignals}
-            passiveSignals={snapshot.passiveSignals}
-            learningSignals={snapshot.learningSignals}
-          />
-
-          <StudentProgressOverviewCards snapshot={snapshot} />
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Activity Strengths</CardTitle>
-              <CardDescription>
-                Average score by activity type from saved attempts.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {snapshot.activityStats.length === 0 ? (
-                <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                  No activity score breakdown yet.
-                </div>
-              ) : (
-                snapshot.activityStats.slice(0, 5).map((stat) => (
-                  <div key={stat.type} className="space-y-2">
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <div className="font-medium text-foreground">
-                        {stat.label}
-                      </div>
-                      <div className="text-muted-foreground">
-                        {stat.averageScore}%
-                      </div>
-                    </div>
-                    <Progress value={stat.averageScore} className="h-2" />
-                    <p className="text-xs text-muted-foreground">
-                      {stat.count} saved attempt{stat.count === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </>
+        <StudentOverallProgressSections
+          snapshot={snapshot}
+          showTimeAdjustmentCard
+          studentId={studentId}
+          initialTimeAdjustmentHours={initialTimeAdjustmentHours}
+          showCefrGuidedHoursCard={false}
+        />
       )}
     </div>
   );

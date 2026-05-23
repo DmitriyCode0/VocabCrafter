@@ -232,7 +232,11 @@ export default async function AssignmentsReviewPage({
                 full_name: string | null;
                 email: string;
               } | null;
-              const scored = attempt.score != null && attempt.max_score != null;
+              const isFlashcardAttempt = quiz?.type === "flashcards";
+              const scored =
+                !isFlashcardAttempt &&
+                attempt.score != null &&
+                attempt.max_score != null;
               const pct = scored
                 ? Math.round((Number(attempt.score) / Number(attempt.max_score)) * 100)
                 : null;

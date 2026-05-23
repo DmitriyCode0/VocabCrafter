@@ -6,6 +6,7 @@ import {
   generateTutorStudentMonthlyReport,
   listTutorStudentMonthlyReports,
   monthlyReportGenerationInputSchema,
+  resolveMonthlyReportMetricsReferenceDate,
 } from "@/lib/progress/monthly-reports";
 import { normalizeTutorStudentPlanMonth } from "@/lib/progress/tutor-student-plan";
 
@@ -93,7 +94,7 @@ export async function POST(
   const planMonth = normalizeTutorStudentPlanMonth(
     request.nextUrl.searchParams.get("month"),
   );
-  const referenceDate = new Date(`${planMonth}T00:00:00.000Z`);
+  const referenceDate = resolveMonthlyReportMetricsReferenceDate(planMonth);
   const access = await requireTutorAccess(studentId);
 
   if ("errorResponse" in access) {

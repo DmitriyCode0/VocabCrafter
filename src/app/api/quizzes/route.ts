@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import {
-  inferPassiveVocabularyItemType,
-  normalizePassiveVocabularyText,
-} from "@/lib/mastery/passive-vocabulary";
-import { resolvePassiveVocabularyLibraryItems } from "@/lib/mastery/passive-vocabulary-library";
 import { markStudentVocabularyStateAsLearning } from "@/lib/mastery/student-vocabulary-state";
-import { normalizeLearningLanguage } from "@/lib/languages";
+import {
+  normalizeLearningLanguage,
+  normalizeSourceLanguage,
+} from "@/lib/languages";
+import { resolveQuizTermsWithDictionary } from "@/lib/quiz/quiz-term-resolution";
 import { z } from "zod";
 
 const PASSING_SCORE_PERCENT = 80;
@@ -85,6 +84,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const sourceLanguage = normalizeSourceLanguage(
+      typeof config?.sourceLanguage === "string" ? config.sourceLanguage : null,
+    );
+    const resolvedVocabularyTerms = await resolveQuizTermsWithDictionary({
+      adminClient: supabaseAdmin,
+      actorUserId: user.id,
+      targetLanguage: normalizeLearningLanguage(profile.preferred_language),
+      sourceLanguage,
+      terms: vocabularyTerms,
+      createMissing: true,
+    });
+    const persistedVocabularyTerms = resolvedVocabularyTerms.map(
+      ({ term, definition }) => ({
+        term,
+        definition,
+      }),
+    );
+
     const { data: quiz, error: insertError } = await supabase
       .from("quizzes")
       .insert({
@@ -92,7 +109,7 @@ export async function POST(request: Request) {
         title,
         type,
         cefr_level: cefrLevel,
-        vocabulary_terms: vocabularyTerms as unknown as Record<
+        vocabulary_terms: persistedVocabularyTerms as unknown as Record<
           string,
           unknown
         >[],
@@ -111,32 +128,32 @@ export async function POST(request: Request) {
       );
     }
 
-    const requestedItems = vocabularyTerms
-      .map((item) => {
-        const trimmedTerm = item.term.trim().replace(/\s+/g, " ");
-        const normalizedTerm = normalizePassiveVocabularyText(trimmedTerm);
-
-        if (!trimmedTerm || !normalizedTerm) {
+    const resolvedItems = resolvedVocabularyTerms
+      .map(({ resolution, libraryInput }) => {
+        if (!libraryInput) {
           return null;
         }
 
+        if (resolution) {
+          return {
+            term: resolution.canonicalTerm,
+            normalizedTerm: resolution.canonicalNormalizedTerm,
+            itemType: resolution.itemType,
+            libraryItemId: resolution.libraryItemId,
+          };
+        }
+
         return {
-          term: trimmedTerm,
-          normalizedTerm,
-          itemType: inferPassiveVocabularyItemType(trimmedTerm),
+          term: libraryInput.term,
+          normalizedTerm: libraryInput.normalizedTerm,
+          itemType: libraryInput.itemType,
+          libraryItemId: null,
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
 
-    if (requestedItems.length > 0) {
+    if (resolvedItems.length > 0) {
       try {
-        const resolvedItems = await resolvePassiveVocabularyLibraryItems({
-          adminClient: supabaseAdmin,
-          actorUserId: user.id,
-          targetLanguage: normalizeLearningLanguage(profile.preferred_language),
-          items: requestedItems,
-        });
-
         if (profile.role === "student") {
           const dedupedVocabularyItems = new Map<
             string,
@@ -149,14 +166,14 @@ export async function POST(request: Request) {
           >();
 
           for (const item of resolvedItems) {
-            const key = `${item.itemType}:${item.canonicalNormalizedTerm}`;
+            const key = `${item.itemType}:${item.normalizedTerm}`;
             if (dedupedVocabularyItems.has(key)) {
               continue;
             }
 
             dedupedVocabularyItems.set(key, {
-              term: item.canonicalTerm,
-              normalizedTerm: item.canonicalNormalizedTerm,
+              term: item.term,
+              normalizedTerm: item.normalizedTerm,
               itemType: item.itemType,
               libraryItemId: item.libraryItemId,
             });

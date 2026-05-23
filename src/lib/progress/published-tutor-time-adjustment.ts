@@ -1,19 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  hasTutorProgressOverrideContent,
-  parseTutorProgressOverride,
-  type TutorProgressOverride,
-} from "@/lib/progress/contracts";
 
-export interface PublishedTutorProgressOverride {
-  tutorName: string | null;
-  updatedAt: string;
-  override: TutorProgressOverride;
-}
-
-export async function getPublishedTutorProgressOverride(
+export async function getPublishedTutorTimeAdjustment(
   studentId: string,
-): Promise<PublishedTutorProgressOverride | null> {
+): Promise<number | null> {
   const supabaseAdmin = createAdminClient();
 
   const [
@@ -62,45 +51,24 @@ export async function getPublishedTutorProgressOverride(
       ...classTutorIds,
     ]),
   ];
+
   if (tutorIds.length === 0) {
     return null;
   }
 
-  const { data: overrideRow, error: overrideError } = await supabaseAdmin
+  const { data: adjustmentRow, error: adjustmentError } = await supabaseAdmin
     .from("tutor_student_progress_overrides")
-    .select(
-      "tutor_id, axis_overrides, insights_override, monthly_target_overrides, time_adjustment_hours, updated_at",
-    )
+    .select("time_adjustment_hours")
     .eq("student_id", studentId)
     .in("tutor_id", tutorIds)
+    .neq("time_adjustment_hours", 0)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (overrideError) {
-    throw overrideError;
+  if (adjustmentError) {
+    throw adjustmentError;
   }
 
-  if (!overrideRow) {
-    return null;
-  }
-
-  const parsedOverride = parseTutorProgressOverride(overrideRow);
-  const hasContent = hasTutorProgressOverrideContent(parsedOverride);
-
-  if (!hasContent) {
-    return null;
-  }
-
-  const { data: tutorProfile } = await supabaseAdmin
-    .from("profiles")
-    .select("full_name, email")
-    .eq("id", overrideRow.tutor_id)
-    .maybeSingle();
-
-  return {
-    tutorName: tutorProfile?.full_name || tutorProfile?.email || null,
-    updatedAt: overrideRow.updated_at,
-    override: parsedOverride,
-  };
+  return adjustmentRow?.time_adjustment_hours ?? null;
 }

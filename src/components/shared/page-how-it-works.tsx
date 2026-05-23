@@ -36,6 +36,11 @@ function matchesProgressPath(pathname: string) {
   );
 }
 
+const PAGE_GUIDE_SHEET_ID = "page-how-it-works-sheet";
+const PAGE_GUIDE_SHEET_TITLE_ID = "page-how-it-works-sheet-title";
+const PAGE_GUIDE_SHEET_DESCRIPTION_ID =
+  "page-how-it-works-sheet-description";
+
 export function PageHowItWorksButton({ role }: { role: Role }) {
   const pathname = usePathname();
   const { appLanguage, messages } = useAppI18n();
@@ -64,22 +69,31 @@ export function PageHowItWorksButton({ role }: { role: Role }) {
 
   return (
     <Sheet>
-      <SheetTrigger asChild>
+      <SheetTrigger asChild aria-controls={PAGE_GUIDE_SHEET_ID}>
         <Button size="sm">
           <BookOpenText className="h-4 w-4" />
           {messages.dashboard.guide.buttonLabel}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+      <SheetContent
+        id={PAGE_GUIDE_SHEET_ID}
+        aria-labelledby={PAGE_GUIDE_SHEET_TITLE_ID}
+        aria-describedby={
+          isProgressPage ? PAGE_GUIDE_SHEET_DESCRIPTION_ID : undefined
+        }
+        className="w-full overflow-y-auto sm:max-w-xl"
+      >
         <SheetHeader>
           <div className="flex items-center gap-2">
-            <SheetTitle>
+            <SheetTitle id={PAGE_GUIDE_SHEET_TITLE_ID}>
               {isProgressPage ? progressTitle : placeholderTitle}
             </SheetTitle>
             {isProgressPage ? <Badge variant="secondary">Progress</Badge> : null}
           </div>
           {isProgressPage ? (
-            <SheetDescription>{progressDescription}</SheetDescription>
+            <SheetDescription id={PAGE_GUIDE_SHEET_DESCRIPTION_ID}>
+              {progressDescription}
+            </SheetDescription>
           ) : null}
         </SheetHeader>
 

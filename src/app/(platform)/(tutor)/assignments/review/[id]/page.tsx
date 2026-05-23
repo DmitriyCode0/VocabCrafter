@@ -114,10 +114,20 @@ export default async function AssignmentReviewDetailPage({
   } | null;
   const rawAnswers = attempt.answers as Record<string, unknown> | null;
   const answerResults = (rawAnswers?.results ?? []) as Record<string, unknown>[];
-  const scored = attempt.score != null && attempt.max_score != null;
+  const isFlashcardAttempt = quiz?.type === "flashcards";
+  const scored =
+    !isFlashcardAttempt &&
+    attempt.score != null &&
+    attempt.max_score != null;
   const pct = scored
     ? Math.round((Number(attempt.score) / Number(attempt.max_score)) * 100)
     : null;
+  const flashcardReviewedCount =
+    answerResults.length > 0
+      ? answerResults.length
+      : typeof rawAnswers?.total === "number"
+        ? rawAnswers.total
+        : null;
 
   return (
     <div className="space-y-6">
@@ -211,10 +221,9 @@ export default async function AssignmentReviewDetailPage({
           {quiz?.type === "flashcards" ? (
             <div className="text-sm text-muted-foreground">
               <p>
-                {scored
-                  ? messages.reviewDetail.flashcardKnown(
-                      Number(attempt.score),
-                      Number(attempt.max_score),
+                {flashcardReviewedCount != null
+                  ? messages.reviewDetail.flashcardReviewed(
+                      flashcardReviewedCount,
                     )
                   : messages.reviewDetail.flashcardCompleted}
               </p>

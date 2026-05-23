@@ -277,7 +277,7 @@ export function StudentProgressInsights({
                   <Badge variant="outline">Approximate</Badge>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Use this as a coaching signal, not an official CEFR result.
+                  Use this as a learning signal, not an official CEFR result.
                 </p>
               </div>
 

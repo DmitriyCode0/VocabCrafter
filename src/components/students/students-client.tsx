@@ -438,14 +438,6 @@ export function StudentsClient({
                     </Button>
                     <Button variant="outline" size="sm" asChild>
                       <Link
-                        href={`/results/coaching?student=${conn.student_id as string}`}
-                      >
-                        <BookMarked className="mr-2 h-4 w-4" />
-                        Coach
-                      </Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link
                         href={`/plans-and-reports?student=${conn.student_id as string}`}
                       >
                         <Target className="mr-2 h-4 w-4" />

@@ -1,51 +1,19 @@
 "use client";
 
 import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
-
-type MonthlyReportPentagramAxisKey =
-  | "active_vocab"
-  | "grammar_variety"
-  | "engagement"
-  | "accuracy"
-  | "passive_vocab";
-
-interface MonthlyReportPentagramAxis {
-  key: MonthlyReportPentagramAxisKey;
-  label: string;
-  shortLabel: string;
-  score: number;
-  value: string;
-  helper: string;
-  beta?: boolean;
-}
-
-interface MonthlyReportPentagramChartDatum {
-  axis: string;
-  score: number;
-  fullMark: number;
-}
-
-interface MonthlyReportPentagramMonth {
-  reportMonth: string;
-  axes: MonthlyReportPentagramAxis[];
-  chartData: MonthlyReportPentagramChartDatum[];
-}
-
-interface MonthlyReportPentagramSnapshot {
-  currentMonth: MonthlyReportPentagramMonth;
-  previousMonth: MonthlyReportPentagramMonth;
-}
+import {
+  getMonthlyPentagramUiCopy,
+  localizeMonthlyReportPentagramSnapshot,
+} from "@/lib/progress/monthly-pentagram-localization";
+import type { MonthlyPentagramSnapshot } from "@/lib/progress/monthly-pentagram-localization";
 
 interface MonthlyReportPentagramCardProps {
-  pentagram: MonthlyReportPentagramSnapshot;
+  pentagram: MonthlyPentagramSnapshot;
   locale: string;
   title: string;
   description: string;
   badgeLabel?: string;
 }
-
-const MONTHLY_GRAMMAR_NOTICE =
-  "Grammar variety is month-scoped here and reflects confident grammar-topic coverage inside the reporting window rather than cumulative lifetime grammar coverage.";
 
 function formatMonthLabel(reportMonth: string, locale: string) {
   return new Intl.DateTimeFormat(locale, {
@@ -62,25 +30,35 @@ export function MonthlyReportPentagramCard({
   description,
   badgeLabel,
 }: MonthlyReportPentagramCardProps) {
-  const currentLabel = formatMonthLabel(pentagram.currentMonth.reportMonth, locale);
+  const localizedPentagram = localizeMonthlyReportPentagramSnapshot(
+    pentagram,
+    locale,
+  );
+  const uiCopy = getMonthlyPentagramUiCopy(locale);
+  const currentLabel = formatMonthLabel(
+    localizedPentagram.currentMonth.reportMonth,
+    locale,
+  );
   const previousLabel = formatMonthLabel(
-    pentagram.previousMonth.reportMonth,
+    localizedPentagram.previousMonth.reportMonth,
     locale,
   );
 
   return (
     <StudentSkillRadar
-      axes={pentagram.currentMonth.axes}
-      chartData={pentagram.currentMonth.chartData}
+      axes={localizedPentagram.currentMonth.axes}
+      chartData={localizedPentagram.currentMonth.chartData}
       cefrLevel={badgeLabel ?? currentLabel}
-      grammarNotice={MONTHLY_GRAMMAR_NOTICE}
+      grammarNotice={uiCopy.grammarNotice}
+      betaLabel={uiCopy.betaLabel}
+      grammarNoteLabel={uiCopy.grammarNoteLabel}
       title={title}
       description={description}
       comparison={{
         currentLabel,
         previousLabel,
-        previousAxes: pentagram.previousMonth.axes,
-        previousChartData: pentagram.previousMonth.chartData,
+        previousAxes: localizedPentagram.previousMonth.axes,
+        previousChartData: localizedPentagram.previousMonth.chartData,
       }}
     />
   );

@@ -24,7 +24,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { RotateCcw, Home, Clock3 } from "lucide-react";
 import { saveAttempt } from "@/lib/save-attempt";
 import type { Quiz } from "@/types/database";
@@ -107,8 +106,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
     TextTranslationResult[]
   >([]);
   const [discussionPromptCount, setDiscussionPromptCount] = useState(0);
-  const [flashcardKnown, setFlashcardKnown] = useState(0);
-  const [flashcardTotal, setFlashcardTotal] = useState(0);
+  const [flashcardReviewedCount, setFlashcardReviewedCount] = useState(0);
   const [completedTimeSpentSeconds, setCompletedTimeSpentSeconds] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [timerSessionKey, setTimerSessionKey] = useState(0);
@@ -261,30 +259,27 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
     setTranslationResults([]);
     setTextTranslationResults([]);
     setDiscussionPromptCount(0);
-    setFlashcardKnown(0);
-    setFlashcardTotal(0);
+    setFlashcardReviewedCount(0);
     setCompletedTimeSpentSeconds(0);
     resetTimer();
   }
 
   const handleFlashcardComplete = useCallback(
-    (results: FlashcardResult[], known: number, total: number) => {
+    (results: FlashcardResult[]) => {
       const completedElapsedSeconds = getCompletedElapsedSeconds();
 
       saveAttempt(
         quiz.id,
         {
           type: "flashcards",
-          known,
-          total,
-          results: results.map((r) => ({ term: r.term, known: r.known })),
+          total: results.length,
+          results: results.map((result) => ({ term: result.term })),
         },
-        known,
-        total,
+        null,
+        null,
         completedElapsedSeconds,
       );
-      setFlashcardKnown(known);
-      setFlashcardTotal(total);
+      setFlashcardReviewedCount(results.length);
       setCompletedTimeSpentSeconds(completedElapsedSeconds);
       setShowResults(true);
     },
@@ -319,10 +314,6 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
 
   if (quiz.type === "flashcards") {
     if (showResults) {
-      const percentage =
-        flashcardTotal > 0
-          ? Math.round((flashcardKnown / flashcardTotal) * 100)
-          : 0;
       return (
         <div className="space-y-6">
           <Card>
@@ -332,21 +323,11 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
               </CardTitle>
               <CardDescription>
                 {messages.quizSession.flashcardsResult.description(
-                  flashcardKnown,
-                  flashcardTotal,
-                  percentage,
+                  flashcardReviewedCount,
                 )}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Progress value={percentage} className="h-3" />
-              <p className="text-center text-sm text-muted-foreground">
-                {percentage >= 80
-                  ? messages.quizSession.flashcardsResult.encouragementHigh
-                  : percentage >= 50
-                    ? messages.quizSession.flashcardsResult.encouragementMedium
-                    : messages.quizSession.flashcardsResult.encouragementLow}
-              </p>
               <div className="flex gap-2 pt-4">
                 <Button variant="outline" onClick={handleRestart}>
                   <RotateCcw className="mr-2 h-4 w-4" />

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { TutorProgressSectionTabs } from "@/components/progress/tutor-progress-section-tabs";
 
 interface TutorProgressPageHeaderProps {
-  currentSection: "overall" | "monthly" | "coaching";
+  currentSection: "overall" | "monthly";
   basePath: string;
   title?: string;
   description: string;

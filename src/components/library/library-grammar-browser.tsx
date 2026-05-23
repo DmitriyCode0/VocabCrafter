@@ -195,7 +195,7 @@ export function LibraryGrammarBrowser({ sections }: LibraryGrammarBrowserProps) 
                           )}
                           className="block h-full"
                         >
-                          <Card className="h-full transition-colors hover:border-foreground/20 hover:bg-muted/20">
+                          <Card className="flex h-full min-h-64 flex-col transition-colors hover:border-foreground/20 hover:bg-muted/20">
                             <CardHeader className="pb-3">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="space-y-1">
@@ -213,7 +213,7 @@ export function LibraryGrammarBrowser({ sections }: LibraryGrammarBrowserProps) 
                                 ) : null}
                               </div>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="flex flex-1">
                               <GrammarTopicCardContent
                                 topic={topic}
                                 fallbackMessage={messages.library.futureDevelopment}

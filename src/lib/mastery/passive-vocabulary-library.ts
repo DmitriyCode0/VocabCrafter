@@ -16,13 +16,16 @@ import {
   formatPassiveVocabularyCanonicalTerm,
   getPassiveVocabularyCanonicalHeadword,
   getPassiveVocabularyCompositeKey,
+  getPassiveVocabularyEnglishDefinitions,
   getPassiveVocabularyForms,
   getPassiveVocabularyGeneratedForms,
   getPassiveVocabularyLookupCandidates,
   getPassiveVocabularyMetadataValidation,
   getPassiveVocabularyNounCountability,
+  getPassiveVocabularyUkrainianTranslation,
   normalizePassiveVocabularyLibraryAttributes,
   normalizePassiveVocabularyText,
+  withPassiveVocabularyEnglishDefinitions,
   withPassiveVocabularyUkrainianTranslation,
   type PassiveVocabularyItemType,
   type PassiveVocabularyLibraryAttributes,
@@ -38,11 +41,14 @@ type LibraryRow =
 type LibraryFormRow =
   Database["public"]["Tables"]["passive_vocabulary_library_forms"]["Row"];
 
-interface PassiveVocabularyLibraryInput {
+export interface PassiveVocabularyLibraryInput {
   term: string;
   normalizedTerm: string;
   itemType: PassiveVocabularyItemType;
   partOfSpeech?: PassiveVocabularyPartOfSpeech;
+  attributes?: PassiveVocabularyLibraryAttributes;
+  englishDefinitions?: string[] | null;
+  ukrainianTranslation?: string | null;
 }
 
 interface PassiveVocabularyEnrichmentItem {
@@ -211,6 +217,41 @@ function getFallbackCanonicalTerm(input: PassiveVocabularyLibraryInput) {
     canonicalTerm: input.term,
     canonicalNormalizedTerm: input.normalizedTerm,
   };
+}
+
+function mergeSeededPassiveVocabularyLibraryAttributes(
+  currentAttributes: PassiveVocabularyLibraryAttributes,
+  input: PassiveVocabularyLibraryInput,
+) {
+  let nextAttributes = normalizePassiveVocabularyLibraryAttributes({
+    ...currentAttributes,
+    ...normalizePassiveVocabularyLibraryAttributes(input.attributes),
+  });
+
+  const currentUkrainianTranslation =
+    getPassiveVocabularyUkrainianTranslation(nextAttributes);
+  const nextUkrainianTranslation =
+    currentUkrainianTranslation ?? input.ukrainianTranslation ?? null;
+
+  nextAttributes = withPassiveVocabularyUkrainianTranslation(
+    nextAttributes,
+    nextUkrainianTranslation,
+  );
+
+  const seededEnglishDefinitions = Array.isArray(input.englishDefinitions)
+    ? input.englishDefinitions
+    : [];
+  const nextEnglishDefinitions = Array.from(
+    new Set([
+      ...getPassiveVocabularyEnglishDefinitions(nextAttributes),
+      ...seededEnglishDefinitions,
+    ]),
+  );
+
+  return withPassiveVocabularyEnglishDefinitions(
+    nextAttributes,
+    nextEnglishDefinitions,
+  );
 }
 
 function toAdminItem(row: LibraryRow): PassiveVocabularyLibraryAdminItem {
@@ -672,6 +713,16 @@ async function findExistingPassiveVocabularyLibraryMatches(
   return matches;
 }
 
+export async function lookupPassiveVocabularyLibraryItems({
+  items,
+  adminClient,
+}: {
+  items: PassiveVocabularyLibraryInput[];
+  adminClient: AdminClient;
+}) {
+  return findExistingPassiveVocabularyLibraryMatches(adminClient, items);
+}
+
 async function enrichPassiveVocabularyWords(
   inputs: PassiveVocabularyLibraryInput[],
   targetLanguage: LearningLanguage,
@@ -855,7 +906,10 @@ export async function createPassiveVocabularyLibraryEntries(
       itemType: input.itemType,
       cefrLevel: null,
       partOfSpeech,
-      attributes: {},
+      attributes: mergeSeededPassiveVocabularyLibraryAttributes(
+        existingGroup?.attributes ?? {},
+        input,
+      ),
       enrichmentStatus: "pending",
       enrichmentError: null,
       inputItems: [...(existingGroup?.inputItems ?? []), input],

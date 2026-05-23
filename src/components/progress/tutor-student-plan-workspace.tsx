@@ -499,12 +499,6 @@ export function TutorStudentPlanWorkspace({
                 <p className="text-2xl font-semibold">{metrics.activeDays}</p>
               </div>
               <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Quizzes</p>
-                <p className="text-2xl font-semibold">
-                  {metrics.completedQuizzes}
-                </p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
                 <p className="text-xs text-muted-foreground">New words</p>
                 <p className="text-2xl font-semibold">
                   {metrics.newMasteryWords}

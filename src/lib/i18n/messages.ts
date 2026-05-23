@@ -530,8 +530,8 @@ const EN_MESSAGES = {
     unsupportedQuizType: (type: string) => `Unsupported quiz type: ${type}`,
     flashcardsResult: {
       title: "Flashcards Complete!",
-      description: (known: number, total: number, percentage: number) =>
-        `You knew ${known} of ${total} terms (${percentage}%).`,
+      description: (total: number) =>
+        `You reviewed ${formatPluralizedCount("en", total, { one: "flashcard", other: "flashcards" })}.`,
       encouragementHigh: "Great job! You know most of these terms.",
       encouragementMedium: "Good progress! Keep practicing to improve.",
       encouragementLow: "Keep studying! Practice makes perfect.",
@@ -658,6 +658,9 @@ const EN_MESSAGES = {
       progress: (current: number, total: number) =>
         `Card ${current} of ${total}`,
       remaining: (count: number) => `${count} remaining`,
+      previous: "Previous",
+      next: "Next",
+      finish: "Finish",
       knowCount: (count: number) => `Know: ${count}`,
       learningCount: (count: number) => `Learning: ${count}`,
       frontAria: "Flashcard front. Press to reveal the translation.",
@@ -954,8 +957,8 @@ const EN_MESSAGES = {
     correctLabel: "Correct",
     correctBadge: "Correct",
     wrongBadge: "Wrong",
-    flashcardKnown: (score: number, maxScore: number) =>
-      `Flashcard session - ${score} of ${maxScore} cards marked as known.`,
+    flashcardReviewed: (count: number) =>
+      `Flashcard session - ${count} cards reviewed.`,
     flashcardCompleted: "Flashcard session - completed.",
     previousFeedback: "Previous Feedback",
     tutorFallback: "Tutor",
@@ -1002,18 +1005,14 @@ const EN_MESSAGES = {
     tutorView: "Tutor Progress View",
     targetLabel: (level: string) => `Target ${level}`,
     description: (name: string) =>
-      `Review ${name}'s computed learning profile, then curate your own coaching version of the radar metrics, AI suggestions, and progress comments.`,
+      `Review ${name}'s computed learning profile and current performance metrics.`,
     overviewDescription:
       "Review one connected student at a time with the same performance summary used in student progress reporting.",
     monthlyDescription:
       "Compare completed quizzes and lessons for one connected student across the last 30 days.",
-    coachingDescription:
-      "Curate tutor-specific radar adjustments, coaching notes, and progress reviews for one connected student.",
     overallTab: "Overall",
     monthlyTab: "Monthly",
-    coachingTab: "Coaching",
     viewProgress: "View Progress",
-    openCoachingWorkspace: "Open Coaching Workspace",
     openHistory: "Open History",
     monthlyPanelDescription: (name: string) =>
       `Track ${name}'s completed quizzes and lessons across the last 30 days.`,
@@ -1980,8 +1979,8 @@ const UK_MESSAGES: AppMessages = {
       `Непідтримуваний тип вікторини: ${type}`,
     flashcardsResult: {
       title: "Картки завершено!",
-      description: (known: number, total: number, percentage: number) =>
-        `Ви знали ${known} із ${total} слів (${percentage}%).`,
+      description: (total: number) =>
+        `Ви переглянули ${formatPluralizedCount("uk", total, { one: "картку", few: "картки", many: "карток" })}.`,
       encouragementHigh: "Чудова робота! Ви знаєте більшість цих слів.",
       encouragementMedium:
         "Хороший прогрес! Продовжуйте практикуватися, щоб покращити результат.",
@@ -2108,6 +2107,9 @@ const UK_MESSAGES: AppMessages = {
       progress: (current: number, total: number) =>
         `Картка ${current} з ${total}`,
       remaining: (count: number) => `Залишилося ${count}`,
+      previous: "Попередня",
+      next: "Наступна",
+      finish: "Завершити",
       knowCount: (count: number) => `Знаю: ${count}`,
       learningCount: (count: number) => `Вивчаю: ${count}`,
       frontAria: "Лицьова сторона картки. Натисніть, щоб побачити переклад.",
@@ -2408,8 +2410,8 @@ const UK_MESSAGES: AppMessages = {
     correctLabel: "Правильно",
     correctBadge: "Правильно",
     wrongBadge: "Неправильно",
-    flashcardKnown: (score: number, maxScore: number) =>
-      `Сесію карток завершено - ${score} із ${maxScore} карток позначено як відомі.`,
+    flashcardReviewed: (count: number) =>
+      `Сесію карток завершено - переглянуто ${count} карток.`,
     flashcardCompleted: "Сесію карток завершено.",
     previousFeedback: "Попередній відгук",
     tutorFallback: "Викладач",
@@ -2457,18 +2459,14 @@ const UK_MESSAGES: AppMessages = {
     tutorView: "Перегляд прогресу викладачем",
     targetLabel: (level: string) => `Ціль ${level}`,
     description: (name: string) =>
-      `Перегляньте обчислений навчальний профіль ${name}, а потім сформуйте власну викладацьку версію радарних метрик, AI-підказок і коментарів до прогресу.`,
+      `Перегляньте обчислений навчальний профіль ${name} і поточні метрики успішності.`,
     overviewDescription:
       "Переглядайте одного під’єднаного студента за раз, використовуючи той самий підсумок успішності, що й у студентському прогресі.",
     monthlyDescription:
       "Порівнюйте завершені вікторини та уроки одного під’єднаного студента за останні 30 днів.",
-    coachingDescription:
-      "Формуйте викладацькі коригування радара, нотатки для коучингу та огляди прогресу для одного під’єднаного студента.",
     overallTab: "Загалом",
     monthlyTab: "Щомісяця",
-    coachingTab: "Коучинг",
     viewProgress: "Переглянути прогрес",
-    openCoachingWorkspace: "Відкрити простір коучингу",
     openHistory: "Відкрити історію",
     monthlyPanelDescription: (name: string) =>
       `Переглядайте завершені вікторини та уроки ${name} за останні 30 днів.`,

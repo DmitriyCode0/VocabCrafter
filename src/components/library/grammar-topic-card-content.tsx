@@ -17,11 +17,11 @@ export function GrammarTopicCardContent({
   const preview = content?.summary ?? topic.effectiveRule.split("\n")[0]?.trim();
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full flex-col gap-3">
       <p className="text-sm leading-6 text-foreground/90">
         {preview || fallbackMessage}
       </p>
-      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+      <div className="mt-auto flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
         <span>{openArticleLabel}</span>
         <ArrowUpRight className="h-3.5 w-3.5" />
       </div>

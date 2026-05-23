@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookOpen, FileText, Target } from "lucide-react";
+import { Target } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getGrammarTopicPromptCatalogUpToLevel } from "@/lib/grammar/prompt-overrides";
@@ -11,10 +10,10 @@ import {
   getLearningLanguageLabel,
   normalizeLearningLanguage,
 } from "@/lib/languages";
-import { getReportLanguageLabel } from "@/lib/progress/monthly-report-language";
 import {
   formatMonthlyReportMonthLabel,
   getTutorStudentMonthlyReportMetrics,
+  resolveMonthlyReportMetricsReferenceDate,
 } from "@/lib/progress/monthly-reports";
 import { ReportMonthFilter } from "@/components/progress/report-month-filter";
 import { TutorPlansReportsPageHeader } from "@/components/progress/tutor-plans-reports-page-header";
@@ -22,7 +21,6 @@ import { ResultsStudentFilter } from "@/components/progress/results-student-filt
 import { TutorStudentPlanWorkspace } from "@/components/progress/tutor-student-plan-workspace";
 import { MonthlyReportPentagramCard } from "@/components/progress/monthly-report-pentagram-card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -33,7 +31,6 @@ import {
 import { getTutorProgressPageData } from "@/lib/progress/tutor-progress-page-data";
 import {
   getTutorStudentPlan,
-  hasConfiguredTutorStudentPlan,
   isTutorStudentMonthlyPlansTableAvailable,
   listStudentTutorPlans,
   normalizeTutorStudentPlanMonth,
@@ -45,25 +42,6 @@ const APP_LANGUAGE_LOCALES = {
   en: "en-GB",
   uk: "uk-UA",
 } as const;
-
-/** Returns today for the current calendar month, last day of month for past months. */
-function resolveMetricsReferenceDate(planMonth: string): Date {
-  const now = new Date();
-  const currentMonthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
-  if (planMonth === currentMonthKey) {
-    return now;
-  }
-  const [year, month] = planMonth.split("-").map(Number);
-  return new Date(Date.UTC(year, month, 0)); // day 0 of next month = last day of requested month
-}
-
-function formatPercentage(value: number | null) {
-  if (value == null || !Number.isFinite(value)) {
-    return "n/a";
-  }
-
-  return `${Number.isInteger(value) ? value.toString() : value.toFixed(1).replace(/\.0$/, "")}%`;
-}
 
 export default async function PlansAndReportsPage({
   searchParams,
@@ -97,7 +75,9 @@ export default async function PlansAndReportsPage({
   const selectedMonth = normalizeTutorStudentPlanMonth(
     resolvedSearchParams.month,
   );
-  const selectedMonthDate = resolveMetricsReferenceDate(selectedMonth);
+  const selectedMonthDate = resolveMonthlyReportMetricsReferenceDate(
+    selectedMonth,
+  );
   const selectedMonthLabel = formatMonthlyReportMonthLabel(
     selectedMonth,
     locale,

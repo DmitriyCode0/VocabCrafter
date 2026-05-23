@@ -220,7 +220,11 @@ const AttemptCard = React.memo(function AttemptCard({
 }) {
   const quiz = resolveAttemptQuiz(attempt);
   const student = attempt.profiles;
-  const scored = attempt.score != null && attempt.max_score != null;
+  const isFlashcardAttempt = quiz?.type === "flashcards";
+  const scored =
+    !isFlashcardAttempt &&
+    attempt.score != null &&
+    attempt.max_score != null;
   const pct = scored
     ? Math.round((Number(attempt.score) / Number(attempt.max_score)) * 100)
     : null;
@@ -265,7 +269,7 @@ const AttemptCard = React.memo(function AttemptCard({
                 {grammarTopic}
               </Badge>
             )}
-            {quiz?.cefr_level && (
+            {quiz?.cefr_level && !isFlashcardAttempt && (
               <Badge variant="secondary">{quiz.cefr_level}</Badge>
             )}
             {pct !== null && (

@@ -17,6 +17,7 @@ import {
   getTutorStudentMonthlyReportMetrics,
   listStudentPublishedMonthlyReports,
   listTutorStudentMonthlyReports,
+  resolveMonthlyReportMetricsReferenceDate,
 } from "@/lib/progress/monthly-reports";
 import { ReportMonthFilter } from "@/components/progress/report-month-filter";
 import { TutorPlansReportsPageHeader } from "@/components/progress/tutor-plans-reports-page-header";
@@ -45,17 +46,6 @@ const APP_LANGUAGE_LOCALES = {
   en: "en-GB",
   uk: "uk-UA",
 } as const;
-
-/** Returns today for the current calendar month, last day of month for past months. */
-function resolveMetricsReferenceDate(planMonth: string): Date {
-  const now = new Date();
-  const currentMonthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
-  if (planMonth === currentMonthKey) {
-    return now;
-  }
-  const [year, month] = planMonth.split("-").map(Number);
-  return new Date(Date.UTC(year, month, 0)); // day 0 of next month = last day of requested month
-}
 
 function formatNumber(value: number, maximumFractionDigits = 1) {
   if (Number.isInteger(value)) {
@@ -148,7 +138,9 @@ export default async function PlansAndReportsReportsPage({
   const selectedMonth = normalizeTutorStudentPlanMonth(
     resolvedSearchParams.month,
   );
-  const selectedMonthDate = resolveMetricsReferenceDate(selectedMonth);
+  const selectedMonthDate = resolveMonthlyReportMetricsReferenceDate(
+    selectedMonth,
+  );
   const selectedMonthLabel = formatMonthlyReportMonthLabel(
     selectedMonth,
     locale,
@@ -252,9 +244,6 @@ export default async function PlansAndReportsReportsPage({
                           )}
                         </Badge>
                         <Badge variant="outline">
-                          Quizzes: {report.metricsSnapshot.completedQuizzes}
-                        </Badge>
-                        <Badge variant="outline">
                           Sentence translations:{" "}
                           {report.metricsSnapshot.completedSentenceTranslations}
                           {report.goalsSnapshot
@@ -275,10 +264,6 @@ export default async function PlansAndReportsReportsPage({
                           null
                             ? ` / ${report.goalsSnapshot.monthlyCompletedLessonsTarget}`
                             : ""}
-                        </Badge>
-                        <Badge variant="outline">
-                          Classroom sessions:{" "}
-                          {report.metricsSnapshot.classroomSessions}
                         </Badge>
                         <Badge variant="outline">
                           Student speaking time:{" "}
@@ -363,17 +348,6 @@ export default async function PlansAndReportsReportsPage({
                           {formatProgressValue(
                             report.metricsSnapshot.completedLessons,
                             report.goalsSnapshot.monthlyCompletedLessonsTarget,
-                          )}
-                        </p>
-                      </div>
-                      <div className="rounded-lg border px-3 py-3">
-                        <p className="text-xs text-muted-foreground">
-                          Classroom sessions
-                        </p>
-                        <p className="text-xl font-semibold">
-                          {formatNumber(
-                            report.metricsSnapshot.classroomSessions,
-                            0,
                           )}
                         </p>
                       </div>

@@ -3,7 +3,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 import { getAppMessages } from "@/lib/i18n/messages";
 import { getTutorProgressPageData } from "@/lib/progress/tutor-progress-page-data";
-import { parseTutorProgressOverride } from "@/lib/progress/contracts";
 import { applyTutorTimeAdjustmentToSnapshot } from "@/lib/progress/profile-metrics";
 import { ResultsStudentFilter } from "@/components/progress/results-student-filter";
 import { TutorProgressPageHeader } from "@/components/progress/tutor-progress-page-header";
@@ -28,25 +27,29 @@ export default async function ResultsPage({
     await getTutorProgressPageData(requestedStudentId);
   const messages = getAppMessages(appLanguage);
   const supabaseAdmin = createAdminClient();
-  const [snapshot, overrideResult] = activeStudentId
+  const [snapshot, timeAdjustmentResult] = activeStudentId
     ? await Promise.all([
         getStudentProgressSnapshot(activeStudentId),
         supabaseAdmin
           .from("tutor_student_progress_overrides")
-          .select("axis_overrides, insights_override, time_adjustment_hours")
+          .select("time_adjustment_hours")
           .eq("tutor_id", userId)
           .eq("student_id", activeStudentId)
           .maybeSingle(),
       ])
     : [null, null];
 
-  if (overrideResult?.error) {
-    throw overrideResult.error;
+  if (timeAdjustmentResult?.error) {
+    throw timeAdjustmentResult.error;
   }
 
-  const timeOverride = parseTutorProgressOverride(overrideResult?.data);
+  const timeAdjustmentHours = Number.isFinite(
+    timeAdjustmentResult?.data?.time_adjustment_hours,
+  )
+    ? Number(timeAdjustmentResult?.data?.time_adjustment_hours)
+    : 0;
   const effectiveSnapshot = snapshot
-    ? applyTutorTimeAdjustmentToSnapshot(snapshot, timeOverride.timeAdjustmentHours)
+    ? applyTutorTimeAdjustmentToSnapshot(snapshot, timeAdjustmentHours)
     : null;
 
   return (
@@ -96,7 +99,7 @@ export default async function ResultsPage({
             messages.tutorProgressPage.studentFallback
           }
           snapshot={effectiveSnapshot}
-          initialTimeAdjustmentHours={timeOverride.timeAdjustmentHours}
+          initialTimeAdjustmentHours={timeAdjustmentHours}
           appLanguage={appLanguage}
         />
       )}

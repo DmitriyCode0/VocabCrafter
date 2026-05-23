@@ -506,14 +506,6 @@ export function TutorStudentMonthlyReportsWorkspace({
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-lg border px-3 py-3">
                 <p className="text-xs text-muted-foreground">
-                  Completed quizzes
-                </p>
-                <p className="text-2xl font-semibold">
-                  {formatNumber(metrics.completedQuizzes, 0)}
-                </p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">
                   Sentence translation exercises
                 </p>
                 <p className="text-2xl font-semibold">
@@ -543,14 +535,6 @@ export function TutorStudentMonthlyReportsWorkspace({
                     metrics.completedLessons,
                     plan.monthlyCompletedLessonsTarget,
                   )}
-                </p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">
-                  Classroom sessions
-                </p>
-                <p className="text-2xl font-semibold">
-                  {formatNumber(metrics.classroomSessions, 0)}
                 </p>
               </div>
               <div className="rounded-lg border px-3 py-3">
@@ -882,9 +866,6 @@ export function TutorStudentMonthlyReportsWorkspace({
                     )}
                   </Badge>
                   <Badge variant="outline">
-                    Quizzes: {report.metricsSnapshot.completedQuizzes}
-                  </Badge>
-                  <Badge variant="outline">
                     Sentence translations:{" "}
                     {report.metricsSnapshot.completedSentenceTranslations}
                     {report.goalsSnapshot.monthlySentenceTranslationTarget !=
@@ -903,10 +884,6 @@ export function TutorStudentMonthlyReportsWorkspace({
                     {report.goalsSnapshot.monthlyCompletedLessonsTarget != null
                       ? ` / ${report.goalsSnapshot.monthlyCompletedLessonsTarget}`
                       : ""}
-                  </Badge>
-                  <Badge variant="outline">
-                    Classroom sessions:{" "}
-                    {report.metricsSnapshot.classroomSessions}
                   </Badge>
                   <Badge variant="outline">
                     Student speaking time:{" "}

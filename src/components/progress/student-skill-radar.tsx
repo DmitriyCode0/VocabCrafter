@@ -181,6 +181,8 @@ interface StudentSkillRadarProps {
   onGrammarTopicToggle?: (topicKey: string, checked: boolean) => void;
   title?: string;
   description?: string;
+  betaLabel?: string;
+  grammarNoteLabel?: string;
   comparison?: {
     currentLabel: string;
     previousLabel: string;
@@ -209,6 +211,8 @@ export function StudentSkillRadar({
   onGrammarTopicToggle,
   title = "Learning Profile",
   description = "A five-axis view of your current learning experience.",
+  betaLabel = "Beta",
+  grammarNoteLabel = "Grammar note.",
   comparison,
 }: StudentSkillRadarProps) {
   const mergedChartData = comparison
@@ -395,7 +399,7 @@ export function StudentSkillRadar({
                           variant="secondary"
                           className="text-[11px] uppercase tracking-wide"
                         >
-                          Beta
+                          {betaLabel}
                         </Badge>
                       )}
                     </div>
@@ -498,7 +502,9 @@ export function StudentSkillRadar({
           ))}
 
           <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-xs leading-relaxed text-muted-foreground">
-            <span className="font-medium text-foreground">Grammar note.</span>{" "}
+            <span className="font-medium text-foreground">
+              {grammarNoteLabel}
+            </span>{" "}
             {grammarNotice}
           </div>
         </motion.div>

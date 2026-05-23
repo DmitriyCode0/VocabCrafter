@@ -1,23 +1,11 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookMarked, BookOpen, Shield, TrendingUp, Users } from "lucide-react";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-import {
-  ActiveEvidenceList,
-  type ActiveEvidenceListItem,
-} from "@/components/mastery/active-evidence-list";
 import { ImportPassiveVocabularyCard } from "@/components/mastery/import-passive-vocabulary-card";
-import { PassiveLibraryAdminPanel } from "@/components/mastery/passive-library-admin-panel";
-import { VocabularyViewTabs } from "@/components/mastery/vocabulary-view-tabs";
-import {
-  PassiveEvidenceList,
-  type PassiveEvidenceListItem,
-} from "@/components/mastery/passive-evidence-list";
 import { PassiveVocabularyStudentFilter } from "@/components/mastery/passive-vocabulary-student-filter";
-import { PagePagination } from "@/components/shared/page-pagination";
+import {
+  StudentVocabularyBrowser,
+  type StudentVocabularyBrowserItem,
+} from "@/components/mastery/student-vocabulary-browser";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -30,31 +18,23 @@ import {
   normalizeLearningLanguage,
 } from "@/lib/languages";
 import {
-  summarizeActiveVocabularyEvidence,
-  type ActiveVocabularySignalSummary,
-} from "@/lib/mastery/active-vocabulary-evidence";
-import {
-  getPassiveVocabularyEquivalentWeight,
+  getPassiveVocabularyForms,
+  getPassiveVocabularyEnglishDefinitions,
+  getPassiveVocabularyUkrainianSearchForms,
+  getPassiveVocabularyUkrainianTranslation,
   normalizePassiveVocabularyLibraryAttributes,
-  PASSIVE_EQUIVALENT_WORDS_EXPLANATION,
-  summarizePassiveVocabularyEvidence,
-  type PassiveVocabularyEvidenceRow,
   type PassiveVocabularyPartOfSpeech,
 } from "@/lib/mastery/passive-vocabulary";
-import { hasConfirmedPassiveVocabularyLibraryEntry } from "@/lib/mastery/dictionary-approval";
-import {
-  createStudentVocabularyStateKey,
-  getStudentLearningVocabularyKeySet,
+import type {
+  StudentVocabularyCurrentState,
+  StudentVocabularyGroupOverride,
 } from "@/lib/mastery/student-vocabulary-state";
-import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import type { Role } from "@/types/roles";
 import type { CEFRLevel } from "@/types/quiz";
 
 export const dynamic = "force-dynamic";
-
-const EVIDENCE_PAGE_SIZE = 18;
-const LIBRARY_PAGE_SIZE = 20;
-const CEFR_LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
 interface PassiveVocabularyStudentOption {
   id: string;
@@ -63,62 +43,32 @@ interface PassiveVocabularyStudentOption {
   cefr_level: string | null;
 }
 
-interface PassiveEvidenceQueryRow {
+interface StudentVocabularyRow {
   id: string;
+  library_item_id: string | null;
   term: string;
-  definition: string | null;
   normalized_term: string;
   item_type: "word" | "phrase";
-  source_type: "full_text" | "manual_list" | "curated_list";
-  source_label: string | null;
-  import_count: number;
-  last_imported_at: string;
+  current_state: StudentVocabularyCurrentState;
+  group_override: StudentVocabularyGroupOverride | null;
+  custom_definition: string | null;
+  updated_at: string;
   passive_vocabulary_library: {
     approval_status: "unconfirmed" | "confirmed" | "rejected";
     cefr_level: string | null;
     part_of_speech: string | null;
+    attributes: unknown;
   } | null;
 }
 
-interface ActiveEvidenceQueryRow {
-  id: string;
-  term: string;
-  normalized_term: string;
-  source_type: "lesson_recording" | "manual_list" | "other";
-  source_label: string | null;
-  usage_count: number;
-  first_used_at: string;
-  last_used_at: string;
-  passive_vocabulary_library: {
-    approval_status: "unconfirmed" | "confirmed" | "rejected";
-    cefr_level: string | null;
-    part_of_speech: PassiveVocabularyPartOfSpeech | null;
-  } | null;
-}
-
-interface PassiveVocabularyWorkspaceData {
+interface StudentVocabularyWorkspace {
   studentId: string;
   studentName: string;
   studentEmail: string;
+  cefrLevel: CEFRLevel;
   targetLanguage: ReturnType<typeof normalizeLearningLanguage>;
   targetLanguageLabel: string;
-  cefrLevel: CEFRLevel;
-  evidenceTotal: number;
-  pendingReviewCount: number;
-  evidenceItems: PassiveEvidenceListItem[];
-  summary: ReturnType<typeof summarizePassiveVocabularyEvidence>;
-  aboveTargetCount: number;
-}
-
-interface ActiveVocabularyWorkspaceData {
-  studentId: string;
-  studentName: string;
-  studentEmail: string;
-  cefrLevel: CEFRLevel;
-  evidenceTotal: number;
-  evidenceItems: ActiveEvidenceListItem[];
-  summary: ActiveVocabularySignalSummary;
-  taggedItemsCount: number;
+  items: StudentVocabularyBrowserItem[];
 }
 
 interface PassiveVocabularyPageProps {
@@ -154,63 +104,13 @@ function buildRedirectPath(
 }
 
 function normalizeCefrLevel(value?: string | null): CEFRLevel {
-  return CEFR_LEVELS.includes(value as CEFRLevel) ? (value as CEFRLevel) : "A1";
+  return ["A1", "A2", "B1", "B2", "C1", "C2"].includes(value ?? "")
+    ? (value as CEFRLevel)
+    : "A1";
 }
 
 function buildStudentLabel(student: PassiveVocabularyStudentOption) {
   return student.full_name ?? student.email ?? "Student";
-}
-
-function countAboveTargetLevels(
-  cefrCounts: ReturnType<
-    typeof summarizePassiveVocabularyEvidence
-  >["cefrCounts"],
-  targetLevel: CEFRLevel,
-) {
-  const targetIndex = CEFR_LEVELS.indexOf(targetLevel);
-
-  return CEFR_LEVELS.slice(targetIndex + 1).reduce(
-    (sum, level) => sum + cefrCounts[level],
-    0,
-  );
-}
-
-function countTaggedActiveVocabularyItems(
-  cefrCounts: ActiveVocabularySignalSummary["cefrCounts"],
-) {
-  return CEFR_LEVELS.reduce((sum, level) => sum + cefrCounts[level], 0);
-}
-
-function hasPendingPassiveVocabularyLibraryEntry(
-  libraryItem: PassiveEvidenceQueryRow["passive_vocabulary_library"],
-) {
-  return libraryItem?.approval_status === "unconfirmed";
-}
-
-function resolveVocabularyTab(value?: string) {
-  return value === "active" ? "active" : "passive";
-}
-
-function buildVocabularyHref({
-  tab,
-  studentId,
-}: {
-  tab: "active" | "passive";
-  studentId?: string | null;
-}) {
-  const nextParams = new URLSearchParams();
-
-  if (tab === "active") {
-    nextParams.set("tab", "active");
-  }
-
-  if (studentId) {
-    nextParams.set("student", studentId);
-  }
-
-  return nextParams.size > 0
-    ? `/vocabulary?${nextParams.toString()}`
-    : "/vocabulary";
 }
 
 async function fetchTutorStudentOptions(
@@ -247,13 +147,9 @@ async function fetchTutorStudentOptions(
       ];
     })
     .sort((left, right) =>
-      buildStudentLabel(left).localeCompare(
-        buildStudentLabel(right),
-        undefined,
-        {
-          sensitivity: "base",
-        },
-      ),
+      buildStudentLabel(left).localeCompare(buildStudentLabel(right), undefined, {
+        sensitivity: "base",
+      }),
     );
 }
 
@@ -272,213 +168,6 @@ async function fetchSuperadminStudentOptions() {
   return (data ?? []) as PassiveVocabularyStudentOption[];
 }
 
-async function loadPassiveVocabularyWorkspace(
-  studentId: string,
-  evidencePage: number,
-) {
-  const supabaseAdmin = createAdminClient();
-  const evidenceRange = getPaginationRange(evidencePage, EVIDENCE_PAGE_SIZE);
-  const [studentProfileResult, evidenceRowsResult, learningVocabularyKeySet] = await Promise.all([
-    supabaseAdmin
-      .from("profiles")
-      .select("full_name, email, preferred_language, cefr_level")
-      .eq("id", studentId)
-      .single(),
-    supabaseAdmin
-      .from("passive_vocabulary_evidence")
-      .select(
-        "id, term, definition, normalized_term, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(approval_status, cefr_level, part_of_speech)",
-      )
-      .eq("student_id", studentId)
-      .order("last_imported_at", { ascending: false }),
-    getStudentLearningVocabularyKeySet({
-      adminClient: supabaseAdmin,
-      studentId,
-    }),
-  ]);
-
-  if (studentProfileResult.error || !studentProfileResult.data) {
-    return null;
-  }
-
-  const cefrLevel = normalizeCefrLevel(studentProfileResult.data.cefr_level);
-  const mapSummaryRow = (
-    row: PassiveEvidenceQueryRow,
-  ): PassiveVocabularyEvidenceRow => ({
-    term: row.term,
-    definition: row.definition,
-    item_type: row.item_type,
-    source_type: row.source_type,
-    source_label: row.source_label,
-    import_count: row.import_count,
-    last_imported_at: row.last_imported_at,
-    library_cefr_level:
-      (row.passive_vocabulary_library?.cefr_level as
-        | PassiveVocabularyEvidenceRow["library_cefr_level"]
-        | null) ?? null,
-    library_part_of_speech:
-      (row.passive_vocabulary_library?.part_of_speech as
-        | PassiveVocabularyEvidenceRow["library_part_of_speech"]
-        | null) ?? null,
-  });
-  const allEvidenceRows =
-    (evidenceRowsResult.data ?? []) as PassiveEvidenceQueryRow[];
-  const visibleEvidenceRows = allEvidenceRows.filter((row) =>
-    hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library) &&
-      !learningVocabularyKeySet.has(
-        createStudentVocabularyStateKey(row.normalized_term, row.item_type),
-      ),
-  );
-  const pendingReviewCount = allEvidenceRows.filter((row) =>
-    hasPendingPassiveVocabularyLibraryEntry(row.passive_vocabulary_library) &&
-      !learningVocabularyKeySet.has(
-        createStudentVocabularyStateKey(row.normalized_term, row.item_type),
-      ),
-  ).length;
-  const summary = summarizePassiveVocabularyEvidence(
-    visibleEvidenceRows.map(mapSummaryRow),
-    cefrLevel,
-  );
-  const evidenceItems = visibleEvidenceRows
-    .slice(evidenceRange.from, evidenceRange.to + 1)
-    .map(
-    (row): PassiveEvidenceListItem => ({
-      id: row.id,
-      term: row.term,
-      definition: row.definition,
-      item_type: row.item_type,
-      source_type: row.source_type,
-      source_label: row.source_label,
-      import_count: row.import_count,
-      last_imported_at: row.last_imported_at,
-      library_cefr_level: row.passive_vocabulary_library?.cefr_level ?? null,
-      library_part_of_speech:
-        row.passive_vocabulary_library?.part_of_speech ?? null,
-      recognitionWeight: getPassiveVocabularyEquivalentWeight(row.item_type, {
-        libraryCefrLevel:
-          (row.passive_vocabulary_library?.cefr_level as
-            | PassiveVocabularyEvidenceRow["library_cefr_level"]
-            | null) ?? null,
-        studentCefrLevel: cefrLevel,
-      }),
-    }),
-  );
-
-  return {
-    studentId,
-    studentName:
-      studentProfileResult.data.full_name ||
-      studentProfileResult.data.email ||
-      "Student",
-    studentEmail: studentProfileResult.data.email,
-    targetLanguage: normalizeLearningLanguage(
-      studentProfileResult.data.preferred_language,
-    ),
-    targetLanguageLabel: getLearningLanguageLabel(
-      studentProfileResult.data.preferred_language,
-    ),
-    cefrLevel,
-    evidenceTotal: visibleEvidenceRows.length,
-    pendingReviewCount,
-    evidenceItems,
-    summary,
-    aboveTargetCount: countAboveTargetLevels(summary.cefrCounts, cefrLevel),
-  } satisfies PassiveVocabularyWorkspaceData;
-}
-
-async function loadActiveVocabularyWorkspace(
-  studentId: string,
-  evidencePage: number,
-) {
-  const supabaseAdmin = createAdminClient();
-  const evidenceRange = getPaginationRange(evidencePage, EVIDENCE_PAGE_SIZE);
-  const [studentProfileResult, evidenceRowsResult, learningVocabularyKeySet] = await Promise.all([
-    supabaseAdmin
-      .from("profiles")
-      .select("full_name, email, cefr_level")
-      .eq("id", studentId)
-      .single(),
-    supabaseAdmin
-      .from("active_vocabulary_evidence")
-      .select(
-        "id, term, normalized_term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(approval_status, cefr_level, part_of_speech)",
-      )
-      .eq("student_id", studentId)
-      .order("last_used_at", { ascending: false }),
-    getStudentLearningVocabularyKeySet({
-      adminClient: supabaseAdmin,
-      studentId,
-    }),
-  ]);
-
-  if (studentProfileResult.error || !studentProfileResult.data) {
-    return null;
-  }
-
-  const visibleEvidenceRows = (
-    (evidenceRowsResult.data ?? []) as ActiveEvidenceQueryRow[]
-  ).filter(
-    (row) =>
-      hasConfirmedPassiveVocabularyLibraryEntry(row.passive_vocabulary_library) &&
-      !learningVocabularyKeySet.has(
-        createStudentVocabularyStateKey(row.normalized_term, "word"),
-      ),
-  );
-  const summary = summarizeActiveVocabularyEvidence(
-    visibleEvidenceRows.map((row) => ({
-      id: row.id,
-      term: row.term,
-      source_type: row.source_type,
-      source_label: row.source_label,
-      usage_count: row.usage_count,
-      first_used_at: row.first_used_at,
-      last_used_at: row.last_used_at,
-      library_cefr_level:
-        (row.passive_vocabulary_library?.cefr_level as
-          | "A1"
-          | "A2"
-          | "B1"
-          | "B2"
-          | "C1"
-          | "C2"
-          | null) ?? null,
-      library_part_of_speech:
-        row.passive_vocabulary_library?.part_of_speech ?? null,
-    })),
-  );
-
-  const evidenceItems = visibleEvidenceRows
-    .slice(evidenceRange.from, evidenceRange.to + 1)
-    .map(
-    (row): ActiveEvidenceListItem => ({
-      id: row.id,
-      term: row.term,
-      source_type: row.source_type,
-      source_label: row.source_label,
-      usage_count: row.usage_count,
-      first_used_at: row.first_used_at,
-      last_used_at: row.last_used_at,
-      library_cefr_level: row.passive_vocabulary_library?.cefr_level ?? null,
-      library_part_of_speech:
-        row.passive_vocabulary_library?.part_of_speech ?? null,
-    }),
-  );
-
-  return {
-    studentId,
-    studentName:
-      studentProfileResult.data.full_name ||
-      studentProfileResult.data.email ||
-      "Student",
-    studentEmail: studentProfileResult.data.email,
-    cefrLevel: normalizeCefrLevel(studentProfileResult.data.cefr_level),
-    evidenceTotal: visibleEvidenceRows.length,
-    evidenceItems,
-    summary,
-    taggedItemsCount: countTaggedActiveVocabularyItems(summary.cefrCounts),
-  } satisfies ActiveVocabularyWorkspaceData;
-}
-
 function resolveSelectedStudentId(
   requestedStudentId: string | undefined,
   students: PassiveVocabularyStudentOption[],
@@ -494,24 +183,157 @@ function resolveSelectedStudentId(
   return fallbackStudentId;
 }
 
+async function loadStudentVocabularyWorkspace(
+  studentId: string,
+): Promise<StudentVocabularyWorkspace | null> {
+  const supabaseAdmin = createAdminClient();
+  const [studentProfileResult, rowsResult] = await Promise.all([
+    supabaseAdmin
+      .from("profiles")
+      .select("full_name, email, preferred_language, cefr_level")
+      .eq("id", studentId)
+      .single(),
+    supabaseAdmin
+      .from("student_vocabulary_items")
+      .select(
+        "id, library_item_id, term, normalized_term, item_type, current_state, group_override, custom_definition, updated_at, passive_vocabulary_library(approval_status, cefr_level, part_of_speech, attributes)",
+      )
+      .eq("student_id", studentId),
+  ]);
+
+  if (studentProfileResult.error || !studentProfileResult.data) {
+    return null;
+  }
+
+  const rows = (rowsResult.data ?? []) as StudentVocabularyRow[];
+  const libraryItemIds = Array.from(
+    new Set(rows.flatMap((row) => (row.library_item_id ? [row.library_item_id] : []))),
+  );
+  const [formsResult, ukrainianFormsResult] =
+    libraryItemIds.length > 0
+      ? await Promise.all([
+          supabaseAdmin
+            .from("passive_vocabulary_library_forms")
+            .select("library_item_id, form_term")
+            .in("library_item_id", libraryItemIds),
+          supabaseAdmin
+            .from("passive_vocabulary_library_ukrainian_forms")
+            .select("library_item_id, form_term")
+            .in("library_item_id", libraryItemIds),
+        ])
+      : [{ data: [], error: null }, { data: [], error: null }];
+
+  if (formsResult.error || ukrainianFormsResult.error) {
+    console.error("Failed to load student vocabulary search forms", {
+      studentId,
+      formsError: formsResult.error,
+      ukrainianFormsError: ukrainianFormsResult.error,
+    });
+  }
+
+  const formsByLibraryId = new Map<string, string[]>();
+  for (const row of formsResult.error ? [] : (formsResult.data ?? [])) {
+    const existing = formsByLibraryId.get(row.library_item_id) ?? [];
+    existing.push(row.form_term);
+    formsByLibraryId.set(row.library_item_id, existing);
+  }
+
+  const ukrainianFormsByLibraryId = new Map<string, string[]>();
+  for (const row of ukrainianFormsResult.error ? [] : (ukrainianFormsResult.data ?? [])) {
+    const existing = ukrainianFormsByLibraryId.get(row.library_item_id) ?? [];
+    existing.push(row.form_term);
+    ukrainianFormsByLibraryId.set(row.library_item_id, existing);
+  }
+
+  const items = rows
+    .map((row) => {
+      const normalizedAttributes = normalizePassiveVocabularyLibraryAttributes(
+        row.passive_vocabulary_library?.attributes,
+      );
+      const attributeForms = getPassiveVocabularyForms(
+        normalizedAttributes,
+        row.term,
+      );
+      const attributeUkrainianForms = getPassiveVocabularyUkrainianSearchForms(
+        normalizedAttributes,
+        getPassiveVocabularyUkrainianTranslation(normalizedAttributes),
+      );
+
+      return {
+        id: row.id,
+        term: row.term,
+        normalizedTerm: row.normalized_term,
+        itemType: row.item_type,
+        currentState: row.current_state,
+        groupOverride: row.group_override,
+        customDefinition: row.custom_definition,
+        updatedAt: row.updated_at,
+        approvalStatus: row.passive_vocabulary_library?.approval_status ?? "unconfirmed",
+        cefrLevel:
+          (row.passive_vocabulary_library?.cefr_level as CEFRLevel | null) ?? null,
+        partOfSpeech:
+          (row.passive_vocabulary_library?.part_of_speech as PassiveVocabularyPartOfSpeech | null) ?? null,
+        sharedTranslation: getPassiveVocabularyUkrainianTranslation(
+          normalizedAttributes,
+        ),
+        sharedDefinitions: getPassiveVocabularyEnglishDefinitions(
+          normalizedAttributes,
+        ),
+        searchForms: Array.from(
+          new Set([
+            ...(row.library_item_id
+              ? (formsByLibraryId.get(row.library_item_id) ?? [])
+              : []),
+            ...attributeForms,
+          ]),
+        ),
+        ukrainianSearchForms: Array.from(
+          new Set([
+            ...(row.library_item_id
+              ? (ukrainianFormsByLibraryId.get(row.library_item_id) ?? [])
+              : []),
+            ...attributeUkrainianForms,
+          ]),
+        ),
+      } satisfies StudentVocabularyBrowserItem;
+    })
+    .sort((left, right) =>
+      left.normalizedTerm.localeCompare(right.normalizedTerm, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
+
+  return {
+    studentId,
+    studentName:
+      studentProfileResult.data.full_name ||
+      studentProfileResult.data.email ||
+      "Student",
+    studentEmail: studentProfileResult.data.email,
+    cefrLevel: normalizeCefrLevel(studentProfileResult.data.cefr_level),
+    targetLanguage: normalizeLearningLanguage(
+      studentProfileResult.data.preferred_language,
+    ),
+    targetLanguageLabel: getLearningLanguageLabel(
+      studentProfileResult.data.preferred_language,
+    ),
+    items,
+  } satisfies StudentVocabularyWorkspace;
+}
+
 function getHeaderDescription(role: Role) {
-  if (role === "superadmin") {
-    return "Review student active and passive evidence and manage the shared vocabulary library that powers CEFR-aware passive estimates.";
+  if (role === "tutor" || role === "superadmin") {
+    return "Choose a student and review their My Dictionary with the same filter-first view used by the shared dictionary.";
   }
 
-  if (role === "tutor") {
-    return "Choose a student and switch between active and passive evidence in one vocabulary workspace.";
-  }
-
-  return "Review the words you use in lessons and the words you recognize from text in one vocabulary workspace.";
+  return "Browse your dictionary, change vocabulary groups, keep your own definitions, and remove words you no longer want tracked.";
 }
 
 export async function PassiveVocabularyPageContent({
   searchParams,
 }: PassiveVocabularyPageProps) {
   const resolvedSearchParams = await searchParams;
-  const evidencePage = getCurrentPage(resolvedSearchParams.page);
-  const activeTab = resolveVocabularyTab(resolvedSearchParams.tab);
   const supabase = await createClient();
   const {
     data: { user },
@@ -546,66 +368,20 @@ export async function PassiveVocabularyPageContent({
           studentOptions,
           studentOptions.length === 1 ? studentOptions[0].id : null,
         );
-  const activeWorkspace =
-    activeTab === "active" && selectedStudentId
-      ? await loadActiveVocabularyWorkspace(selectedStudentId, evidencePage)
-      : null;
-  const passiveWorkspace =
-    activeTab === "passive" && selectedStudentId
-      ? await loadPassiveVocabularyWorkspace(selectedStudentId, evidencePage)
-      : null;
-
-  const supabaseAdmin = createAdminClient();
-  const [
-    libraryCountResult,
-    completedLibraryCountResult,
-    needsReviewLibraryCountResult,
-    libraryRowsResult,
-  ] =
-    role === "superadmin"
-      ? await Promise.all([
-          supabaseAdmin
-            .from("passive_vocabulary_library")
-            .select("id", { count: "exact", head: true }),
-          supabaseAdmin
-            .from("passive_vocabulary_library")
-            .select("id", { count: "exact", head: true })
-            .eq("enrichment_status", "completed"),
-          supabaseAdmin
-            .from("passive_vocabulary_library")
-            .select("id", { count: "exact", head: true })
-            .neq("enrichment_status", "completed"),
-          supabaseAdmin
-            .from("passive_vocabulary_library")
-            .select(
-              "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, reviewed_at, updated_at",
-            )
-            .order("updated_at", { ascending: false })
-            .range(0, LIBRARY_PAGE_SIZE - 1),
-        ])
-      : [null, null, null, null];
+  const workspace = selectedStudentId
+    ? await loadStudentVocabularyWorkspace(selectedStudentId)
+    : null;
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Vocabulary</h1>
-          <p className="text-muted-foreground">{getHeaderDescription(role)}</p>
-        </div>
-        <VocabularyViewTabs
-          activeHref={buildVocabularyHref({
-            tab: "active",
-            studentId: selectedStudentId,
-          })}
-          passiveHref={buildVocabularyHref({
-            tab: "passive",
-            studentId: selectedStudentId,
-          })}
-          activeTab={activeTab}
-        />
+      <div className="space-y-2">
+        <h1 className="text-2xl font-bold tracking-tight">
+          {role === "student" ? "My Dictionary" : "Vocabulary"}
+        </h1>
+        <p className="text-muted-foreground">{getHeaderDescription(role)}</p>
       </div>
 
-      {role !== "student" && (
+      {role !== "student" ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Choose Student</CardTitle>
@@ -618,394 +394,69 @@ export async function PassiveVocabularyPageContent({
             {studentOptions.length === 0 ? (
               <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
                 {role === "tutor"
-                  ? "No connected students yet. Connect a student first to import passive vocabulary for them."
+                  ? "No connected students yet. Connect a student first to manage their dictionary."
                   : "No students found yet."}
               </div>
             ) : (
-              <>
-                <PassiveVocabularyStudentFilter
-                  students={studentOptions.map((student) => ({
-                    id: student.id,
-                    label: buildStudentLabel(student),
-                  }))}
-                  activeStudentId={selectedStudentId}
-                />
-
-                {!activeWorkspace && !passiveWorkspace && (
-                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                    {studentOptions.slice(0, 12).map((student) => (
-                      <Button
-                        key={student.id}
-                        asChild
-                        variant="outline"
-                        className="justify-start"
-                      >
-                        <Link
-                          href={buildVocabularyHref({
-                            tab: activeTab,
-                            studentId: student.id,
-                          })}
-                        >
-                          {buildStudentLabel(student)}
-                        </Link>
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              </>
+              <PassiveVocabularyStudentFilter
+                students={studentOptions.map((student) => ({
+                  id: student.id,
+                  label: buildStudentLabel(student),
+                }))}
+                activeStudentId={selectedStudentId}
+              />
             )}
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
-      {activeWorkspace && (
-        <div className="space-y-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-semibold">
-                  {activeWorkspace.studentName}
-                </h2>
-                {role !== "student" && (
-                  <Badge variant="outline">Student Workspace</Badge>
-                )}
-                <Badge variant="secondary">
-                  Target {activeWorkspace.cefrLevel}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Lesson-derived active vocabulary evidence for{" "}
-                {activeWorkspace.studentEmail}.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Used Words
-                </CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {activeWorkspace.summary.uniqueItems}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  unique words tracked from student production
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Uses
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {activeWorkspace.summary.totalUsageCount}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  aggregated production hits across all tracked words
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Tagged Items
-                </CardTitle>
-                <BookMarked className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {activeWorkspace.taggedItemsCount}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  evidence rows already linked to shared library CEFR metadata
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card id="active-evidence">
-            <CardHeader>
-              <CardTitle className="text-base">Active Evidence</CardTitle>
-              <CardDescription>
-                Review lesson-derived production words and remove entries that
-                should not stay attached to the student.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ActiveEvidenceList
-                items={activeWorkspace.evidenceItems}
-                emptyMessage="No active evidence tracked yet."
-                canDelete={role !== "student"}
-                deleteTitle="Delete active evidence"
-                getDeleteDescription={(term) =>
-                  `${term} will be removed from this student's active evidence.`
-                }
-                getDeleteSuccessMessage={(term) =>
-                  `Deleted ${term} from the student's active evidence`
-                }
-              />
-
-              <PagePagination
-                pathname="/vocabulary"
-                currentPage={evidencePage}
-                pageSize={EVIDENCE_PAGE_SIZE}
-                totalItems={activeWorkspace.evidenceTotal}
-                searchParams={resolvedSearchParams}
-              />
-            </CardContent>
-          </Card>
+      {!workspace && role !== "student" ? (
+        <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+          Choose a student to view their dictionary.
         </div>
-      )}
+      ) : null}
 
-      {passiveWorkspace && (
+      {workspace ? (
         <div className="space-y-6">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-semibold">
-                  {passiveWorkspace.studentName}
-                </h2>
-                {role !== "student" && (
+                <h2 className="text-xl font-semibold">{workspace.studentName}</h2>
+                {role !== "student" ? (
                   <Badge variant="outline">Student Workspace</Badge>
-                )}
-                <Badge variant="secondary">
-                  Target {passiveWorkspace.cefrLevel}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {passiveWorkspace.targetLanguageLabel} passive-recognition
-                evidence for {passiveWorkspace.studentEmail}.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Visible Items
-                </CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {passiveWorkspace.summary.uniqueItems}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {passiveWorkspace.summary.wordCount} words and{" "}
-                  {passiveWorkspace.summary.phraseCount} phrases
-                </p>
-                {passiveWorkspace.pendingReviewCount > 0 ? (
-                  <p className="mt-1 text-xs text-amber-700">
-                    {passiveWorkspace.pendingReviewCount} pending review and
-                    hidden from this list
-                  </p>
                 ) : null}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Equivalent Words
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {passiveWorkspace.summary.equivalentWordCount}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {passiveWorkspace.summary.rawEquivalentWordCount} raw items
-                  before level weighting
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Above Target
-                </CardTitle>
-                <BookMarked className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {passiveWorkspace.aboveTargetCount}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  library-tagged words above the current{" "}
-                  {passiveWorkspace.cefrLevel} target
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  What It Means
-                </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  {PASSIVE_EQUIVALENT_WORDS_EXPLANATION}
-                </p>
-              </CardContent>
-            </Card>
+                <Badge variant="secondary">Target {workspace.cefrLevel}</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {workspace.targetLanguageLabel} dictionary for {workspace.studentEmail}.
+              </p>
+            </div>
           </div>
 
           <ImportPassiveVocabularyCard
-            targetLanguage={passiveWorkspace.targetLanguage}
-            studentId={
-              role === "student" ? undefined : passiveWorkspace.studentId
-            }
-            cardId="passive-recognition"
+            targetLanguage={workspace.targetLanguage}
+            studentId={role === "student" ? undefined : workspace.studentId}
+            cardId="my-dictionary-import"
           />
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">
-                Recent Passive Evidence
-              </CardTitle>
+              <CardTitle className="text-base">My Dictionary</CardTitle>
               <CardDescription>
-                Review imported passive-recognition items, including the shared
-                library CEFR and part-of-speech metadata when available. Only
-                confirmed items are shown here.
-                {passiveWorkspace.pendingReviewCount > 0
-                  ? ` ${passiveWorkspace.pendingReviewCount} pending item${passiveWorkspace.pendingReviewCount === 1 ? " is" : "s are"} hidden until review.`
-                  : ""}
+                Search, filter, regroup, edit your own definitions, and delete
+                student-owned vocabulary without changing the shared dictionary.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <PassiveEvidenceList
-                items={passiveWorkspace.evidenceItems}
-                emptyMessage="No passive evidence imported yet."
-              />
-
-              <PagePagination
-                pathname="/vocabulary"
-                currentPage={evidencePage}
-                pageSize={EVIDENCE_PAGE_SIZE}
-                totalItems={passiveWorkspace.evidenceTotal}
-                searchParams={resolvedSearchParams}
+            <CardContent>
+              <StudentVocabularyBrowser
+                key={workspace.studentId}
+                initialItems={workspace.items}
+                role={role === "student" ? "student" : role}
               />
             </CardContent>
           </Card>
         </div>
-      )}
-
-      {role === "superadmin" && activeTab === "passive" && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-semibold">Shared Vocabulary Library</h2>
-            <Badge variant="destructive">Superadmin Only</Badge>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Library Items
-                </CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {libraryCountResult?.count ?? 0}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Fully Tagged
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {completedLibraryCountResult?.count ?? 0}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Needs Review
-                </CardTitle>
-                <Shield className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {needsReviewLibraryCountResult?.count ?? 0}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <ImportPassiveVocabularyCard
-            targetLanguage={passiveWorkspace?.targetLanguage ?? "english"}
-            mode="library"
-            cardId="shared-library-import"
-          />
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Library Table</CardTitle>
-              <CardDescription>
-                Every passive import feeds this shared library. Superadmins can
-                correct canonical forms, CEFR levels, parts of speech, and
-                future attributes here.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <PassiveLibraryAdminPanel
-                initialItems={(libraryRowsResult?.data ?? []).map((item) => ({
-                  id: item.id,
-                  canonical_term: item.canonical_term,
-                  normalized_term: item.normalized_term,
-                  item_type: item.item_type,
-                  cefr_level: item.cefr_level as
-                    | "A1"
-                    | "A2"
-                    | "B1"
-                    | "B2"
-                    | "C1"
-                    | "C2"
-                    | null,
-                  part_of_speech:
-                    item.part_of_speech as PassiveVocabularyPartOfSpeech | null,
-                  attributes: normalizePassiveVocabularyLibraryAttributes(
-                    item.attributes,
-                  ),
-                  approval_status: item.approval_status,
-                  rejection_reason: item.rejection_reason,
-                  enrichment_status: item.enrichment_status,
-                  enrichment_error: item.enrichment_error,
-                  reviewed_at: item.reviewed_at,
-                  updated_at: item.updated_at,
-                }))}
-                initialHasMore={
-                  (libraryCountResult?.count ?? 0) > LIBRARY_PAGE_SIZE
-                }
-              />
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }

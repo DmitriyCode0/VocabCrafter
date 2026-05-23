@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BarChart3, BookMarked, Loader2, TrendingUp } from "lucide-react";
+import { BarChart3, Loader2, TrendingUp } from "lucide-react";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 interface TutorProgressSectionTabsProps {
-  currentSection: "overall" | "monthly" | "coaching";
+  currentSection: "overall" | "monthly";
   basePath: string;
 }
 
@@ -33,17 +33,8 @@ export function TutorProgressSectionTabs({
       label: messages.progress.monthlyTab,
       icon: BarChart3,
     },
-    {
-      value: "coaching",
-      href: `${basePath}/coaching`,
-      label: messages.tutorProgressPage.coachingTab,
-      icon: BookMarked,
-    },
   ] as const;
-  const sections =
-    basePath === "/progress"
-      ? allSections.filter((section) => section.value !== "coaching")
-      : allSections;
+  const sections = allSections;
 
   return (
     <Tabs
@@ -66,7 +57,7 @@ export function TutorProgressSectionTabs({
         variant="line"
         className={cn(
           "mx-auto grid h-auto w-full max-w-4xl rounded-none border-b border-border/60 bg-transparent p-0",
-          sections.length === 2 ? "grid-cols-2" : "grid-cols-3",
+          "grid-cols-2",
         )}
       >
         {sections.map((section) => {

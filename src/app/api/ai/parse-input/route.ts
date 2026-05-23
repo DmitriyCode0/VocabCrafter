@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { generateFromGeminiWithUsage, GEMINI_MODEL } from "@/lib/gemini/client";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { recordAIUsageEvent } from "@/lib/ai/usage";
+import { resolveQuizTermsWithDictionary } from "@/lib/quiz/quiz-term-resolution";
 import { z } from "zod";
 import {
   getLearningLanguageLabel,
@@ -165,7 +167,29 @@ User input summary:
     // Increment AI call counter after successful parse
     await incrementAICalls(user.id);
 
-    return NextResponse.json(result);
+    let resolvedTerms = result.terms;
+
+    try {
+      const dictionaryResolvedTerms = await resolveQuizTermsWithDictionary({
+        adminClient: createAdminClient(),
+        actorUserId: user.id,
+        targetLanguage,
+        sourceLanguage,
+        terms: result.terms,
+      });
+
+      resolvedTerms = dictionaryResolvedTerms.map(({ term, definition }) => ({
+        term,
+        definition,
+      }));
+    } catch (dictionaryResolutionError) {
+      console.error(
+        "Parse input dictionary resolution error:",
+        dictionaryResolutionError,
+      );
+    }
+
+    return NextResponse.json({ terms: resolvedTerms });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

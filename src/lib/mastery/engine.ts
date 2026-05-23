@@ -257,7 +257,8 @@ function extractFlashcardResults(
   answers: Record<string, unknown>,
   vocabularyTerms: { term: string; definition: string }[],
 ): WordResult[] {
-  // New format: { type: "flashcards", results: [{ term, known }] }
+  // Current format: { type: "flashcards", total, results: [{ term }] }
+  // Legacy result entries may still include { term, known }.
   const results = answers.results as
     | { term?: string; known?: boolean }[]
     | undefined;
@@ -273,7 +274,7 @@ function extractFlashcardResults(
         return {
           term: termLower,
           definition: vocabEntry?.definition ?? "",
-          correct: r.known === true,
+          correct: false,
           practiceType: "flashcards",
         };
       })
@@ -436,10 +437,30 @@ export async function upsertWordMastery(
 
   for (const [term, result] of termResults) {
     const current = existingMap.get(term) ?? null;
+
+    if (result.practiceType === "flashcards") {
+      if (current) {
+        continue;
+      }
+
+      upsertRows.push({
+        student_id: studentId,
+        term,
+        definition: result.definition,
+        mastery_level: 1,
+        correct_count: 0,
+        incorrect_count: 0,
+        translation_correct_count: 0,
+        streak: 0,
+        last_practiced: now,
+        next_review: getNextReviewDateForLevel(1),
+      });
+      continue;
+    }
+
     // For words tested multiple times in one quiz, apply sequentially
-    let state = current;
     const correct = result.correctCount > result.totalCount / 2; // majority wins
-    const newMastery = computeNewMastery(state, {
+    const newMastery = computeNewMastery(current, {
       correct,
       practiceType: result.practiceType,
     });
@@ -456,6 +477,10 @@ export async function upsertWordMastery(
       last_practiced: now,
       next_review: newMastery.next_review,
     });
+  }
+
+  if (upsertRows.length === 0) {
+    return;
   }
 
   // Upsert in batch

@@ -32,7 +32,7 @@ import {
   applyTutorTimeAdjustmentToSnapshot,
   getStudentProgressSnapshot,
 } from "@/lib/progress/profile-metrics";
-import { getPublishedTutorProgressOverride } from "@/lib/progress/published-tutor-override";
+import { getPublishedTutorTimeAdjustment } from "@/lib/progress/published-tutor-time-adjustment";
 import type { AppMessages } from "@/lib/i18n/messages";
 
 function pct(used: number, total: number) {
@@ -62,7 +62,7 @@ export async function StudentDashboard({
     { data: attemptRows },
     { count: totalWordsTracked },
     progressSnapshot,
-    publishedTutorOverride,
+    publishedTutorTimeAdjustment,
   ] = await Promise.all([
     supabase
       .from("quizzes")
@@ -80,13 +80,13 @@ export async function StudentDashboard({
       .select("id", { count: "exact", head: true })
       .eq("student_id", userId),
     getStudentProgressSnapshot(userId),
-    getPublishedTutorProgressOverride(userId),
+    getPublishedTutorTimeAdjustment(userId),
   ]);
 
-  const effectiveProgressSnapshot = publishedTutorOverride
+  const effectiveProgressSnapshot = publishedTutorTimeAdjustment != null
     ? applyTutorTimeAdjustmentToSnapshot(
         progressSnapshot,
-        publishedTutorOverride.override.timeAdjustmentHours,
+        publishedTutorTimeAdjustment,
       )
     : progressSnapshot;
 

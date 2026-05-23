@@ -8,6 +8,161 @@ import {
 } from "@/lib/mastery/student-vocabulary-state";
 import { parseQuizSnapshot } from "@/lib/quiz-snapshot";
 
+const BACKFILL_PAGE_SIZE = 1000;
+const QUIZ_BATCH_SIZE = 500;
+
+function chunkArray<T>(items: T[], chunkSize: number) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+}
+
+async function loadAllQuizAttempts(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+) {
+  const rows: Array<{
+    id: string;
+    student_id: string;
+    quiz_id: string;
+    answers: unknown;
+    completed_at: string;
+    quiz_snapshot: unknown;
+  }> = [];
+
+  for (let from = 0; ; from += BACKFILL_PAGE_SIZE) {
+    const to = from + BACKFILL_PAGE_SIZE - 1;
+    const { data, error } = await supabaseAdmin
+      .from("quiz_attempts")
+      .select("id, student_id, quiz_id, answers, completed_at, quiz_snapshot")
+      .order("completed_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    rows.push(...data);
+
+    if (data.length < BACKFILL_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return rows;
+}
+
+async function loadAllPassiveEvidenceRows(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+) {
+  const rows: Array<{
+    student_id: string;
+    term: string;
+    normalized_term: string;
+    item_type: "word" | "phrase";
+    library_item_id: string | null;
+  }> = [];
+
+  for (let from = 0; ; from += BACKFILL_PAGE_SIZE) {
+    const to = from + BACKFILL_PAGE_SIZE - 1;
+    const { data, error } = await supabaseAdmin
+      .from("passive_vocabulary_evidence")
+      .select("student_id, term, normalized_term, item_type, library_item_id")
+      .order("student_id", { ascending: true })
+      .order("normalized_term", { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    rows.push(...data);
+
+    if (data.length < BACKFILL_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return rows;
+}
+
+async function loadAllActiveEvidenceRows(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+) {
+  const rows: Array<{
+    student_id: string;
+    term: string;
+    normalized_term: string;
+    library_item_id: string | null;
+  }> = [];
+
+  for (let from = 0; ; from += BACKFILL_PAGE_SIZE) {
+    const to = from + BACKFILL_PAGE_SIZE - 1;
+    const { data, error } = await supabaseAdmin
+      .from("active_vocabulary_evidence")
+      .select("student_id, term, normalized_term, library_item_id")
+      .order("student_id", { ascending: true })
+      .order("normalized_term", { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    rows.push(...data);
+
+    if (data.length < BACKFILL_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return rows;
+}
+
+async function loadQuizzesByIds(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  quizIds: string[],
+) {
+  const rows: Array<{
+    id: string;
+    type: string;
+    vocabulary_terms: Record<string, unknown>[] | null;
+    generated_content: Record<string, unknown> | null;
+  }> = [];
+
+  for (const quizIdChunk of chunkArray(quizIds, QUIZ_BATCH_SIZE)) {
+    const { data, error } = await supabaseAdmin
+      .from("quizzes")
+      .select("id, type, vocabulary_terms, generated_content")
+      .in("id", quizIdChunk)
+      .is("deleted_at", null);
+
+    if (error) {
+      throw error;
+    }
+
+    rows.push(...(data ?? []));
+  }
+
+  return rows;
+}
+
 /**
  * POST /api/mastery/backfill
  * Processes ALL existing quiz attempts and populates word_mastery.
@@ -39,12 +194,11 @@ export async function POST() {
     }
 
     // Fetch all attempts ordered by completion date (oldest first)
-    const { data: attempts, error: attErr } = await supabaseAdmin
-      .from("quiz_attempts")
-      .select("id, student_id, quiz_id, answers, completed_at, quiz_snapshot")
-      .order("completed_at", { ascending: true });
+    let attempts;
 
-    if (attErr) {
+    try {
+      attempts = await loadAllQuizAttempts(supabaseAdmin);
+    } catch (attErr) {
       console.error("Backfill: failed to load attempts", attErr);
       return NextResponse.json(
         { error: "Failed to load attempts" },
@@ -76,19 +230,17 @@ export async function POST() {
       );
     }
 
-    const [passiveEvidenceResult, activeEvidenceResult] = await Promise.all([
-      supabaseAdmin
-        .from("passive_vocabulary_evidence")
-        .select("student_id, term, normalized_term, item_type, library_item_id"),
-      supabaseAdmin
-        .from("active_vocabulary_evidence")
-        .select("student_id, term, normalized_term, library_item_id"),
-    ]);
+    let passiveEvidenceRows;
+    let activeEvidenceRows;
 
-    if (passiveEvidenceResult.error || activeEvidenceResult.error) {
+    try {
+      [passiveEvidenceRows, activeEvidenceRows] = await Promise.all([
+        loadAllPassiveEvidenceRows(supabaseAdmin),
+        loadAllActiveEvidenceRows(supabaseAdmin),
+      ]);
+    } catch (evidenceError) {
       console.error("Backfill: failed to load evidence rows", {
-        passiveEvidenceError: passiveEvidenceResult.error,
-        activeEvidenceError: activeEvidenceResult.error,
+        evidenceError,
       });
       return NextResponse.json(
         { error: "Failed to load vocabulary evidence" },
@@ -105,7 +257,7 @@ export async function POST() {
         libraryItemId: string | null;
       }>
     >();
-    for (const row of passiveEvidenceResult.data ?? []) {
+    for (const row of passiveEvidenceRows) {
       const studentRows = passiveRowsByStudent.get(row.student_id) ?? [];
       studentRows.push({
         term: row.term,
@@ -133,7 +285,7 @@ export async function POST() {
         libraryItemId: string | null;
       }>
     >();
-    for (const row of activeEvidenceResult.data ?? []) {
+    for (const row of activeEvidenceRows) {
       const studentRows = activeRowsByStudent.get(row.student_id) ?? [];
       studentRows.push({
         term: row.term,
@@ -154,11 +306,17 @@ export async function POST() {
 
     // Pre-fetch all quizzes we need
     const quizIds = [...new Set(attempts.map((a) => a.quiz_id))];
-    const { data: quizzes } = await supabaseAdmin
-      .from("quizzes")
-      .select("id, type, vocabulary_terms, generated_content")
-      .in("id", quizIds)
-      .is("deleted_at", null);
+    let quizzes;
+
+    try {
+      quizzes = await loadQuizzesByIds(supabaseAdmin, quizIds);
+    } catch (quizLoadError) {
+      console.error("Backfill: failed to load quizzes", quizLoadError);
+      return NextResponse.json(
+        { error: "Failed to load quizzes" },
+        { status: 500 },
+      );
+    }
 
     const quizMap = new Map(
       (quizzes ?? []).map((q) => [

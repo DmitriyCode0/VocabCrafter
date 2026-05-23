@@ -243,6 +243,28 @@ export function CreateQuizFlow({
     setStep("edit");
   }
 
+  async function resolveTermsWithDictionary(currentTerms: QuizTerm[]) {
+    const response = await fetch("/api/quizzes/resolve-terms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        terms: currentTerms,
+        targetLanguage,
+        sourceLanguage,
+      }),
+    });
+
+    if (!response.ok) {
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      throw new Error(data?.error || "Failed to resolve quiz vocabulary");
+    }
+
+    const data = (await response.json()) as { terms: QuizTerm[] };
+    return data.terms;
+  }
+
   async function handleSaveToBank() {
     if (!bankName.trim() || terms.length === 0) return;
 
@@ -277,6 +299,9 @@ export function CreateQuizFlow({
     setIsGenerating(true);
 
     try {
+      const resolvedTerms = await resolveTermsWithDictionary(terms);
+      setTerms(resolvedTerms);
+
       const grammarTopicLabels = Object.fromEntries(
         availableGrammarLevels.flatMap(({ topics }) =>
           topics.map((topic) => [topic.topicKey, topic.displayName]),
@@ -302,7 +327,7 @@ export function CreateQuizFlow({
       if (selectedActivity === "flashcards") {
         // Build flashcards directly from terms — no AI needed
         content = {
-          cards: terms.map((t) => ({
+          cards: resolvedTerms.map((t) => ({
             term: t.term,
             definition: t.definition,
           })),
@@ -313,7 +338,7 @@ export function CreateQuizFlow({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             type: selectedActivity,
-            terms,
+            terms: resolvedTerms,
             config,
           }),
         });
@@ -337,7 +362,7 @@ export function CreateQuizFlow({
             `${messages.createQuiz.defaultTitlePrefix} - ${formatDateForAppLanguage(appLanguage, new Date())}`,
           type: selectedActivity,
           cefrLevel,
-          vocabularyTerms: terms,
+          vocabularyTerms: resolvedTerms,
           generatedContent: content,
           config,
         }),
