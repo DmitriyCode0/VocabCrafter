@@ -133,7 +133,9 @@ export async function generateJsonFromGeminiWithUsage(
       ...(options.systemInstruction
         ? { systemInstruction: options.systemInstruction }
         : {}),
-      ...(options.cachedContent ? { cachedContent: options.cachedContent } : {}),
+      ...(options.cachedContent
+        ? { cachedContent: options.cachedContent }
+        : {}),
       ...(options.thinkingConfig
         ? { thinkingConfig: options.thinkingConfig }
         : {}),

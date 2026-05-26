@@ -464,9 +464,8 @@ export async function POST(request: Request) {
     const systemInstruction = getSystemInstruction(config);
     const thinkingConfig = getQuizThinkingConfig(type);
 
-    const cacheResolution = await resolveQuizSystemInstructionCache(
-      systemInstruction,
-    );
+    const cacheResolution =
+      await resolveQuizSystemInstructionCache(systemInstruction);
     let cacheStatus = cacheResolution.status;
 
     const SCHEMA_MAP: Record<QuizType, z.ZodSchema> = {
@@ -504,7 +503,9 @@ export async function POST(request: Request) {
         let result: Awaited<ReturnType<typeof generateJsonFromGeminiWithUsage>>;
 
         try {
-          result = await generateJsonFromGeminiWithUsage(buildGenerateOptions(0.4));
+          result = await generateJsonFromGeminiWithUsage(
+            buildGenerateOptions(0.4),
+          );
         } catch (error) {
           if (!cacheResolution.cachedContent) {
             throw error;
@@ -531,7 +532,8 @@ export async function POST(request: Request) {
           config,
         );
         usageSnapshot = result.usageSnapshot;
-        cachedContentTokenCount = result.usageMetadata?.cachedContentTokenCount ?? 0;
+        cachedContentTokenCount =
+          result.usageMetadata?.cachedContentTokenCount ?? 0;
       } catch (error) {
         console.warn(
           "Discussion generation fell back to deterministic prompts:",
@@ -554,7 +556,10 @@ export async function POST(request: Request) {
 
         cacheStatus = "fallback";
         cachedContentUsed = false;
-        console.warn("Quiz generation cache failed; retrying without cache", error);
+        console.warn(
+          "Quiz generation cache failed; retrying without cache",
+          error,
+        );
 
         result = await generateFromGeminiWithUsage(
           {
@@ -570,7 +575,8 @@ export async function POST(request: Request) {
       generatedContent =
         type === "mcq" ? randomizeMCQContent(result.data) : result.data;
       usageSnapshot = result.usageSnapshot;
-      cachedContentTokenCount = result.usageMetadata?.cachedContentTokenCount ?? 0;
+      cachedContentTokenCount =
+        result.usageMetadata?.cachedContentTokenCount ?? 0;
     }
 
     console.info("Quiz generation config", {
