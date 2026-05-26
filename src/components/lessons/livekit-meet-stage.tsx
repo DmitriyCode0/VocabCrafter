@@ -99,11 +99,11 @@ function MeetStageLayout() {
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.75fr)]">
+    <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.75fr)] xl:content-start">
       <div className="min-h-[420px]">
         <MeetParticipantTile trackRef={primaryTrack} />
       </div>
-      <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-1">
+      <div className="grid content-start auto-rows-max gap-4 sm:grid-cols-2 xl:grid-cols-1 xl:auto-rows-fr">
         {secondaryTracks.map((trackRef) => {
           const trackKey = isTrackReference(trackRef)
             ? trackRef.publication.trackSid

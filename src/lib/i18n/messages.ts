@@ -286,7 +286,8 @@ const EN_MESSAGES = {
       rejectedSuggestion: (term: string) => `Rejected suggestion for ${term}`,
       approveSuggestionFailed: "Failed to approve suggestion",
       rejectSuggestionFailed: "Failed to reject suggestion",
-      searchPlaceholder: "Search English words, forms, or Ukrainian translations",
+      searchPlaceholder:
+        "Search English words, forms, or Ukrainian translations",
       searchAriaLabel: "Search shared dictionary",
       searchAction: "Search",
       clearAllFiltersAction: "Clear all filters",
@@ -1725,7 +1726,8 @@ const UK_MESSAGES: AppMessages = {
       rejectedSuggestion: (term: string) => `Пропозицію для ${term} відхилено`,
       approveSuggestionFailed: "Не вдалося затвердити пропозицію",
       rejectSuggestionFailed: "Не вдалося відхилити пропозицію",
-      searchPlaceholder: "Шукати англійські слова, форми або українські переклади",
+      searchPlaceholder:
+        "Шукати англійські слова, форми або українські переклади",
       searchAriaLabel: "Пошук у спільному словнику",
       searchAction: "Пошук",
       clearAllFiltersAction: "Очистити всі фільтри",

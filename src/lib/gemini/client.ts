@@ -1,8 +1,12 @@
-import { GoogleGenAI } from "@google/genai";
+import {
+  GoogleGenAI,
+  type GenerateContentResponseUsageMetadata,
+  type ThinkingConfig,
+} from "@google/genai";
 import { ZodError, type z } from "zod";
 import { extractTextUsageSnapshot, type AIUsageSnapshot } from "@/lib/ai/usage";
 
-export const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
+export const GEMINI_MODEL = "gemini-3.5-flash";
 export const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 export const GEMINI_TRANSCRIPTION_MODEL = "gemini-2.5-flash";
 
@@ -50,8 +54,10 @@ async function withRetry<T>(
 
 interface GenerateOptions {
   prompt: string;
-  systemInstruction: string;
+  systemInstruction?: string;
   temperature?: number;
+  cachedContent?: string;
+  thinkingConfig?: ThinkingConfig;
   contents?: Array<
     | { text: string }
     | {
@@ -72,6 +78,7 @@ interface GenerateOptions {
 interface GenerateWithUsageResult<T> {
   data: T;
   usageSnapshot: AIUsageSnapshot;
+  usageMetadata?: GenerateContentResponseUsageMetadata;
 }
 
 function extractJsonPayload(text: string) {
@@ -120,14 +127,22 @@ export async function generateJsonFromGeminiWithUsage(
   options: GenerateOptions,
 ): Promise<GenerateWithUsageResult<unknown>> {
   return withRetry(async () => {
+    const config = {
+      temperature: options.temperature ?? 0.7,
+      responseMimeType: "application/json",
+      ...(options.systemInstruction
+        ? { systemInstruction: options.systemInstruction }
+        : {}),
+      ...(options.cachedContent ? { cachedContent: options.cachedContent } : {}),
+      ...(options.thinkingConfig
+        ? { thinkingConfig: options.thinkingConfig }
+        : {}),
+    };
+
     const response = await getGenAI().models.generateContent({
       model: GEMINI_MODEL,
       contents: options.contents ?? options.prompt,
-      config: {
-        systemInstruction: options.systemInstruction,
-        temperature: options.temperature ?? 0.7,
-        responseMimeType: "application/json",
-      },
+      config,
     });
 
     const text = response.text;
@@ -143,6 +158,7 @@ export async function generateJsonFromGeminiWithUsage(
         responseText: text,
         usageMetadata: response.usageMetadata,
       }),
+      usageMetadata: response.usageMetadata,
     };
   });
 }

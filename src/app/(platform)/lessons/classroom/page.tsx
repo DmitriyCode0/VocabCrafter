@@ -9,7 +9,6 @@ import { DeleteClassroomSessionButton } from "@/components/lessons/delete-classr
 import { LessonsPageHeader } from "@/components/lessons/lessons-page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getClassroomParticipantName,
   getTutorStudentClassroomAccess,
@@ -20,8 +19,6 @@ import { getAppMessages } from "@/lib/i18n/messages";
 import { getLessonsViewerAccess } from "@/lib/lessons-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  getLiveKitRecordingConfigurationError,
-  getLiveKitServerUrl,
   isLiveKitConfigured,
   isLiveKitRecordingConfigured,
 } from "@/lib/livekit";
@@ -32,19 +29,6 @@ const APP_LANGUAGE_LOCALES = {
   en: "en-GB",
   uk: "uk-UA",
 } as const;
-
-function getRoomStatusLabel(status: string) {
-  switch (status) {
-    case "live":
-      return "Live";
-    case "completed":
-      return "Completed";
-    case "archived":
-      return "Archived";
-    default:
-      return "Open";
-  }
-}
 
 function getRecordingStatusLabel(status: string) {
   switch (status) {
@@ -138,11 +122,8 @@ export default async function ClassroomPage({
   const { connection: requestedConnectionId } = await searchParams;
   const { userId, role, appLanguage } = await getLessonsViewerAccess();
   const messages = getAppMessages(appLanguage);
-  const liveKitServerUrl = getLiveKitServerUrl();
   const liveKitConfigured = isLiveKitConfigured();
   const liveKitRecordingConfigured = isLiveKitRecordingConfigured();
-  const liveKitRecordingConfigurationError =
-    getLiveKitRecordingConfigurationError();
   const connections = await listTutorStudentClassroomConnectionsForUser(
     userId,
     role,
@@ -153,9 +134,6 @@ export default async function ClassroomPage({
     null;
   const access = selectedConnection
     ? await getTutorStudentClassroomAccess(selectedConnection.id)
-    : null;
-  const participantName = selectedConnection
-    ? getClassroomParticipantName(role, selectedConnection)
     : null;
   let classroomRecordings: Array<{
     id: string;
@@ -327,15 +305,15 @@ export default async function ClassroomPage({
       />
 
       {!selectedConnection || !access ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
+        <section className="space-y-4 border-y border-border/60 py-6">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight">
               {appLanguage === "uk"
                 ? "Поки немає доступної classroom-кімнати"
                 : "No classroom available yet"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            </h2>
+          </div>
+          <div className="space-y-3 text-sm text-muted-foreground">
             <p>
               {role === "tutor"
                 ? appLanguage === "uk"
@@ -356,63 +334,34 @@ export default async function ClassroomPage({
                     : "Open tutors"}
               </Link>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       ) : (
         <>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-2xl font-bold tracking-tight">
-                  {participantName}
-                </h2>
-                <Badge variant="outline">
-                  {role === "tutor"
-                    ? appLanguage === "uk"
-                      ? "Активне підключення"
-                      : "Active connection"
-                    : appLanguage === "uk"
-                      ? "Ваш classroom"
-                      : "Your classroom"}
-                </Badge>
-                <Badge variant="secondary">
-                  {getRoomStatusLabel(access.classroom.room_status)}
-                </Badge>
-              </div>
-              <p className="text-muted-foreground">
-                {appLanguage === "uk"
-                  ? "Ця classroom-кімната прив’язана до активного підключення між викладачем і студентом та підходить для дзвінків поза розкладом."
-                  : "This classroom is tied to the active tutor-student connection and can be used for ad-hoc sessions outside the lesson calendar."}
-              </p>
-            </div>
-          </div>
-
           <div className="space-y-4">
             <ClassroomRoomClient
               connectionId={selectedConnection.id}
               role={role}
               isConfigured={liveKitConfigured}
-              serverUrl={liveKitServerUrl}
               initialRoomStatus={access.classroom.room_status}
               initialRecordingStatus={access.classroom.recording_status}
               initialRecordingConsentStatus={
                 access.classroom.recording_consent_status
               }
               recordingConfigured={liveKitRecordingConfigured}
-              recordingConfigurationError={liveKitRecordingConfigurationError}
             />
 
-            <div className="grid gap-4 xl:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
+            <div className="grid gap-8 xl:grid-cols-2">
+              <section className="space-y-5 border-y border-border/60 py-6">
+                <div className="space-y-1">
+                  <h3 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
                     <Download className="h-5 w-5 text-primary" />
                     {appLanguage === "uk"
                       ? "Аудіозаписи студента"
                       : "Student Audio Recordings"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
+                  </h3>
+                </div>
+                <div className="space-y-3 text-sm">
                   {classroomRecordings.length === 0 ? (
                     <p className="text-muted-foreground">
                       {appLanguage === "uk"
@@ -490,8 +439,8 @@ export default async function ClassroomPage({
                       );
                     })
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </section>
 
               <ClassroomTranscribeCard
                 connectionId={selectedConnection.id}
@@ -510,93 +459,96 @@ export default async function ClassroomPage({
                 />
               ) : null}
 
-              <Card className="xl:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <CalendarDays className="h-5 w-5 text-primary" />
-                    {appLanguage === "uk"
-                      ? "Останні classroom-сесії"
-                      : "Recent Classroom Sessions"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  {sessionSummaries.length === 0 ? (
-                    <p className="text-muted-foreground">
+              <section className="border-y border-border/60 py-6 xl:col-span-2">
+                <details className="group" open={sessionSummaries.length === 0}>
+                  <summary className="cursor-pointer text-lg font-semibold tracking-tight marker:text-muted-foreground">
+                    <span className="ml-2 inline-flex items-center gap-2 text-foreground">
+                      <CalendarDays className="h-5 w-5 text-primary" />
                       {appLanguage === "uk"
-                        ? "Завершені classroom-сесії збережуться тут разом із тривалістю та балансом мовлення."
-                        : "Completed classroom sessions will appear here with duration and speaking balance."}
-                    </p>
-                  ) : (
-                    sessionSummaries.map((summary) => {
-                      const tutorShare = getSpeakingShareLabel(
-                        summary.tutorSpeakingSeconds,
-                        summary.studentSpeakingSeconds,
-                      );
-                      const studentShare = getSpeakingShareLabel(
-                        summary.studentSpeakingSeconds,
-                        summary.tutorSpeakingSeconds,
-                      );
+                        ? "Останні classroom-сесії"
+                        : "Recent Classroom Sessions"}
+                    </span>
+                  </summary>
 
-                      return (
-                        <div
-                          key={summary.id}
-                          className="rounded-2xl border bg-muted/20 p-4"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="font-medium text-foreground">
-                              {formatSessionDateTime(
-                                summary.sessionStartedAt,
-                                appLanguage,
-                              )}
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline">
-                                {formatDurationLabel(
-                                  summary.durationSeconds,
+                  <div className="mt-5 space-y-3 text-sm">
+                    {sessionSummaries.length === 0 ? (
+                      <p className="text-muted-foreground">
+                        {appLanguage === "uk"
+                          ? "Завершені classroom-сесії збережуться тут разом із тривалістю та балансом мовлення."
+                          : "Completed classroom sessions will appear here with duration and speaking balance."}
+                      </p>
+                    ) : (
+                      sessionSummaries.map((summary) => {
+                        const tutorShare = getSpeakingShareLabel(
+                          summary.tutorSpeakingSeconds,
+                          summary.studentSpeakingSeconds,
+                        );
+                        const studentShare = getSpeakingShareLabel(
+                          summary.studentSpeakingSeconds,
+                          summary.tutorSpeakingSeconds,
+                        );
+
+                        return (
+                          <div
+                            key={summary.id}
+                            className="rounded-2xl border bg-muted/20 p-4"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="font-medium text-foreground">
+                                {formatSessionDateTime(
+                                  summary.sessionStartedAt,
                                   appLanguage,
                                 )}
-                              </Badge>
-                              {role === "tutor" ? (
-                                <DeleteClassroomSessionButton
-                                  connectionId={selectedConnection.id}
-                                  sessionId={summary.id}
-                                  sessionLabel={formatSessionDateTime(
-                                    summary.sessionStartedAt,
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">
+                                  {formatDurationLabel(
+                                    summary.durationSeconds,
                                     appLanguage,
                                   )}
-                                  appLanguage={appLanguage}
-                                />
-                              ) : null}
+                                </Badge>
+                                {role === "tutor" ? (
+                                  <DeleteClassroomSessionButton
+                                    connectionId={selectedConnection.id}
+                                    sessionId={summary.id}
+                                    sessionLabel={formatSessionDateTime(
+                                      summary.sessionStartedAt,
+                                      appLanguage,
+                                    )}
+                                    appLanguage={appLanguage}
+                                  />
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                              <div>
+                                <p className="text-muted-foreground">Tutor</p>
+                                <p className="font-medium text-foreground">
+                                  {tutorShare}% •{" "}
+                                  {formatDurationLabel(
+                                    summary.tutorSpeakingSeconds,
+                                    appLanguage,
+                                  )}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Student</p>
+                                <p className="font-medium text-foreground">
+                                  {studentShare}% •{" "}
+                                  {formatDurationLabel(
+                                    summary.studentSpeakingSeconds,
+                                    appLanguage,
+                                  )}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                            <div>
-                              <p className="text-muted-foreground">Tutor</p>
-                              <p className="font-medium text-foreground">
-                                {tutorShare}% •{" "}
-                                {formatDurationLabel(
-                                  summary.tutorSpeakingSeconds,
-                                  appLanguage,
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Student</p>
-                              <p className="font-medium text-foreground">
-                                {studentShare}% •{" "}
-                                {formatDurationLabel(
-                                  summary.studentSpeakingSeconds,
-                                  appLanguage,
-                                )}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </CardContent>
-              </Card>
+                        );
+                      })
+                    )}
+                  </div>
+                </details>
+              </section>
             </div>
           </div>
         </>

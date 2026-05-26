@@ -23,14 +23,6 @@ import { toast } from "sonner";
 import { LiveKitMeetStage } from "@/components/lessons/livekit-meet-stage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import type { Role } from "@/types/roles";
 
 interface ClassroomJoinPayload {
@@ -45,12 +37,10 @@ interface ClassroomRoomClientProps {
   connectionId: string;
   role: Role;
   isConfigured: boolean;
-  serverUrl: string | null;
   initialRoomStatus: string;
   initialRecordingStatus: string;
   initialRecordingConsentStatus: string;
   recordingConfigured: boolean;
-  recordingConfigurationError: string | null;
 }
 
 interface ClassroomSessionPayload {
@@ -116,34 +106,6 @@ function getRoomStatusLabel(status: string) {
       return "Archived";
     default:
       return "Open";
-  }
-}
-
-function getRecordingStatusLabel(status: string) {
-  switch (status) {
-    case "ready":
-      return "Ready";
-    case "recording":
-      return "Recording";
-    case "processing":
-      return "Processing";
-    case "completed":
-      return "Completed";
-    case "failed":
-      return "Failed";
-    default:
-      return "Idle";
-  }
-}
-
-function getRecordingConsentLabel(status: string) {
-  switch (status) {
-    case "granted":
-      return "Granted";
-    case "declined":
-      return "Declined";
-    default:
-      return "Pending";
   }
 }
 
@@ -331,12 +293,10 @@ export function ClassroomRoomClient({
   connectionId,
   role,
   isConfigured,
-  serverUrl,
   initialRoomStatus,
   initialRecordingStatus,
   initialRecordingConsentStatus,
   recordingConfigured,
-  recordingConfigurationError,
 }: ClassroomRoomClientProps) {
   const router = useRouter();
   const roomRef = useRef<Room | null>(null);
@@ -354,7 +314,7 @@ export function ClassroomRoomClient({
   const [roomStatus, setRoomStatus] = useState(initialRoomStatus);
   const [isJoining, setIsJoining] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
-  const [screenShareEnabled, setScreenShareEnabled] = useState(false);
+  const [, setScreenShareEnabled] = useState(false);
   const [remoteParticipantCount, setRemoteParticipantCount] = useState(0);
   const [remoteMicrophoneTrackCount, setRemoteMicrophoneTrackCount] =
     useState(0);
@@ -1082,30 +1042,22 @@ export function ClassroomRoomClient({
 
   return (
     <>
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Video className="h-5 w-5 text-primary" />
-                Connection Classroom
-              </CardTitle>
-              <CardDescription>
-                {isConfigured
-                  ? "Join the persistent classroom for this tutor-student connection. Recording consent and server-side classroom recordings are managed directly here now."
-                  : "LiveKit is not configured yet, so the classroom cannot connect to realtime media yet."}
-              </CardDescription>
-            </div>
+      <section>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <h3 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <Video className="h-5 w-5 text-primary" />
+            Connection Classroom
+          </h3>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={statusTone}>
-                {getConnectionStateLabel(connectionState)}
-              </Badge>
-              <Badge variant="outline">{getRoomStatusLabel(roomStatus)}</Badge>
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={statusTone}>
+              {getConnectionStateLabel(connectionState)}
+            </Badge>
+            <Badge variant="outline">{getRoomStatusLabel(roomStatus)}</Badge>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </div>
+
+        <div className="space-y-4">
           {!isConfigured ? (
             <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
               <p className="font-medium text-foreground">
@@ -1117,13 +1069,6 @@ export function ClassroomRoomClient({
                 <span className="font-mono">LIVEKIT_API_SECRET</span> to enable
                 classroom calls.
               </p>
-            </div>
-          ) : null}
-
-          {serverUrl ? (
-            <div className="rounded-2xl border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-              Media server:{" "}
-              <span className="font-medium text-foreground">{serverUrl}</span>
             </div>
           ) : null}
 
@@ -1291,10 +1236,6 @@ export function ClassroomRoomClient({
               <p className="text-sm font-medium text-foreground">
                 Speaking timer
               </p>
-              <p className="text-sm text-muted-foreground">
-                Live classroom speaking balance is tracked locally while the
-                room stays connected.
-              </p>
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -1322,99 +1263,41 @@ export function ClassroomRoomClient({
               </div>
             </div>
           </div>
-
-          <div className="rounded-2xl border bg-muted/20 p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">
-                  Recording controls
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Classroom recording is tutor-controlled. Only student speech
-                  in the saved transcript syncs into active vocabulary evidence.
-                </p>
-                {screenShareEnabled ? (
-                  <p className="text-sm text-muted-foreground">
-                    Screen sharing is live in this classroom session.
-                  </p>
-                ) : null}
-                {role === "tutor" &&
-                recordingStatus !== "recording" &&
-                startRecordingDisabledReason ? (
-                  <p className="text-sm text-muted-foreground">
-                    {startRecordingDisabledReason}.
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge
-                  variant={
-                    recordingStatus === "recording" ? "secondary" : "outline"
-                  }
-                >
-                  <Radio className="mr-1 h-3.5 w-3.5" />
-                  Recording {getRecordingStatusLabel(recordingStatus)}
-                </Badge>
-              </div>
-            </div>
-
-            {role === "tutor" && !recordingConfigured ? (
-              <div className="mt-4 rounded-2xl border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">
-                  Recording storage setup required
-                </p>
-                <p className="mt-1">
-                  {recordingConfigurationError ||
-                    "Add the LiveKit egress storage variables to enable server-side classroom recordings."}
-                </p>
-              </div>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {role === "tutor" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+        <section>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h3 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
               <ShieldCheck className="h-5 w-5 text-primary" />
               Recording consent
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>
-              Turn this on after the student confirms consent for classroom
-              recording.
-            </p>
-            <p>
-              If consent is off, recording stays unavailable until you enable it
-              again.
-            </p>
-            <div className="flex flex-col gap-3 rounded-2xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1">
-                <p className="font-medium text-foreground">
-                  Status: {getRecordingConsentLabel(recordingConsentStatus)}
-                </p>
-                <p>Use the toggle to grant or revoke recording permission.</p>
-              </div>
-              <div className="flex items-center gap-3 self-start sm:self-center">
-                <span className="text-sm text-muted-foreground">
-                  {recordingConsentStatus === "granted"
-                    ? "Granted"
-                    : "Not granted"}
-                </span>
-                <Switch
-                  checked={recordingConsentStatus === "granted"}
-                  onCheckedChange={(checked) => {
-                    void updateConsent(checked ? "granted" : "declined");
-                  }}
-                  disabled={isSyncingSession || isRecordingActionPending}
-                  aria-label="Toggle recording consent"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </h3>
+            <Button
+              type="button"
+              size="sm"
+              variant={
+                recordingConsentStatus === "granted" ? "secondary" : "outline"
+              }
+              onClick={() =>
+                void updateConsent(
+                  recordingConsentStatus === "granted" ? "declined" : "granted",
+                )
+              }
+              disabled={isSyncingSession || isRecordingActionPending}
+              aria-label={
+                recordingConsentStatus === "granted"
+                  ? "Set recording consent to not granted"
+                  : "Set recording consent to granted"
+              }
+            >
+              {isSyncingSession ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {recordingConsentStatus === "granted" ? "Granted" : "Not granted"}
+            </Button>
+          </div>
+        </section>
       ) : null}
     </>
   );

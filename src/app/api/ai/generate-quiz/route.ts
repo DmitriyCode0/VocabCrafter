@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import {
+  getGenAI,
   generateFromGeminiWithUsage,
   generateJsonFromGeminiWithUsage,
   GEMINI_MODEL,
@@ -30,6 +32,8 @@ import {
   discussionResponseSchema,
 } from "@/lib/gemini/validation";
 import type { QuizType } from "@/types/quiz";
+
+type QuizCacheStatus = "hit" | "miss" | "bypass" | "error" | "fallback";
 
 const requestSchema = z.object({
   type: z.enum([
@@ -74,6 +78,24 @@ const discussionPromptKeys = [
   "topic",
 ] as const;
 
+const QUIZ_CACHE_ENABLED =
+  (process.env.GEMINI_QUIZ_CACHE_ENABLED ?? "true").toLowerCase() !== "false";
+const QUIZ_CACHE_TTL_SECONDS = Math.max(
+  300,
+  Number.parseInt(process.env.GEMINI_QUIZ_CACHE_TTL_SECONDS ?? "43200", 10),
+);
+const QUIZ_CACHE_MIN_SYSTEM_TOKENS = Math.max(
+  0,
+  Number.parseInt(
+    process.env.GEMINI_QUIZ_CACHE_MIN_SYSTEM_TOKENS ?? "4000",
+    10,
+  ),
+);
+const quizSystemInstructionCache = new Map<
+  string,
+  { cachedContent: string; expiresAt: number }
+>();
+
 interface GeneratedMCQQuestion {
   id: number;
   question: string;
@@ -93,6 +115,75 @@ function shuffleArray<T>(items: readonly T[]): T[] {
 
 function normalizeChoice(value: string) {
   return value.trim().toLowerCase();
+}
+
+function estimateTextTokens(text: string) {
+  const normalized = text.trim();
+  if (!normalized) {
+    return 0;
+  }
+
+  return Math.max(1, Math.ceil(normalized.length / 4));
+}
+
+function getCacheKeyForSystemInstruction(systemInstruction: string) {
+  return createHash("sha256").update(systemInstruction).digest("hex");
+}
+
+function getQuizThinkingConfig(type: QuizType) {
+  if (type === "mcq" || type === "matching") {
+    return {
+      thinkingBudget: 0,
+    };
+  }
+
+  return undefined;
+}
+
+async function resolveQuizSystemInstructionCache(
+  systemInstruction: string,
+): Promise<{ cachedContent?: string; status: QuizCacheStatus }> {
+  if (!QUIZ_CACHE_ENABLED) {
+    return { status: "bypass" };
+  }
+
+  if (estimateTextTokens(systemInstruction) < QUIZ_CACHE_MIN_SYSTEM_TOKENS) {
+    return { status: "bypass" };
+  }
+
+  const key = getCacheKeyForSystemInstruction(systemInstruction);
+  const now = Date.now();
+  const existing = quizSystemInstructionCache.get(key);
+
+  if (existing && existing.expiresAt > now) {
+    return { cachedContent: existing.cachedContent, status: "hit" };
+  }
+
+  try {
+    const created = await getGenAI().caches.create({
+      model: GEMINI_MODEL,
+      config: {
+        displayName: `quiz-system-${key.slice(0, 16)}`,
+        systemInstruction,
+        ttl: `${QUIZ_CACHE_TTL_SECONDS}s`,
+      },
+    });
+
+    if (!created.name) {
+      throw new Error("Gemini cache creation returned no resource name");
+    }
+
+    const expiresAt = now + QUIZ_CACHE_TTL_SECONDS * 1000;
+    quizSystemInstructionCache.set(key, {
+      cachedContent: created.name,
+      expiresAt,
+    });
+
+    return { cachedContent: created.name, status: "miss" };
+  } catch (error) {
+    console.warn("Failed to create Gemini context cache for quizzes", error);
+    return { status: "error" };
+  }
 }
 
 function randomizeMCQContent(rawContent: unknown) {
@@ -371,6 +462,12 @@ export async function POST(request: Request) {
 
     const prompt = getQuizPrompt(type, terms, config);
     const systemInstruction = getSystemInstruction(config);
+    const thinkingConfig = getQuizThinkingConfig(type);
+
+    const cacheResolution = await resolveQuizSystemInstructionCache(
+      systemInstruction,
+    );
+    let cacheStatus = cacheResolution.status;
 
     const SCHEMA_MAP: Record<QuizType, z.ZodSchema> = {
       mcq: mcqResponseSchema,
@@ -389,14 +486,44 @@ export async function POST(request: Request) {
           ReturnType<typeof generateJsonFromGeminiWithUsage>
         >["usageSnapshot"]
       | null = null;
+    let cachedContentUsed = Boolean(cacheResolution.cachedContent);
+    let cachedContentTokenCount = 0;
+
+    const buildGenerateOptions = (temperature: number) => ({
+      prompt,
+      systemInstruction: cacheResolution.cachedContent
+        ? undefined
+        : systemInstruction,
+      cachedContent: cacheResolution.cachedContent,
+      temperature,
+      thinkingConfig,
+    });
 
     if (type === "discussion") {
       try {
-        const result = await generateJsonFromGeminiWithUsage({
-          prompt,
-          systemInstruction,
-          temperature: 0.4,
-        });
+        let result: Awaited<ReturnType<typeof generateJsonFromGeminiWithUsage>>;
+
+        try {
+          result = await generateJsonFromGeminiWithUsage(buildGenerateOptions(0.4));
+        } catch (error) {
+          if (!cacheResolution.cachedContent) {
+            throw error;
+          }
+
+          cacheStatus = "fallback";
+          cachedContentUsed = false;
+          console.warn(
+            "Quiz discussion generation cache failed; retrying without cache",
+            error,
+          );
+
+          result = await generateJsonFromGeminiWithUsage({
+            prompt,
+            systemInstruction,
+            temperature: 0.4,
+            thinkingConfig,
+          });
+        }
 
         generatedContent = normalizeDiscussionContent(
           result.data,
@@ -404,6 +531,7 @@ export async function POST(request: Request) {
           config,
         );
         usageSnapshot = result.usageSnapshot;
+        cachedContentTokenCount = result.usageMetadata?.cachedContentTokenCount ?? 0;
       } catch (error) {
         console.warn(
           "Discussion generation fell back to deterministic prompts:",
@@ -412,19 +540,46 @@ export async function POST(request: Request) {
         generatedContent = buildFallbackDiscussionContent(terms, config);
       }
     } else {
-      const result = await generateFromGeminiWithUsage(
-        {
-          prompt,
-          systemInstruction,
-          temperature: 0.7,
-        },
-        SCHEMA_MAP[type],
-      );
+      let result: Awaited<ReturnType<typeof generateFromGeminiWithUsage>>;
+
+      try {
+        result = await generateFromGeminiWithUsage(
+          buildGenerateOptions(0.7),
+          SCHEMA_MAP[type],
+        );
+      } catch (error) {
+        if (!cacheResolution.cachedContent) {
+          throw error;
+        }
+
+        cacheStatus = "fallback";
+        cachedContentUsed = false;
+        console.warn("Quiz generation cache failed; retrying without cache", error);
+
+        result = await generateFromGeminiWithUsage(
+          {
+            prompt,
+            systemInstruction,
+            temperature: 0.7,
+            thinkingConfig,
+          },
+          SCHEMA_MAP[type],
+        );
+      }
 
       generatedContent =
         type === "mcq" ? randomizeMCQContent(result.data) : result.data;
       usageSnapshot = result.usageSnapshot;
+      cachedContentTokenCount = result.usageMetadata?.cachedContentTokenCount ?? 0;
     }
+
+    console.info("Quiz generation config", {
+      quizType: type,
+      thinkingBudget: thinkingConfig?.thinkingBudget ?? null,
+      cacheStatus,
+      cachedContentUsed,
+      cachedContentTokenCount,
+    });
 
     if (usageSnapshot) {
       await recordAIUsageEvent({
