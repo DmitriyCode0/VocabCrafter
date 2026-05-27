@@ -56,12 +56,14 @@ function getScoreTone(score: number) {
 interface GrammarTopicsDropdownProps {
   topics: GrammarTopicMasteryItem[];
   editable?: boolean;
+  disabled?: boolean;
   onToggle?: (topicKey: string, checked: boolean) => void;
 }
 
 function GrammarTopicsDropdown({
   topics,
   editable,
+  disabled,
   onToggle,
 }: GrammarTopicsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -110,7 +112,7 @@ function GrammarTopicsDropdown({
                         onCheckedChange={(checked) =>
                           onToggle?.(topic.topicKey, Boolean(checked))
                         }
-                        disabled={topic.source === "system"}
+                        disabled={disabled || topic.source === "system"}
                         className="h-3.5 w-3.5"
                       />
                     ) : (
@@ -178,6 +180,8 @@ interface StudentSkillRadarProps {
   onSave?: () => void;
   onUpdateFromBase?: () => void;
   grammarTopics?: GrammarTopicMasteryItem[];
+  grammarTopicsEditable?: boolean;
+  grammarTopicsDisabled?: boolean;
   onGrammarTopicToggle?: (topicKey: string, checked: boolean) => void;
   title?: string;
   description?: string;
@@ -208,6 +212,8 @@ export function StudentSkillRadar({
   onSave,
   onUpdateFromBase,
   grammarTopics,
+  grammarTopicsEditable,
+  grammarTopicsDisabled,
   onGrammarTopicToggle,
   title = "Learning Profile",
   description = "A five-axis view of your current learning experience.",
@@ -485,7 +491,8 @@ export function StudentSkillRadar({
                 !comparison && (
                   <GrammarTopicsDropdown
                     topics={grammarTopics}
-                    editable={editable}
+                    editable={grammarTopicsEditable ?? editable}
+                    disabled={grammarTopicsDisabled}
                     onToggle={onGrammarTopicToggle}
                   />
                 )}

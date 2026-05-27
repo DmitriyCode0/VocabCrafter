@@ -30,7 +30,7 @@ export interface PreparedQuizDictionaryTerm {
 }
 
 export interface ResolvedQuizDictionaryTerm extends PreparedQuizDictionaryTerm {
-  definitionSource: "dictionary" | "input";
+  definitionSource: "personal" | "dictionary" | "input";
   resolution: PassiveVocabularyLibraryResolution | null;
 }
 
@@ -98,6 +98,7 @@ export function prepareQuizTermsForDictionary({
 export async function resolveQuizTermsWithDictionary({
   adminClient,
   actorUserId,
+  studentId,
   targetLanguage,
   sourceLanguage,
   terms,
@@ -105,6 +106,7 @@ export async function resolveQuizTermsWithDictionary({
 }: {
   adminClient: AdminClient;
   actorUserId: string;
+  studentId?: string | null;
   targetLanguage?: LearningLanguage | string | null;
   sourceLanguage?: SourceLanguage | string | null;
   terms: QuizTerm[];
@@ -122,6 +124,7 @@ export async function resolveQuizTermsWithDictionary({
     string,
     PassiveVocabularyLibraryResolution
   >();
+  const customDefinitionByLookupKey = new Map<string, string>();
 
   if (libraryInputs.length > 0) {
     if (createMissing) {
@@ -151,6 +154,41 @@ export async function resolveQuizTermsWithDictionary({
         resolutionByLookupKey.set(lookupKey, resolution);
       }
     }
+
+    if (studentId) {
+      const normalizedTerms = Array.from(
+        new Set(libraryInputs.map((item) => item.normalizedTerm)),
+      );
+      const itemTypes = Array.from(new Set(libraryInputs.map((item) => item.itemType)));
+
+      if (normalizedTerms.length > 0 && itemTypes.length > 0) {
+        const { data: customDefinitionRows, error: customDefinitionError } =
+          await adminClient
+            .from("student_vocabulary_items")
+            .select("normalized_term, item_type, custom_definition")
+            .eq("student_id", studentId)
+            .in("normalized_term", normalizedTerms)
+            .in("item_type", itemTypes)
+            .not("custom_definition", "is", null);
+
+        if (customDefinitionError) {
+          throw new Error("Failed to load personal dictionary definitions");
+        }
+
+        for (const row of customDefinitionRows ?? []) {
+          const normalizedDefinition = row.custom_definition?.trim();
+
+          if (!normalizedDefinition) {
+            continue;
+          }
+
+          customDefinitionByLookupKey.set(
+            getPassiveVocabularyCompositeKey(row.normalized_term, row.item_type),
+            normalizedDefinition,
+          );
+        }
+      }
+    }
   }
 
   return preparedTerms.map((term): ResolvedQuizDictionaryTerm => {
@@ -161,11 +199,22 @@ export async function resolveQuizTermsWithDictionary({
       resolution?.approvalStatus === "confirmed"
         ? getPreferredDictionaryDefinition(resolution, normalizedSourceLanguage)
         : null;
+    const personalDefinition = term.libraryInput
+      ? customDefinitionByLookupKey.get(getQuizTermLookupKey(term.libraryInput)) ??
+        null
+      : null;
+    const resolvedDefinition = personalDefinition ?? dictionaryDefinition ?? term.definition;
+    const definitionSource: ResolvedQuizDictionaryTerm["definitionSource"] =
+      personalDefinition
+        ? "personal"
+        : dictionaryDefinition
+          ? "dictionary"
+          : "input";
 
     return {
       ...term,
-      definition: dictionaryDefinition ?? term.definition,
-      definitionSource: dictionaryDefinition ? "dictionary" : "input",
+      definition: resolvedDefinition,
+      definitionSource,
       resolution,
     };
   });

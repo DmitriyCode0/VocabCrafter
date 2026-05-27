@@ -9,7 +9,13 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
-import { ConnectionState, Room, RoomEvent, Track } from "livekit-client";
+import {
+  ConnectionState,
+  Room,
+  RoomEvent,
+  Track,
+  VideoPresets,
+} from "livekit-client";
 import {
   AlertTriangle,
   Loader2,
@@ -71,6 +77,16 @@ interface ClassroomRecordingPayload {
     storage_path: string | null;
   };
 }
+
+const CLASSROOM_ROOM_OPTIONS = {
+  dynacast: true,
+  videoCaptureDefaults: {
+    resolution: VideoPresets.h720.resolution,
+  },
+  publishDefaults: {
+    videoEncoding: VideoPresets.h720.encoding,
+  },
+};
 
 type PiPParticipantType = "local" | "remote";
 type PiPTrackKind = "camera" | "screen";
@@ -791,7 +807,7 @@ export function ClassroomRoomClient({
     setIsJoining(true);
     setJoinError(null);
 
-    const room = new Room({ dynacast: true });
+    const room = new Room(CLASSROOM_ROOM_OPTIONS);
     roomRef.current = room;
 
     const syncState = () => syncRoomState(room);

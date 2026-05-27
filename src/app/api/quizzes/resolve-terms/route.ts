@@ -39,6 +39,7 @@ export async function POST(request: Request) {
     const resolvedTerms = await resolveQuizTermsWithDictionary({
       adminClient: createAdminClient(),
       actorUserId: user.id,
+      studentId: user.id,
       targetLanguage: parsed.data.targetLanguage,
       sourceLanguage: parsed.data.sourceLanguage,
       terms: parsed.data.terms,

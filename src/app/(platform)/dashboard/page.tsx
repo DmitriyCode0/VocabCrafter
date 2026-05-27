@@ -5,10 +5,7 @@ import {
 } from "@/lib/i18n/app-language";
 import { getAppMessages } from "@/lib/i18n/messages";
 import type { Role } from "@/types/roles";
-import { StudentDashboard } from "@/components/dashboard/student-dashboard";
-import { TutorDashboard } from "@/components/dashboard/tutor-dashboard";
-import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import { DashboardSkeleton, AdminDashboardSkeleton } from "@/components/dashboard/skeletons";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +21,7 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("*")
+    .select("role, app_language, full_name, email, plan")
     .eq("id", user.id)
     .single();
 
@@ -34,6 +31,47 @@ export default async function DashboardPage() {
   const appLanguage = normalizeAppLanguage(profile.app_language);
   const messages = getAppMessages(appLanguage);
   const displayName = profile.full_name || profile.email;
+  let dashboardContent: ReactNode = null;
+
+  if (role === "student") {
+    const { StudentDashboard } = await import(
+      "@/components/dashboard/student-dashboard"
+    );
+
+    dashboardContent = (
+      <Suspense fallback={<DashboardSkeleton />}>
+        <StudentDashboard
+          userId={user.id}
+          planKey={profile.plan}
+          messages={messages}
+        />
+      </Suspense>
+    );
+  } else if (role === "tutor") {
+    const { TutorDashboard } = await import(
+      "@/components/dashboard/tutor-dashboard"
+    );
+
+    dashboardContent = (
+      <Suspense fallback={<DashboardSkeleton />}>
+        <TutorDashboard
+          userId={user.id}
+          planKey={profile.plan}
+          messages={messages}
+        />
+      </Suspense>
+    );
+  } else if (role === "superadmin") {
+    const { AdminDashboard } = await import(
+      "@/components/dashboard/admin-dashboard"
+    );
+
+    dashboardContent = (
+      <Suspense fallback={<AdminDashboardSkeleton />}>
+        <AdminDashboard appLanguage={appLanguage} messages={messages} />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -49,29 +87,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {role === "student" && (
-        <Suspense fallback={<DashboardSkeleton />}>
-          <StudentDashboard
-            userId={user.id}
-            planKey={profile.plan}
-            messages={messages}
-          />
-        </Suspense>
-      )}
-      {role === "tutor" && (
-        <Suspense fallback={<DashboardSkeleton />}>
-          <TutorDashboard
-            userId={user.id}
-            planKey={profile.plan}
-            messages={messages}
-          />
-        </Suspense>
-      )}
-      {role === "superadmin" && (
-        <Suspense fallback={<AdminDashboardSkeleton />}>
-          <AdminDashboard appLanguage={appLanguage} messages={messages} />
-        </Suspense>
-      )}
+      {dashboardContent}
     </div>
   );
 }

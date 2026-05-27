@@ -64,6 +64,9 @@ export function TutorStudentResultsPanel({
           studentId={studentId}
           initialTimeAdjustmentHours={initialTimeAdjustmentHours}
           showCefrGuidedHoursCard={false}
+          overviewCardsVariant="streak-only"
+          showActivityStrengths={false}
+          grammarTopicToggleStudentId={studentId}
         />
       )}
     </div>

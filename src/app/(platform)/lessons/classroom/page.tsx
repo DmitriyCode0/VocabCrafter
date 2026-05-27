@@ -1,4 +1,6 @@
 import Link from "next/link";
+import "@livekit/components-styles";
+import "@livekit/components-styles/prefabs";
 import { CalendarDays, Download } from "lucide-react";
 import { ClassroomConnectionPicker } from "@/components/lessons/classroom-connection-picker";
 import { DeleteRecordingButton } from "@/components/lessons/delete-recording-button";

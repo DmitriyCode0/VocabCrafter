@@ -1,4 +1,6 @@
 import Link from "next/link";
+import "@livekit/components-styles";
+import "@livekit/components-styles/prefabs";
 import {
   CalendarDays,
   Download,

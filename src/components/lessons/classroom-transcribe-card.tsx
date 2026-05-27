@@ -43,6 +43,9 @@ interface ClassroomTranscribeCardProps {
 
 interface ClassroomTranscribeResponse {
   error?: string;
+  alreadyTranscribed?: boolean;
+  queued?: boolean;
+  status?: string;
   transcript?: {
     id: string;
   };
@@ -152,12 +155,42 @@ export function ClassroomTranscribeCard({
         .catch(() => null)) as ClassroomTranscribeResponse | null;
 
       if (!response.ok) {
+        if (response.status === 409) {
+          toast.message(
+            appLanguage === "uk"
+              ? "Транскрипт уже обробляється. Оновлюємо статус..."
+              : "Transcript is already processing. Refreshing status...",
+          );
+          router.refresh();
+          return;
+        }
+
         throw new Error(
           data?.error ||
             (appLanguage === "uk"
               ? "Не вдалося створити транскрипт"
               : "Failed to transcribe the recording"),
         );
+      }
+
+      if (data?.alreadyTranscribed) {
+        toast.success(
+          appLanguage === "uk"
+            ? "Для цього запису вже є готовий транскрипт."
+            : "A transcript already exists for this recording.",
+        );
+        router.refresh();
+        return;
+      }
+
+      if (response.status === 202 || data?.queued) {
+        toast.success(
+          appLanguage === "uk"
+            ? "Транскрипт поставлено в чергу. Оновлюємо статус..."
+            : "Transcript queued. Refreshing status...",
+        );
+        router.refresh();
+        return;
       }
 
       toast.success(

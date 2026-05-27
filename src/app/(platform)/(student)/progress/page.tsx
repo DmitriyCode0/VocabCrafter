@@ -46,18 +46,16 @@ function formatMonthLabel(reportMonth: string, appLanguage: "en" | "uk") {
 function ProgressBodySkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <div className="px-6 pb-6">
-              <Skeleton className="h-8 w-16 mb-1" />
-              <Skeleton className="h-3 w-20" />
-            </div>
-          </Card>
-        ))}
+      <div className="max-w-md">
+        <Card>
+          <CardHeader className="pb-2">
+            <Skeleton className="h-4 w-24" />
+          </CardHeader>
+          <div className="px-6 pb-6">
+            <Skeleton className="mb-1 h-8 w-16" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+        </Card>
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <Card>
@@ -174,6 +172,8 @@ async function ProgressBody({
             />
           }
           showCefrGuidedHoursCard={false}
+          overviewCardsVariant="streak-only"
+          showActivityStrengths={false}
         />
       ) : (
         <>
@@ -215,7 +215,10 @@ async function ProgressBody({
 
           <StudentResultsSummary snapshot={effectiveSnapshot} />
 
-          <StudentProgressOverviewCards snapshot={effectiveSnapshot} />
+          <StudentProgressOverviewCards
+            snapshot={effectiveSnapshot}
+            variant="streak-only"
+          />
         </>
       )}
     </>

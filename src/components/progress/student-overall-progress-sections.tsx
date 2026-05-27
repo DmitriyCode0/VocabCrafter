@@ -8,8 +8,12 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
-import { StudentProgressOverviewCards } from "@/components/progress/student-progress-overview-cards";
+import {
+  StudentProgressOverviewCards,
+  type StudentProgressOverviewCardsVariant,
+} from "@/components/progress/student-progress-overview-cards";
 import { StudentResultsSummary } from "@/components/progress/student-results-summary";
+import { TutorEditableStudentSkillRadar } from "@/components/progress/tutor-editable-student-skill-radar";
 import { TutorTimeAdjustmentCard } from "@/components/progress/tutor-time-adjustment-card";
 import { TutorStudentVocabularyDistribution } from "@/components/progress/tutor-student-vocabulary-distribution";
 import type { StudentProgressSnapshot } from "@/lib/progress/profile-metrics";
@@ -22,6 +26,9 @@ interface StudentOverallProgressSectionsProps {
   studentId?: string;
   initialTimeAdjustmentHours?: number;
   showCefrGuidedHoursCard?: boolean;
+  overviewCardsVariant?: StudentProgressOverviewCardsVariant;
+  showActivityStrengths?: boolean;
+  grammarTopicToggleStudentId?: string;
 }
 
 function ActivityStrengthsCard({
@@ -71,15 +78,29 @@ export function StudentOverallProgressSections({
   studentId,
   initialTimeAdjustmentHours = 0,
   showCefrGuidedHoursCard = false,
+  overviewCardsVariant = "full",
+  showActivityStrengths = true,
+  grammarTopicToggleStudentId,
 }: StudentOverallProgressSectionsProps) {
   const radar = (
-    <StudentSkillRadar
-      axes={snapshot.axes}
-      chartData={snapshot.chartData}
-      cefrLevel={snapshot.profile.cefrLevel}
-      grammarNotice={snapshot.grammar.betaNotice}
-      grammarTopics={snapshot.grammarTopicMastery}
-    />
+    grammarTopicToggleStudentId ? (
+      <TutorEditableStudentSkillRadar
+        studentId={grammarTopicToggleStudentId}
+        axes={snapshot.axes}
+        chartData={snapshot.chartData}
+        cefrLevel={snapshot.profile.cefrLevel}
+        grammarNotice={snapshot.grammar.betaNotice}
+        grammarTopics={snapshot.grammarTopicMastery}
+      />
+    ) : (
+      <StudentSkillRadar
+        axes={snapshot.axes}
+        chartData={snapshot.chartData}
+        cefrLevel={snapshot.profile.cefrLevel}
+        grammarNotice={snapshot.grammar.betaNotice}
+        grammarTopics={snapshot.grammarTopicMastery}
+      />
+    )
   );
 
   return (
@@ -114,9 +135,12 @@ export function StudentOverallProgressSections({
         learningSignals={snapshot.learningSignals}
       />
 
-      <StudentProgressOverviewCards snapshot={snapshot} />
+      <StudentProgressOverviewCards
+        snapshot={snapshot}
+        variant={overviewCardsVariant}
+      />
 
-      <ActivityStrengthsCard snapshot={snapshot} />
+      {showActivityStrengths ? <ActivityStrengthsCard snapshot={snapshot} /> : null}
     </div>
   );
 }

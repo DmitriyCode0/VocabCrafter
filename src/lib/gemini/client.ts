@@ -53,6 +53,7 @@ async function withRetry<T>(
 // ─── Generic Gemini wrapper ──────────────────────────────────────
 
 interface GenerateOptions {
+  model?: string;
   prompt: string;
   systemInstruction?: string;
   temperature?: number;
@@ -142,7 +143,7 @@ export async function generateJsonFromGeminiWithUsage(
     };
 
     const response = await getGenAI().models.generateContent({
-      model: GEMINI_MODEL,
+      model: options.model ?? GEMINI_MODEL,
       contents: options.contents ?? options.prompt,
       config,
     });

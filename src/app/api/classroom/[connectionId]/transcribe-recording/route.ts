@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
-import { FileState, type Part } from "@google/genai";
+import { after, NextResponse } from "next/server";
+import { FileState } from "@google/genai";
 import { z } from "zod";
-import { extractTextUsageSnapshot, recordAIUsageEvent } from "@/lib/ai/usage";
+import { recordAIUsageEvent } from "@/lib/ai/usage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTutorStudentClassroomParticipantAccess } from "@/lib/classroom-access";
-import { GEMINI_TRANSCRIPTION_MODEL, getGenAI } from "@/lib/gemini/client";
+import {
+  GEMINI_TRANSCRIPTION_MODEL,
+  generateFromGeminiWithUsage,
+  getGenAI,
+} from "@/lib/gemini/client";
 import {
   saveClassroomTranscriptAndSyncEvidence,
   type ClassroomTranscriptReviewStatus,
@@ -21,6 +25,7 @@ const fileStateSchema = z.enum([
 const requestSchema = z.object({
   recordingId: z.string().uuid(),
   languageCode: z.string().trim().max(16).nullable().optional(),
+  async: z.boolean().optional(),
 });
 
 const transcriptResultSchema = z.object({
@@ -35,6 +40,22 @@ const transcriptResultSchema = z.object({
     .min(1)
     .max(5000),
 });
+
+const DEFAULT_TRANSCRIPTION_MAX_FILE_BYTES = 15 * 1024 * 1024;
+
+function getTranscriptionMaxFileBytes() {
+  const parsed = Number.parseInt(
+    process.env.TRANSCRIPTION_MAX_FILE_BYTES ??
+      `${DEFAULT_TRANSCRIPTION_MAX_FILE_BYTES}`,
+    10,
+  );
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_TRANSCRIPTION_MAX_FILE_BYTES;
+  }
+
+  return parsed;
+}
 
 function getRecordingMimeType(
   path: string | null,
@@ -188,136 +209,225 @@ export async function POST(
     );
   }
 
-  const { data: recordingBlob, error: downloadError } =
-    await supabaseAdmin.storage
-      .from(recording.storage_bucket)
-      .download(recording.storage_path);
+  const recordingStorageBucket = recording.storage_bucket;
+  const recordingStoragePath = recording.storage_path;
 
-  if (downloadError || !recordingBlob) {
+  const { data: existingTranscript, error: existingTranscriptError } =
+    await supabaseAdmin
+      .from("tutor_student_classroom_transcripts")
+      .select(
+        "id, recording_id, classroom_id, language_code, diarization_status, review_status, full_text, error_message, active_evidence_synced_at, created_at, updated_at",
+      )
+      .eq("recording_id", recording.id)
+      .maybeSingle();
+
+  if (existingTranscriptError) {
     return NextResponse.json(
-      { error: "Failed to download the classroom recording" },
+      { error: "Failed to inspect existing classroom transcript" },
       { status: 500 },
     );
   }
 
-  if (recordingBlob.size === 0) {
+  if (existingTranscript?.diarization_status === "ready") {
+    return NextResponse.json({
+      transcript: existingTranscript,
+      activeEvidence: {
+        importedCount: 0,
+        createdCount: 0,
+        updatedCount: 0,
+      },
+      sourceLabel: "",
+      alreadyTranscribed: true,
+    });
+  }
+
+  if (existingTranscript?.diarization_status === "processing") {
     return NextResponse.json(
-      { error: "The classroom recording is empty" },
+      { error: "Classroom transcript generation is already in progress" },
       { status: 409 },
     );
   }
 
-  const mimeType = getRecordingMimeType(
-    recording.storage_path,
-    recordingBlob.type || undefined,
-  );
-  const prompt = buildTranscriptionPrompt(parsed.data.languageCode ?? null);
-  let uploadedFileName: string | null = null;
-
-  try {
-    const uploadedFile = await getGenAI().files.upload({
-      file: new Blob([recordingBlob], { type: mimeType }),
-      config: {
-        mimeType,
-        displayName: `classroom-recording-${recording.id}`,
-      },
-    });
-
-    if (!uploadedFile.name) {
-      throw new Error("Gemini did not return an uploaded file reference");
+  const markTranscriptionFailed = async (errorMessage: string) => {
+    try {
+      await saveClassroomTranscriptAndSyncEvidence({
+        access,
+        recordingId: parsed.data.recordingId,
+        languageCode: parsed.data.languageCode ?? null,
+        diarizationStatus: "failed",
+        reviewStatus: "pending" as ClassroomTranscriptReviewStatus,
+        errorMessage,
+        syncActiveEvidence: false,
+      });
+    } catch {
+      await supabaseAdmin
+        .from("tutor_student_classrooms")
+        .update({
+          transcript_status: "failed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", access.classroom.id);
     }
+  };
 
-    uploadedFileName = uploadedFile.name;
-    const readyFile = await waitForGeminiFileActive(uploadedFile.name);
-
-    if (!readyFile.uri || !readyFile.mimeType) {
-      throw new Error(
-        "Gemini did not return a usable uploaded recording reference",
-      );
-    }
-
-    const contents: Part[] = [
-      { text: prompt },
-      {
-        fileData: {
-          fileUri: readyFile.uri,
-          mimeType: readyFile.mimeType,
-        },
-      },
-    ];
-    const response = await getGenAI().models.generateContent({
-      model: GEMINI_TRANSCRIPTION_MODEL,
-      contents,
-      config: {
-        systemInstruction:
-          "You are a careful transcription system. Return only valid JSON that matches the requested schema and preserve the spoken words as faithfully as possible.",
-        temperature: 0.1,
-        responseMimeType: "application/json",
-      },
-    });
-
-    const responseText = response.text;
-    if (!responseText) {
-      throw new Error("Gemini returned an empty transcription response");
-    }
-
-    const transcription = transcriptResultSchema.parse(
-      JSON.parse(responseText),
-    );
-    const result = await saveClassroomTranscriptAndSyncEvidence({
+  const runTranscription = async () => {
+    await saveClassroomTranscriptAndSyncEvidence({
       access,
       recordingId: parsed.data.recordingId,
-      languageCode:
-        transcription.languageCode ?? parsed.data.languageCode ?? null,
-      diarizationStatus: "ready",
+      languageCode: parsed.data.languageCode ?? null,
+      diarizationStatus: "processing",
       reviewStatus: "pending" as ClassroomTranscriptReviewStatus,
-      segments: normalizeClassroomTranscriptSegments(
-        transcription.segments.map((segment) => ({
-          speakerRole: segment.speakerRole,
-          content: segment.content,
-        })),
-      ),
       syncActiveEvidence: false,
     });
 
-    await recordAIUsageEvent({
-      userId: access.userId,
-      feature: "classroom_transcript",
-      requestType: "text",
-      model: GEMINI_TRANSCRIPTION_MODEL,
-      snapshot: extractTextUsageSnapshot({
-        prompt,
-        responseText,
-        usageMetadata: response.usageMetadata,
-      }),
-    });
+    const { data: recordingBlob, error: downloadError } =
+      await supabaseAdmin.storage
+        .from(recordingStorageBucket)
+        .download(recordingStoragePath);
 
-    return NextResponse.json(result);
-  } catch (error) {
-    await supabaseAdmin
-      .from("tutor_student_classrooms")
-      .update({
-        transcript_status: "failed",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", access.classroom.id);
+    if (downloadError || !recordingBlob) {
+      throw new Error("Failed to download the classroom recording");
+    }
+
+    if (recordingBlob.size === 0) {
+      throw new Error("The classroom recording is empty");
+    }
+
+    const maxFileBytes = getTranscriptionMaxFileBytes();
+
+    if (recordingBlob.size > maxFileBytes) {
+      throw new Error(
+        `Recording is too large to transcribe automatically (${Math.ceil(
+          recordingBlob.size / (1024 * 1024),
+        )} MB). Current limit is ${Math.ceil(maxFileBytes / (1024 * 1024))} MB.`,
+      );
+    }
+
+    const mimeType = getRecordingMimeType(
+      recordingStoragePath,
+      recordingBlob.type || undefined,
+    );
+    const prompt = buildTranscriptionPrompt(parsed.data.languageCode ?? null);
+    let uploadedFileName: string | null = null;
+
+    try {
+      const uploadedFile = await getGenAI().files.upload({
+        file: new Blob([recordingBlob], { type: mimeType }),
+        config: {
+          mimeType,
+          displayName: `classroom-recording-${recording.id}`,
+        },
+      });
+
+      if (!uploadedFile.name) {
+        throw new Error("Gemini did not return an uploaded file reference");
+      }
+
+      uploadedFileName = uploadedFile.name;
+      const readyFile = await waitForGeminiFileActive(uploadedFile.name);
+
+      if (!readyFile.uri || !readyFile.mimeType) {
+        throw new Error(
+          "Gemini did not return a usable uploaded recording reference",
+        );
+      }
+
+      const contents = [
+        { text: prompt },
+        {
+          fileData: {
+            fileUri: readyFile.uri,
+            mimeType: readyFile.mimeType,
+          },
+        },
+      ];
+      const { data: transcription, usageSnapshot } =
+        await generateFromGeminiWithUsage(
+          {
+            model: GEMINI_TRANSCRIPTION_MODEL,
+            prompt,
+            contents,
+            systemInstruction:
+              "You are a careful transcription system. Return only valid JSON that matches the requested schema and preserve the spoken words as faithfully as possible.",
+            temperature: 0.1,
+          },
+          transcriptResultSchema,
+        );
+      const result = await saveClassroomTranscriptAndSyncEvidence({
+        access,
+        recordingId: parsed.data.recordingId,
+        languageCode:
+          transcription.languageCode ?? parsed.data.languageCode ?? null,
+        diarizationStatus: "ready",
+        reviewStatus: "pending" as ClassroomTranscriptReviewStatus,
+        segments: normalizeClassroomTranscriptSegments(
+          transcription.segments.map((segment) => ({
+            speakerRole: segment.speakerRole,
+            content: segment.content,
+          })),
+        ),
+        syncActiveEvidence: false,
+      });
+
+      await recordAIUsageEvent({
+        userId: access.userId,
+        feature: "classroom_transcript",
+        requestType: "text",
+        model: GEMINI_TRANSCRIPTION_MODEL,
+        snapshot: usageSnapshot,
+      });
+
+      return result;
+    } finally {
+      if (uploadedFileName) {
+        try {
+          await getGenAI().files.delete({ name: uploadedFileName });
+        } catch {
+          // Best-effort cleanup for uploaded Gemini files.
+        }
+      }
+    }
+  };
+
+  const runAsync = parsed.data.async !== false;
+
+  if (runAsync) {
+    after(async () => {
+      try {
+        await runTranscription();
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to transcribe classroom recording";
+        await markTranscriptionFailed(errorMessage);
+      }
+    });
 
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to transcribe classroom recording",
+        queued: true,
+        status: "processing",
+      },
+      { status: 202 },
+    );
+  }
+
+  try {
+    const result = await runTranscription();
+    return NextResponse.json(result);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Failed to transcribe classroom recording";
+    await markTranscriptionFailed(errorMessage);
+
+    return NextResponse.json(
+      {
+        error: errorMessage,
       },
       { status: 500 },
     );
-  } finally {
-    if (uploadedFileName) {
-      try {
-        await getGenAI().files.delete({ name: uploadedFileName });
-      } catch {
-        // Best-effort cleanup for uploaded Gemini files.
-      }
-    }
   }
 }
