@@ -28,6 +28,8 @@ import { formatAppDate, formatAppDateTime } from "@/lib/dates";
 import {
   formatLessonCurrency,
   formatLessonCurrencyInput,
+  formatLessonTimeRange,
+  getLessonDisplayTitle,
   parseLessonCurrencyInput,
   type LessonBalanceSummaryItem,
 } from "@/lib/lessons";
@@ -35,6 +37,38 @@ import {
 interface LessonBalanceManagerProps {
   summaries: LessonBalanceSummaryItem[];
   canManage?: boolean;
+}
+
+interface LessonReportLessonItem {
+  id: string;
+  title: string | null;
+  lesson_date: string;
+  start_time: string | null;
+  end_time: string | null;
+}
+
+function buildLessonReport(
+  participantName: string,
+  lessons: LessonReportLessonItem[],
+) {
+  if (lessons.length === 0) {
+    return `No completed lessons found for ${participantName}.`;
+  }
+
+  return [
+    participantName,
+    "",
+    ...lessons.map((lesson, index) => {
+      const dateLabel = formatAppDate(`${lesson.lesson_date}T00:00:00`);
+      const timeLabel = formatLessonTimeRange(
+        lesson.start_time,
+        lesson.end_time,
+      );
+      const titleLabel = getLessonDisplayTitle(lesson.title);
+
+      return `${index + 1}. ${dateLabel} | ${timeLabel} | ${titleLabel}`;
+    }),
+  ].join("\n");
 }
 
 function UpdateLessonPriceDialog({
@@ -292,6 +326,150 @@ function TopUpBalanceDialog({
   );
 }
 
+function GenerateLessonReportDialog({
+  participant,
+}: {
+  participant: LessonBalanceSummaryItem;
+}) {
+  const [open, setOpen] = useState(false);
+  const [limitInput, setLimitInput] = useState("5");
+  const [reportText, setReportText] = useState("");
+  const [lessonCount, setLessonCount] = useState<number | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  async function handleGenerate() {
+    const limit = Number(limitInput);
+
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+      toast.error("Please enter a whole number between 1 and 50");
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      const response = await fetch(
+        `/api/lessons/reports/${participant.participantId}?limit=${limit}`,
+      );
+
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+        lessons?: LessonReportLessonItem[];
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to generate lesson report");
+      }
+
+      const lessons = data?.lessons ?? [];
+      setLessonCount(lessons.length);
+      setReportText(buildLessonReport(participant.participantName, lessons));
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to generate lesson report",
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(reportText);
+      toast.success(`Copied report for ${participant.participantName}.`);
+    } catch {
+      toast.error("Failed to copy lesson report");
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          setLimitInput("5");
+          setReportText("");
+          setLessonCount(null);
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline" size="sm">
+          Generate Report
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Generate lesson report</DialogTitle>
+          <DialogDescription>
+            Choose how many of the latest completed lessons to include for {participant.participantName}.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor={`lesson-report-limit-${participant.participantId}`}>
+              Number of lessons
+            </Label>
+            <Input
+              id={`lesson-report-limit-${participant.participantId}`}
+              type="number"
+              inputMode="numeric"
+              min="1"
+              max="50"
+              step="1"
+              value={limitInput}
+              onChange={(event) => setLimitInput(event.target.value)}
+            />
+          </div>
+
+          {reportText ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor={`lesson-report-output-${participant.participantId}`}>
+                  Report
+                </Label>
+                <span className="text-xs text-muted-foreground">
+                  {lessonCount === 0
+                    ? "No completed lessons found"
+                    : `Showing ${lessonCount} latest completed lesson${lessonCount === 1 ? "" : "s"}`}
+                </span>
+              </div>
+              <Textarea
+                id={`lesson-report-output-${participant.participantId}`}
+                value={reportText}
+                readOnly
+                rows={Math.max(6, Math.min((lessonCount ?? 0) + 3, 12))}
+              />
+            </div>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          {reportText ? (
+            <Button type="button" variant="outline" onClick={handleCopy}>
+              Copy Report
+            </Button>
+          ) : null}
+          <Button type="button" onClick={handleGenerate} disabled={isGenerating}>
+            {isGenerating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : reportText ? (
+              "Regenerate"
+            ) : (
+              "Generate"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function LessonBalanceManager({
   summaries,
   canManage = false,
@@ -417,6 +595,7 @@ export function LessonBalanceManager({
                 <UpdateLessonPriceDialog participant={summary} />
                 <TopUpBalanceDialog participant={summary} />
                 <TopUpBalanceDialog participant={summary} direction="debit" />
+                <GenerateLessonReportDialog participant={summary} />
               </div>
             ) : null}
           </CardContent>

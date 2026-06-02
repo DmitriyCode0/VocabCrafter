@@ -6,7 +6,7 @@ import {
 import { ZodError, type z } from "zod";
 import { extractTextUsageSnapshot, type AIUsageSnapshot } from "@/lib/ai/usage";
 
-export const GEMINI_MODEL = "gemini-3.5-flash";
+export const GEMINI_MODEL = "gemini-3.1-flash-lite";
 export const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 export const GEMINI_TRANSCRIPTION_MODEL = "gemini-2.5-flash";
 
