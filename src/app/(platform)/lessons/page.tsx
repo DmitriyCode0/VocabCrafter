@@ -485,6 +485,7 @@ async function TutorLessonsView({
       <MonthlyLessonsCalendar
         month={month}
         lessons={lessons}
+        showDailyEarnings
         emptyMessage={
           connectedStudents.length > 0
             ? "No lessons scheduled in this month yet. Add a one-time lesson or one for a connected student."

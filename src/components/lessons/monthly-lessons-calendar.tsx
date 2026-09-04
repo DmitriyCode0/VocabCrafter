@@ -37,6 +37,7 @@ interface MonthlyLessonsCalendarProps {
   month: Date;
   lessons: MonthlyLessonItem[];
   emptyMessage: string;
+  showDailyEarnings?: boolean;
   canManageLessons?: boolean;
   studentOptions?: LessonStudentOption[];
 }
@@ -45,6 +46,7 @@ export function MonthlyLessonsCalendar({
   month,
   lessons,
   emptyMessage,
+  showDailyEarnings = false,
   canManageLessons = false,
   studentOptions = [],
 }: MonthlyLessonsCalendarProps) {
@@ -227,6 +229,9 @@ export function MonthlyLessonsCalendar({
               <div className="grid grid-cols-7">
                 {cells.map((cell) => {
                   const dayLessons = lessonsByDate.get(cell.isoDate) ?? [];
+                  const earnedCents = dayLessons
+                    .filter((lesson) => lesson.status === "completed")
+                    .reduce((total, lesson) => total + lesson.priceCents, 0);
                   const isSelected = selectedDate === cell.isoDate;
                   const isClickable = dayLessons.length > 0 || canQuickCreate;
 
@@ -260,11 +265,21 @@ export function MonthlyLessonsCalendar({
                         >
                           {cell.dayNumber}
                         </span>
-                        {dayLessons.length > 0 ? (
-                          <Badge variant="secondary" className="text-[10px]">
-                            {dayLessons.length}
-                          </Badge>
-                        ) : null}
+                        <div className="flex items-center gap-1.5">
+                          {showDailyEarnings && dayLessons.length > 0 ? (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-emerald-600 dark:text-emerald-400"
+                            >
+                              {formatLessonCurrency(earnedCents)}
+                            </Badge>
+                          ) : null}
+                          {dayLessons.length > 0 ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {dayLessons.length}
+                            </Badge>
+                          ) : null}
+                        </div>
                       </div>
 
                       <div className="mt-2 space-y-1.5">
