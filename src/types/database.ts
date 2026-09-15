@@ -355,6 +355,47 @@ export interface Database {
           },
         ];
       };
+      tutor_student_lesson_library: {
+        Row: {
+          id: string;
+          tutor_id: string;
+          student_id: string;
+          lesson_key: string;
+          completed_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tutor_id: string;
+          student_id: string;
+          lesson_key: string;
+          completed_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          tutor_id?: string;
+          student_id?: string;
+          lesson_key?: string;
+          completed_at?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_lesson_library_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_lesson_library_tutor_id_fkey";
+            columns: ["tutor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tutor_student_classrooms: {
         Row: {
           id: string;

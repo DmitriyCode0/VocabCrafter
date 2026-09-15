@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StudentOverallProgressSections } from "@/components/progress/student-overall-progress-sections";
+import { TutorLessonLibrary } from "@/components/progress/tutor-lesson-library";
 import { getAppMessages } from "@/lib/i18n/messages";
 import type { StudentProgressSnapshot } from "@/lib/progress/profile-metrics";
 
@@ -69,6 +70,7 @@ export function TutorStudentResultsPanel({
           grammarTopicToggleStudentId={studentId}
         />
       )}
+      <TutorLessonLibrary studentId={studentId} />
     </div>
   );
 }
