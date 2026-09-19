@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 import {
   LayoutDashboard,
   CalendarDays,
   BookOpen,
   TrendingUp,
-  Zap,
   UserPlus,
   ClipboardList,
   Brain,
@@ -53,13 +52,11 @@ interface MobileBottomNavProps {
 export function MobileBottomNav({ role }: MobileBottomNavProps) {
   const pathname = usePathname();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!pendingHref) return;
-    if (pathname === pendingHref || pathname.startsWith(`${pendingHref}/`)) {
-      setPendingHref(null);
-    }
-  }, [pathname, pendingHref]);
+  const visiblePendingHref =
+    pendingHref &&
+    (pathname === pendingHref || pathname.startsWith(`${pendingHref}/`))
+      ? null
+      : pendingHref;
 
   const tabs = getTabsForRole(role);
 
@@ -77,7 +74,7 @@ export function MobileBottomNav({ role }: MobileBottomNavProps) {
           const isActive = isQuizTab
             ? pathname === "/quizzes"
             : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
-          const isPending = pendingHref === tab.href && !isActive;
+          const isPending = visiblePendingHref === tab.href && !isActive;
 
           const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
             if (

@@ -20,7 +20,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Languages, LogOut, Settings, User } from "lucide-react";
+import { Languages, LogOut, Settings } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { Profile } from "@/types/database";
 import type { Role } from "@/types/roles";

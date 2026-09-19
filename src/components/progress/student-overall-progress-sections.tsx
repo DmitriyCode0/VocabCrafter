@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import dynamic from "next/dynamic";
 import {
   Card,
   CardContent,
@@ -7,16 +8,35 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
 import {
   StudentProgressOverviewCards,
   type StudentProgressOverviewCardsVariant,
 } from "@/components/progress/student-progress-overview-cards";
 import { StudentResultsSummary } from "@/components/progress/student-results-summary";
-import { TutorEditableStudentSkillRadar } from "@/components/progress/tutor-editable-student-skill-radar";
 import { TutorTimeAdjustmentCard } from "@/components/progress/tutor-time-adjustment-card";
-import { TutorStudentVocabularyDistribution } from "@/components/progress/tutor-student-vocabulary-distribution";
 import type { StudentProgressSnapshot } from "@/lib/progress/profile-metrics";
+
+const StudentSkillRadar = dynamic(
+  () =>
+    import("@/components/progress/student-skill-radar").then(
+      (module) => module.StudentSkillRadar,
+    ),
+  { loading: () => <div className="h-[28rem] w-full animate-pulse rounded-xl bg-muted" /> },
+);
+const TutorEditableStudentSkillRadar = dynamic(
+  () =>
+    import("@/components/progress/tutor-editable-student-skill-radar").then(
+      (module) => module.TutorEditableStudentSkillRadar,
+    ),
+  { loading: () => <div className="h-[28rem] w-full animate-pulse rounded-xl bg-muted" /> },
+);
+const TutorStudentVocabularyDistribution = dynamic(
+  () =>
+    import("@/components/progress/tutor-student-vocabulary-distribution").then(
+      (module) => module.TutorStudentVocabularyDistribution,
+    ),
+  { loading: () => <div className="h-[20rem] w-full animate-pulse rounded-xl bg-muted" /> },
+);
 
 interface StudentOverallProgressSectionsProps {
   snapshot: StudentProgressSnapshot;

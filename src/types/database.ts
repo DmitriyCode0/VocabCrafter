@@ -2381,6 +2381,70 @@ export interface Database {
           },
         ];
       };
+      lesson_topics: {
+        Row: {
+          id: string;
+          title: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      tutor_student_lesson_topics: {
+        Row: {
+          tutor_id: string;
+          student_id: string;
+          topic_id: string;
+          covered_at: string;
+        };
+        Insert: {
+          tutor_id: string;
+          student_id: string;
+          topic_id: string;
+          covered_at?: string;
+        };
+        Update: {
+          tutor_id?: string;
+          student_id?: string;
+          topic_id?: string;
+          covered_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tutor_student_lesson_topics_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_lesson_topics_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "lesson_topics";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tutor_student_lesson_topics_tutor_id_fkey";
+            columns: ["tutor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;

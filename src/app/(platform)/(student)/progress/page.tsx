@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import dynamicImport from "next/dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import {
@@ -11,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { StudentOverallProgressSections } from "@/components/progress/student-overall-progress-sections";
-import { StudentSkillRadar } from "@/components/progress/student-skill-radar";
 import { StudentProgressInsights } from "@/components/progress/student-progress-insights";
 import { StudentResultsSummary } from "@/components/progress/student-results-summary";
 import { StudentProgressOverviewCards } from "@/components/progress/student-progress-overview-cards";
@@ -29,6 +29,16 @@ import { parseProgressInsightsValue } from "@/lib/progress/contracts";
 import { getPublishedTutorTimeAdjustment } from "@/lib/progress/published-tutor-time-adjustment";
 
 export const dynamic = "force-dynamic";
+
+const StudentSkillRadar = dynamicImport(
+  () =>
+    import("@/components/progress/student-skill-radar").then(
+      (module) => module.StudentSkillRadar,
+    ),
+  {
+    loading: () => <Skeleton className="h-[28rem] w-full rounded-xl" />,
+  },
+);
 
 const APP_LANGUAGE_LOCALES = {
   en: "en-GB",

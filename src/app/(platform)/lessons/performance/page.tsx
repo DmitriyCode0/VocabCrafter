@@ -1,11 +1,21 @@
+import dynamicImport from "next/dynamic";
 import { Badge } from "@/components/ui/badge";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LessonsPageHeader } from "@/components/lessons/lessons-page-header";
-import { TutorPerformanceDashboard } from "@/components/lessons/tutor-performance-dashboard";
 import { getAppMessages } from "@/lib/i18n/messages";
 import { getLessonsViewerAccess } from "@/lib/lessons-access";
 import { formatLessonMonthParam } from "@/lib/lessons";
 import { autoCompleteOverduePlannedLessons } from "@/lib/lessons-server";
+
+const TutorPerformanceDashboard = dynamicImport(
+  () =>
+    import("@/components/lessons/tutor-performance-dashboard").then(
+      (module) => module.TutorPerformanceDashboard,
+    ),
+  {
+    loading: () => <div className="h-[32rem] w-full animate-pulse rounded-xl bg-muted" />,
+  },
+);
 
 interface CompletedPerformanceLessonRow {
   id: string;

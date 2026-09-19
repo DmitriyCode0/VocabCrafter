@@ -120,7 +120,7 @@ export async function TutorDashboard({
               </CardHeader>
               <CardFooter className="mt-auto justify-center">
                 <Button asChild className="w-full">
-                  <Link href="/quizzes/new">
+                  <Link href="/quizzes/new" prefetch={false}>
                     {messages.dashboard.tutor.createQuizButton}
                   </Link>
                 </Button>
@@ -148,7 +148,7 @@ export async function TutorDashboard({
               </CardHeader>
               <CardFooter className="mt-auto justify-center">
                 <Button asChild variant="outline" className="w-full">
-                  <Link href="/assignments/review">
+                  <Link href="/assignments/review" prefetch={false}>
                     {messages.dashboard.tutor.reviewButton}
                   </Link>
                 </Button>
@@ -175,7 +175,7 @@ export async function TutorDashboard({
               <CardFooter className="mt-auto justify-center">
                 {connectedStudentIds.length > 0 ? (
                   <Button asChild variant="outline" className="w-full">
-                    <Link href={passiveImportHref}>
+                    <Link href={passiveImportHref} prefetch={false}>
                       {passiveImportButtonLabel}
                     </Link>
                   </Button>
@@ -209,7 +209,7 @@ export async function TutorDashboard({
               </CardContent>
               <CardFooter className="mt-auto justify-center">
                 <Button asChild variant="outline" className="w-full">
-                  <Link href="/students">
+                  <Link href="/students" prefetch={false}>
                     {messages.dashboard.tutor.viewStudentsButton}
                   </Link>
                 </Button>

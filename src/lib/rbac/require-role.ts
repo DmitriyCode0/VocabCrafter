@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Role, Permission } from "@/types/roles";
 import type { Profile } from "@/types/database";
 import { hasPermission } from "./check-permission";
 
-export async function getAuthenticatedUser(): Promise<{
+export const getAuthenticatedUser = cache(async (): Promise<{
   user: { id: string; email: string };
   profile: Profile;
-} | null> {
+} | null> => {
   const supabase = await createClient();
 
   const {
@@ -28,7 +29,7 @@ export async function getAuthenticatedUser(): Promise<{
     user: { id: user.id, email: user.email ?? "" },
     profile,
   };
-}
+});
 
 export async function requireRole(...roles: Role[]): Promise<{
   user: { id: string; email: string };

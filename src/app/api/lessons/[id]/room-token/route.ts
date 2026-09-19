@@ -19,16 +19,6 @@ function buildParticipantIdentity({
   return `lesson:${lessonId}:${role}:${userId}`;
 }
 
-function buildParticipantName(
-  access: Awaited<ReturnType<typeof requireLessonRoomParticipantAccess>> extends {
-    errorResponse: NextResponse;
-  }
-    ? never
-    : never,
-) {
-  return access;
-}
-
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },

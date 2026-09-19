@@ -32,25 +32,25 @@ export function WordBankPicker({ onSelect }: WordBankPickerProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchBanks();
-  }, []);
+    async function loadBanks() {
+      setIsLoading(true);
+      setError(null);
 
-  async function fetchBanks() {
-    setIsLoading(true);
-    setError(null);
+      try {
+        const res = await fetch("/api/word-banks");
+        if (!res.ok) throw new Error("Failed to fetch word banks");
 
-    try {
-      const res = await fetch("/api/word-banks");
-      if (!res.ok) throw new Error("Failed to fetch word banks");
-
-      const data = await res.json();
-      setBanks(data.wordBanks || []);
-    } catch {
-      setError(messages.createQuiz.wordBankPicker.loadFailed);
-    } finally {
-      setIsLoading(false);
+        const data = await res.json();
+        setBanks(data.wordBanks || []);
+      } catch {
+        setError(messages.createQuiz.wordBankPicker.loadFailed);
+      } finally {
+        setIsLoading(false);
+      }
     }
-  }
+
+    void loadBanks();
+  }, [messages]);
 
   async function handleDelete(id: string) {
     setDeletingId(id);

@@ -43,7 +43,7 @@ interface TutorMasteryPageProps {
   searchParams: Promise<{ page?: string }>;
 }
 
-export async function TutorMasteryPageContent({
+async function TutorMasteryPageContent({
   searchParams,
 }: TutorMasteryPageProps) {
   const supabase = await createClient();

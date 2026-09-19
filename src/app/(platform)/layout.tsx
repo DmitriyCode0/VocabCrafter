@@ -1,8 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { Profile } from "@/types/database";
 import type { Role } from "@/types/roles";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
+import { getAuthenticatedUser } from "@/lib/rbac/require-role";
 import { AppLanguageProvider } from "@/components/providers/app-language-provider";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
@@ -13,25 +13,13 @@ export default async function PlatformLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
+  const authenticatedUser = await getAuthenticatedUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!authenticatedUser) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) {
-    redirect("/login");
-  }
+  const { profile } = authenticatedUser;
 
   if (!profile.onboarding_completed) {
     redirect("/onboarding");

@@ -18,7 +18,6 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [quizId, setQuizId] = useState<string | null>(null);
 
   const handleStartReview = async () => {
     setLoading(true);
@@ -45,7 +44,6 @@ export default function ReviewPage() {
       }
 
       const { quiz } = await response.json();
-      setQuizId(quiz.id);
       setSuccess(true);
 
       // Redirect to quiz after a short delay
@@ -105,7 +103,7 @@ export default function ReviewPage() {
               <div>
                 <p className="font-medium">Due Words First</p>
                 <p className="text-sm text-muted-foreground">
-                  We'll queue overdue spaced-repetition words first, then fill
+                  We&apos;ll queue overdue spaced-repetition words first, then fill
                   the remaining slots with your weakest tracked words.
                 </p>
               </div>

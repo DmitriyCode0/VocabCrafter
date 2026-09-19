@@ -33,25 +33,25 @@ export function QuizWordPicker({ onSelect }: QuizWordPickerProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchQuizzes();
-  }, []);
+    async function loadQuizzes() {
+      setIsLoading(true);
+      setError(null);
 
-  async function fetchQuizzes() {
-    setIsLoading(true);
-    setError(null);
+      try {
+        const res = await fetch("/api/quizzes");
+        if (!res.ok) throw new Error("Failed to fetch quizzes");
 
-    try {
-      const res = await fetch("/api/quizzes");
-      if (!res.ok) throw new Error("Failed to fetch quizzes");
-
-      const data = await res.json();
-      setQuizzes(data.quizzes || []);
-    } catch {
-      setError(messages.createQuiz.quizWordPicker.loadFailed);
-    } finally {
-      setIsLoading(false);
+        const data = await res.json();
+        setQuizzes(data.quizzes || []);
+      } catch {
+        setError(messages.createQuiz.quizWordPicker.loadFailed);
+      } finally {
+        setIsLoading(false);
+      }
     }
-  }
+
+    void loadQuizzes();
+  }, [messages]);
 
   if (isLoading) {
     return (

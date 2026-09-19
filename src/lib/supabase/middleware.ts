@@ -35,6 +35,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+  const isApiRoute = pathname.startsWith("/api/");
 
   // Public routes that don't require authentication
   const publicRoutes = [
@@ -57,7 +58,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // If authenticated, check onboarding status
-  if (user && !isPublicRoute && pathname !== "/onboarding") {
+  if (user && !isPublicRoute && pathname !== "/onboarding" && !isApiRoute) {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("onboarding_completed, role")

@@ -123,7 +123,7 @@ export async function StudentDashboard({
               </CardHeader>
               <CardFooter className="mt-auto justify-center">
                 <Button asChild className="w-full">
-                  <Link href="/quizzes/new">
+                  <Link href="/quizzes/new" prefetch={false}>
                     {messages.dashboard.student.createQuizButton}
                   </Link>
                 </Button>
@@ -151,7 +151,7 @@ export async function StudentDashboard({
               </CardHeader>
               <CardFooter className="mt-auto justify-center">
                 <Button asChild variant="outline" className="w-full">
-                  <Link href="/quizzes/review">
+                  <Link href="/quizzes/review" prefetch={false}>
                     {messages.dashboard.student.startReviewButton}
                   </Link>
                 </Button>
@@ -179,7 +179,7 @@ export async function StudentDashboard({
               </CardHeader>
               <CardFooter className="mt-auto justify-center">
                 <Button asChild variant="outline" className="w-full">
-                  <Link href="/vocabulary">
+                  <Link href="/vocabulary" prefetch={false}>
                     {messages.dashboard.student.passiveButton}
                   </Link>
                 </Button>

@@ -214,7 +214,7 @@ export async function AdminDashboard({
             </CardHeader>
             <CardFooter className="mt-auto justify-center">
               <Button asChild className="w-full">
-                <Link href="/analytics">
+                <Link href="/analytics" prefetch={false}>
                   {messages.dashboard.admin.viewAnalyticsButton}
                 </Link>
               </Button>
@@ -237,7 +237,7 @@ export async function AdminDashboard({
             </CardHeader>
             <CardFooter className="mt-auto justify-center">
               <Button asChild variant="outline" className="w-full">
-                <Link href="/users">
+                <Link href="/users" prefetch={false}>
                   {messages.dashboard.admin.manageUsersButton}
                 </Link>
               </Button>

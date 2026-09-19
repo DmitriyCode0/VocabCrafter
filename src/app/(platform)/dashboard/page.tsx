@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import {
   normalizeAppLanguage,
@@ -7,25 +6,16 @@ import { getAppMessages } from "@/lib/i18n/messages";
 import type { Role } from "@/types/roles";
 import { Suspense, type ReactNode } from "react";
 import { DashboardSkeleton, AdminDashboardSkeleton } from "@/components/dashboard/skeletons";
+import { getAuthenticatedUser } from "@/lib/rbac/require-role";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
+  const authenticatedUser = await getAuthenticatedUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  if (!authenticatedUser) redirect("/login");
 
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, app_language, full_name, email, plan")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) redirect("/login");
+  const { user, profile } = authenticatedUser;
 
   const role = profile.role as Role;
   const appLanguage = normalizeAppLanguage(profile.app_language);

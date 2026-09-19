@@ -147,8 +147,6 @@ export function normalizeTutorStudentPlanMonth(
   return getCurrentTutorStudentPlanMonth(referenceDate);
 }
 
-type TutorStudentConnectionRow =
-  Database["public"]["Tables"]["tutor_students"]["Row"];
 type TutorStudentMonthlyPlanRow =
   Database["public"]["Tables"]["tutor_student_monthly_plans"]["Row"];
 

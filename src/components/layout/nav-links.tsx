@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useEffectEvent, useState, type MouseEvent } from "react";
 import { motion } from "motion/react";
 import {
@@ -216,7 +216,6 @@ interface NavLinksProps {
 
 export function NavLinks({ role, collapsed = false }: NavLinksProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { messages } = useAppI18n();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
@@ -256,10 +255,6 @@ export function NavLinks({ role, collapsed = false }: NavLinksProps) {
           const isPending = pendingHref === item.href && !isActive;
           const label = messages.nav[item.labelKey];
 
-          const handleMouseEnter = () => {
-            router.prefetch(item.href);
-          };
-
           const handleLinkClick = (event: MouseEvent<HTMLAnchorElement>) => {
             if (
               event.defaultPrevented ||
@@ -289,9 +284,9 @@ export function NavLinks({ role, collapsed = false }: NavLinksProps) {
                 <TooltipTrigger asChild>
                   <Link
                     href={item.href}
+                    prefetch={false}
                     data-active={isActive}
                     data-pending={isPending}
-                    onMouseEnter={handleMouseEnter}
                     onClick={handleLinkClick}
                     className={cn(
                       "nav-link-animated flex items-center rounded-lg py-3 text-base transition-[padding,justify-content,opacity] duration-200 ease-out",

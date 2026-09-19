@@ -75,34 +75,6 @@ interface PassiveVocabularyPageProps {
   searchParams: Promise<{ student?: string; page?: string; tab?: string }>;
 }
 
-interface LegacyPassiveVocabularyRedirectProps {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
-
-function buildRedirectPath(
-  pathname: string,
-  searchParams: Record<string, string | string[] | undefined>,
-) {
-  const nextParams = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(searchParams)) {
-    if (typeof value === "string") {
-      nextParams.set(key, value);
-      continue;
-    }
-
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        nextParams.append(key, item);
-      }
-    }
-  }
-
-  return nextParams.size > 0
-    ? `${pathname}?${nextParams.toString()}`
-    : pathname;
-}
-
 function normalizeCefrLevel(value?: string | null): CEFRLevel {
   return ["A1", "A2", "B1", "B2", "C1", "C2"].includes(value ?? "")
     ? (value as CEFRLevel)
@@ -330,7 +302,7 @@ function getHeaderDescription(role: Role) {
   return "Browse your dictionary, change vocabulary groups, keep your own definitions, and remove words you no longer want tracked.";
 }
 
-export async function PassiveVocabularyPageContent({
+async function PassiveVocabularyPageContent({
   searchParams,
 }: PassiveVocabularyPageProps) {
   const resolvedSearchParams = await searchParams;
@@ -461,10 +433,4 @@ export async function PassiveVocabularyPageContent({
   );
 }
 
-export default async function PassiveVocabularyPage({
-  searchParams,
-}: LegacyPassiveVocabularyRedirectProps) {
-  const resolvedSearchParams = await searchParams;
-
-  redirect(buildRedirectPath("/vocabulary", resolvedSearchParams));
-}
+export default PassiveVocabularyPageContent;

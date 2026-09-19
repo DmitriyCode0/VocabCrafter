@@ -907,7 +907,7 @@ export function EditPassiveLibraryDialog({
               <Label>Adjective gradability</Label>
               <p className="text-xs text-muted-foreground">
                 Gradable adjectives naturally work with degree words like
-                "very", while non-gradable adjectives are usually absolute or
+                &quot;very&quot;, while non-gradable adjectives are usually absolute or
                 extreme in meaning.
               </p>
               <div className="flex flex-wrap gap-4 pt-1">
