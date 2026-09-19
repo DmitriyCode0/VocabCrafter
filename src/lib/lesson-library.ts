@@ -12,59 +12,60 @@ export const LESSON_LEVELS = [
 
 export type LessonLevel = (typeof LESSON_LEVELS)[number];
 
-const lessonGroups: Record<LessonLevel, string[]> = {
+export type LessonCategory = "grammar" | "vocabulary" | "seasonal" | "unavailable";
+
+export type LessonDefinition = {
+  title: string;
+  category?: LessonCategory;
+};
+
+const lessonCategoryOrder: LessonCategory[] = ["grammar", "vocabulary", "seasonal", "unavailable"];
+
+const lessonGroups: Record<LessonLevel, (string | LessonDefinition)[]> = {
   A1: [
-    "What Did You Do Last Weekend? (20 most common irregular verbs)",
-    "Most Common Irregular Verbs (Part 2)",
-    "Let Us Get Started - First Lesson",
-    "My Day, My Way (Daily Routine)",
-    "Weather Wonders",
-    "Family Connections (Possessive)",
-    "Common Irregular Verbs (Part 3)",
-    "What Is In Your Fridge?",
-    "It Was a Nice Weekend",
-    "First Trip Together",
-    "Packing For A Trip",
-    "A Night in the Clouds (Past Simple)",
-    "The Secret Language of Cats",
-    "Blooming Plurals",
-    "Yoga Basics",
-    "Birthday Buzz",
-    "Everyday Things 3.0",
-    "I Love Dancing, I Hate Cleaning - love like hate",
-    "A Busy Evening - Past Continuous",
-    "My Daily Life - Everyday Verbs",
-    "People, Things, and Pronouns - Object Pronouns",
-    "This or These - Demonstrative Pronouns",
-    "Famous Faces Uncovered - to be",
-    "In My Childhood",
-    "A Busy Day in Town",
-    "At the Train Station",
-    "End-of-Year Wrap-Up",
-    "Press the Sunday Button",
-    "Are You Ready To Order?",
-    "The Code of Daily Life",
-    "Everyday Things 4.0",
-    "She Can Do That",
-    "Spring Picnics",
-    "Everyday Small Talk",
-    "People and Their Things Possessive Pronouns",
-    "Find It in the House - Prepositions of Place",
-    "What Can You Do - Can for Ability",
-    "Health Problems",
-    "It Wasn't My Day - Past Simple",
-    "Little Things, Big Smiles",
-    "Big City, Small Town - Opposite Adjectives",
-    "What Shall We Do? - Making and Responding to Suggestions",
-    "Everyday Verbs 2.0",
-    "Red Flag, Green Flag: You Decide - Can and Like",
-    "Meet the Housemates - Wh- questions with be",
-    "New Faces, New Stories",
-    "Nice to Meet You",
-    "My Day on Repeat",
-    "It Is Study Time",
-    "The Advice Line",
-    "Our Small Traditions - Possessive Adjectives",
+    { title: "A Night in the Clouds (Past Simple)", category: "grammar" },
+    { title: "Amazing Autumn Days (Questions words)", category: "grammar" },
+    { title: "Are You Ready To Order?", category: "vocabulary" },
+    { title: "Big City, Small Town - Opposite Adjectives", category: "unavailable" },
+    { title: "Common Irregular Verbs (Past Simple: irregular verbs 20)", category: "grammar" },
+    { title: "Everyday Small Talk", category: "vocabulary" },
+    { title: "Family Connections (Possessive 's)", category: "grammar" },
+    { title: "Famous Faces Uncovered (Present Simple to be +, -, ?)", category: "grammar" },
+    { title: "Father's Day", category: "seasonal" },
+    { title: "Find It in the House (Prepositions of Place)", category: "grammar" },
+    { title: "First Trip Together", category: "vocabulary" },
+    { title: "Health Problems", category: "unavailable" },
+    { title: "In My Childhood (Past Simple: Regular Verbs)", category: "grammar" },
+    { title: "It Is Study Time", category: "unavailable" },
+    { title: "It Was a Nice Weekend (Past Simple to be: was/were)", category: "grammar" },
+    { title: "Let Us Get Started - First Lesson (be vs have got)", category: "grammar" },
+    { title: "Making Requests In Everyday Situations (can/could for requests)", category: "grammar" },
+    { title: "Meet the Housemates", category: "unavailable" },
+    { title: "Most Common Irregular Verbs (Past Simple: irregular verbs 40)", category: "grammar" },
+    { title: "My Day on Repeat", category: "unavailable" },
+    { title: "My Day, My Way (Present Simple to do)", category: "grammar" },
+    { title: "New Faces, New Stories", category: "unavailable" },
+    { title: "Nice to Meet You", category: "unavailable" },
+    { title: "Our Small Traditions", category: "unavailable" },
+    { title: "Packing For A Trip (prepositions of place in, on, at)", category: "grammar" },
+    { title: "People and Their Things (Possessive Pronouns)", category: "grammar" },
+    { title: "People, Things, and Pronouns", category: "unavailable" },
+    { title: "Red Flag, Green Flag: You Decide", category: "unavailable" },
+    { title: "Say Hello to the World", category: "vocabulary" },
+    { title: "She Can Do That", category: "seasonal" },
+    { title: "Spring Picnics", category: "seasonal" },
+    { title: "Summer vs Autumn - Back on Track Series", category: "seasonal" },
+    { title: "The Advice Line", category: "unavailable" },
+    { title: "The Best Christmas Tree Ever", category: "seasonal" },
+    { title: "The Code of Daily Life", category: "grammar" },
+    { title: "The Golden Tastes of Autumn", category: "seasonal" },
+    { title: "The Secret Language of Cats", category: "vocabulary" },
+    { title: "This or These (Demonstrative Pronouns)", category: "grammar" },
+    { title: "Weather Wonders", category: "vocabulary" },
+    { title: "What Can You Do", category: "unavailable" },
+    { title: "What Did You Do Last Weekend? (Past Simple: irregular verbs 20)", category: "grammar" },
+    { title: "What Is In Your Fridge? (there is, some/any, countable/uncountable)", category: "grammar" },
+    { title: "What Shall We Do?", category: "unavailable" },
   ],
   "A1-A2": [
     "A Very Simple Apartment Tour",
@@ -526,16 +527,25 @@ const lessonGroups: Record<LessonLevel, string[]> = {
 };
 
 export const LESSON_LIBRARY = LESSON_LEVELS.flatMap((level) =>
-  lessonGroups[level].map((title) => ({
-    level,
-    title,
-    key: `${level}:${title}`,
-  })),
+  lessonGroups[level].map((lesson) => {
+    const definition = typeof lesson === "string" ? { title: lesson } : lesson;
+    return {
+      level,
+      ...definition,
+      key: `${level}:${definition.title}`,
+    };
+  }),
 );
 
 export function getLessonsByLevel() {
   return LESSON_LEVELS.map((level) => ({
     level,
-    lessons: LESSON_LIBRARY.filter((lesson) => lesson.level === level),
+    lessons: LESSON_LIBRARY
+      .filter((lesson) => lesson.level === level)
+      .sort((first, second) => {
+        const firstCategory = first.category ? lessonCategoryOrder.indexOf(first.category) : -1;
+        const secondCategory = second.category ? lessonCategoryOrder.indexOf(second.category) : -1;
+        return firstCategory - secondCategory;
+      }),
   }));
 }

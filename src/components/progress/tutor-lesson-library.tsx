@@ -5,7 +5,14 @@ import { CheckCircle2, ChevronDown, Library, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getLessonsByLevel } from "@/lib/lesson-library";
+import { getLessonsByLevel, type LessonCategory } from "@/lib/lesson-library";
+
+const categoryStyles: Record<LessonCategory, { label: string; className: string }> = {
+  grammar: { label: "Grammar", className: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300" },
+  vocabulary: { label: "Vocab", className: "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-900 dark:bg-teal-950/50 dark:text-teal-300" },
+  seasonal: { label: "Seasonal", className: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300" },
+  unavailable: { label: "N/A", className: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300" },
+};
 
 export function TutorLessonLibrary({ studentId }: { studentId: string }) {
   const groups = getLessonsByLevel();
@@ -102,7 +109,14 @@ export function TutorLessonLibrary({ studentId }: { studentId: string }) {
                         onCheckedChange={(value) => toggleLesson(lesson.key, value === true)}
                         className="mt-0.5"
                       />
-                      <span className={checked ? "text-muted-foreground line-through" : ""}>{lesson.title}</span>
+                      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                        <span className={checked ? "text-muted-foreground line-through" : ""}>{lesson.title}</span>
+                        {lesson.category ? (
+                          <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${categoryStyles[lesson.category].className}`}>
+                            {categoryStyles[lesson.category].label}
+                          </span>
+                        ) : null}
+                      </span>
                     </label>
                   );
                 })}
