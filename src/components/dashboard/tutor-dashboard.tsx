@@ -25,6 +25,7 @@ import {
   GraduationCap,
   MessageSquare,
   PlusCircle,
+  Video,
   Wallet,
 } from "lucide-react";
 import { fmtLimit } from "@/lib/plans";
@@ -68,6 +69,7 @@ interface UpcomingLessonRow {
   end_time: string | null;
   status: "planned" | "completed" | "cancelled";
   price_cents: number;
+  meet_url?: string | null;
   student_profile: {
     full_name: string | null;
     email: string;
@@ -142,7 +144,7 @@ export async function TutorDashboard({
     supabaseAdmin
       .from("tutor_student_lessons")
       .select(
-        "id, student_id, title, lesson_date, start_time, end_time, status, price_cents, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
+        "id, student_id, title, lesson_date, start_time, end_time, status, price_cents, meet_url, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
       )
       .eq("tutor_id", userId)
       .neq("status", "cancelled")
@@ -365,6 +367,23 @@ export async function TutorDashboard({
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
+                      {lesson.meet_url ? (
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="h-7 border-emerald-500/30 bg-emerald-500/10 px-2 text-xs text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300"
+                        >
+                          <a
+                            href={lesson.meet_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Video className="mr-1 h-3.5 w-3.5" />
+                            Meet
+                          </a>
+                        </Button>
+                      ) : null}
                       {lessonsLeft !== null ? (
                         <Badge
                           variant={isLowBalance ? "destructive" : "outline"}

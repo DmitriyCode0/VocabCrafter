@@ -40,6 +40,13 @@ interface GoogleCalendarTokenResponse {
 
 interface GoogleCalendarEventResponse {
   id?: string;
+  hangoutLink?: string;
+  conferenceData?: {
+    entryPoints?: Array<{
+      entryPointType?: string;
+      uri?: string;
+    }>;
+  };
 }
 
 interface LessonGoogleCalendarSyncRow {
@@ -348,10 +355,11 @@ export async function syncLessonToGoogleCalendar({
     );
     const payload = buildGoogleCalendarEventPayload(lesson);
     let googleEventId = mapping?.google_event_id ?? null;
+    let createdMeetUrl: string | null = null;
 
     if (googleEventId) {
       const updateResponse = await fetch(
-        `${GOOGLE_CALENDAR_API_BASE_URL}/calendars/${encodeURIComponent(connection.calendar_id)}/events/${encodeURIComponent(googleEventId)}`,
+        `${GOOGLE_CALENDAR_API_BASE_URL}/calendars/${encodeURIComponent(connection.calendar_id)}/events/${encodeURIComponent(googleEventId)}?conferenceDataVersion=1&sendUpdates=all`,
         {
           method: "PATCH",
           headers: {
@@ -363,20 +371,39 @@ export async function syncLessonToGoogleCalendar({
       );
 
       if (updateResponse.status === 404) {
-        googleEventId = await createGoogleCalendarEvent(
+        const created = await createGoogleCalendarEvent(
           accessToken,
           connection.calendar_id,
           payload,
         );
+        googleEventId = created.id;
+        createdMeetUrl = created.meetUrl;
       } else if (!updateResponse.ok) {
         throw new Error(await readGoogleResponseError(updateResponse));
+      } else {
+        const updatedData = (await updateResponse.json().catch(() => null)) as GoogleCalendarEventResponse | null;
+        createdMeetUrl =
+          updatedData?.hangoutLink ??
+          updatedData?.conferenceData?.entryPoints?.find(
+            (entry) => entry.entryPointType === "video",
+          )?.uri ??
+          null;
       }
     } else {
-      googleEventId = await createGoogleCalendarEvent(
+      const created = await createGoogleCalendarEvent(
         accessToken,
         connection.calendar_id,
         payload,
       );
+      googleEventId = created.id;
+      createdMeetUrl = created.meetUrl;
+    }
+
+    if (createdMeetUrl) {
+      await supabaseAdmin
+        .from("tutor_student_lessons")
+        .update({ meet_url: createdMeetUrl, updated_at: new Date().toISOString() })
+        .eq("id", lessonId);
     }
 
     const syncedAt = new Date().toISOString();
@@ -641,18 +668,16 @@ async function createGoogleCalendarEvent(
   accessToken: string,
   calendarId: string,
   payload: Record<string, unknown>,
-) {
-  const response = await fetch(
-    `${GOOGLE_CALENDAR_API_BASE_URL}/calendars/${encodeURIComponent(calendarId)}/events`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
+): Promise<{ id: string; meetUrl: string | null }> {
+  const url = `${GOOGLE_CALENDAR_API_BASE_URL}/calendars/${encodeURIComponent(calendarId)}/events?conferenceDataVersion=1&sendUpdates=all`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(payload),
+  });
 
   if (!response.ok) {
     throw new Error(await readGoogleResponseError(response));
@@ -664,7 +689,14 @@ async function createGoogleCalendarEvent(
     throw new Error("Google Calendar did not return an event id.");
   }
 
-  return event.id;
+  const meetUrl =
+    event.hangoutLink ??
+    event.conferenceData?.entryPoints?.find(
+      (entry) => entry.entryPointType === "video",
+    )?.uri ??
+    null;
+
+  return { id: event.id, meetUrl };
 }
 
 function buildGoogleCalendarEventPayload(lesson: LessonGoogleCalendarSyncRow) {
@@ -697,6 +729,14 @@ function buildGoogleCalendarEventPayload(lesson: LessonGoogleCalendarSyncRow) {
 
   descriptionLines.push("Managed in Vocab Crafter.");
 
+  const attendees: Array<{ email: string; displayName?: string }> = [];
+  if (lesson.student_profile?.email) {
+    attendees.push({
+      email: lesson.student_profile.email,
+      displayName: lesson.student_profile.full_name || undefined,
+    });
+  }
+
   return {
     summary: lesson.title?.trim()
       ? `${getLessonDisplayTitle(lesson.title)} · ${studentName}`
@@ -705,6 +745,15 @@ function buildGoogleCalendarEventPayload(lesson: LessonGoogleCalendarSyncRow) {
         : "One-time lesson",
     description: descriptionLines.join("\n\n"),
     status: lesson.status === "cancelled" ? "cancelled" : "confirmed",
+    attendees: attendees.length > 0 ? attendees : undefined,
+    conferenceData: {
+      createRequest: {
+        requestId: `vocab-crafter-${lesson.id}-${Date.now()}`,
+        conferenceSolutionKey: {
+          type: "hangoutsMeet",
+        },
+      },
+    },
     extendedProperties: {
       private: privateProperties,
     },

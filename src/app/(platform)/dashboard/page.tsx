@@ -29,15 +29,61 @@ export default async function DashboardPage() {
     const { StudentDashboard } = await import(
       "@/components/dashboard/student-dashboard"
     );
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const supabaseAdmin = createAdminClient();
+
+    const now = new Date();
+    const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+    const { data: upcomingLessonRows } = await supabaseAdmin
+      .from("tutor_student_lessons")
+      .select(
+        "id, title, lesson_date, start_time, end_time, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
+      )
+      .eq("student_id", user.id)
+      .neq("status", "cancelled")
+      .gte("lesson_date", todayIso)
+      .order("lesson_date", { ascending: true })
+      .order("start_time", { ascending: true })
+      .limit(1);
+
+    const rawNextLesson = upcomingLessonRows?.[0] as
+      | {
+          id: string;
+          title: string | null;
+          lesson_date: string;
+          start_time: string | null;
+          end_time: string | null;
+          meet_url: string | null;
+          tutor_profile: { full_name: string | null; email: string } | null;
+        }
+      | undefined;
+
+    const nextLesson = rawNextLesson
+      ? {
+          id: rawNextLesson.id,
+          title: rawNextLesson.title,
+          lessonDate: rawNextLesson.lesson_date,
+          startTime: rawNextLesson.start_time,
+          endTime: rawNextLesson.end_time,
+          meetUrl: rawNextLesson.meet_url,
+          tutorName:
+            rawNextLesson.tutor_profile?.full_name ||
+            rawNextLesson.tutor_profile?.email ||
+            "Tutor",
+        }
+      : null;
 
     return (
       <>
-        {/* Mobile Student View: Single focused Gap-Fill Launcher */}
+        {/* Mobile Student View: Focused Launcher + Next Lesson Google Meet banner */}
         <StudentMobileGapFillLauncher
           displayName={displayName}
           cefrLevel={profile.cefr_level}
           preferredLanguage={profile.preferred_language}
           sourceLanguage={profile.source_language}
+          nextLesson={nextLesson}
+          todayIso={todayIso}
         />
 
         {/* Desktop / PC Student View: Full Dashboard */}

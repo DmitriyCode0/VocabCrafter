@@ -33,6 +33,10 @@ import {
   getStudentProgressSnapshot,
 } from "@/lib/progress/profile-metrics";
 import { getPublishedTutorTimeAdjustment } from "@/lib/progress/published-tutor-time-adjustment";
+import {
+  StudentGoogleMeetBanner,
+  type StudentNextLesson,
+} from "@/components/dashboard/student-google-meet-banner";
 import type { AppMessages } from "@/lib/i18n/messages";
 
 function pct(used: number, total: number) {
@@ -57,12 +61,19 @@ export async function StudentDashboard({
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const todayIso = `${year}-${month}-${day}`;
+
   const [
     { count: monthlyQuizCount },
     { data: attemptRows },
     { count: totalWordsTracked },
     progressSnapshot,
     publishedTutorTimeAdjustment,
+    { data: upcomingLessonRows },
   ] = await Promise.all([
     supabase
       .from("quizzes")
@@ -81,7 +92,45 @@ export async function StudentDashboard({
       .eq("student_id", userId),
     getStudentProgressSnapshot(userId),
     getPublishedTutorTimeAdjustment(userId),
+    supabaseAdmin
+      .from("tutor_student_lessons")
+      .select(
+        "id, title, lesson_date, start_time, end_time, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
+      )
+      .eq("student_id", userId)
+      .neq("status", "cancelled")
+      .gte("lesson_date", todayIso)
+      .order("lesson_date", { ascending: true })
+      .order("start_time", { ascending: true })
+      .limit(1),
   ]);
+
+  const rawNextLesson = upcomingLessonRows?.[0] as
+    | {
+        id: string;
+        title: string | null;
+        lesson_date: string;
+        start_time: string | null;
+        end_time: string | null;
+        meet_url: string | null;
+        tutor_profile: { full_name: string | null; email: string } | null;
+      }
+    | undefined;
+
+  const nextLesson: StudentNextLesson | null = rawNextLesson
+    ? {
+        id: rawNextLesson.id,
+        title: rawNextLesson.title,
+        lessonDate: rawNextLesson.lesson_date,
+        startTime: rawNextLesson.start_time,
+        endTime: rawNextLesson.end_time,
+        meetUrl: rawNextLesson.meet_url,
+        tutorName:
+          rawNextLesson.tutor_profile?.full_name ||
+          rawNextLesson.tutor_profile?.email ||
+          "Tutor",
+      }
+    : null;
 
   const effectiveProgressSnapshot = publishedTutorTimeAdjustment != null
     ? applyTutorTimeAdjustmentToSnapshot(
@@ -100,6 +149,11 @@ export async function StudentDashboard({
 
   return (
     <div className="space-y-6">
+      <StudentGoogleMeetBanner
+        nextLesson={nextLesson}
+        todayIso={todayIso}
+      />
+
       <CustomizableDashboard
         storageKey={`vocab-crafter.dashboard-layout:student:${userId}`}
         className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"

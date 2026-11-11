@@ -308,6 +308,7 @@ export interface Database {
           notes: string | null;
           status: "planned" | "completed" | "cancelled";
           price_cents: number;
+          meet_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -322,6 +323,7 @@ export interface Database {
           notes?: string | null;
           status?: "planned" | "completed" | "cancelled";
           price_cents?: number;
+          meet_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -335,6 +337,7 @@ export interface Database {
           notes?: string | null;
           status?: "planned" | "completed" | "cancelled";
           price_cents?: number;
+          meet_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };

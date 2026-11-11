@@ -24,6 +24,7 @@ export interface MonthlyLessonItem {
   studentId?: string | null;
   participantName: string;
   participantLabel: string;
+  meetUrl?: string | null;
 }
 
 export function isOneTimeLessonStudentValue(value?: string | null) {

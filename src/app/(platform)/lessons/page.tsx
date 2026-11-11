@@ -67,6 +67,7 @@ interface TutorLessonRow {
   notes: string | null;
   status: "planned" | "completed" | "cancelled";
   price_cents: number;
+  meet_url?: string | null;
   student_profile: {
     full_name: string | null;
     email: string;
@@ -82,6 +83,7 @@ interface StudentLessonRow {
   notes: string | null;
   status: "planned" | "completed" | "cancelled";
   price_cents: number;
+  meet_url?: string | null;
   tutor_profile: {
     full_name: string | null;
     email: string;
@@ -112,6 +114,7 @@ function mapTutorLessons(rows: TutorLessonRow[]): MonthlyLessonItem[] {
       row.student_profile?.email ||
       "One-time",
     participantLabel: row.student_id ? "Student" : "Type",
+    meetUrl: row.meet_url ?? null,
   }));
 }
 
@@ -128,6 +131,7 @@ function mapStudentLessons(rows: StudentLessonRow[]): MonthlyLessonItem[] {
     participantName:
       row.tutor_profile?.full_name || row.tutor_profile?.email || "Tutor",
     participantLabel: "Tutor",
+    meetUrl: row.meet_url ?? null,
   }));
 }
 
@@ -265,7 +269,7 @@ export default async function LessonsPage({
       supabaseAdmin
         .from("tutor_student_lessons")
         .select(
-          "id, title, lesson_date, start_time, end_time, notes, status, price_cents, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
+          "id, title, lesson_date, start_time, end_time, notes, status, price_cents, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
         )
         .eq("student_id", userId)
         .order("lesson_date", { ascending: true })
@@ -351,7 +355,7 @@ export default async function LessonsPage({
     supabaseAdmin
       .from("tutor_student_lessons")
       .select(
-        "id, student_id, title, lesson_date, start_time, end_time, notes, status, price_cents, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
+        "id, student_id, title, lesson_date, start_time, end_time, notes, status, price_cents, meet_url, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
       )
       .eq("tutor_id", userId)
       .order("lesson_date", { ascending: true })

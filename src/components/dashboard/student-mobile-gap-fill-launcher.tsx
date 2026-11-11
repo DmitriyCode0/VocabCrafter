@@ -1,8 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import Image from "next/image";
+import { useRef, useState, type ChangeEvent, type ClipboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Languages, Loader2, PenLine, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  ImagePlus,
+  Languages,
+  Loader2,
+  PenLine,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,15 +32,65 @@ import {
   normalizeSourceLanguage,
 } from "@/lib/languages";
 import { cn } from "@/lib/utils";
+import {
+  StudentGoogleMeetBanner,
+  type StudentNextLesson,
+} from "@/components/dashboard/student-google-meet-banner";
+import { QuizWordPicker } from "@/components/quiz/quiz-word-picker";
 import type { CEFRLevel, QuizTerm } from "@/types/quiz";
 
 type MobileActivityType = "gap_fill" | "translation";
+type InputTab = "manual" | "from_quiz";
+
+const MAX_SCREENSHOTS = 3;
+const MAX_SCREENSHOT_SIZE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+
+interface ScreenshotDraft {
+  id: string;
+  name: string;
+  mimeType: (typeof ACCEPTED_IMAGE_TYPES)[number];
+  dataUrl: string;
+}
+
+function createScreenshotId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function isAcceptedImageType(
+  value: string,
+): value is (typeof ACCEPTED_IMAGE_TYPES)[number] {
+  return ACCEPTED_IMAGE_TYPES.includes(
+    value as (typeof ACCEPTED_IMAGE_TYPES)[number],
+  );
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Failed to read screenshot"));
+    };
+    reader.onerror = () => reject(new Error("Failed to read screenshot"));
+    reader.readAsDataURL(file);
+  });
+}
+
 
 interface StudentMobileGapFillLauncherProps {
   displayName: string;
   cefrLevel?: string | null;
   preferredLanguage?: string | null;
   sourceLanguage?: string | null;
+  nextLesson?: StudentNextLesson | null;
+  todayIso?: string;
 }
 
 export function StudentMobileGapFillLauncher({
@@ -38,6 +98,8 @@ export function StudentMobileGapFillLauncher({
   cefrLevel: rawCefrLevel,
   preferredLanguage,
   sourceLanguage: rawSourceLanguage,
+  nextLesson = null,
+  todayIso = "",
 }: StudentMobileGapFillLauncherProps) {
   const router = useRouter();
   const { messages, appLanguage } = useAppI18n();
@@ -52,67 +114,109 @@ export function StudentMobileGapFillLauncher({
       : getDefaultCefrLevelForLanguage(targetLanguage);
 
   const [mode, setMode] = useState<"home" | "paste">("home");
+  const [inputTab, setInputTab] = useState<InputTab>("manual");
   const [activityType, setActivityType] =
     useState<MobileActivityType>("gap_fill");
   const [selectedLevel, setSelectedLevel] =
     useState<CEFRLevel>(resolvedCefrLevel);
   const [text, setText] = useState("");
+  const [screenshots, setScreenshots] = useState<ScreenshotDraft[]>([]);
   const [statusStep, setStatusStep] = useState<"idle" | "parsing" | "building">(
     "idle",
   );
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isWorking = statusStep !== "idle";
 
   function openActivity(type: MobileActivityType) {
     setActivityType(type);
     setError(null);
+    setInputTab("manual");
     setMode("paste");
   }
 
-  async function handleGenerate() {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      setError(t.emptyInputError);
+  async function appendScreenshotFiles(files: File[]) {
+    const remainingSlots = MAX_SCREENSHOTS - screenshots.length;
+
+    if (remainingSlots <= 0) {
+      setError(messages.createQuiz.wordInput.attachLimitError(MAX_SCREENSHOTS));
       return;
     }
 
+    const validFiles = files.slice(0, remainingSlots);
+    const nextDrafts: ScreenshotDraft[] = [];
+
+    for (const file of validFiles) {
+      if (!isAcceptedImageType(file.type)) {
+        setError(messages.createQuiz.wordInput.invalidImageTypeError);
+        continue;
+      }
+
+      if (file.size > MAX_SCREENSHOT_SIZE_BYTES) {
+        setError(messages.createQuiz.wordInput.screenshotSizeError(5));
+        continue;
+      }
+
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        nextDrafts.push({
+          id: createScreenshotId(),
+          name:
+            file.name ||
+            messages.createQuiz.wordInput.screenshotLabel(
+              screenshots.length + nextDrafts.length + 1,
+            ),
+          mimeType: file.type,
+          dataUrl,
+        });
+      } catch {
+        setError(messages.createQuiz.wordInput.parseFailed);
+      }
+    }
+
+    if (nextDrafts.length > 0) {
+      setError(null);
+      setScreenshots((current) => [...current, ...nextDrafts]);
+    }
+  }
+
+  function handleFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length > 0) {
+      void appendScreenshotFiles(files);
+    }
+    event.target.value = "";
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+
+    if (files.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    void appendScreenshotFiles(files);
+  }
+
+  function removeScreenshot(id: string) {
+    setScreenshots((current) => current.filter((item) => item.id !== id));
+  }
+
+  async function generateFromTerms(terms: QuizTerm[]) {
     setError(null);
-    setStatusStep("parsing");
+    setStatusStep("building");
 
     try {
-      // 1. Parse pasted vocabulary with AI
-      const parseRes = await fetch("/api/ai/parse-input", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: trimmed,
-          targetLanguage,
-          sourceLanguage,
-          screenshots: [],
-        }),
-      });
-
-      if (!parseRes.ok) {
-        const data = await parseRes.json().catch(() => null);
-        throw new Error(
-          data?.error || messages.createQuiz.wordInput.parseFailed,
-        );
-      }
-
-      const parsedData = (await parseRes.json()) as { terms: QuizTerm[] };
-      if (!parsedData.terms || parsedData.terms.length === 0) {
-        throw new Error(messages.createQuiz.wordInput.parseFailed);
-      }
-
-      setStatusStep("building");
-
-      // 2. Resolve terms against the shared dictionary
       const resolveRes = await fetch("/api/quizzes/resolve-terms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          terms: parsedData.terms,
+          terms,
           targetLanguage,
           sourceLanguage,
         }),
@@ -120,7 +224,7 @@ export function StudentMobileGapFillLauncher({
 
       const resolvedTerms: QuizTerm[] = resolveRes.ok
         ? ((await resolveRes.json()) as { terms: QuizTerm[] }).terms
-        : parsedData.terms;
+        : terms;
 
       const config = {
         cefrLevel: selectedLevel,
@@ -134,7 +238,6 @@ export function StudentMobileGapFillLauncher({
         timedMode: false,
       };
 
-      // 3. Generate exercise at selected CEFR level
       const genRes = await fetch("/api/ai/generate-quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -154,7 +257,6 @@ export function StudentMobileGapFillLauncher({
         content: Record<string, unknown>;
       };
 
-      // 4. Save quiz & redirect directly to the interactive player
       const saveRes = await fetch("/api/quizzes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -183,10 +285,66 @@ export function StudentMobileGapFillLauncher({
     }
   }
 
+  async function handleGenerate() {
+    const trimmed = text.trim();
+    if (!trimmed && screenshots.length === 0) {
+      setError(t.emptyInputError);
+      return;
+    }
+
+    setError(null);
+    setStatusStep("parsing");
+
+    try {
+      const payloadScreenshots = screenshots.map((s) => ({
+        name: s.name,
+        mimeType: s.mimeType,
+        data: s.dataUrl.split(",")[1] || s.dataUrl,
+      }));
+
+      // 1. Parse pasted vocabulary and/or screenshots with AI
+      const parseRes = await fetch("/api/ai/parse-input", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: trimmed,
+          targetLanguage,
+          sourceLanguage,
+          screenshots: payloadScreenshots,
+        }),
+      });
+
+      if (!parseRes.ok) {
+        const data = await parseRes.json().catch(() => null);
+        throw new Error(
+          data?.error || messages.createQuiz.wordInput.parseFailed,
+        );
+      }
+
+      const parsedData = (await parseRes.json()) as { terms: QuizTerm[] };
+      if (!parsedData.terms || parsedData.terms.length === 0) {
+        throw new Error(messages.createQuiz.wordInput.parseFailed);
+      }
+
+      await generateFromTerms(parsedData.terms);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to generate exercise",
+      );
+      setStatusStep("idle");
+    }
+  }
+
   return (
     <div className="flex min-h-[calc(100dvh-6.5rem)] flex-col justify-center py-4 md:hidden">
       {mode === "home" ? (
-        <Card className="border-primary/25 shadow-md">
+        <div className="space-y-4">
+          <StudentGoogleMeetBanner
+            nextLesson={nextLesson}
+            todayIso={todayIso}
+          />
+
+          <Card className="border-primary/25 shadow-md">
           <CardHeader className="items-center space-y-4 pb-4 pt-8 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
               <PenLine className="h-7 w-7" />
@@ -244,6 +402,7 @@ export function StudentMobileGapFillLauncher({
             </Button>
           </CardContent>
         </Card>
+      </div>
       ) : (
         <Card className="border-primary/25 shadow-md">
           <CardHeader className="pb-3">
@@ -300,42 +459,149 @@ export function StudentMobileGapFillLauncher({
               })}
             </div>
 
-            <Textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={t.pastePlaceholder}
-              disabled={isWorking}
-              rows={8}
-              autoFocus
-              className="min-h-[190px] resize-none rounded-xl text-base leading-relaxed"
-            />
+            <div className="grid grid-cols-2 gap-1.5 rounded-lg border bg-muted/40 p-1">
+              <button
+                type="button"
+                disabled={isWorking}
+                onClick={() => {
+                  setError(null);
+                  setInputTab("manual");
+                }}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+                  inputTab === "manual"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <PenLine className="h-3.5 w-3.5" />
+                {t.tabManual}
+              </button>
+              <button
+                type="button"
+                disabled={isWorking}
+                onClick={() => {
+                  setError(null);
+                  setInputTab("from_quiz");
+                }}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+                  inputTab === "from_quiz"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                {t.tabFromQuiz}
+              </button>
+            </div>
 
-            {error ? (
-              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {error}
-              </p>
-            ) : null}
+            {inputTab === "from_quiz" ? (
+              <div className="space-y-3">
+                <QuizWordPicker
+                  onSelect={(terms) => {
+                    void generateFromTerms(terms);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <Textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onPaste={handlePaste}
+                  placeholder={t.pastePlaceholder}
+                  disabled={isWorking}
+                  rows={6}
+                  autoFocus
+                  className="min-h-[150px] resize-none rounded-xl text-base leading-relaxed"
+                />
 
-            <Button
-              size="lg"
-              className="h-14 w-full rounded-xl text-base font-semibold shadow-sm"
-              disabled={isWorking || !text.trim()}
-              onClick={handleGenerate}
-            >
-              {isWorking ? (
-                <>
-                  <Loader2 className="mr-2.5 h-5 w-5 animate-spin" />
-                  {statusStep === "parsing"
-                    ? t.generatingStepParsing
-                    : t.generatingStepBuilding}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2.5 h-5 w-5" />
-                  {t.generateButton}
-                </>
-              )}
-            </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileSelection}
+                />
+
+                <div className="flex items-center justify-between gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isWorking || screenshots.length >= MAX_SCREENSHOTS}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-8 text-xs"
+                  >
+                    <ImagePlus className="mr-1.5 h-3.5 w-3.5" />
+                    {t.attachScreenshotButton}
+                    {screenshots.length > 0
+                      ? ` (${screenshots.length}/${MAX_SCREENSHOTS})`
+                      : ""}
+                  </Button>
+                  <span className="text-[11px] text-muted-foreground">
+                    Max 3 photos (up to 5MB)
+                  </span>
+                </div>
+
+                {screenshots.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2 pt-1">
+                    {screenshots.map((s) => (
+                      <div
+                        key={s.id}
+                        className="group relative aspect-video overflow-hidden rounded-lg border bg-muted"
+                      >
+                        <Image
+                          src={s.dataUrl}
+                          alt={s.name}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeScreenshot(s.id)}
+                          disabled={isWorking}
+                          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white transition-opacity hover:bg-black"
+                          title="Remove screenshot"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {error ? (
+                  <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    {error}
+                  </p>
+                ) : null}
+
+                <Button
+                  size="lg"
+                  className="h-14 w-full rounded-xl text-base font-semibold shadow-sm"
+                  disabled={isWorking || (!text.trim() && screenshots.length === 0)}
+                  onClick={handleGenerate}
+                >
+                  {isWorking ? (
+                    <>
+                      <Loader2 className="mr-2.5 h-5 w-5 animate-spin" />
+                      {statusStep === "parsing"
+                        ? t.generatingStepParsing
+                        : t.generatingStepBuilding}
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2.5 h-5 w-5" />
+                      {t.generateButton}
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

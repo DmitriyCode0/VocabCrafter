@@ -29,7 +29,7 @@ import {
   type LessonStudentOption,
   type MonthlyLessonItem,
 } from "@/lib/lessons";
-import { CalendarDays, ChevronDown, PlusCircle } from "lucide-react";
+import { CalendarDays, ChevronDown, PlusCircle, Video } from "lucide-react";
 
 interface MonthlyLessonsCalendarProps {
   month: Date;
@@ -148,6 +148,24 @@ export function MonthlyLessonsCalendar({
               <Badge variant="outline">
                 {formatLessonCurrency(lesson.priceCents)}
               </Badge>
+            ) : null}
+            {lesson.meetUrl ? (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="h-7 border-emerald-500/30 bg-emerald-500/10 px-2 text-xs text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300"
+              >
+                <a
+                  href={lesson.meetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Video className="mr-1.5 h-3.5 w-3.5" />
+                  Google Meet
+                </a>
+              </Button>
             ) : null}
             {showManageActions ? (
               <div className="flex items-center gap-1">
