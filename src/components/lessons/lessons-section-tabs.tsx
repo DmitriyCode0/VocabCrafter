@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, CalendarDays, Loader2, Video, Wallet } from "lucide-react";
+import { BarChart3, CalendarDays, Loader2, Wallet } from "lucide-react";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -38,12 +38,6 @@ export function LessonsSectionTabs({
             icon: CalendarDays,
           },
           {
-            value: "classroom" as const,
-            href: "/lessons/classroom",
-            label: messages.lessons.classroomTab,
-            icon: Video,
-          },
-          {
             value: "performance" as const,
             href: "/lessons/performance",
             label: messages.lessons.performanceTab,
@@ -62,12 +56,6 @@ export function LessonsSectionTabs({
             href: scheduleHref,
             label: messages.lessons.scheduleTab,
             icon: CalendarDays,
-          },
-          {
-            value: "classroom" as const,
-            href: "/lessons/classroom",
-            label: messages.lessons.classroomTab,
-            icon: Video,
           },
         ];
 
@@ -90,7 +78,11 @@ export function LessonsSectionTabs({
         variant="line"
         className={cn(
           "mx-auto grid h-auto w-full max-w-4xl rounded-none border-b border-border/60 bg-transparent p-0",
-          sections.length === 2 ? "grid-cols-2" : "grid-cols-4",
+          sections.length === 1
+            ? "grid-cols-1"
+            : sections.length === 2
+              ? "grid-cols-2"
+              : "grid-cols-3",
         )}
       >
         {sections.map((section) => {

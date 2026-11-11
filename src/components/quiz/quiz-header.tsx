@@ -54,7 +54,13 @@ export function QuizHeader({ quizId, title, type, isOwner }: QuizHeaderProps) {
 
   return (
     <div className="flex items-center gap-4">
-      <Button variant="ghost" size="sm" asChild>
+      <Button variant="ghost" size="sm" asChild className="md:hidden">
+        <Link href="/dashboard">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          {messages.common.back}
+        </Link>
+      </Button>
+      <Button variant="ghost" size="sm" asChild className="hidden md:inline-flex">
         <Link href="/quizzes">
           <ArrowLeft className="mr-2 h-4 w-4" />
           {messages.quizSession.header.backToQuizzes}

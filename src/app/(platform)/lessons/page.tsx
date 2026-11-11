@@ -1,31 +1,8 @@
-import Link from "next/link";
-import {
-  ChevronLeft,
-  ChevronRight,
-  CalendarDays,
-  Users,
-  UserCheck,
-} from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { GoogleCalendarSyncCard } from "@/components/lessons/google-calendar-sync-card";
-import { MonthlyLessonsCalendar } from "@/components/lessons/monthly-lessons-calendar";
-import { LessonBalanceManager } from "@/components/lessons/lesson-balance-manager";
-import { CreateLessonDialog } from "@/components/lessons/create-lesson-dialog";
-import { LessonsPageHeader } from "@/components/lessons/lessons-page-header";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { LessonsScheduleClient } from "@/components/lessons/lessons-schedule-client";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  formatLessonMonthLabel,
   formatLessonMonthParam,
   getLessonDisplayTitle,
-  getLessonMonthRange,
   getLessonsLeft,
   normalizeLessonMonthParam,
   type LessonBalanceHistoryEntry,
@@ -117,10 +94,6 @@ interface GoogleCalendarConnectionStatusRow {
   connectedAt: string;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
-}
-
-function buildMonthHref(monthDate: Date) {
-  return `/lessons?month=${formatLessonMonthParam(monthDate)}`;
 }
 
 function mapTutorLessons(rows: TutorLessonRow[]): MonthlyLessonItem[] {
@@ -264,147 +237,103 @@ function buildLessonBalanceSummaries(
   });
 }
 
-async function StudentLessonsView({
-  userId,
-  month,
+export default async function LessonsPage({
+  searchParams,
 }: {
-  userId: string;
-  month: Date;
+  searchParams: Promise<SearchParams>;
 }) {
+  const resolvedSearchParams = await searchParams;
+  const month = normalizeLessonMonthParam(resolvedSearchParams.month);
+  const initialMonthParam = formatLessonMonthParam(month);
+  const { userId, role, appLanguage } = await getLessonsViewerAccess();
+  const messages = getAppMessages(appLanguage);
   const supabaseAdmin = createAdminClient();
-  const { startIsoDate, endIsoDate } = getLessonMonthRange(month);
 
-  const [
-    { data: lessonsResult },
-    { data: connectionsResult },
-    { data: topUpsResult },
-    { data: completedLessonsResult },
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("tutor_student_lessons")
-      .select(
-        "id, title, lesson_date, start_time, end_time, notes, status, price_cents, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
-      )
-      .eq("student_id", userId)
-      .gte("lesson_date", startIsoDate)
-      .lte("lesson_date", endIsoDate)
-      .order("lesson_date", { ascending: true })
-      .order("start_time", { ascending: true }),
-    supabaseAdmin
-      .from("tutor_students")
-      .select(
-        "tutor_id, lesson_price_cents, tutor_profile:profiles!tutor_students_tutor_id_fkey(full_name, email)",
-      )
-      .eq("student_id", userId)
-      .eq("status", "active"),
-    supabaseAdmin
-      .from("tutor_student_balance_transactions")
-      .select("id, tutor_id, student_id, amount_cents, note, created_at")
-      .eq("student_id", userId),
-    supabaseAdmin
-      .from("tutor_student_lessons")
-      .select("id, tutor_id, student_id, title, lesson_date, price_cents")
-      .eq("student_id", userId)
-      .eq("status", "completed"),
-  ]);
-
-  const lessons = mapStudentLessons(
-    (lessonsResult ?? []) as StudentLessonRow[],
+  await autoCompleteOverduePlannedLessons(
+    role === "student"
+      ? { studentId: userId, supabaseAdmin }
+      : { tutorId: userId, supabaseAdmin },
   );
-  const tutorConnections = (connectionsResult ??
-    []) as StudentTutorConnectionRow[];
-  const balanceTransactions = (topUpsResult ??
-    []) as LessonBalanceTransactionRow[];
-  const completedLessonCharges = (completedLessonsResult ??
-    []) as CompletedLessonChargeRow[];
-  const lessonBalanceSummaries = buildLessonBalanceSummaries(
-    tutorConnections
-      .map((row) => ({
-        id: row.tutor_id,
-        name:
-          row.tutor_profile?.full_name || row.tutor_profile?.email || "Tutor",
-        label: "Tutor",
-        lessonPriceCents: row.lesson_price_cents,
-      }))
-      .sort((left, right) =>
-        left.name.localeCompare(right.name, undefined, {
-          sensitivity: "base",
-        }),
+
+  if (role === "student") {
+    const [
+      { data: lessonsResult },
+      { data: connectionsResult },
+      { data: topUpsResult },
+      { data: completedLessonsResult },
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("tutor_student_lessons")
+        .select(
+          "id, title, lesson_date, start_time, end_time, notes, status, price_cents, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
+        )
+        .eq("student_id", userId)
+        .order("lesson_date", { ascending: true })
+        .order("start_time", { ascending: true }),
+      supabaseAdmin
+        .from("tutor_students")
+        .select(
+          "tutor_id, lesson_price_cents, tutor_profile:profiles!tutor_students_tutor_id_fkey(full_name, email)",
+        )
+        .eq("student_id", userId)
+        .eq("status", "active"),
+      supabaseAdmin
+        .from("tutor_student_balance_transactions")
+        .select("id, tutor_id, student_id, amount_cents, note, created_at")
+        .eq("student_id", userId),
+      supabaseAdmin
+        .from("tutor_student_lessons")
+        .select("id, tutor_id, student_id, title, lesson_date, price_cents")
+        .eq("student_id", userId)
+        .eq("status", "completed"),
+    ]);
+
+    const allLessons = mapStudentLessons(
+      (lessonsResult ?? []) as StudentLessonRow[],
+    );
+    const tutorConnections = (connectionsResult ??
+      []) as StudentTutorConnectionRow[];
+    const balanceTransactions = (topUpsResult ??
+      []) as LessonBalanceTransactionRow[];
+    const completedLessonCharges = (completedLessonsResult ??
+      []) as CompletedLessonChargeRow[];
+    const lessonBalanceSummaries = buildLessonBalanceSummaries(
+      tutorConnections
+        .map((row) => ({
+          id: row.tutor_id,
+          name:
+            row.tutor_profile?.full_name || row.tutor_profile?.email || "Tutor",
+          label: "Tutor",
+          lessonPriceCents: row.lesson_price_cents,
+        }))
+        .sort((left, right) =>
+          left.name.localeCompare(right.name, undefined, {
+            sensitivity: "base",
+          }),
+        ),
+      buildTotalsByKey(balanceTransactions, "tutor_id", "amount_cents"),
+      buildTotalsByKey(completedLessonCharges, "tutor_id", "price_cents"),
+      buildBalanceHistoryByKey(
+        balanceTransactions,
+        completedLessonCharges,
+        "tutor_id",
       ),
-    buildTotalsByKey(balanceTransactions, "tutor_id", "amount_cents"),
-    buildTotalsByKey(completedLessonCharges, "tutor_id", "price_cents"),
-    buildBalanceHistoryByKey(
-      balanceTransactions,
-      completedLessonCharges,
-      "tutor_id",
-    ),
-  );
+    );
 
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Lessons This Month
-            </CardTitle>
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{lessons.length}</div>
-            <p className="text-xs text-muted-foreground">
-              sessions visible in this month view
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Connected Tutors
-            </CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{tutorConnections.length}</div>
-            <p className="text-xs text-muted-foreground">
-              tutors who can schedule lessons for you
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <MonthlyLessonsCalendar
-        month={month}
-        lessons={lessons}
-        emptyMessage="No lessons are scheduled in this month yet. Your tutor will add them here."
+    return (
+      <LessonsScheduleClient
+        role={role}
+        initialMonthParam={initialMonthParam}
+        title={messages.lessons.title}
+        description={messages.lessons.scheduleDescription}
+        previousLabel={messages.common.previous}
+        nextLabel={messages.common.next}
+        allLessons={allLessons}
+        studentTutorCount={tutorConnections.length}
+        studentBalanceSummaries={lessonBalanceSummaries}
       />
-
-      {lessonBalanceSummaries.length > 0 ? (
-        <div className="space-y-3">
-          <div>
-            <h2 className="text-lg font-semibold">Balances</h2>
-            <p className="text-sm text-muted-foreground">
-              See your prepaid balance, lesson price, and how many lessons each
-              tutor balance currently covers.
-            </p>
-          </div>
-          <LessonBalanceManager summaries={lessonBalanceSummaries} />
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-async function TutorLessonsView({
-  userId,
-  month,
-}: {
-  userId: string;
-  month: Date;
-}) {
-  const supabaseAdmin = createAdminClient();
-  const { startIsoDate, endIsoDate } = getLessonMonthRange(month);
+    );
+  }
 
   const [
     { data: connectionsResult },
@@ -417,15 +346,14 @@ async function TutorLessonsView({
         "student_id, lesson_price_cents, student_profile:profiles!tutor_students_student_id_fkey(full_name, email)",
       )
       .eq("tutor_id", userId)
-      .eq("status", "active"),
+      .eq("status", "active")
+      .is("archived_at", null),
     supabaseAdmin
       .from("tutor_student_lessons")
       .select(
         "id, student_id, title, lesson_date, start_time, end_time, notes, status, price_cents, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
       )
       .eq("tutor_id", userId)
-      .gte("lesson_date", startIsoDate)
-      .lte("lesson_date", endIsoDate)
       .order("lesson_date", { ascending: true })
       .order("start_time", { ascending: true }),
     getGoogleCalendarConnectionSummary(userId, supabaseAdmin),
@@ -446,106 +374,23 @@ async function TutorLessonsView({
       left.name.localeCompare(right.name, undefined, { sensitivity: "base" }),
     );
 
-  const lessons = mapTutorLessons((lessonsResult ?? []) as TutorLessonRow[]);
+  const allLessons = mapTutorLessons((lessonsResult ?? []) as TutorLessonRow[]);
   const googleCalendarConnection = (googleCalendarConnectionResult ??
     null) as GoogleCalendarConnectionStatusRow | null;
   const isGoogleCalendarAvailable = isGoogleCalendarSyncConfigured();
-  const connectHref = `/api/google-calendar/connect?next=${encodeURIComponent(buildMonthHref(month))}`;
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] lg:items-start">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Tutor Lesson Planner</CardTitle>
-            <CardDescription>
-              Add one-time lessons for yourself or lessons for connected
-              students.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <Users className="h-4 w-4" />
-              <span>
-                {connectedStudents.length} connected student
-                {connectedStudents.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-            <CreateLessonDialog students={connectedStudents} />
-          </CardContent>
-        </Card>
-
-        <GoogleCalendarSyncCard
-          available={isGoogleCalendarAvailable}
-          connectHref={connectHref}
-          connection={googleCalendarConnection}
-        />
-      </div>
-
-      <MonthlyLessonsCalendar
-        month={month}
-        lessons={lessons}
-        showDailyEarnings
-        emptyMessage={
-          connectedStudents.length > 0
-            ? "No lessons scheduled in this month yet. Add a one-time lesson or one for a connected student."
-            : "No lessons scheduled in this month yet. Add a one-time lesson or connect a student."
-        }
-        canManageLessons
-        studentOptions={connectedStudents}
-      />
-    </div>
-  );
-}
-
-export default async function LessonsPage({
-  searchParams,
-}: {
-  searchParams: Promise<SearchParams>;
-}) {
-  const resolvedSearchParams = await searchParams;
-  const month = normalizeLessonMonthParam(resolvedSearchParams.month);
-  const { userId, role, appLanguage } = await getLessonsViewerAccess();
-  const messages = getAppMessages(appLanguage);
-  await autoCompleteOverduePlannedLessons(
-    role === "student" ? { studentId: userId } : { tutorId: userId },
-  );
-  const previousMonth = new Date(month.getFullYear(), month.getMonth() - 1, 1);
-  const nextMonth = new Date(month.getFullYear(), month.getMonth() + 1, 1);
-
-  return (
-    <div className="space-y-6">
-      <LessonsPageHeader
-        role={role}
-        currentSection="schedule"
-        title={messages.lessons.title}
-        description={messages.lessons.scheduleDescription}
-        scheduleHref={buildMonthHref(month)}
-        actions={
-          <>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={buildMonthHref(previousMonth)}>
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                {messages.common.previous}
-              </Link>
-            </Button>
-            <Badge variant="outline" className="h-9 px-4 text-sm">
-              {formatLessonMonthLabel(month)}
-            </Badge>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={buildMonthHref(nextMonth)}>
-                {messages.common.next}
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Link>
-            </Button>
-          </>
-        }
-      />
-      {role === "student" ? (
-        <StudentLessonsView userId={userId} month={month} />
-      ) : (
-        <TutorLessonsView userId={userId} month={month} />
-      )}
-    </div>
+    <LessonsScheduleClient
+      role={role}
+      initialMonthParam={initialMonthParam}
+      title={messages.lessons.title}
+      description={messages.lessons.scheduleDescription}
+      previousLabel={messages.common.previous}
+      nextLabel={messages.common.next}
+      allLessons={allLessons}
+      connectedStudents={connectedStudents}
+      googleCalendarAvailable={isGoogleCalendarAvailable}
+      googleCalendarConnection={googleCalendarConnection}
+    />
   );
 }

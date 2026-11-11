@@ -25,16 +25,31 @@ export default async function ClassesPage() {
   const role = profile.role as Role;
 
   if (role === "tutor" || role === "superadmin") {
-    const { data: classes } = await supabase
-      .from("classes")
-      .select("*, class_members(id)")
-      .eq("tutor_id", user.id)
-      .order("created_at", { ascending: false });
+    const [{ data: classes }, { data: archivedConnections }] =
+      await Promise.all([
+        supabase
+          .from("classes")
+          .select("*, class_members(id, student_id)")
+          .eq("tutor_id", user.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("tutor_students")
+          .select("student_id")
+          .eq("tutor_id", user.id)
+          .not("archived_at", "is", null),
+      ]);
+
+    const archivedStudentIds = new Set(
+      (archivedConnections ?? []).map((c) => c.student_id),
+    );
 
     const formatted = (classes || []).map((c) => ({
       ...c,
       student_count: Array.isArray(c.class_members)
-        ? c.class_members.length
+        ? c.class_members.filter(
+            (m: { student_id?: string }) =>
+              !m.student_id || !archivedStudentIds.has(m.student_id),
+          ).length
         : 0,
       class_members: undefined,
     }));

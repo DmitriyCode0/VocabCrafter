@@ -101,7 +101,9 @@ export async function listTutorStudentClassroomConnectionsForUser(
     .order("connected_at", { ascending: false });
 
   const scopedQuery =
-    role === "tutor" ? query.eq("tutor_id", userId) : query.eq("student_id", userId);
+    role === "tutor"
+      ? query.eq("tutor_id", userId).is("archived_at", null)
+      : query.eq("student_id", userId);
   const { data, error } = await scopedQuery;
 
   if (error) {

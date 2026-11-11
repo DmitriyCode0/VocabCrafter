@@ -586,7 +586,16 @@ export function HistoryClient({
         </Select>
 
         {isTutor && students.length > 0 && (
-          <Select value={filterStudent} onValueChange={setFilterStudent}>
+          <Select
+            value={
+              filterStudent === "all" ||
+              filterStudent === userId ||
+              students.some((s) => s.id === filterStudent)
+                ? filterStudent
+                : "all"
+            }
+            onValueChange={setFilterStudent}
+          >
             <SelectTrigger className="w-[220px]">
               <SelectValue placeholder="Student" />
             </SelectTrigger>
@@ -601,6 +610,25 @@ export function HistoryClient({
             </SelectContent>
           </Select>
         )}
+
+        {isTutor &&
+          filterStudent !== "all" &&
+          filterStudent !== userId &&
+          !students.some((s) => s.id === filterStudent) && (
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-muted-foreground border-dashed">
+                Viewing Archived Student
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setFilterStudent("all")}
+              >
+                Clear
+              </Button>
+            </div>
+          )}
 
         <span className="text-sm text-muted-foreground">
           Loaded {attempts.length} attempt{attempts.length !== 1 ? "s" : ""}

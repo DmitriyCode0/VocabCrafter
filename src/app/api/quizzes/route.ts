@@ -351,3 +351,80 @@ export async function GET() {
     );
   }
 }
+
+export async function DELETE() {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const supabaseAdmin = createAdminClient();
+    const { data: userQuizzes, error: lookupError } = await supabaseAdmin
+      .from("quizzes")
+      .select("id")
+      .eq("creator_id", user.id)
+      .is("deleted_at", null);
+
+    if (lookupError) {
+      console.error("Delete all quizzes lookup error:", lookupError);
+      return NextResponse.json(
+        { error: "Failed to find quizzes" },
+        { status: 500 },
+      );
+    }
+
+    const quizIds = (userQuizzes ?? []).map((quiz) => quiz.id);
+
+    if (quizIds.length === 0) {
+      return NextResponse.json({ deletedCount: 0 });
+    }
+
+    const { error: assignmentDeleteError } = await supabaseAdmin
+      .from("assignments")
+      .delete()
+      .in("quiz_id", quizIds);
+
+    if (assignmentDeleteError) {
+      console.error("Delete all quizzes assignment cleanup error:", {
+        assignmentDeleteError,
+      });
+      return NextResponse.json(
+        { error: "Failed to archive quizzes" },
+        { status: 500 },
+      );
+    }
+
+    const { error: quizDeleteError } = await supabaseAdmin
+      .from("quizzes")
+      .update({
+        deleted_at: new Date().toISOString(),
+        generated_content: {},
+        vocabulary_terms: [],
+        is_public: false,
+      })
+      .eq("creator_id", user.id)
+      .in("id", quizIds);
+
+    if (quizDeleteError) {
+      console.error("Delete all quizzes update error:", quizDeleteError);
+      return NextResponse.json(
+        { error: "Failed to delete quizzes" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ deletedCount: quizIds.length });
+  } catch (error) {
+    console.error("Delete all quizzes error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}

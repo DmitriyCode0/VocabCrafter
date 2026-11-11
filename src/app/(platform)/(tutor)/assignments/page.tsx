@@ -3,6 +3,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { AssignmentsPageHeader } from "@/components/assignments/assignments-page-header";
 import {
+  TutorHomeworkClient,
+  type FormalClassAssignmentItem,
+  type HomeworkAttemptItem,
+  type RegularityDayItem,
+  type StudentHomeworkItem,
+} from "@/components/assignments/tutor-homework-client";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -14,8 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ClipboardList } from "lucide-react";
-import { DeleteAssignmentButton } from "@/components/assignments/delete-assignment-button";
-import { CreateAssignmentDialog } from "@/components/assignments/create-assignment-dialog";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import { PagePagination } from "@/components/shared/page-pagination";
 import {
@@ -25,18 +30,28 @@ import {
 import { getAppMessages, type AppMessages } from "@/lib/i18n/messages";
 import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { formatDateForAppLanguage } from "@/lib/i18n/format";
+import {
+  getGrammarTopicDisplayName,
+  getPrimaryGrammarTopic,
+} from "@/lib/utils";
 import type { Role } from "@/types/roles";
 
 export const dynamic = "force-dynamic";
 
 const ASSIGNMENTS_PAGE_SIZE = 10;
 
-function getActivityLabel(messages: AppMessages, type: string | null | undefined) {
+function getActivityLabel(
+  messages: AppMessages,
+  type: string | null | undefined,
+) {
   if (!type) {
     return "";
   }
 
   return (
+    messages.quizzes.typeLabels[
+      type as keyof typeof messages.quizzes.typeLabels
+    ] ||
     messages.createQuiz.activityLabels[
       type as keyof typeof messages.createQuiz.activityLabels
     ] ||
@@ -48,6 +63,49 @@ function getActivityLabel(messages: AppMessages, type: string | null | undefined
   );
 }
 
+function toLocalIsoDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+interface TutorStudentConnectionRow {
+  student_id: string;
+  student_profile: {
+    id: string;
+    full_name: string | null;
+    email: string;
+    cefr_level: string | null;
+  } | null;
+}
+
+interface TutorLessonRow {
+  student_id: string | null;
+  lesson_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  status: "planned" | "completed" | "cancelled";
+}
+
+interface StudentQuizAttemptRow {
+  id: string;
+  student_id: string;
+  quiz_id: string;
+  score: number | null;
+  max_score: number | null;
+  time_spent_seconds: number | null;
+  completed_at: string;
+  quizzes: {
+    id: string;
+    title: string;
+    type: string;
+    cefr_level: string | null;
+    vocabulary_terms: Array<{ term?: string }> | null;
+    config: unknown;
+  } | null;
+}
+
 export default async function AssignmentsPage({
   searchParams,
 }: {
@@ -56,7 +114,6 @@ export default async function AssignmentsPage({
   const supabase = await createClient();
   const resolvedSearchParams = await searchParams;
   const currentPage = getCurrentPage(resolvedSearchParams.page);
-  const { from, to } = getPaginationRange(currentPage, ASSIGNMENTS_PAGE_SIZE);
 
   const {
     data: { user },
@@ -86,18 +143,296 @@ export default async function AssignmentsPage({
     );
   }
 
-  // Tutor / superadmin view
-  const { count: totalAssignments } = await supabase
-    .from("assignments")
-    .select("id", { count: "exact", head: true })
-    .eq("tutor_id", user.id);
+  const supabaseAdmin = createAdminClient();
+  const now = new Date();
+  const todayIso = toLocalIsoDate(now);
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  const weekdayLocale = appLanguage === "uk" ? "uk-UA" : "en-GB";
 
-  const { data: assignments } = await supabase
-    .from("assignments")
-    .select("*, classes(name, id), quizzes(title, type)")
-    .eq("tutor_id", user.id)
-    .order("created_at", { ascending: false })
-    .range(from, to);
+  const [
+    { data: connectionsData },
+    { data: lessonsData },
+    { data: assignmentsData },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("tutor_students")
+      .select(
+        "student_id, student_profile:profiles!tutor_students_student_id_fkey(id, full_name, email, cefr_level)",
+      )
+      .eq("tutor_id", user.id)
+      .eq("status", "active")
+      .is("archived_at", null),
+    supabaseAdmin
+      .from("tutor_student_lessons")
+      .select("student_id, lesson_date, start_time, end_time, status")
+      .eq("tutor_id", user.id)
+      .neq("status", "cancelled")
+      .not("student_id", "is", null)
+      .order("lesson_date", { ascending: false })
+      .order("start_time", { ascending: false }),
+    supabase
+      .from("assignments")
+      .select("*, classes(name, id), quizzes(title, type)")
+      .eq("tutor_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(30),
+  ]);
+
+  const activeConnections = (
+    (connectionsData ?? []) as TutorStudentConnectionRow[]
+  ).filter((row) => row.student_id !== user.id);
+
+  const activeStudentIds = Array.from(
+    new Set(activeConnections.map((row) => row.student_id)),
+  );
+
+  const { data: attemptsData } =
+    activeStudentIds.length > 0
+      ? await supabaseAdmin
+          .from("quiz_attempts")
+          .select(
+            "id, student_id, quiz_id, score, max_score, time_spent_seconds, completed_at, quizzes(id, title, type, cefr_level, vocabulary_terms, config)",
+          )
+          .in("student_id", activeStudentIds)
+          .gte("completed_at", sixtyDaysAgo.toISOString())
+          .order("completed_at", { ascending: false })
+      : { data: [] as StudentQuizAttemptRow[] };
+
+  // Build last completed lesson & next planned lesson maps per student
+  const lastCompletedLessonByStudent = new Map<
+    string,
+    { lessonDate: string; cutoffMs: number }
+  >();
+  const nextPlannedLessonByStudent = new Map<
+    string,
+    { lessonDate: string; startTime: string | null }
+  >();
+
+  for (const lesson of (lessonsData ?? []) as TutorLessonRow[]) {
+    if (!lesson.student_id) continue;
+
+    if (
+      lesson.status === "completed" &&
+      !lastCompletedLessonByStudent.has(lesson.student_id)
+    ) {
+      const endTimePart = lesson.end_time ? `${lesson.end_time}:00` : "23:59:59";
+      const parsedMs = new Date(`${lesson.lesson_date}T${endTimePart}`).getTime();
+      const cutoffMs = Number.isFinite(parsedMs)
+        ? parsedMs
+        : new Date(`${lesson.lesson_date}T23:59:59`).getTime();
+      lastCompletedLessonByStudent.set(lesson.student_id, {
+        lessonDate: lesson.lesson_date,
+        cutoffMs,
+      });
+    }
+
+    if (lesson.status === "planned" && lesson.lesson_date >= todayIso) {
+      const existingNext = nextPlannedLessonByStudent.get(lesson.student_id);
+      if (
+        !existingNext ||
+        lesson.lesson_date < existingNext.lessonDate ||
+        (lesson.lesson_date === existingNext.lessonDate &&
+          (lesson.start_time ?? "") < (existingNext.startTime ?? ""))
+      ) {
+        nextPlannedLessonByStudent.set(lesson.student_id, {
+          lessonDate: lesson.lesson_date,
+          startTime: lesson.start_time,
+        });
+      }
+    }
+  }
+
+  // Group attempts by student
+  const attemptsByStudent = new Map<string, StudentQuizAttemptRow[]>();
+  for (const attempt of (attemptsData ?? []) as StudentQuizAttemptRow[]) {
+    const existing = attemptsByStudent.get(attempt.student_id) ?? [];
+    existing.push(attempt);
+    attemptsByStudent.set(attempt.student_id, existing);
+  }
+
+  // Build 7-day window template (D-6 .. Today)
+  const sevenDayWindow = Array.from({ length: 7 }, (_, index) => {
+    const dayDate = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - (6 - index),
+    );
+    return {
+      isoDate: toLocalIsoDate(dayDate),
+      shortWeekday: new Intl.DateTimeFormat(weekdayLocale, {
+        weekday: "short",
+      }).format(dayDate),
+      dayNumber: String(dayDate.getDate()),
+    };
+  });
+
+  const studentHomeworkItems: StudentHomeworkItem[] = activeConnections
+    .map((connection) => {
+      const studentId = connection.student_id;
+      const studentName =
+        connection.student_profile?.full_name ||
+        connection.student_profile?.email ||
+        "Student";
+      const cefrLevel = connection.student_profile?.cefr_level ?? null;
+
+      const lastLesson = lastCompletedLessonByStudent.get(studentId) ?? null;
+      const nextLesson = nextPlannedLessonByStudent.get(studentId) ?? null;
+      const cutoffMs = lastLesson
+        ? lastLesson.cutoffMs
+        : fourteenDaysAgo.getTime();
+
+      const allStudentAttempts = attemptsByStudent.get(studentId) ?? [];
+
+      // 7-day regularity calculation across all attempts in the last 7 days
+      const countsByDay = new Map<string, number>();
+      for (const attempt of allStudentAttempts) {
+        const dayIso = toLocalIsoDate(new Date(attempt.completed_at));
+        countsByDay.set(dayIso, (countsByDay.get(dayIso) ?? 0) + 1);
+      }
+
+      const regularityDays: RegularityDayItem[] = sevenDayWindow.map((day) => ({
+        ...day,
+        count: countsByDay.get(day.isoDate) ?? 0,
+      }));
+      const activeDaysCount = regularityDays.filter(
+        (day) => day.count > 0,
+      ).length;
+
+      // Attempts completed strictly since the last completed lesson
+      const sinceLessonRows = allStudentAttempts.filter(
+        (attempt) => new Date(attempt.completed_at).getTime() > cutoffMs,
+      );
+
+      const uniqueTermsSet = new Set<string>();
+      const activityCountMap = new Map<string, number>();
+      let totalTimeSeconds = 0;
+      let scoredSum = 0;
+      let scoredCount = 0;
+
+      const mappedAttempts: HomeworkAttemptItem[] = sinceLessonRows.map(
+        (attempt) => {
+          const quiz = attempt.quizzes;
+          const quizType = quiz?.type ?? "mcq";
+          const activityLabel = getActivityLabel(messages, quizType);
+          activityCountMap.set(
+            activityLabel,
+            (activityCountMap.get(activityLabel) ?? 0) + 1,
+          );
+
+          const rawTerms = Array.isArray(quiz?.vocabulary_terms)
+            ? quiz.vocabulary_terms
+            : [];
+          for (const item of rawTerms) {
+            if (typeof item?.term === "string" && item.term.trim()) {
+              uniqueTermsSet.add(item.term.trim().toLowerCase());
+            }
+          }
+
+          const isFlashcards = quizType === "flashcards";
+          const hasScore =
+            !isFlashcards &&
+            attempt.score !== null &&
+            attempt.max_score !== null &&
+            attempt.max_score > 0;
+          const scorePercent = hasScore
+            ? Math.round(
+                (Number(attempt.score) / Number(attempt.max_score)) * 100,
+              )
+            : null;
+
+          if (scorePercent !== null) {
+            scoredSum += scorePercent;
+            scoredCount += 1;
+          }
+
+          if (
+            typeof attempt.time_spent_seconds === "number" &&
+            attempt.time_spent_seconds > 0
+          ) {
+            totalTimeSeconds += attempt.time_spent_seconds;
+          }
+
+          const grammarTopicKey = getPrimaryGrammarTopic(quiz?.config);
+          const grammarTopic = grammarTopicKey
+            ? getGrammarTopicDisplayName(quiz?.config, grammarTopicKey)
+            : null;
+
+          return {
+            id: attempt.id,
+            quizId: attempt.quiz_id,
+            quizTitle: quiz?.title || "Quiz",
+            quizType,
+            activityLabel,
+            cefrLevel: quiz?.cefr_level ?? null,
+            grammarTopic,
+            scorePercent,
+            wordsCount: rawTerms.length,
+            timeSpentSeconds: attempt.time_spent_seconds,
+            completedAt: attempt.completed_at,
+          };
+        },
+      );
+
+      const activityCounts = Array.from(activityCountMap.entries()).map(
+        ([label, count]) => ({ label, count }),
+      );
+
+      return {
+        studentId,
+        studentName,
+        cefrLevel,
+        lastLessonDate: lastLesson?.lessonDate ?? null,
+        nextLessonDate: nextLesson?.lessonDate ?? null,
+        nextLessonTime: nextLesson?.startTime
+          ? nextLesson.startTime.slice(0, 5)
+          : null,
+        exercisesCount: mappedAttempts.length,
+        avgScorePercent:
+          scoredCount > 0 ? Math.round(scoredSum / scoredCount) : null,
+        uniqueWordsPracticed: uniqueTermsSet.size,
+        totalTimeSeconds,
+        activityCounts,
+        regularityDays,
+        activeDaysCount,
+        attempts: mappedAttempts,
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.exercisesCount - left.exercisesCount ||
+        right.activeDaysCount - left.activeDaysCount ||
+        left.studentName.localeCompare(right.studentName, undefined, {
+          sensitivity: "base",
+        }),
+    );
+
+  const formalAssignments: FormalClassAssignmentItem[] = (
+    assignmentsData ?? []
+  ).map((assignment) => {
+    const cls = assignment.classes as unknown as {
+      name: string;
+      id: string;
+    } | null;
+    const quiz = assignment.quizzes as unknown as {
+      title: string;
+      type: string;
+    } | null;
+
+    return {
+      id: assignment.id,
+      title: assignment.title,
+      instructions: assignment.instructions,
+      dueDate: assignment.due_date,
+      createdAt: assignment.created_at,
+      classId: cls?.id ?? null,
+      className: cls?.name ?? null,
+      quizTitle: quiz?.title ?? null,
+      quizActivityLabel: quiz?.type
+        ? getActivityLabel(messages, quiz.type)
+        : null,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -106,110 +441,12 @@ export default async function AssignmentsPage({
         currentSection="assignments"
         title={messages.assignments.title}
         description={messages.assignments.tutorDescription}
-        actions={<CreateAssignmentDialog />}
       />
 
-      {!assignments || assignments.length === 0 ? (
-        <Card>
-          <CardHeader className="items-center text-center py-12">
-            <ClipboardList className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">
-              {messages.assignments.noAssignmentsTitle}
-            </CardTitle>
-            <CardDescription>
-              {messages.assignments.noAssignmentsTutorDescription}
-            </CardDescription>
-          </CardHeader>
-          <CardFooter className="justify-center pb-12">
-            <CreateAssignmentDialog />
-          </CardFooter>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          <div className="space-y-3">
-            {assignments.map((assignment) => {
-              const cls = assignment.classes as unknown as {
-                name: string;
-                id: string;
-              } | null;
-              const quiz = assignment.quizzes as unknown as {
-                title: string;
-                type: string;
-              } | null;
-              const isPastDue =
-                assignment.due_date &&
-                new Date(assignment.due_date) < new Date();
-
-              return (
-                <Card key={assignment.id}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">
-                        {assignment.title}
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        {assignment.due_date && (
-                          <Badge
-                            variant={isPastDue ? "destructive" : "outline"}
-                            className="text-xs"
-                          >
-                            {isPastDue
-                              ? messages.assignments.pastDue
-                              : messages.assignments.due}{" "}
-                            {formatDateForAppLanguage(
-                              appLanguage,
-                              assignment.due_date,
-                            )}
-                          </Badge>
-                        )}
-                        <DeleteAssignmentButton assignmentId={assignment.id} />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      {cls && (
-                        <Link
-                          href={`/classes/${cls.id}`}
-                          className="hover:text-primary"
-                        >
-                          {messages.assignments.classLabel}: {cls.name}
-                        </Link>
-                      )}
-                      {quiz && (
-                        <span>
-                          {messages.assignments.quizLabel}: {quiz.title} (
-                          {getActivityLabel(messages, quiz.type)})
-                        </span>
-                      )}
-                    </div>
-                    {assignment.instructions && (
-                      <p className="text-sm text-muted-foreground mt-2">
-                        {assignment.instructions}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {messages.assignments.created}{" "}
-                      {formatDateForAppLanguage(
-                        appLanguage,
-                        assignment.created_at,
-                      )}
-                    </p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-          <PagePagination
-            pathname="/assignments"
-            currentPage={currentPage}
-            pageSize={ASSIGNMENTS_PAGE_SIZE}
-            totalItems={totalAssignments ?? assignments.length}
-            searchParams={resolvedSearchParams}
-            labels={messages.pagination}
-          />
-        </div>
-      )}
+      <TutorHomeworkClient
+        students={studentHomeworkItems}
+        formalAssignments={formalAssignments}
+      />
     </div>
   );
 }

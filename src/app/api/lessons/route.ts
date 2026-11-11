@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { syncLessonToGoogleCalendar } from "@/lib/google-calendar";
+import {
+  syncLessonToGoogleCalendar,
+  type CalendarSyncResult,
+} from "@/lib/google-calendar";
 import { LESSON_STATUSES } from "@/lib/lessons";
 
 const lessonTitleSchema = z
@@ -22,17 +25,30 @@ const timeSchema = z
   .nullable()
   .optional();
 
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 const createLessonSchema = z
   .object({
     studentId: z.string().uuid().nullable().optional(),
     title: lessonTitleSchema,
-    lessonDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    lessonDate: isoDateSchema.optional(),
+    lessonDates: z.array(isoDateSchema).min(1).max(60).optional(),
     startTime: timeSchema,
     endTime: timeSchema,
     notes: z.string().trim().max(2000).nullable().optional(),
-    status: z.enum(LESSON_STATUSES).default("completed"),
+    status: z.enum(LESSON_STATUSES).optional(),
     priceCents: z.number().int().nonnegative().optional(),
   })
+  .refine(
+    (value) =>
+      Boolean(
+        value.lessonDate || (value.lessonDates && value.lessonDates.length > 0),
+      ),
+    {
+      message: "At least one lesson date is required",
+      path: ["lessonDate"],
+    },
+  )
   .refine(
     (value) =>
       !value.startTime || !value.endTime || value.endTime > value.startTime,
@@ -105,26 +121,43 @@ export async function POST(request: NextRequest) {
     connection = connectionData;
   }
 
-  const nowIso = new Date().toISOString();
-  const { data, error } = await supabaseAdmin
-    .from("tutor_student_lessons")
-    .insert({
-      tutor_id: user.id,
-      student_id: parsed.data.studentId ?? null,
-      title: parsed.data.title,
-      lesson_date: parsed.data.lessonDate,
-      start_time: parsed.data.startTime ?? null,
-      end_time: parsed.data.endTime ?? null,
-      notes: parsed.data.notes ?? null,
-      status: parsed.data.status,
-      price_cents:
-        parsed.data.priceCents ?? connection?.lesson_price_cents ?? 0,
-      updated_at: nowIso,
-    })
-    .select()
-    .single();
+  const isRecurringRequest = Boolean(
+    parsed.data.lessonDates && parsed.data.lessonDates.length > 0,
+  );
+  const resolvedDates = Array.from(
+    new Set(
+      parsed.data.lessonDates && parsed.data.lessonDates.length > 0
+        ? parsed.data.lessonDates
+        : parsed.data.lessonDate
+          ? [parsed.data.lessonDate]
+          : [],
+    ),
+  ).sort();
+  const resolvedStatus =
+    parsed.data.status ?? (isRecurringRequest ? "planned" : "completed");
+  const resolvedPriceCents =
+    parsed.data.priceCents ?? connection?.lesson_price_cents ?? 0;
 
-  if (error) {
+  const nowIso = new Date().toISOString();
+  const rowsToInsert = resolvedDates.map((dateIso) => ({
+    tutor_id: user.id,
+    student_id: parsed.data.studentId ?? null,
+    title: parsed.data.title,
+    lesson_date: dateIso,
+    start_time: parsed.data.startTime ?? null,
+    end_time: parsed.data.endTime ?? null,
+    notes: parsed.data.notes ?? null,
+    status: resolvedStatus,
+    price_cents: resolvedPriceCents,
+    updated_at: nowIso,
+  }));
+
+  const { data: insertedLessons, error } = await supabaseAdmin
+    .from("tutor_student_lessons")
+    .insert(rowsToInsert)
+    .select();
+
+  if (error || !insertedLessons || insertedLessons.length === 0) {
     console.error("Create lesson error:", error);
     return NextResponse.json(
       { error: "Failed to create lesson" },
@@ -132,11 +165,33 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const calendarSync = await syncLessonToGoogleCalendar({
-    lessonId: data.id,
-    tutorId: user.id,
-    supabaseAdmin,
-  });
+  let calendarSync: CalendarSyncResult = { status: "skipped" };
+  for (const lesson of insertedLessons) {
+    const syncResult = await syncLessonToGoogleCalendar({
+      lessonId: lesson.id,
+      tutorId: user.id,
+      supabaseAdmin,
+    });
+    if (syncResult.status === "failed") {
+      calendarSync = syncResult;
+      break;
+    }
+    if (syncResult.status === "synced") {
+      calendarSync = syncResult;
+    }
+    if (syncResult.status === "skipped") {
+      break;
+    }
+  }
 
-  return NextResponse.json({ ...data, calendarSync }, { status: 201 });
+  const firstLesson = insertedLessons[0];
+  return NextResponse.json(
+    {
+      ...firstLesson,
+      createdCount: insertedLessons.length,
+      lessons: insertedLessons,
+      calendarSync,
+    },
+    { status: 201 },
+  );
 }

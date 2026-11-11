@@ -224,6 +224,100 @@ export async function POST(request: Request) {
   }
 }
 
+const updateConnectionSchema = z
+  .object({
+    connectionId: z.string().optional(),
+    studentId: z.string().optional(),
+    action: z.enum(["archive", "restore"]),
+  })
+  .refine((data) => data.connectionId || data.studentId, {
+    message: "Either connectionId or studentId is required",
+  });
+
+// PATCH — archive or restore a student connection
+export async function PATCH(request: Request) {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile || (profile.role !== "tutor" && profile.role !== "superadmin")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await request.json().catch(() => null);
+    const parsed = updateConnectionSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid request", details: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    const { connectionId, studentId, action } = parsed.data;
+    const archivedAt = action === "archive" ? new Date().toISOString() : null;
+
+    const supabaseAdmin = createAdminClient();
+
+    let query = supabaseAdmin
+      .from("tutor_students")
+      .update({
+        archived_at: archivedAt,
+        updated_at: new Date().toISOString(),
+      });
+
+    if (connectionId) {
+      query = query.eq("id", connectionId);
+    } else if (studentId) {
+      query = query.eq("student_id", studentId);
+    }
+
+    if (profile.role !== "superadmin") {
+      query = query.eq("tutor_id", user.id);
+    }
+
+    const { data: updated, error } = await query
+      .select("id, student_id, tutor_id, status, archived_at")
+      .maybeSingle();
+
+    if (error) {
+      console.error("Update connection archive status error:", error);
+      return NextResponse.json(
+        { error: "Failed to update connection status" },
+        { status: 500 },
+      );
+    }
+
+    if (!updated) {
+      return NextResponse.json(
+        { error: "Student connection not found" },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({ success: true, connection: updated });
+  } catch (error) {
+    console.error("Connections PATCH error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
 // DELETE — remove a connection
 export async function DELETE(request: Request) {
   try {

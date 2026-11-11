@@ -175,10 +175,6 @@ function buildPerformancePageHref(
   return query ? `${pathname}?${query}` : pathname;
 }
 
-function minDate(...dates: Date[]) {
-  return new Date(Math.min(...dates.map((date) => date.getTime())));
-}
-
 function getMetricLabel(
   period: "week" | "month" | "year",
 ) {
@@ -408,14 +404,6 @@ export default async function LessonsPerformancePage({
   const selectedMonthEnd = monthOffset === 0 ? today : endOfMonth(selectedMonthStart);
   const selectedYearStart = addYears(currentYearStart, yearOffset);
   const selectedYearEnd = yearOffset === 0 ? today : endOfYear(selectedYearStart);
-  const weeklyWindowStart = addDays(currentWeekStart, -11 * 7);
-  const queryStart = minDate(
-    weeklyWindowStart,
-    currentYearStart,
-    selectedWeekStart,
-    selectedMonthStart,
-    selectedYearStart,
-  );
 
   const { data: completedLessonsResult } = await supabaseAdmin
     .from("tutor_student_lessons")
@@ -424,7 +412,6 @@ export default async function LessonsPerformancePage({
     )
     .eq("tutor_id", userId)
     .eq("status", "completed")
-    .gte("lesson_date", toIsoDate(queryStart))
     .lte("lesson_date", toIsoDate(today))
     .order("lesson_date", { ascending: true });
 
@@ -774,6 +761,11 @@ export default async function LessonsPerformancePage({
           averageHoursPerWorkdayLabel: formatHours(averageHoursPerWorkday),
         }}
         hasCompletedLessons={completedLessons.length > 0}
+        completedLessons={completedLessons}
+        todayIsoDate={toIsoDate(today)}
+        initialWeekOffset={weekOffset}
+        initialMonthOffset={monthOffset}
+        initialYearOffset={yearOffset}
       />
     </div>
   );

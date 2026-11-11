@@ -98,7 +98,8 @@ export async function fetchConnectedStudents(userId: string) {
       "student_id, profiles!tutor_students_student_id_fkey(id, full_name, email, avatar_url, cefr_level)",
     )
     .eq("tutor_id", userId)
-    .eq("status", "active");
+    .eq("status", "active")
+    .is("archived_at", null);
 
   if (error) {
     throw error;
@@ -117,7 +118,7 @@ async function fetchHistoryStudents(userId: string) {
     supabaseAdmin
       .from("tutor_students")
       .select(
-        "student_id, profiles!tutor_students_student_id_fkey(id, full_name, email, avatar_url, cefr_level)",
+        "student_id, archived_at, profiles!tutor_students_student_id_fkey(id, full_name, email, avatar_url, cefr_level)",
       )
       .eq("tutor_id", userId)
       .eq("status", "active"),
@@ -136,13 +137,19 @@ async function fetchHistoryStudents(userId: string) {
     throw classesResult.error;
   }
 
-  const directStudents = (directConnectionsResult.data ?? []).flatMap(
-    (connection) => {
+  const archivedStudentIds = new Set(
+    (directConnectionsResult.data ?? [])
+      .filter((connection) => Boolean(connection.archived_at))
+      .map((connection) => connection.student_id),
+  );
+
+  const directStudents = (directConnectionsResult.data ?? [])
+    .filter((connection) => !connection.archived_at)
+    .flatMap((connection) => {
       const student = toHistoryStudent(connection.profiles);
 
       return student && student.id !== userId ? [student] : [];
-    },
-  );
+    });
   const classIds = (classesResult.data ?? []).map((classItem) => classItem.id);
 
   if (classIds.length === 0) {
@@ -163,7 +170,11 @@ async function fetchHistoryStudents(userId: string) {
   const classStudents = (members ?? []).flatMap((member) => {
     const student = toHistoryStudent(member.profiles);
 
-    return student && student.id !== userId ? [student] : [];
+    return student &&
+      student.id !== userId &&
+      !archivedStudentIds.has(student.id)
+      ? [student]
+      : [];
   });
 
   return dedupeHistoryStudents([...directStudents, ...classStudents]);
@@ -188,12 +199,27 @@ export async function fetchHistoryPageData({
     role === "student"
       ? [userId]
       : Array.from(new Set([userId, ...students.map((student) => student.id)]));
-  const activeStudentFilter =
-    requestedStudentId && allowedStudentIds.includes(requestedStudentId)
-      ? requestedStudentId
-      : null;
 
   const supabaseAdmin = createAdminClient();
+
+  let activeStudentFilter: string | null = null;
+  if (requestedStudentId) {
+    if (allowedStudentIds.includes(requestedStudentId)) {
+      activeStudentFilter = requestedStudentId;
+    } else if (role !== "student") {
+      const { data: ownStudent } = await supabaseAdmin
+        .from("tutor_students")
+        .select("id")
+        .eq("tutor_id", userId)
+        .eq("student_id", requestedStudentId)
+        .maybeSingle();
+
+      if (ownStudent) {
+        activeStudentFilter = requestedStudentId;
+      }
+    }
+  }
+
   const quizzesRelation = normalizedQuizType ? "quizzes!inner" : "quizzes";
   let query = supabaseAdmin
     .from("quiz_attempts")

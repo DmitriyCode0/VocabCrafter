@@ -88,15 +88,25 @@ export default async function AssignmentReviewDetailPage({
   } | null;
 
   if (quizData?.creator_id !== user.id && profile.role !== "superadmin") {
-    const { data: assignment } = await supabaseAdmin
-      .from("assignments")
-      .select("id")
-      .eq("quiz_id", attempt.quiz_id)
-      .eq("tutor_id", user.id)
-      .limit(1)
-      .single();
+    const [{ data: assignment }, { data: tutorConnection }] = await Promise.all([
+      supabaseAdmin
+        .from("assignments")
+        .select("id")
+        .eq("quiz_id", attempt.quiz_id)
+        .eq("tutor_id", user.id)
+        .limit(1)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("tutor_students")
+        .select("id")
+        .eq("tutor_id", user.id)
+        .eq("student_id", attempt.student_id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
-    if (!assignment) {
+    if (!assignment && !tutorConnection) {
       redirect("/assignments/review");
     }
   }

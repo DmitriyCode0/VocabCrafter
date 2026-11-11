@@ -66,6 +66,44 @@ export async function PATCH(
       return NextResponse.json({ success: true });
     }
 
+    // Tutor adding a connected student directly to the class
+    if (body.action === "add_student" && body.studentId) {
+      const { data: classData } = await supabase
+        .from("classes")
+        .select("tutor_id")
+        .eq("id", id)
+        .single();
+
+      if (!classData || classData.tutor_id !== user.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const { data: existingMember } = await supabase
+        .from("class_members")
+        .select("id")
+        .eq("class_id", id)
+        .eq("student_id", body.studentId)
+        .maybeSingle();
+
+      if (existingMember) {
+        return NextResponse.json({ success: true });
+      }
+
+      const { error } = await supabase.from("class_members").insert({
+        class_id: id,
+        student_id: body.studentId,
+      });
+
+      if (error) {
+        return NextResponse.json(
+          { error: "Failed to add student to class" },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error) {
     console.error("Class PATCH error:", error);

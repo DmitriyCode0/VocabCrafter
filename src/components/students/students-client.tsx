@@ -34,7 +34,10 @@ import {
   BookMarked,
   FileText,
   Target,
+  Archive,
+  RotateCcw,
 } from "lucide-react";
+import { toast } from "sonner";
 import Link from "next/link";
 import { formatAppDate } from "@/lib/dates";
 
@@ -71,9 +74,14 @@ export function StudentsClient({
   const [copied, setCopied] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   const activeConnections = connections.filter(
-    (c) => c.status === "active" && c.student_id !== tutorId,
+    (c) => c.status === "active" && c.student_id !== tutorId && !c.archived_at,
+  );
+  const archivedConnections = connections.filter(
+    (c) => c.status === "active" && c.student_id !== tutorId && Boolean(c.archived_at),
   );
   const pendingConnections = connections.filter((c) => c.status === "pending");
   const showPassiveImportChooser = intent === "passive-recognition";
@@ -117,12 +125,46 @@ export function StudentsClient({
         method: "DELETE",
       });
       if (res.ok) {
+        toast.success("Connection deleted");
         router.refresh();
+      } else {
+        toast.error("Failed to delete connection");
       }
     } catch (err) {
       console.error("Delete connection error:", err);
+      toast.error("Network error while deleting connection");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleToggleArchive(
+    connectionId: string,
+    action: "archive" | "restore",
+  ) {
+    setArchivingId(connectionId);
+    try {
+      const res = await fetch("/api/connections", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionId, action }),
+      });
+      if (res.ok) {
+        toast.success(
+          action === "archive"
+            ? "Student moved to archive"
+            : "Student restored from archive",
+        );
+        router.refresh();
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(err?.error || "Failed to update student archive status");
+      }
+    } catch (err) {
+      console.error("Archive connection error:", err);
+      toast.error("Network error while updating archive status");
+    } finally {
+      setArchivingId(null);
     }
   }
 
@@ -336,11 +378,11 @@ export function StudentsClient({
         </div>
       )}
 
-      {/* Connected students */}
+      {/* Active students */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Link2 className="h-4 w-4 text-muted-foreground" />
-          Connected Students ({activeConnections.length})
+          Active Students ({activeConnections.length})
         </h2>
 
         {activeConnections.length === 0 ? (
@@ -462,6 +504,20 @@ export function StudentsClient({
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      title="Archive student"
+                      onClick={() => handleToggleArchive(conn.id as string, "archive")}
+                      disabled={archivingId === (conn.id as string)}
+                    >
+                      {archivingId === (conn.id as string) ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Archive className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="h-8 w-8 text-destructive"
                       onClick={() => handleDelete(conn.id as string)}
                       disabled={deletingId === (conn.id as string)}
@@ -476,6 +532,96 @@ export function StudentsClient({
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {/* Archived students collapsible section */}
+        {archivedConnections.length > 0 && (
+          <div className="pt-8 border-t space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Archive className="h-5 w-5 text-muted-foreground" />
+                <h2 className="text-lg font-semibold">
+                  Archived Students ({archivedConnections.length})
+                </h2>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowArchived((prev) => !prev)}
+              >
+                {showArchived ? "Hide Archived" : "Show Archived"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Inactive students hidden from your active schedule and classroom list. All their learning history, plans, and reports are fully preserved.
+            </p>
+
+            {showArchived && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {archivedConnections.map((conn) => {
+                  const student = conn.profiles as StudentProfile | null;
+                  const isArchiving = archivingId === (conn.id as string);
+
+                  return (
+                    <Card
+                      key={`archived-${conn.id as string}`}
+                      className="opacity-80 border-dashed hover:opacity-100 transition-opacity"
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base">
+                            {student?.full_name || student?.email || "Unknown"}
+                          </CardTitle>
+                          <Badge variant="outline">Archived</Badge>
+                        </div>
+                        <CardDescription>{student?.email}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex flex-1 flex-col space-y-3">
+                        <div className="text-xs text-muted-foreground">
+                          Connected{" "}
+                          {conn.connected_at
+                            ? formatAppDate(conn.connected_at as string)
+                            : "—"}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="flex flex-wrap gap-2 pt-2 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            handleToggleArchive(conn.id as string, "restore")
+                          }
+                          disabled={isArchiving}
+                        >
+                          {isArchiving ? (
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                          )}
+                          Restore Student
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link
+                            href={`/plans-and-reports/reports?student=${conn.student_id as string}`}
+                          >
+                            <FileText className="mr-1.5 h-3.5 w-3.5" />
+                            Reports
+                          </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link
+                            href={`/history?student=${conn.student_id as string}`}
+                          >
+                            History
+                          </Link>
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

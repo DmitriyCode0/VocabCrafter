@@ -72,44 +72,41 @@ export default async function AssignmentsReviewPage({
     );
   }
 
-  const { data: classes } = await supabase
-    .from("classes")
-    .select("id")
-    .eq("tutor_id", user.id);
+  const supabaseAdmin = createAdminClient();
+  const [{ data: tutorConnections }, { data: classes }] = await Promise.all([
+    supabaseAdmin
+      .from("tutor_students")
+      .select("student_id, archived_at")
+      .eq("tutor_id", user.id)
+      .eq("status", "active"),
+    supabase.from("classes").select("id").eq("tutor_id", user.id),
+  ]);
+
+  const archivedStudentIds = new Set(
+    (tutorConnections ?? [])
+      .filter((row) => Boolean(row.archived_at))
+      .map((row) => row.student_id),
+  );
+  const directStudentIds = (tutorConnections ?? [])
+    .filter((row) => !row.archived_at && row.student_id !== user.id)
+    .map((row) => row.student_id);
 
   const classIds = classes?.map((item) => item.id) ?? [];
+  const { data: members } =
+    classIds.length > 0
+      ? await supabaseAdmin
+          .from("class_members")
+          .select("student_id")
+          .in("class_id", classIds)
+      : { data: [] as { student_id: string }[] };
 
-  if (classIds.length === 0) {
-    return (
-      <div className="space-y-6">
-        <AssignmentsPageHeader
-          role={role}
-          currentSection="review"
-          title={messages.assignments.title}
-          description={messages.assignments.reviewDescription}
-        />
-        <Card>
-          <CardHeader className="items-center py-12 text-center">
-            <MessageSquare className="mb-2 h-12 w-12 text-muted-foreground/50" />
-            <CardTitle className="text-lg">
-              {messages.reviewPage.noClassesTitle}
-            </CardTitle>
-            <CardDescription>
-              {messages.reviewPage.noClassesDescription}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+  const classStudentIds = (members ?? [])
+    .map((member) => member.student_id)
+    .filter(
+      (studentId) => studentId !== user.id && !archivedStudentIds.has(studentId),
     );
-  }
 
-  const supabaseAdmin = createAdminClient();
-  const { data: members } = await supabaseAdmin
-    .from("class_members")
-    .select("student_id")
-    .in("class_id", classIds);
-
-  const studentIds = [...new Set(members?.map((member) => member.student_id) ?? [])];
+  const studentIds = [...new Set([...directStudentIds, ...classStudentIds])];
 
   if (studentIds.length === 0) {
     return (
@@ -135,55 +132,14 @@ export default async function AssignmentsReviewPage({
     );
   }
 
-  const { data: assignments } = await supabase
-    .from("assignments")
-    .select("quiz_id")
-    .eq("tutor_id", user.id);
-
-  const assignedQuizIds = assignments?.map((assignment) => assignment.quiz_id) ?? [];
-
-  const { data: ownQuizzes } = await supabase
-    .from("quizzes")
-    .select("id")
-    .eq("creator_id", user.id);
-
-  const ownQuizIds = ownQuizzes?.map((quiz) => quiz.id) ?? [];
-  const allQuizIds = [...new Set([...assignedQuizIds, ...ownQuizIds])];
-
-  if (allQuizIds.length === 0) {
-    return (
-      <div className="space-y-6">
-        <AssignmentsPageHeader
-          role={role}
-          currentSection="review"
-          title={messages.assignments.title}
-          description={messages.assignments.reviewDescription}
-        />
-        <Card>
-          <CardHeader className="items-center py-12 text-center">
-            <MessageSquare className="mb-2 h-12 w-12 text-muted-foreground/50" />
-            <CardTitle className="text-lg">
-              {messages.reviewPage.noQuizzesTitle}
-            </CardTitle>
-            <CardDescription>
-              {messages.reviewPage.noQuizzesDescription}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
-
   const { count: totalAttempts } = await supabaseAdmin
     .from("quiz_attempts")
     .select("id", { count: "exact", head: true })
-    .in("quiz_id", allQuizIds)
     .in("student_id", studentIds);
 
   const { data: attempts } = await supabaseAdmin
     .from("quiz_attempts")
     .select("*, quizzes(title, type), profiles(full_name, email)")
-    .in("quiz_id", allQuizIds)
     .in("student_id", studentIds)
     .order("completed_at", { ascending: false })
     .range(from, to);

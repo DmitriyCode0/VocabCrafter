@@ -175,7 +175,13 @@ export function QuizResults({
                 <RotateCcw className="mr-2 h-4 w-4" />
                 {messages.common.restart}
               </Button>
-              <Button asChild className="flex-1">
+              <Button asChild className="flex-1 md:hidden">
+                <Link href="/dashboard">
+                  <Home className="mr-2 h-4 w-4" />
+                  {messages.nav.dashboard}
+                </Link>
+              </Button>
+              <Button asChild className="hidden flex-1 md:inline-flex">
                 <Link href="/quizzes">
                   <Home className="mr-2 h-4 w-4" />
                   {messages.quizzes.title}
@@ -239,7 +245,13 @@ export function QuizResults({
                 <RotateCcw className="mr-2 h-4 w-4" />
                 {messages.common.restart}
               </Button>
-              <Button asChild className="flex-1">
+              <Button asChild className="flex-1 md:hidden">
+                <Link href="/dashboard">
+                  <Home className="mr-2 h-4 w-4" />
+                  {messages.nav.dashboard}
+                </Link>
+              </Button>
+              <Button asChild className="hidden flex-1 md:inline-flex">
                 <Link href="/quizzes">
                   <Home className="mr-2 h-4 w-4" />
                   {messages.quizzes.title}
@@ -333,7 +345,13 @@ export function QuizResults({
                 <RotateCcw className="mr-2 h-4 w-4" />
                 {messages.common.restart}
               </Button>
-              <Button asChild className="flex-1">
+              <Button asChild className="flex-1 md:hidden">
+                <Link href="/dashboard">
+                  <Home className="mr-2 h-4 w-4" />
+                  {messages.nav.dashboard}
+                </Link>
+              </Button>
+              <Button asChild className="hidden flex-1 md:inline-flex">
                 <Link href="/quizzes">
                   <Home className="mr-2 h-4 w-4" />
                   {messages.quizzes.title}
@@ -416,7 +434,13 @@ export function QuizResults({
                 <RotateCcw className="mr-2 h-4 w-4" />
                 {messages.common.restart}
               </Button>
-              <Button asChild className="flex-1">
+              <Button asChild className="flex-1 md:hidden">
+                <Link href="/dashboard">
+                  <Home className="mr-2 h-4 w-4" />
+                  {messages.nav.dashboard}
+                </Link>
+              </Button>
+              <Button asChild className="hidden flex-1 md:inline-flex">
                 <Link href="/quizzes">
                   <Home className="mr-2 h-4 w-4" />
                   {messages.quizzes.title}

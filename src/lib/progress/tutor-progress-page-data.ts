@@ -51,16 +51,47 @@ export async function getTutorProgressPageData(
   const appLanguage = normalizeAppLanguage(profile.app_language);
   const students =
     role === "tutor" ? await fetchConnectedStudents(user.id) : [];
-  const activeStudentId =
-    role === "tutor"
-      ? (students.find((student) => student.id === requestedStudentId)?.id ??
-        students[0]?.id ??
-        null)
-      : (requestedStudentId ?? null);
-  const studentProfile = activeStudentId
-    ? role === "tutor"
-      ? (students.find((student) => student.id === activeStudentId) ?? null)
-      : await supabase
+
+  let activeStudentId: string | null = null;
+  let studentProfile: HistoryStudent | null = null;
+
+  if (role === "tutor") {
+    const matchedActive = students.find((student) => student.id === requestedStudentId);
+    if (matchedActive) {
+      activeStudentId = matchedActive.id;
+      studentProfile = matchedActive;
+    } else if (requestedStudentId) {
+      const { data: ownStudent } = await supabase
+        .from("tutor_students")
+        .select(
+          "student_id, profiles!tutor_students_student_id_fkey(id, full_name, email, avatar_url, cefr_level)",
+        )
+        .eq("tutor_id", user.id)
+        .eq("student_id", requestedStudentId)
+        .maybeSingle();
+
+      if (ownStudent?.profiles) {
+        activeStudentId = requestedStudentId;
+        const p = ownStudent.profiles as unknown as Record<string, unknown>;
+        studentProfile = {
+          id: p.id as string,
+          full_name: (p.full_name as string) || null,
+          email: (p.email as string) || null,
+          avatar_url: (p.avatar_url as string) || null,
+          cefr_level: (p.cefr_level as string) || null,
+        };
+      } else {
+        activeStudentId = students[0]?.id ?? null;
+        studentProfile = students[0] ?? null;
+      }
+    } else {
+      activeStudentId = students[0]?.id ?? null;
+      studentProfile = students[0] ?? null;
+    }
+  } else {
+    activeStudentId = requestedStudentId ?? null;
+    studentProfile = activeStudentId
+      ? await supabase
           .from("profiles")
           .select("id, full_name, email, avatar_url, cefr_level")
           .eq("id", activeStudentId)
@@ -68,7 +99,8 @@ export async function getTutorProgressPageData(
           .then((result) =>
             result.error ? null : (result.data as HistoryStudent),
           )
-    : null;
+      : null;
+  }
 
   return {
     userId: user.id,

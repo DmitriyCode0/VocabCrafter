@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
@@ -7,10 +8,7 @@ interface LessonsViewerAccessOptions {
   requireTutor?: boolean;
 }
 
-export async function getLessonsViewerAccess(
-  options: LessonsViewerAccessOptions = {},
-) {
-  const { requireTutor = false } = options;
+const getCachedLessonsViewer = cache(async () => {
   const supabase = await createClient();
 
   const {
@@ -31,7 +29,18 @@ export async function getLessonsViewerAccess(
     redirect("/dashboard");
   }
 
-  const role = profile.role as Role;
+  return {
+    userId: user.id,
+    role: profile.role as Role,
+    appLanguage: normalizeAppLanguage(profile.app_language),
+  };
+});
+
+export async function getLessonsViewerAccess(
+  options: LessonsViewerAccessOptions = {},
+) {
+  const { requireTutor = false } = options;
+  const { userId, role, appLanguage } = await getCachedLessonsViewer();
 
   if (requireTutor) {
     if (role !== "tutor") {
@@ -39,9 +48,9 @@ export async function getLessonsViewerAccess(
     }
 
     return {
-      userId: user.id,
+      userId,
       role,
-      appLanguage: normalizeAppLanguage(profile.app_language),
+      appLanguage,
     };
   }
 
@@ -50,8 +59,8 @@ export async function getLessonsViewerAccess(
   }
 
   return {
-    userId: user.id,
+    userId,
     role,
-    appLanguage: normalizeAppLanguage(profile.app_language),
+    appLanguage,
   };
 }

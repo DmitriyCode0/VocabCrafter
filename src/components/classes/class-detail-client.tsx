@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -12,6 +13,14 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +40,7 @@ import {
 } from "@/components/ui/table";
 import {
   ArrowLeft,
+  ArrowUpRight,
   Copy,
   Check,
   Users,
@@ -41,17 +51,31 @@ import {
   LogOut,
   X,
   BookOpen,
+  MessageSquare,
+  Plus,
+  Sparkles,
+  UserPlus,
 } from "lucide-react";
 import type { Role } from "@/types/roles";
 import { CreateAssignmentDialog } from "@/components/assignments/create-assignment-dialog";
 import { formatAppDate } from "@/lib/dates";
+import {
+  extractPassiveVocabularyTermsFromText,
+  inferPassiveVocabularyItemType,
+} from "@/lib/mastery/passive-vocabulary";
+import type { StudentThreeStateVocabularySummary } from "@/lib/progress/profile-metrics";
 
 interface ClassDetailClientProps {
   classData: Record<string, unknown>;
   members: Record<string, unknown>[];
   assignments: Record<string, unknown>[];
   quizzes: Record<string, unknown>[];
-  wordMastery: Record<string, unknown>[];
+  availableTutorStudents?: Array<{
+    id: string;
+    name: string;
+    cefr_level: string | null;
+  }>;
+  threeStateSummaries?: Record<string, StudentThreeStateVocabularySummary>;
   role: Role;
   userId: string;
 }
@@ -61,7 +85,8 @@ export function ClassDetailClient({
   members,
   assignments,
   quizzes,
-  wordMastery,
+  availableTutorStudents = [],
+  threeStateSummaries = {},
   role,
   userId,
 }: ClassDetailClientProps) {
@@ -76,9 +101,19 @@ export function ClassDetailClient({
     null,
   );
 
+  // Add connected student state
+  const [selectedStudentToAdd, setSelectedStudentToAdd] = useState<string>("");
+  const [isAddingStudent, setIsAddingStudent] = useState(false);
+
+  // Speaking session vocabulary sync state
+  const [sessionVocabText, setSessionVocabText] = useState("");
+  const [isSyncingVocab, setIsSyncingVocab] = useState(false);
+
   const isTutor =
     (role === "tutor" || role === "superadmin") &&
     classData.tutor_id === userId;
+
+  const discussionQuizzes = quizzes.filter((q) => q.type === "discussion");
 
   function copyCode() {
     navigator.clipboard.writeText(classData.join_code as string);
@@ -122,6 +157,32 @@ export function ClassDetailClient({
     }
   }
 
+  async function handleAddStudent() {
+    if (!selectedStudentToAdd) return;
+    setIsAddingStudent(true);
+    try {
+      const res = await fetch(`/api/classes/${classData.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_student",
+          studentId: selectedStudentToAdd,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Failed to add student");
+      }
+      toast.success("Participant added to speaking class");
+      setSelectedStudentToAdd("");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add student");
+    } finally {
+      setIsAddingStudent(false);
+    }
+  }
+
   async function handleRemoveStudent(studentId: string) {
     setRemovingStudent(studentId);
     try {
@@ -156,12 +217,68 @@ export function ClassDetailClient({
     }
   }
 
+  async function handleSyncVocabularyToAllMembers() {
+    const memberIds = members
+      .map((m) => m.student_id as string)
+      .filter(Boolean);
+    if (memberIds.length === 0) {
+      toast.error("Add participants to the class first");
+      return;
+    }
+
+    const extracted = extractPassiveVocabularyTermsFromText(sessionVocabText);
+    if (extracted.length === 0) {
+      toast.error("Enter vocabulary words or text from the speaking session");
+      return;
+    }
+
+    const items = extracted.map((term) => ({
+      term,
+      itemType: inferPassiveVocabularyItemType(term),
+    }));
+
+    setIsSyncingVocab(true);
+    try {
+      const results = await Promise.all(
+        memberIds.map((studentId) =>
+          fetch("/api/mastery/passive-import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              studentId,
+              sourceType: "full_text",
+              sourceLabel: `Speaking Class: ${classData.name as string}`,
+              items,
+            }),
+          }),
+        ),
+      );
+
+      const succeeded = results.filter((r) => r.ok).length;
+      if (succeeded === 0) {
+        throw new Error("Failed to sync vocabulary to class members");
+      }
+
+      toast.success(
+        `Synced ${items.length} words to ${succeeded} class ${succeeded === 1 ? "participant" : "participants"}!`,
+      );
+      setSessionVocabText("");
+      router.refresh();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to sync vocabulary",
+      );
+    } finally {
+      setIsSyncingVocab(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="ghost" size="icon" asChild className="h-8 w-8">
               <Link href="/classes">
                 <ArrowLeft className="h-4 w-4" />
@@ -186,7 +303,7 @@ export function ClassDetailClient({
               ) : (
                 <Copy className="mr-2 h-3 w-3" />
               )}
-              {classData.join_code as string}
+              Join Code: {classData.join_code as string}
             </Button>
             <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
               <DialogTrigger asChild>
@@ -200,10 +317,10 @@ export function ClassDetailClient({
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Delete Class</DialogTitle>
+                  <DialogTitle>Delete Speaking Class</DialogTitle>
                   <DialogDescription>
                     This will permanently delete the class, remove all members,
-                    and delete all assignments. This cannot be undone.
+                    and delete all class assignments. This cannot be undone.
                   </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
@@ -276,7 +393,7 @@ export function ClassDetailClient({
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Students</CardTitle>
+            <CardTitle className="text-sm font-medium">Participants</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -285,7 +402,9 @@ export function ClassDetailClient({
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Assignments</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Speaking & Quiz Activities
+            </CardTitle>
             <ClipboardList className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -305,15 +424,168 @@ export function ClassDetailClient({
         </Card>
       </div>
 
-      {/* Members section */}
+      {/* Tutor Speaking Session Workspace & Post-Session Vocabulary Sync */}
+      {isTutor ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Live Discussion Prompts Card */}
+          <Card className="border-primary/20">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-base">
+                    Speaking Prompts & Discussion Decks
+                  </CardTitle>
+                </div>
+                <Button size="sm" asChild>
+                  <Link href="/quizzes/new">
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    New Discussion Deck
+                  </Link>
+                </Button>
+              </div>
+              <CardDescription>
+                Open your Live Discussion decks during a Google Meet speaking
+                club or assign them to this group.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {discussionQuizzes.length === 0 ? (
+                <div className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                  No Live Discussion quizzes yet. Click &ldquo;New Discussion
+                  Deck&rdquo; and choose &ldquo;Live Discussion&rdquo; to
+                  generate CEFR speaking questions around your target words.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {discussionQuizzes.slice(0, 5).map((quiz) => (
+                    <div
+                      key={quiz.id as string}
+                      className="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {quiz.title as string}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Level {(quiz.cefr_level as string) || "B1"}
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/quizzes/${quiz.id as string}`}>
+                          Open Prompts
+                          <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Post-Session Vocabulary Sync Card */}
+          <Card className="border-primary/20">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <CardTitle className="text-base">
+                  Post-Session Vocabulary Sync
+                </CardTitle>
+              </div>
+              <CardDescription>
+                Paste the vocabulary, phrases, or notes covered in today&apos;s
+                speaking session to push them into all {members.length}{" "}
+                participants&apos; Passive Vocabulary at once.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Textarea
+                value={sessionVocabText}
+                onChange={(e) => setSessionVocabText(e.target.value)}
+                placeholder="Paste target words, expressions, or discussion notes from the speaking session..."
+                rows={4}
+              />
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {sessionVocabText.trim()
+                    ? `${extractPassiveVocabularyTermsFromText(sessionVocabText).length} words detected`
+                    : "Words will be matched against the shared dictionary"}
+                </span>
+                <Button
+                  size="sm"
+                  disabled={
+                    isSyncingVocab ||
+                    !sessionVocabText.trim() ||
+                    members.length === 0
+                  }
+                  onClick={handleSyncVocabularyToAllMembers}
+                >
+                  {isSyncingVocab ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      Sync to All {members.length} Participants
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {/* Members & Unified 3-State Vocabulary Matrix */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Students</CardTitle>
-          <CardDescription>
-            {members.length === 0
-              ? "No students have joined yet. Share the join code."
-              : `${members.length} student${members.length !== 1 ? "s" : ""} enrolled`}
-          </CardDescription>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="text-base">
+              Participants & 3-State Vocabulary
+            </CardTitle>
+            <CardDescription>
+              {members.length === 0
+                ? "No students have joined yet. Add your connected students directly or share the join code."
+                : `${members.length} active participant${members.length !== 1 ? "s" : ""} enrolled`}
+            </CardDescription>
+          </div>
+
+          {isTutor && availableTutorStudents.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedStudentToAdd}
+                onValueChange={setSelectedStudentToAdd}
+              >
+                <SelectTrigger className="w-[210px] h-9 text-xs">
+                  <SelectValue placeholder="Add connected student..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTutorStudents.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name} {s.cefr_level ? `(${s.cefr_level})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                disabled={!selectedStudentToAdd || isAddingStudent}
+                onClick={handleAddStudent}
+              >
+                {isAddingStudent ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <>
+                    <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+                    Add
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : null}
         </CardHeader>
         {members.length > 0 && (
           <CardContent>
@@ -321,10 +593,18 @@ export function ClassDetailClient({
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
                   <TableHead>Level</TableHead>
+                  {isTutor ? (
+                    <>
+                      <TableHead>Learning</TableHead>
+                      <TableHead>Passive (% to next lvl)</TableHead>
+                      <TableHead>Active (% to next lvl)</TableHead>
+                    </>
+                  ) : (
+                    <TableHead>Email</TableHead>
+                  )}
                   <TableHead>Joined</TableHead>
-                  {isTutor && <TableHead className="w-10" />}
+                  {isTutor && <TableHead className="w-24 text-right" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -333,46 +613,96 @@ export function ClassDetailClient({
                     string,
                     unknown
                   > | null;
+                  const studentId =
+                    (profile?.id as string) ?? (member.student_id as string);
+                  const summary = threeStateSummaries[studentId];
+
                   return (
                     <TableRow key={member.id as string}>
                       <TableCell className="font-medium">
-                        {(profile?.full_name as string) || "—"}
+                        {(profile?.full_name as string) ||
+                          (profile?.email as string) ||
+                          "—"}
                       </TableCell>
-                      <TableCell>{(profile?.email as string) || "—"}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {(profile?.cefr_level as string) || "—"}
+                          {summary
+                            ? summary.nextCefrLevel
+                              ? `${summary.currentCefrLevel} → ${summary.nextCefrLevel}`
+                              : summary.currentCefrLevel
+                            : (profile?.cefr_level as string) || "—"}
                         </Badge>
                       </TableCell>
+                      {isTutor ? (
+                        <>
+                          <TableCell className="font-semibold text-amber-600 dark:text-amber-400">
+                            {summary ? summary.learningCount : 0}
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-semibold text-sky-600 dark:text-sky-400">
+                              {summary ? summary.passiveEquivalentCount : 0}
+                            </span>
+                            {summary ? (
+                              <span className="ml-1.5 text-xs text-muted-foreground">
+                                ({summary.passivePercentToNextLevel}%
+                                {summary.nextCefrLevel
+                                  ? ` to ${summary.nextCefrLevel}`
+                                  : ""}
+                                )
+                              </span>
+                            ) : null}
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                              {summary ? summary.activeCount : 0}
+                            </span>
+                            {summary ? (
+                              <span className="ml-1.5 text-xs text-muted-foreground">
+                                ({summary.activePercentToNextLevel}%
+                                {summary.nextCefrLevel
+                                  ? ` to ${summary.nextCefrLevel}`
+                                  : ""}
+                                )
+                              </span>
+                            ) : null}
+                          </TableCell>
+                        </>
+                      ) : (
+                        <TableCell>
+                          {(profile?.email as string) || "—"}
+                        </TableCell>
+                      )}
                       <TableCell className="text-muted-foreground text-sm">
                         {formatAppDate(member.joined_at as string)}
                       </TableCell>
                       {isTutor && (
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                            onClick={() =>
-                              handleRemoveStudent(
-                                (profile?.id as string) ??
-                                  (member.student_id as string),
-                              )
-                            }
-                            disabled={
-                              removingStudent ===
-                              ((profile?.id as string) ??
-                                (member.student_id as string))
-                            }
-                          >
-                            {removingStudent ===
-                            ((profile?.id as string) ??
-                              (member.student_id as string)) ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <X className="h-3 w-3" />
-                            )}
-                          </Button>
+                        <TableCell className="text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              asChild
+                            >
+                              <Link href={`/mastery?student=${studentId}`}>
+                                <BookOpen className="mr-1 h-3 w-3" />
+                                Mastery
+                              </Link>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleRemoveStudent(studentId)}
+                              disabled={removingStudent === studentId}
+                            >
+                              {removingStudent === studentId ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <X className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
@@ -384,15 +714,17 @@ export function ClassDetailClient({
         )}
       </Card>
 
-      {/* Assignments section */}
+      {/* Group Activities & Assignments section */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-base">Assignments</CardTitle>
+            <CardTitle className="text-base">
+              Assigned Speaking & Vocabulary Activities
+            </CardTitle>
             <CardDescription>
               {assignments.length === 0
-                ? "No assignments yet."
-                : `${assignments.length} assignment${assignments.length !== 1 ? "s" : ""}`}
+                ? "Assign a discussion deck or vocabulary quiz for this group."
+                : `${assignments.length} activity${assignments.length !== 1 ? "ies" : ""} assigned`}
             </CardDescription>
           </div>
           {isTutor && (
@@ -472,109 +804,6 @@ export function ClassDetailClient({
           </CardContent>
         )}
       </Card>
-
-      {/* Vocabulary Mastery – tutor only */}
-      {isTutor &&
-        wordMastery.length > 0 &&
-        (() => {
-          const LEVEL_LABELS = [
-            "New",
-            "Seen",
-            "Learning",
-            "Familiar",
-            "Strong",
-            "Mastered",
-          ];
-          const LEVEL_COLORS = [
-            "bg-gray-200 text-gray-700",
-            "bg-red-100 text-red-700",
-            "bg-orange-100 text-orange-700",
-            "bg-yellow-100 text-yellow-700",
-            "bg-blue-100 text-blue-700",
-            "bg-green-100 text-green-700",
-          ];
-
-          // group by student
-          const byStudent = new Map<string, Record<string, unknown>[]>();
-          for (const row of wordMastery) {
-            const sid = row.student_id as string;
-            if (!byStudent.has(sid)) byStudent.set(sid, []);
-            byStudent.get(sid)!.push(row);
-          }
-
-          return (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" /> Vocabulary Mastery
-                </CardTitle>
-                <CardDescription>
-                  Per-student word mastery overview
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {members
-                  .filter((m) => byStudent.has(m.student_id as string))
-                  .map((member) => {
-                    const profile = member.profiles as Record<
-                      string,
-                      unknown
-                    > | null;
-                    const name =
-                      (profile?.full_name as string) ||
-                      (profile?.email as string) ||
-                      "Student";
-                    const words =
-                      byStudent.get(member.student_id as string) ?? [];
-                    const mastered = words.filter(
-                      (w) => (w.mastery_level as number) >= 4,
-                    ).length;
-                    const avgLevel = words.length
-                      ? (
-                          words.reduce(
-                            (s, w) => s + (w.mastery_level as number),
-                            0,
-                          ) / words.length
-                        ).toFixed(1)
-                      : "0";
-
-                    // level distribution
-                    const dist = [0, 0, 0, 0, 0, 0];
-                    for (const w of words) dist[w.mastery_level as number]++;
-
-                    return (
-                      <div
-                        key={member.student_id as string}
-                        className="space-y-2"
-                      >
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium">{name}</p>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span>{words.length} words</span>
-                            <span>{mastered} mastered</span>
-                            <span>Avg {avgLevel}</span>
-                          </div>
-                        </div>
-                        <div className="flex gap-1 flex-wrap">
-                          {dist.map((count, lvl) =>
-                            count > 0 ? (
-                              <Badge
-                                key={lvl}
-                                variant="secondary"
-                                className={`text-xs ${LEVEL_COLORS[lvl]}`}
-                              >
-                                {LEVEL_LABELS[lvl]} {count}
-                              </Badge>
-                            ) : null,
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </CardContent>
-            </Card>
-          );
-        })()}
     </div>
   );
 }

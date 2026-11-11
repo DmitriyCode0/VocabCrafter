@@ -11,8 +11,10 @@ import {
 type SupabaseAdminClient = ReturnType<typeof createAdminClient>;
 
 interface StudentConnectionRow {
+  id?: string;
   student_id: string;
   lesson_price_cents: number;
+  archived_at?: string | null;
   student_profile: {
     full_name: string | null;
     email: string;
@@ -122,10 +124,12 @@ function buildBalanceHistoryByKey(
 
 function buildLessonBalanceSummaries(
   participants: Array<{
+    connectionId?: string;
     id: string;
     name: string;
     label: string;
     lessonPriceCents: number;
+    archivedAt?: string | null;
   }>,
   totalAmountPaidTotals: Map<string, number>,
   completedSpendTotals: Map<string, number>,
@@ -138,6 +142,7 @@ function buildLessonBalanceSummaries(
     const balanceCents = totalAmountPaidCents - totalCompletedSpendCents;
 
     return {
+      connectionId: participant.connectionId,
       participantId: participant.id,
       participantName: participant.name,
       participantLabel: participant.label,
@@ -146,6 +151,7 @@ function buildLessonBalanceSummaries(
       balanceCents,
       lessonsLeft: getLessonsLeft(balanceCents, participant.lessonPriceCents),
       historyEntries: historyByKey.get(participant.id) ?? [],
+      archivedAt: participant.archivedAt ?? null,
     } satisfies LessonBalanceSummaryItem;
   });
 }
@@ -202,7 +208,7 @@ export async function getTutorLessonBalanceSummaries(
     supabaseAdmin
       .from("tutor_students")
       .select(
-        "student_id, lesson_price_cents, student_profile:profiles!tutor_students_student_id_fkey(full_name, email)",
+        "id, student_id, lesson_price_cents, archived_at, student_profile:profiles!tutor_students_student_id_fkey(full_name, email)",
       )
       .eq("tutor_id", tutorId)
       .eq("status", "active"),
@@ -231,12 +237,14 @@ export async function getTutorLessonBalanceSummaries(
 
   const connectedStudents = ((connectionsResult ?? []) as StudentConnectionRow[])
     .map((row) => ({
+      connectionId: row.id,
       id: row.student_id,
       name:
         row.student_profile?.full_name ||
         row.student_profile?.email ||
         "Student",
       lessonPriceCents: row.lesson_price_cents,
+      archivedAt: row.archived_at ?? null,
     }))
     .sort((left, right) =>
       left.name.localeCompare(right.name, undefined, { sensitivity: "base" }),
@@ -247,10 +255,12 @@ export async function getTutorLessonBalanceSummaries(
 
   return buildLessonBalanceSummaries(
     connectedStudents.map((student) => ({
+      connectionId: student.connectionId,
       id: student.id,
       name: student.name,
       label: "Student",
       lessonPriceCents: student.lessonPriceCents ?? 0,
+      archivedAt: student.archivedAt,
     })),
     buildTotalsByKey(balanceTransactions, "student_id", "amount_cents"),
     buildTotalsByKey(completedLessonCharges, "student_id", "price_cents"),

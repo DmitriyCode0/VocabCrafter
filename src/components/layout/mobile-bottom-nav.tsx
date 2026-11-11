@@ -7,10 +7,8 @@ import {
   LayoutDashboard,
   CalendarDays,
   BookOpen,
-  TrendingUp,
   UserPlus,
   ClipboardList,
-  Brain,
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,14 +21,6 @@ interface BottomNavItem {
   variant?: "default" | "review";
 }
 
-const STUDENT_TABS: BottomNavItem[] = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-  { href: "/lessons", label: "Lessons", icon: CalendarDays },
-  { href: "/quizzes/review", label: "Review", icon: Brain, variant: "review" },
-  { href: "/quizzes", label: "Quizzes", icon: BookOpen },
-  { href: "/progress", label: "Progress", icon: TrendingUp },
-];
-
 const TUTOR_TABS: BottomNavItem[] = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/lessons", label: "Lessons", icon: CalendarDays },
@@ -40,7 +30,7 @@ const TUTOR_TABS: BottomNavItem[] = [
 ];
 
 function getTabsForRole(role: Role): BottomNavItem[] {
-  if (role === "student") return STUDENT_TABS;
+  if (role === "student") return [];
   if (role === "tutor") return TUTOR_TABS;
   return [];
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { CreateLessonDialog } from "@/components/lessons/create-lesson-dialog";
 import { DeleteLessonButton } from "@/components/lessons/delete-lesson-button";
 import { EditLessonDialog } from "@/components/lessons/edit-lesson-dialog";
@@ -27,11 +26,10 @@ import {
   getLessonStatusSurfaceClassName,
   getLessonWeekdayLabels,
   groupLessonsByDate,
-  isLessonJoinable,
   type LessonStudentOption,
   type MonthlyLessonItem,
 } from "@/lib/lessons";
-import { CalendarDays, ChevronDown, PlusCircle, Video } from "lucide-react";
+import { CalendarDays, ChevronDown, PlusCircle } from "lucide-react";
 
 interface MonthlyLessonsCalendarProps {
   month: Date;
@@ -150,14 +148,6 @@ export function MonthlyLessonsCalendar({
               <Badge variant="outline">
                 {formatLessonCurrency(lesson.priceCents)}
               </Badge>
-            ) : null}
-            {!compact && isLessonJoinable(lesson) ? (
-              <Button asChild size="sm" className="gap-1.5">
-                <Link href={`/lessons/${lesson.id}/room`}>
-                  <Video className="h-3.5 w-3.5" />
-                  Join
-                </Link>
-              </Button>
             ) : null}
             {showManageActions ? (
               <div className="flex items-center gap-1">

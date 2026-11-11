@@ -10,27 +10,17 @@ import {
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { BookOpen, PlusCircle } from "lucide-react";
-import { QuizCard } from "@/components/quiz/quiz-card";
+import { DeleteAllQuizzesButton } from "@/components/quiz/delete-all-quizzes-button";
 import { RemoveReviewQuizzesButton } from "@/components/quiz/remove-review-quizzes-button";
-import { PagePagination } from "@/components/shared/page-pagination";
+import { QuizzesLibraryClient } from "@/components/quiz/quizzes-library-client";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAppMessages } from "@/lib/i18n/messages";
-import { getCurrentPage, getPaginationRange } from "@/lib/pagination";
 import { REVIEW_ACTIVITY_TITLE_PREFIX } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
-const QUIZZES_PAGE_SIZE = 12;
-
-export default async function QuizzesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ page?: string }>;
-}) {
+export default async function QuizzesPage() {
   const supabase = await createClient();
-  const resolvedSearchParams = await searchParams;
-  const currentPage = getCurrentPage(resolvedSearchParams.page);
-  const { from, to } = getPaginationRange(currentPage, QUIZZES_PAGE_SIZE);
 
   const {
     data: { user },
@@ -38,44 +28,35 @@ export default async function QuizzesPage({
 
   if (!user) redirect("/login");
 
-  const [
-    profileResult,
-    totalQuizzesResult,
-    reviewQuizzesResult,
-    quizzesResult,
-  ] = await Promise.all([
+  const [profileResult, quizzesResult] = await Promise.all([
     supabase.from("profiles").select("app_language").eq("id", user.id).single(),
     supabase
       .from("quizzes")
-      .select("id", { count: "exact", head: true })
-      .eq("creator_id", user.id)
-      .is("deleted_at", null),
-    supabase
-      .from("quizzes")
-      .select("id", { count: "exact", head: true })
+      .select(
+        "id, creator_id, title, type, cefr_level, vocabulary_terms, config, is_public, created_at, deleted_at",
+      )
       .eq("creator_id", user.id)
       .is("deleted_at", null)
-      .ilike("title", `${REVIEW_ACTIVITY_TITLE_PREFIX}%`),
-    supabase
-      .from("quizzes")
-      .select("*")
-      .eq("creator_id", user.id)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .range(from, to),
+      .order("created_at", { ascending: false }),
   ]);
 
   const messages = getAppMessages(
     normalizeAppLanguage(profileResult.data?.app_language),
   );
 
-  const totalQuizzes = totalQuizzesResult.count;
-  const reviewQuizCount = reviewQuizzesResult.count ?? 0;
   const { data: quizzes, error: quizzesError } = quizzesResult;
 
   if (quizzesError) {
     console.error("Failed to load quizzes:", quizzesError);
   }
+
+  const allQuizzes = quizzes ?? [];
+  const totalQuizzes = allQuizzes.length;
+  const reviewQuizCount = allQuizzes.filter((q) =>
+    q.title
+      .toLowerCase()
+      .startsWith(REVIEW_ACTIVITY_TITLE_PREFIX.toLowerCase()),
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -89,6 +70,7 @@ export default async function QuizzesPage({
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
+          <DeleteAllQuizzesButton totalCount={totalQuizzes} />
           <RemoveReviewQuizzesButton reviewCount={reviewQuizCount} />
           <Button asChild variant="outline" className="w-full sm:w-auto">
             <Link href="/quizzes/review">
@@ -104,7 +86,7 @@ export default async function QuizzesPage({
         </div>
       </div>
 
-      {!quizzes || quizzes.length === 0 ? (
+      {allQuizzes.length === 0 ? (
         <Card>
           <CardHeader className="items-center text-center py-12">
             <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-2" />
@@ -124,21 +106,7 @@ export default async function QuizzesPage({
           </CardFooter>
         </Card>
       ) : (
-        <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {quizzes.map((quiz) => (
-              <QuizCard key={quiz.id} quiz={quiz} />
-            ))}
-          </div>
-          <PagePagination
-            pathname="/quizzes"
-            currentPage={currentPage}
-            pageSize={QUIZZES_PAGE_SIZE}
-            totalItems={totalQuizzes ?? quizzes.length}
-            searchParams={resolvedSearchParams}
-            labels={messages.pagination}
-          />
-        </div>
+        <QuizzesLibraryClient quizzes={allQuizzes} />
       )}
     </div>
   );

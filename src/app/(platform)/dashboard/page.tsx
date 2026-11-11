@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
-import {
-  normalizeAppLanguage,
-} from "@/lib/i18n/app-language";
+import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAppMessages } from "@/lib/i18n/messages";
 import type { Role } from "@/types/roles";
 import { Suspense, type ReactNode } from "react";
-import { DashboardSkeleton, AdminDashboardSkeleton } from "@/components/dashboard/skeletons";
+import {
+  DashboardSkeleton,
+  AdminDashboardSkeleton,
+} from "@/components/dashboard/skeletons";
+import { StudentMobileGapFillLauncher } from "@/components/dashboard/student-mobile-gap-fill-launcher";
 import { getAuthenticatedUser } from "@/lib/rbac/require-role";
 
 export const dynamic = "force-dynamic";
@@ -28,14 +30,36 @@ export default async function DashboardPage() {
       "@/components/dashboard/student-dashboard"
     );
 
-    dashboardContent = (
-      <Suspense fallback={<DashboardSkeleton />}>
-        <StudentDashboard
-          userId={user.id}
-          planKey={profile.plan}
-          messages={messages}
+    return (
+      <>
+        {/* Mobile Student View: Single focused Gap-Fill Launcher */}
+        <StudentMobileGapFillLauncher
+          displayName={displayName}
+          cefrLevel={profile.cefr_level}
+          preferredLanguage={profile.preferred_language}
+          sourceLanguage={profile.source_language}
         />
-      </Suspense>
+
+        {/* Desktop / PC Student View: Full Dashboard */}
+        <div className="hidden space-y-6 md:block">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {messages.dashboard.welcomeBack(displayName)}
+            </h1>
+            <p className="text-muted-foreground">
+              {messages.dashboard.roleDescriptions.student}
+            </p>
+          </div>
+
+          <Suspense fallback={<DashboardSkeleton />}>
+            <StudentDashboard
+              userId={user.id}
+              planKey={profile.plan}
+              messages={messages}
+            />
+          </Suspense>
+        </div>
+      </>
     );
   } else if (role === "tutor") {
     const { TutorDashboard } = await import(
@@ -70,7 +94,6 @@ export default async function DashboardPage() {
           {messages.dashboard.welcomeBack(displayName)}
         </h1>
         <p className="text-muted-foreground">
-          {role === "student" && messages.dashboard.roleDescriptions.student}
           {role === "tutor" && messages.dashboard.roleDescriptions.tutor}
           {role === "superadmin" &&
             messages.dashboard.roleDescriptions.superadmin}

@@ -95,7 +95,8 @@ async function fetchTutorStudentOptions(
       "student_id, profiles!tutor_students_student_id_fkey(id, full_name, email, cefr_level)",
     )
     .eq("tutor_id", tutorId)
-    .eq("status", "active");
+    .eq("status", "active")
+    .is("archived_at", null);
 
   if (error) {
     throw new Error("Failed to load connected students");

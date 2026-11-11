@@ -35,18 +35,18 @@ export default async function StudentsPage({
 
   const supabaseAdmin = createAdminClient();
 
-  // Get all connections (both pending and active)
+  // Get all connections (both pending and active, including archived)
   const { data: connections } = await supabaseAdmin
     .from("tutor_students")
     .select(
-      "id, student_id, connect_code, status, created_at, connected_at, profiles!tutor_students_student_id_fkey(id, full_name, email, avatar_url, cefr_level)",
+      "id, student_id, connect_code, status, archived_at, created_at, connected_at, profiles!tutor_students_student_id_fkey(id, full_name, email, avatar_url, cefr_level)",
     )
     .eq("tutor_id", user.id)
     .order("created_at", { ascending: false });
 
-  // Get recent attempts for active students
+  // Get recent attempts for active (non-archived) students
   const activeStudentIds = (connections ?? [])
-    .filter((c) => c.status === "active" && c.student_id !== user.id)
+    .filter((c) => c.status === "active" && c.student_id !== user.id && !c.archived_at)
     .map((c) => c.student_id);
 
   let recentAttempts: Record<string, unknown>[] = [];

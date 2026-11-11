@@ -31,6 +31,7 @@ export function isOneTimeLessonStudentValue(value?: string | null) {
 }
 
 export interface LessonBalanceSummaryItem {
+  connectionId?: string;
   participantId: string;
   participantName: string;
   participantLabel: string;
@@ -39,6 +40,7 @@ export interface LessonBalanceSummaryItem {
   balanceCents: number;
   lessonsLeft: number | null;
   historyEntries: LessonBalanceHistoryEntry[];
+  archivedAt?: string | null;
 }
 
 export interface LessonBalanceHistoryEntry {

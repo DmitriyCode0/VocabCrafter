@@ -222,6 +222,15 @@ interface FormulaMetrics {
   averageHoursPerWorkdayLabel: string;
 }
 
+export interface PerformanceLessonClientItem {
+  id: string;
+  studentId: string | null;
+  studentName: string;
+  lessonDate: string;
+  durationHours: number;
+  priceCents: number;
+}
+
 interface TutorPerformanceDashboardProps {
   periodMetrics: PeriodMetric[];
   weeklyTrend: TrendPoint[];
@@ -231,6 +240,169 @@ interface TutorPerformanceDashboardProps {
   insights: PerformanceInsight[];
   formulaMetrics: FormulaMetrics;
   hasCompletedLessons: boolean;
+  completedLessons?: PerformanceLessonClientItem[];
+  todayIsoDate?: string;
+  initialWeekOffset?: number;
+  initialMonthOffset?: number;
+  initialYearOffset?: number;
+}
+
+function stripClientTime(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function parseClientLessonDate(isoDate: string) {
+  return new Date(`${isoDate}T00:00:00`);
+}
+
+function startOfClientWeek(date: Date) {
+  const start = stripClientTime(date);
+  const offset = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - offset);
+  return start;
+}
+
+function startOfClientMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfClientMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+function startOfClientYear(date: Date) {
+  return new Date(date.getFullYear(), 0, 1);
+}
+
+function endOfClientYear(date: Date) {
+  return new Date(date.getFullYear(), 11, 31);
+}
+
+function addClientDays(date: Date, amount: number) {
+  const next = stripClientTime(date);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function addClientMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function addClientYears(date: Date, amount: number) {
+  return new Date(date.getFullYear() + amount, 0, 1);
+}
+
+function formatClientShortDate(date: Date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+  }).format(date);
+}
+
+function formatClientLongMonthLabel(date: Date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+function countClientLessonsInRange(
+  lessons: PerformanceLessonClientItem[],
+  startDate: Date,
+  endDate: Date,
+) {
+  const startTime = startDate.getTime();
+  const endTime = endDate.getTime();
+
+  return lessons.reduce((total, lesson) => {
+    const lessonTime = parseClientLessonDate(lesson.lessonDate).getTime();
+    return lessonTime >= startTime && lessonTime <= endTime ? total + 1 : total;
+  }, 0);
+}
+
+function sumClientLessonHoursInRange(
+  lessons: PerformanceLessonClientItem[],
+  startDate: Date,
+  endDate: Date,
+) {
+  const startTime = startDate.getTime();
+  const endTime = endDate.getTime();
+
+  return lessons.reduce((total, lesson) => {
+    const lessonTime = parseClientLessonDate(lesson.lessonDate).getTime();
+    if (lessonTime < startTime || lessonTime > endTime) {
+      return total;
+    }
+    return total + lesson.durationHours;
+  }, 0);
+}
+
+function sumClientLessonEarningsInRange(
+  lessons: PerformanceLessonClientItem[],
+  startDate: Date,
+  endDate: Date,
+) {
+  const startTime = startDate.getTime();
+  const endTime = endDate.getTime();
+
+  return lessons.reduce((total, lesson) => {
+    const lessonTime = parseClientLessonDate(lesson.lessonDate).getTime();
+    if (lessonTime < startTime || lessonTime > endTime) {
+      return total;
+    }
+    return total + lesson.priceCents;
+  }, 0);
+}
+
+function countClientDaysInRange(startDate: Date, endDate: Date) {
+  const cursor = stripClientTime(startDate);
+  const endTime = stripClientTime(endDate).getTime();
+  let total = 0;
+
+  while (cursor.getTime() <= endTime) {
+    total += 1;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return total;
+}
+
+function countClientWeekdaysInRange(startDate: Date, endDate: Date) {
+  const cursor = stripClientTime(startDate);
+  const endTime = stripClientTime(endDate).getTime();
+  let total = 0;
+
+  while (cursor.getTime() <= endTime) {
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6) {
+      total += 1;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return total;
+}
+
+function formatClientHours(value: number) {
+  return `${value.toFixed(value >= 10 ? 0 : 1)} h`;
+}
+
+function formatClientLessonAverage(value: number) {
+  return `${value.toFixed(1)} lessons`;
+}
+
+function buildClientPerformanceHref(
+  pathname: string,
+  weekOffset: number,
+  monthOffset: number,
+  yearOffset: number,
+) {
+  const params = new URLSearchParams();
+  if (weekOffset < 0) params.set("weekOffset", String(weekOffset));
+  if (monthOffset < 0) params.set("monthOffset", String(monthOffset));
+  if (yearOffset < 0) params.set("yearOffset", String(yearOffset));
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
 }
 
 function MetricCard({
@@ -403,10 +575,18 @@ export function TutorPerformanceDashboard({
   insights,
   formulaMetrics,
   hasCompletedLessons,
+  completedLessons,
+  todayIsoDate,
+  initialWeekOffset = 0,
+  initialMonthOffset = 0,
+  initialYearOffset = 0,
 }: TutorPerformanceDashboardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [weekOffset, setWeekOffset] = useState(initialWeekOffset);
+  const [monthOffset, setMonthOffset] = useState(initialMonthOffset);
+  const [yearOffset, setYearOffset] = useState(initialYearOffset);
   const [optimisticPeriodSnapshot, setOptimisticPeriodSnapshot] = useState<{
     href: string;
     periodMetrics: PeriodMetric[];
@@ -419,32 +599,252 @@ export function TutorPerformanceDashboard({
         : pathname,
     [pathname, searchParamsString],
   );
+
+  const clientPeriodMetrics = useMemo<PeriodMetric[] | null>(() => {
+    if (!completedLessons || !todayIsoDate) {
+      return null;
+    }
+
+    const today = parseClientLessonDate(todayIsoDate);
+    const currentWeekStart = startOfClientWeek(today);
+    const currentMonthStart = startOfClientMonth(today);
+    const currentYearStart = startOfClientYear(today);
+
+    const selectedWeekStart = addClientDays(currentWeekStart, weekOffset * 7);
+    const selectedWeekEnd =
+      weekOffset === 0 ? today : addClientDays(selectedWeekStart, 6);
+    const selectedMonthStart = addClientMonths(currentMonthStart, monthOffset);
+    const selectedMonthEnd =
+      monthOffset === 0 ? today : endOfClientMonth(selectedMonthStart);
+    const selectedYearStart = addClientYears(currentYearStart, yearOffset);
+    const selectedYearEnd =
+      yearOffset === 0 ? today : endOfClientYear(selectedYearStart);
+
+    const firstLessonDate = completedLessons[0]
+      ? parseClientLessonDate(completedLessons[0].lessonDate)
+      : null;
+
+    const weekCount = countClientLessonsInRange(
+      completedLessons,
+      selectedWeekStart,
+      selectedWeekEnd,
+    );
+    const monthCount = countClientLessonsInRange(
+      completedLessons,
+      selectedMonthStart,
+      selectedMonthEnd,
+    );
+    const yearCount = countClientLessonsInRange(
+      completedLessons,
+      selectedYearStart,
+      selectedYearEnd,
+    );
+
+    const weekEarningsCents = sumClientLessonEarningsInRange(
+      completedLessons,
+      selectedWeekStart,
+      selectedWeekEnd,
+    );
+    const monthEarningsCents = sumClientLessonEarningsInRange(
+      completedLessons,
+      selectedMonthStart,
+      selectedMonthEnd,
+    );
+    const yearEarningsCents = sumClientLessonEarningsInRange(
+      completedLessons,
+      selectedYearStart,
+      selectedYearEnd,
+    );
+
+    const monthTotalHours = sumClientLessonHoursInRange(
+      completedLessons,
+      selectedMonthStart,
+      selectedMonthEnd,
+    );
+    const selectedYearTotalHours = sumClientLessonHoursInRange(
+      completedLessons,
+      selectedYearStart,
+      selectedYearEnd,
+    );
+
+    const daysSinceMonthStart = countClientDaysInRange(
+      selectedMonthStart,
+      selectedMonthEnd,
+    );
+    const daysInSelectedYear = countClientDaysInRange(
+      selectedYearStart,
+      selectedYearEnd,
+    );
+    const workdaysSinceMonthStart = countClientWeekdaysInRange(
+      selectedMonthStart,
+      selectedMonthEnd,
+    );
+    const workdaysInSelectedYear = countClientWeekdaysInRange(
+      selectedYearStart,
+      selectedYearEnd,
+    );
+
+    const averageLessonsPerMonthWeek =
+      daysSinceMonthStart > 0 ? (monthCount * 7) / daysSinceMonthStart : 0;
+    const averageLessonsPerYearWeek =
+      daysInSelectedYear > 0 ? (yearCount * 7) / daysInSelectedYear : 0;
+    const averageMonthHoursPerDay =
+      daysSinceMonthStart > 0 ? monthTotalHours / daysSinceMonthStart : 0;
+    const averageMonthHoursPerWorkday =
+      workdaysSinceMonthStart > 0
+        ? monthTotalHours / workdaysSinceMonthStart
+        : 0;
+    const selectedYearAverageHoursPerDay =
+      daysInSelectedYear > 0 ? selectedYearTotalHours / daysInSelectedYear : 0;
+    const selectedYearAverageHoursPerWorkday =
+      workdaysInSelectedYear > 0
+        ? selectedYearTotalHours / workdaysInSelectedYear
+        : 0;
+
+    const canGoToPreviousWeek = firstLessonDate
+      ? selectedWeekStart.getTime() > startOfClientWeek(firstLessonDate).getTime()
+      : false;
+    const canGoToPreviousMonth = firstLessonDate
+      ? selectedMonthStart.getTime() >
+        startOfClientMonth(firstLessonDate).getTime()
+      : false;
+    const canGoToPreviousYear = firstLessonDate
+      ? selectedYearStart.getTime() > startOfClientYear(firstLessonDate).getTime()
+      : false;
+
+    return [
+      {
+        label: `${formatClientShortDate(selectedWeekStart)} - ${formatClientShortDate(selectedWeekEnd)}`,
+        value: weekCount,
+        earningsCents: weekEarningsCents,
+        helper: "Weekly performance",
+        iconKey: "week",
+        accentClassName: "bg-[var(--color-chart-1)]/18",
+        previousHref: canGoToPreviousWeek
+          ? buildClientPerformanceHref(
+              pathname,
+              weekOffset - 1,
+              monthOffset,
+              yearOffset,
+            )
+          : undefined,
+        nextHref:
+          weekOffset < 0
+            ? buildClientPerformanceHref(
+                pathname,
+                Math.min(weekOffset + 1, 0),
+                monthOffset,
+                yearOffset,
+              )
+            : undefined,
+        previousAriaLabel: "View previous week",
+        nextAriaLabel: "View next week",
+      },
+      {
+        label: formatClientLongMonthLabel(selectedMonthStart),
+        value: monthCount,
+        earningsCents: monthEarningsCents,
+        helper: "Monthly performance",
+        iconKey: "month",
+        accentClassName: "bg-[var(--color-chart-2)]/18",
+        previousHref: canGoToPreviousMonth
+          ? buildClientPerformanceHref(
+              pathname,
+              weekOffset,
+              monthOffset - 1,
+              yearOffset,
+            )
+          : undefined,
+        nextHref:
+          monthOffset < 0
+            ? buildClientPerformanceHref(
+                pathname,
+                weekOffset,
+                Math.min(monthOffset + 1, 0),
+                yearOffset,
+              )
+            : undefined,
+        previousAriaLabel: "View previous month",
+        nextAriaLabel: "View next month",
+        stats: [
+          {
+            label: "Avg / week",
+            value: formatClientLessonAverage(averageLessonsPerMonthWeek),
+          },
+          {
+            label: "Avg hrs / day",
+            value: formatClientHours(averageMonthHoursPerDay),
+          },
+          {
+            label: "5-day avg",
+            value: formatClientHours(averageMonthHoursPerWorkday),
+          },
+        ],
+      },
+      {
+        label: String(selectedYearStart.getFullYear()),
+        value: yearCount,
+        earningsCents: yearEarningsCents,
+        helper: "Yearly performance",
+        iconKey: "year",
+        accentClassName: "bg-[var(--color-chart-3)]/18",
+        previousHref: canGoToPreviousYear
+          ? buildClientPerformanceHref(
+              pathname,
+              weekOffset,
+              monthOffset,
+              yearOffset - 1,
+            )
+          : undefined,
+        nextHref:
+          yearOffset < 0
+            ? buildClientPerformanceHref(
+                pathname,
+                weekOffset,
+                monthOffset,
+                Math.min(yearOffset + 1, 0),
+              )
+            : undefined,
+        previousAriaLabel: "View previous year",
+        nextAriaLabel: "View next year",
+        stats: [
+          {
+            label: "Avg / week",
+            value: formatClientLessonAverage(averageLessonsPerYearWeek),
+          },
+          {
+            label: "Avg hrs / day",
+            value: formatClientHours(selectedYearAverageHoursPerDay),
+          },
+          {
+            label: "5-day avg",
+            value: formatClientHours(selectedYearAverageHoursPerWorkday),
+          },
+        ],
+      },
+    ];
+  }, [
+    completedLessons,
+    monthOffset,
+    pathname,
+    todayIsoDate,
+    weekOffset,
+    yearOffset,
+  ]);
+
   const displayedPeriodMetrics = useMemo(
     () =>
-      optimisticPeriodSnapshot && optimisticPeriodSnapshot.href !== currentHref
+      clientPeriodMetrics ??
+      (optimisticPeriodSnapshot && optimisticPeriodSnapshot.href !== currentHref
         ? optimisticPeriodSnapshot.periodMetrics
-        : periodMetrics,
-    [currentHref, optimisticPeriodSnapshot, periodMetrics],
+        : periodMetrics),
+    [clientPeriodMetrics, currentHref, optimisticPeriodSnapshot, periodMetrics],
   );
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    storeCachedPeriodMetrics(currentHref, periodMetrics);
-  }, [currentHref, periodMetrics]);
-
-  useEffect(() => {
-    const uniqueHrefs = new Set(
-      displayedPeriodMetrics.flatMap((metric) =>
-        [metric.previousHref, metric.nextHref].filter(
-          (href): href is string => typeof href === "string" && href.length > 0,
-        ),
-      ),
-    );
-
-    uniqueHrefs.forEach((href) => {
-      router.prefetch(href);
-    });
-  }, [displayedPeriodMetrics, router]);
+    storeCachedPeriodMetrics(currentHref, displayedPeriodMetrics);
+  }, [currentHref, displayedPeriodMetrics]);
 
   function handlePeriodNavigation(
     event: MouseEvent<HTMLAnchorElement>,
@@ -452,7 +852,31 @@ export function TutorPerformanceDashboard({
   ) {
     event.preventDefault();
 
-    if (!href || isPending) {
+    if (!href) {
+      return;
+    }
+
+    if (completedLessons && todayIsoDate) {
+      const queryIndex = href.indexOf("?");
+      const nextParams = new URLSearchParams(
+        queryIndex >= 0 ? href.slice(queryIndex + 1) : "",
+      );
+      const parseOffset = (val: string | null) => {
+        const parsed = Number.parseInt(val ?? "", 10);
+        return Number.isNaN(parsed) ? 0 : Math.min(parsed, 0);
+      };
+
+      setWeekOffset(parseOffset(nextParams.get("weekOffset")));
+      setMonthOffset(parseOffset(nextParams.get("monthOffset")));
+      setYearOffset(parseOffset(nextParams.get("yearOffset")));
+
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", href);
+      }
+      return;
+    }
+
+    if (isPending) {
       return;
     }
 

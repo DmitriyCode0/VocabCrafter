@@ -1492,6 +1492,223 @@ export async function getStudentMonthlyComparisonSnapshot(
   };
 }
 
+function computeStudentThreeStateSignals({
+  cefrLevel,
+  rawStudentVocabularyRows,
+  rawPassiveEvidenceRows,
+  rawActiveEvidenceRows,
+}: {
+  cefrLevel: CEFRLevel;
+  rawStudentVocabularyRows: StudentVocabularyMetricWithLibraryRow[];
+  rawPassiveEvidenceRows: PassiveEvidenceWithLibraryRow[];
+  rawActiveEvidenceRows: ActiveEvidenceWithLibraryRow[];
+}) {
+  const passiveEvidenceMetadataByKey = buildPassiveEvidenceMetadataByKey(
+    rawPassiveEvidenceRows,
+  );
+  const activeEvidenceMetadataByKey = buildActiveEvidenceMetadataByKey(
+    rawActiveEvidenceRows,
+  );
+
+  const passiveVocabularyRows = rawStudentVocabularyRows.filter(
+    (row) => row.current_state !== "learning",
+  );
+  const activeVocabularyRows = rawStudentVocabularyRows.filter(
+    (row) => row.current_state === "active_and_passive",
+  );
+  const activeLearningRows = rawStudentVocabularyRows.filter(
+    (row) =>
+      row.current_state === "learning" && row.learning_archived_at == null,
+  );
+
+  const passivePendingReviewCount = passiveVocabularyRows.filter((row) =>
+    hasPendingDictionaryEntry(row.passive_vocabulary_library),
+  ).length;
+  const passiveSignals = {
+    ...summarizePassiveVocabularyEvidence(
+      mapStudentVocabularyRowsToPassiveEvidence(
+        passiveVocabularyRows.filter((row) =>
+          hasConfirmedDictionaryEntry(row.passive_vocabulary_library),
+        ),
+        passiveEvidenceMetadataByKey,
+      ),
+      cefrLevel,
+    ),
+    pendingReviewCount: passivePendingReviewCount,
+  } satisfies StudentProgressSnapshot["passiveSignals"];
+
+  const activePendingReviewCount = activeVocabularyRows.filter((row) =>
+    hasPendingDictionaryEntry(row.passive_vocabulary_library),
+  ).length;
+  const activeSignals = {
+    ...summarizeActiveVocabularyEvidence(
+      mapStudentVocabularyRowsToActiveEvidence(
+        activeVocabularyRows.filter((row) =>
+          hasConfirmedDictionaryEntry(row.passive_vocabulary_library),
+        ),
+        activeEvidenceMetadataByKey,
+      ),
+    ),
+    pendingReviewCount: activePendingReviewCount,
+  } satisfies StudentProgressSnapshot["activeSignals"];
+
+  const learningPendingReviewCount = activeLearningRows.filter((row) =>
+    hasPendingDictionaryEntry(row.passive_vocabulary_library),
+  ).length;
+  const learningSignals = {
+    ...summarizeLearningVocabularyRows(
+      activeLearningRows.filter((row) =>
+        hasConfirmedDictionaryEntry(row.passive_vocabulary_library),
+      ),
+    ),
+    uniqueItems: activeLearningRows.length,
+    pendingReviewCount: learningPendingReviewCount,
+  } satisfies StudentProgressSnapshot["learningSignals"];
+
+  return {
+    passiveSignals,
+    activeSignals,
+    learningSignals,
+  };
+}
+
+export interface StudentThreeStateVocabularySummary {
+  studentId: string;
+  currentCefrLevel: CEFRLevel;
+  nextCefrLevel: CEFRLevel | null;
+  activeCount: number;
+  activeTarget: number;
+  activePercentToNextLevel: number;
+  passiveEquivalentCount: number;
+  passiveRawCount: number;
+  passiveTarget: number;
+  passivePercentToNextLevel: number;
+  learningCount: number;
+  srsTotalWords: number;
+  srsMasteredWords: number;
+  srsAvgLevel: number;
+  srsLevelCounts: number[];
+}
+
+export async function getStudentThreeStateVocabularySummary(
+  studentId: string,
+  cefrLevelHint?: string | null,
+): Promise<StudentThreeStateVocabularySummary> {
+  const supabaseAdmin = createAdminClient();
+  const [
+    profileResult,
+    masteryResult,
+    passiveEvidenceResult,
+    activeEvidenceResult,
+    studentVocabularyStateResult,
+  ] = await Promise.all([
+    cefrLevelHint
+      ? Promise.resolve({ data: { cefr_level: cefrLevelHint }, error: null })
+      : supabaseAdmin
+          .from("profiles")
+          .select("cefr_level")
+          .eq("id", studentId)
+          .single(),
+    supabaseAdmin
+      .from("word_mastery")
+      .select("mastery_level")
+      .eq("student_id", studentId),
+    supabaseAdmin
+      .from("passive_vocabulary_evidence")
+      .select(
+        "term, definition, normalized_term, item_type, source_type, source_label, import_count, last_imported_at, passive_vocabulary_library(approval_status, cefr_level, part_of_speech, attributes)",
+      )
+      .eq("student_id", studentId)
+      .order("last_imported_at", { ascending: false }),
+    supabaseAdmin
+      .from("active_vocabulary_evidence")
+      .select(
+        "id, term, normalized_term, source_type, source_label, usage_count, first_used_at, last_used_at, passive_vocabulary_library:passive_vocabulary_library!active_vocabulary_evidence_library_item_id_fkey(approval_status, cefr_level, part_of_speech, attributes)",
+      )
+      .eq("student_id", studentId)
+      .eq("source_type", "lesson_recording"),
+    supabaseAdmin
+      .from("student_vocabulary_items")
+      .select(
+        "id, term, normalized_term, item_type, current_state, custom_definition, updated_at, learning_archived_at, passive_vocabulary_library:passive_vocabulary_library!student_vocabulary_items_library_item_id_fkey(approval_status, cefr_level, part_of_speech, attributes)",
+      )
+      .eq("student_id", studentId)
+      .order("updated_at", { ascending: false }),
+  ]);
+
+  const currentCefrLevel = normalizeCefrLevel(profileResult.data?.cefr_level);
+  const nextCefrLevel = getNextCefrLevel(currentCefrLevel);
+  const { passiveSignals, activeSignals, learningSignals } =
+    computeStudentThreeStateSignals({
+      cefrLevel: currentCefrLevel,
+      rawStudentVocabularyRows: (studentVocabularyStateResult.data ??
+        []) as StudentVocabularyMetricWithLibraryRow[],
+      rawPassiveEvidenceRows: (passiveEvidenceResult.data ??
+        []) as PassiveEvidenceWithLibraryRow[],
+      rawActiveEvidenceRows: (activeEvidenceResult.data ??
+        []) as ActiveEvidenceWithLibraryRow[],
+    });
+
+  const masteryRows = (masteryResult.data ?? []) as Array<{
+    mastery_level: number;
+  }>;
+  const srsTotalWords = masteryRows.length;
+  const srsMasteredWords = masteryRows.filter(
+    (r) => (r.mastery_level ?? 0) >= 5,
+  ).length;
+  const srsAvgLevel =
+    srsTotalWords > 0
+      ? Math.round(
+          (masteryRows.reduce((sum, r) => sum + (r.mastery_level ?? 0), 0) /
+            srsTotalWords) *
+            10,
+        ) / 10
+      : 0;
+  const srsLevelCounts = [0, 0, 0, 0, 0, 0];
+  for (const row of masteryRows) {
+    const normalized = Math.min(Math.max(row.mastery_level ?? 0, 0), 5);
+    srsLevelCounts[normalized]++;
+  }
+
+  const activeTarget = ACTIVE_VOCAB_TARGETS[currentCefrLevel];
+  const passiveTarget = PASSIVE_VOCAB_TARGETS[currentCefrLevel];
+  const activeCount = activeSignals.uniqueItems;
+  const passiveEquivalentCount = passiveSignals.equivalentWordCount;
+
+  return {
+    studentId,
+    currentCefrLevel,
+    nextCefrLevel,
+    activeCount,
+    activeTarget,
+    activePercentToNextLevel:
+      activeTarget > 0 ? clampScore((activeCount / activeTarget) * 100) : 0,
+    passiveEquivalentCount,
+    passiveRawCount: passiveSignals.uniqueItems,
+    passiveTarget,
+    passivePercentToNextLevel:
+      passiveTarget > 0
+        ? clampScore((passiveEquivalentCount / passiveTarget) * 100)
+        : 0,
+    learningCount: learningSignals.uniqueItems,
+    srsTotalWords,
+    srsMasteredWords,
+    srsAvgLevel,
+    srsLevelCounts,
+  };
+}
+
+export async function getBatchStudentThreeStateVocabularySummaries(
+  students: Array<{ id: string; cefr_level?: string | null }>,
+): Promise<Map<string, StudentThreeStateVocabularySummary>> {
+  const summaries = await Promise.all(
+    students.map((student) =>
+      getStudentThreeStateVocabularySummary(student.id, student.cefr_level),
+    ),
+  );
+  return new Map(summaries.map((summary) => [summary.studentId, summary]));
+}
+
 export async function getStudentProgressSnapshot(
   userId: string,
   options?: {
@@ -1630,66 +1847,14 @@ export async function getStudentProgressSnapshot(
     (activeEvidenceResult.data ?? []) as ActiveEvidenceWithLibraryRow[];
   const rawStudentVocabularyRows =
     (studentVocabularyStateResult.data ?? []) as StudentVocabularyMetricWithLibraryRow[];
-  const passiveEvidenceMetadataByKey = buildPassiveEvidenceMetadataByKey(
-    rawPassiveEvidenceRows,
-  );
-  const activeEvidenceMetadataByKey = buildActiveEvidenceMetadataByKey(
-    rawActiveEvidenceRows,
-  );
-
-  const passiveVocabularyRows = rawStudentVocabularyRows.filter(
-    (row) => row.current_state !== "learning",
-  );
-  const activeVocabularyRows = rawStudentVocabularyRows.filter(
-    (row) => row.current_state === "active_and_passive",
-  );
-  const activeLearningRows = rawStudentVocabularyRows.filter(
-    (row) => row.current_state === "learning" && row.learning_archived_at == null,
-  );
-
-  const passivePendingReviewCount = passiveVocabularyRows.filter((row) =>
-    hasPendingDictionaryEntry(row.passive_vocabulary_library),
-  ).length;
-  const passiveSignals = {
-    ...summarizePassiveVocabularyEvidence(
-      mapStudentVocabularyRowsToPassiveEvidence(
-        passiveVocabularyRows.filter((row) =>
-          hasConfirmedDictionaryEntry(row.passive_vocabulary_library),
-        ),
-        passiveEvidenceMetadataByKey,
-      ),
+  const { passiveSignals, activeSignals, learningSignals } =
+    computeStudentThreeStateSignals({
       cefrLevel,
-    ),
-    pendingReviewCount: passivePendingReviewCount,
-  } satisfies StudentProgressSnapshot["passiveSignals"];
-
-  const activePendingReviewCount = activeVocabularyRows.filter((row) =>
-    hasPendingDictionaryEntry(row.passive_vocabulary_library),
-  ).length;
-  const activeSignals = {
-    ...summarizeActiveVocabularyEvidence(
-      mapStudentVocabularyRowsToActiveEvidence(
-        activeVocabularyRows.filter((row) =>
-          hasConfirmedDictionaryEntry(row.passive_vocabulary_library),
-        ),
-        activeEvidenceMetadataByKey,
-      ),
-    ),
-    pendingReviewCount: activePendingReviewCount,
-  } satisfies StudentProgressSnapshot["activeSignals"];
-
-  const learningPendingReviewCount = activeLearningRows.filter((row) =>
-    hasPendingDictionaryEntry(row.passive_vocabulary_library),
-  ).length;
-  const learningSignals = {
-    ...summarizeLearningVocabularyRows(
-      activeLearningRows.filter((row) =>
-        hasConfirmedDictionaryEntry(row.passive_vocabulary_library),
-      ),
-    ),
-    uniqueItems: activeLearningRows.length,
-    pendingReviewCount: learningPendingReviewCount,
-  } satisfies StudentProgressSnapshot["learningSignals"];
+      rawStudentVocabularyRows,
+      rawPassiveEvidenceRows,
+      rawActiveEvidenceRows,
+    });
+  const passivePendingReviewCount = passiveSignals.pendingReviewCount;
   const classroomSessions = classroomSessionSummariesResult.data as Array<{
     duration_seconds: number | null;
     tutor_speaking_seconds: number;

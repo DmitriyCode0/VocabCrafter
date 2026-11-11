@@ -37,6 +37,7 @@ import {
   Loader2,
   Copy,
   Check,
+  MessageSquare,
 } from "lucide-react";
 import type { Role } from "@/types/roles";
 
@@ -44,6 +45,27 @@ interface ClassesClientProps {
   role: Role;
   classes: Record<string, unknown>[];
 }
+
+const SPEAKING_CLASS_PRESETS = [
+  {
+    label: "Speaking Club",
+    name: "Speaking Club — Weekly Discussion",
+    description:
+      "Live group speaking session focused on conversation questions, idioms, and active vocabulary.",
+  },
+  {
+    label: "Debate & Fluency",
+    name: "Debate & Fluency Group",
+    description:
+      "Structured opinions, argument building, and spontaneous speaking practice.",
+  },
+  {
+    label: "Topic Workshop",
+    name: "Topic & Vocabulary Workshop",
+    description:
+      "Thematic vocabulary activation and guided group conversation.",
+  },
+] as const;
 
 export function ClassesClient({ role, classes }: ClassesClientProps) {
   const isTutor = role === "tutor" || role === "superadmin";
@@ -98,46 +120,75 @@ function TutorClasses({ classes }: { classes: Record<string, unknown>[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Classes</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Speaking Classes & Groups
+          </h1>
           <p className="text-muted-foreground">
-            Create and manage your classes, invite students, and assign quizzes.
+            Organize speaking clubs and group sessions, share live discussion
+            prompts, and sync session vocabulary to all participants at once.
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" />
-              New Class
+              New Speaking Class
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New Class</DialogTitle>
+              <DialogTitle>Create Speaking Class / Group</DialogTitle>
               <DialogDescription>
-                Set up a class for your students. You&apos;ll get a join code to
-                share.
+                Set up a speaking club or group class. You can add your
+                connected students in 1 click or share a join code.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  Quick Presets
+                </Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {SPEAKING_CLASS_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setName(preset.name);
+                        setDescription(preset.description);
+                      }}
+                    >
+                      <MessageSquare className="mr-1.5 h-3 w-3" />
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="class-name">Class Name</Label>
+                <Label htmlFor="class-name">Class / Topic Name</Label>
                 <Input
                   id="class-name"
-                  placeholder="e.g., English B1 - Monday Group"
+                  placeholder="e.g., B2 Speaking Club — Technology & AI"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="class-desc">Description (optional)</Label>
+                <Label htmlFor="class-desc">
+                  Speaking Topic & Agenda (optional)
+                </Label>
                 <Textarea
                   id="class-desc"
-                  placeholder="Brief description of the class..."
+                  placeholder="Discussion questions, speaking goals, or target expressions..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={2}
+                  rows={3}
                 />
               </div>
               <div className="space-y-2">
@@ -147,7 +198,7 @@ function TutorClasses({ classes }: { classes: Record<string, unknown>[] }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {["A1", "A2", "B1", "B2", "C1"].map((level) => (
+                    {["A1", "A2", "B1", "B2", "C1", "C2"].map((level) => (
                       <SelectItem key={level} value={level}>
                         {level}
                       </SelectItem>
@@ -168,7 +219,7 @@ function TutorClasses({ classes }: { classes: Record<string, unknown>[] }) {
                     Creating...
                   </>
                 ) : (
-                  "Create Class"
+                  "Create Speaking Class"
                 )}
               </Button>
             </DialogFooter>
@@ -179,11 +230,12 @@ function TutorClasses({ classes }: { classes: Record<string, unknown>[] }) {
       {classes.length === 0 ? (
         <Card>
           <CardHeader className="items-center text-center py-12">
-            <Users className="h-12 w-12 text-muted-foreground/50 mb-2" />
-            <CardTitle className="text-lg">No classes yet</CardTitle>
+            <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-2" />
+            <CardTitle className="text-lg">No speaking classes yet</CardTitle>
             <CardDescription>
-              Create your first class to start managing students and assigning
-              vocabulary activities.
+              Create a speaking club or group class to add participants, run
+              live discussion prompts, and sync session vocabulary to all
+              members.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -328,8 +380,10 @@ function ClassCard({
     <Link href={`/classes/${cls.id}`}>
       <Card className="h-full transition-colors hover:border-primary cursor-pointer">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">{cls.name as string}</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base line-clamp-1">
+              {cls.name as string}
+            </CardTitle>
             <Badge variant="secondary">{cls.cefr_level as string}</Badge>
           </div>
           {!!cls.description && (
@@ -337,11 +391,12 @@ function ClassCard({
               {cls.description as string}
             </CardDescription>
           )}
-          <div className="flex items-center gap-3 pt-1">
+          <div className="flex items-center justify-between gap-3 pt-2">
             {isTutor && (
               <>
-                <span className="text-xs text-muted-foreground">
-                  {(cls.student_count as number) ?? 0} students
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Users className="h-3.5 w-3.5" />
+                  {(cls.student_count as number) ?? 0} active participants
                 </span>
                 <Button
                   variant="ghost"

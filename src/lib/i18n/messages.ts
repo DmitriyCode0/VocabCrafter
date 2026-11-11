@@ -127,7 +127,7 @@ const EN_MESSAGES = {
     myQuizzes: "My Quizzes",
     myClasses: "My Classes",
     lessons: "Lessons",
-    assignments: "Assignments",
+    assignments: "Homework",
     progress: "Progress",
     plansAndReports: "Plans and reports",
     plan: "Plan",
@@ -372,6 +372,25 @@ const EN_MESSAGES = {
       deleteAction: "Delete",
       deleteAria: "Delete quiz",
       deleting: "Deleting...",
+      copyLinkAction: "Copy Link",
+      copiedLinkToast: "Quiz link copied to clipboard",
+      openQuizAction: "Open",
+      moreTerms: (count: number) => `+${count} more`,
+    },
+    filters: {
+      searchPlaceholder:
+        "Search by quiz title, grammar topic, or vocabulary word...",
+      allTypes: "All Types",
+      allLevels: "All Levels",
+      sourceAll: "All Quizzes",
+      sourceCustom: "Custom Only",
+      sourceReviews: "Reviews Only",
+      showingCount: (filtered: number, total: number) =>
+        `Showing ${filtered} of ${total} ${total === 1 ? "quiz" : "quizzes"}`,
+      clearFilters: "Clear filters",
+      noMatchingQuizzesTitle: "No quizzes match your filters",
+      noMatchingQuizzesDescription:
+        "Try clearing the search query or selecting a different activity type or CEFR level.",
     },
     noQuizzesTitle: "No quizzes yet",
     noQuizzesDescription:
@@ -387,6 +406,17 @@ const EN_MESSAGES = {
         `Removed ${formatPluralizedCount("en", count, { one: "review session", other: "review sessions" })}.`,
       emptySuccess: "No review sessions to remove.",
       failed: "Failed to remove review sessions",
+    },
+    deleteAllButton: "Delete All",
+    deleteAll: {
+      title: "Delete All Quizzes",
+      description: (count: number) =>
+        `Are you sure you want to delete all ${formatPluralizedCount("en", count, { one: "quiz", other: "quizzes" })} from My Quizzes? Their stored questions will be cleared, while History and statistics will stay available.`,
+      emptyDescription: "There are no quizzes to delete.",
+      success: (count: number) =>
+        `Deleted ${formatPluralizedCount("en", count, { one: "quiz", other: "quizzes" })}.`,
+      emptySuccess: "No quizzes to delete.",
+      failed: "Failed to delete all quizzes",
     },
   },
   createQuiz: {
@@ -717,6 +747,23 @@ const EN_MESSAGES = {
         `${count} consecutive ${count === 1 ? "day" : "days"}`,
       totalWordsTitle: "Total Words Tracked",
       totalWordsDescription: "vocabulary terms in your library",
+      mobileGapFill: {
+        levelBadge: (level: string) => `Level ${level}`,
+        chooseLevelLabel: "Level",
+        createGapFillButton: "Create Gap-Fill Exercise",
+        createTranslationButton: "Create Sentence Translation",
+        gapFillBadge: "Gap-Fill",
+        translationBadge: "Sentence Translation",
+        pasteTitle: "Paste Your Words",
+        pasteDescription: (level: string) =>
+          `Paste your words and press Generate (${level}).`,
+        pastePlaceholder: "Paste your vocabulary words or lesson notes here...",
+        generateButton: "Generate",
+        generatingStepParsing: "Reading your words...",
+        generatingStepBuilding: "Creating your exercise...",
+        backButton: "Back",
+        emptyInputError: "Please paste some words first.",
+      },
     },
     tutor: {
       newQuizTitle: "New Quiz",
@@ -736,11 +783,41 @@ const EN_MESSAGES = {
       passiveButtonSingle: "Import Passive Vocabulary",
       passiveButtonMultiple: "Choose Student",
       studentsTitle: "Students",
-      enrolledStudents: "connected students",
+      enrolledStudents: "active students",
       viewStudentsButton: "View Students",
       quizzesCreatedTitle: "Quizzes Created",
       remainingThisMonth: (count: number) => `${count} remaining this month`,
       unlimited: "Unlimited",
+      commandCenter: {
+        todayScheduleTitle: "Today & Upcoming Lessons",
+        todayScheduleDescription:
+          "Your upcoming sessions, lesson times, and student balance status.",
+        todayBadge: "Today",
+        noUpcomingLessons:
+          "No upcoming lessons scheduled for the next 7 days.",
+        openScheduleButton: "Open Schedule",
+        lessonsLeftBadge: (count: number) =>
+          `${count} ${count === 1 ? "lesson" : "lessons"} left`,
+        homeworkSnapshotTitle: "Activity Since Last Lesson",
+        homeworkSnapshotDescription:
+          "Exercises completed by your active students since their last completed lesson.",
+        noActiveStudents: "Connect an active student to see their activity.",
+        lastLessonLabel: (dateLabel: string) => `Last lesson: ${dateLabel}`,
+        noPastLessonLabel: "No completed lesson yet (last 7 days)",
+        quizzesDoneBadge: (count: number) =>
+          `${count} ${count === 1 ? "exercise" : "exercises"}`,
+        avgScoreBadge: (score: number) => `Avg ${score}%`,
+        noActivitySinceLesson: "No exercises since last lesson",
+        openHistoryButton: "View Full History",
+        balanceAlertsTitle: "Low Balance Alerts",
+        balanceAlertsDescription:
+          "Active students who have 0 prepaid lessons left or a negative balance.",
+        allBalancesHealthy:
+          "All active students with priced lessons currently have prepaid balance.",
+        manageBalancesButton: "Manage Balances",
+        studentHubButton: "Progress",
+        historyButton: "History",
+      },
     },
     admin: {
       quizzesCreatedTitle: "Quizzes Created",
@@ -849,15 +926,16 @@ const EN_MESSAGES = {
     },
   },
   assignments: {
-    title: "Assignments",
-    tutorDescription: "Manage quiz assignments for your classes.",
+    title: "Homework",
+    tutorDescription:
+      "At-a-glance view of exercises and regularity for each active student since their last completed lesson.",
     studentDescription: "Quizzes assigned to you by your tutors.",
     reviewDescription: "Review student submissions and provide feedback.",
-    assignmentsTab: "Assignments",
+    assignmentsTab: "Homework",
     reviewTab: "Review",
-    noAssignmentsTitle: "No assignments yet",
+    noAssignmentsTitle: "No class assignments yet",
     noAssignmentsTutorDescription:
-      "Create your first assignment by selecting a class and quiz.",
+      "Create a formal class assignment by selecting a class and quiz.",
     noAssignmentsStudentDescription:
       "Your tutors haven't assigned any quizzes yet. Check back later!",
     noClassesJoinedTitle: "No classes joined",
@@ -872,7 +950,47 @@ const EN_MESSAGES = {
     done: "Done",
     start: "Start",
     retry: "Retry",
-    createAssignmentButton: "Create Assignment",
+    createAssignmentButton: "Create Class Assignment",
+    homeworkTracker: {
+      studentsPracticedKpi: "Students Practiced",
+      studentsPracticedHelper: "since their last completed lesson",
+      totalExercisesKpi: "Exercises Completed",
+      totalExercisesHelper: "across all active students since last lesson",
+      avgRegularityKpi: "7-Day Regularity",
+      avgRegularityHelper: "average active practice days per week",
+      filterAll: "All Active Students",
+      filterPracticed: "Practiced",
+      filterNeedsAttention: "No Activity Yet",
+      searchPlaceholder: "Search student by name...",
+      practicedBadge: "Practiced",
+      noActivityBadge: "No activity since lesson",
+      lastLessonLabel: (dateLabel: string) => `Last lesson: ${dateLabel}`,
+      noCompletedLessonYet: "No completed lesson yet (showing last 14 days)",
+      nextLessonLabel: (dateLabel: string) => `Next lesson: ${dateLabel}`,
+      exercisesMetric: "Exercises",
+      avgAccuracyMetric: "Avg Accuracy",
+      wordsPracticedMetric: "Words Practiced",
+      timeSpentMetric: "Time Spent",
+      regularityLabel: (activeDays: number) =>
+        `7-day regularity: ${activeDays}/7 days`,
+      copyReportSnippet: "Copy Report",
+      copiedReportToast: (name: string) =>
+        `Copied homework summary for ${name}`,
+      showExercises: (count: number) =>
+        `Show ${count} ${count === 1 ? "exercise" : "exercises"} since last lesson`,
+      hideExercises: "Hide exercises",
+      reviewAttempt: "Review",
+      openHistory: "History",
+      openProgress: "Progress",
+      noStudentsConnectedTitle: "No active students connected",
+      noStudentsConnectedDescription:
+        "Connect active students to automatically track the exercises they complete between lessons.",
+      noMatchingStudents: "No students match the selected filter.",
+      classAssignmentsSectionTitle: (count: number) =>
+        `Class Assignments (${count})`,
+      classAssignmentsSectionDescription:
+        "Optional formal quiz assignments linked to group classes.",
+    },
   },
   lessons: {
     title: "Lessons",
@@ -1181,17 +1299,88 @@ const EN_MESSAGES = {
   tutorMastery: {
     title: "Student Mastery",
     description:
-      "See how well your students know their vocabulary across all classes, including passive evidence imported from text they already understand.",
-    noClassesTitle: "No classes yet",
+      "Unified 3-state vocabulary mastery (Learning → Passive → Active), 5-axis skill pentagon, and data-informed teaching plans for your active students.",
+    noClassesTitle: "No active students yet",
     noClassesDescription:
-      "Create a class and invite students to see their vocabulary mastery here.",
-    noStudentsTitle: "No students enrolled",
+      "Connect an active student in My Students to track their 3-state vocabulary mastery here.",
+    noStudentsTitle: "No active students connected",
     noStudentsDescription:
-      "Your students will appear here once they join a class.",
-    studentOverviewTitle: "Student Overview",
+      "Your active students will appear here once connected.",
+    studentOverviewTitle: "Word Mastery Breakdown (SRS Levels 0–5)",
     studentOverviewDescription:
-      "Student summaries load first. Expand a student to load their words. Equivalent words is the single-word total from passive evidence used in passive-vocabulary estimates.",
+      "Expand a student to inspect, edit, or delete individual practiced vocabulary items.",
     unknownStudent: "Unknown",
+    unified: {
+      allStudentsRosterTitle: "Active Students — 3-State Vocabulary Matrix",
+      allStudentsRosterDescription:
+        "Compare Learning, Passive, and Active vocabulary across all active students. Click any student to open their deep-dive mastery profile, pentagon chart, and recommendations.",
+      selectedBadge: "Selected",
+      targetBadge: (level: string) => `Target ${level}`,
+      levelProgressionBadge: (current: string, next: string | null) =>
+        next ? `${current} → ${next}` : current,
+      percentToNextLevel: (pct: number, nextLevel: string | null) =>
+        nextLevel ? `${pct}% to ${nextLevel}` : `${pct}% of C2`,
+      ofTargetToNextLevel: (
+        current: number,
+        target: number,
+        nextLevel: string | null,
+      ) => {
+        const remaining = Math.max(0, target - current);
+        return nextLevel
+          ? `${current.toLocaleString()} / ${target.toLocaleString()} to reach ${nextLevel} (${remaining.toLocaleString()} left)`
+          : `${current.toLocaleString()} / ${target.toLocaleString()} C2 mastery (${remaining.toLocaleString()} left)`;
+      },
+      activeVocabLabel: "Active Vocabulary",
+      activeVocabSublabel: "Produced in speech & quizzes",
+      passiveVocabLabel: "Passive Vocabulary",
+      passiveVocabSublabel: "Recognized in text & exercises",
+      learningVocabLabel: "Learning Queue",
+      learningVocabSublabel: "Currently in progress & SRS review",
+      ofTarget: (current: number, target: number) =>
+        `${current.toLocaleString()} / ${target.toLocaleString()} target`,
+      activationRateLabel: (rate: number) => `${rate}% activation rate`,
+      wordsAndPhrasesLabel: (words: number, phrases: number) =>
+        `${words.toLocaleString()} words · ${phrases.toLocaleString()} phrases`,
+      srsReviewDueLabel: (mastered: number, total: number) =>
+        `${mastered.toLocaleString()} mastered of ${total.toLocaleString()} SRS words`,
+      practiceLearningButton: "Create Quiz",
+      manageDictionaryButton: "Manage Dictionary",
+      importPassiveButton: "Import Text / Words",
+      funnelTitle: (name: string) =>
+        `${name} — 3-State Vocabulary Funnel`,
+      funnelDescription:
+        "How words move from initial Learning practice into Passive recognition and confirmed Active production.",
+      recommendationsTitle: "Data-Informed Teaching Plan & Recommendations",
+      recommendationsDescription:
+        "Actionable next steps computed from the student's 3-state vocabulary balance, grammar mastery, and 30-day regularity.",
+      vocabDiagnosticTitle: "1. Vocabulary Activation & Balance",
+      vocabDiagnosticActivate: (passivePct: number, activePct: number) =>
+        `Passive recognition (${passivePct}% of target) is ahead of Active production (${activePct}% of target). Prioritize speaking prompts, sentence translation, and gap-fill production drills to activate passive words.`,
+      vocabDiagnosticBuildPassive: (passivePct: number) =>
+        `Passive vocabulary is at ${passivePct}% of level target. Import lesson reading texts or transcripts into Passive Vocabulary to expand recognition coverage.`,
+      vocabDiagnosticConsolidateLearning: (learningCount: number) =>
+        `${learningCount} words are currently in the Learning state. Run a targeted review quiz to move them into confirmed mastery.`,
+      vocabDiagnosticBalanced: (activePct: number, passivePct: number) =>
+        `Healthy progression (${activePct}% Active / ${passivePct}% Passive of CEFR target). Continue balanced input and speaking output.`,
+      grammarDiagnosticTitle: "2. Priority Grammar Topics for Target Level",
+      grammarDiagnosticSummary: (mastered: number, total: number, level: string) =>
+        `${mastered}/${total} ${level} grammar topics mastered.`,
+      grammarDiagnosticAllMastered:
+        "All grammar topics for this target CEFR level are marked mastered! Consider advancing the student's target CEFR level.",
+      grammarDiagnosticNextTopicsLabel: "Recommended next topics to cover:",
+      regularityDiagnosticTitle: "3. Regularity, Accuracy & Guided Hours",
+      regularityDiagnosticSummary: (
+        activeDays30: number,
+        avgScore: number,
+        totalHours: number,
+        targetHours: number,
+      ) =>
+        `${activeDays30} active days in last 30d · ${avgScore}% avg quiz accuracy · ${totalHours}h / ${targetHours}h guided level hours.`,
+      workflowActionsTitle: "Connected Tutor Workflow",
+      openPlanButton: "Update Plan & Report",
+      openHomeworkButton: "Check Homework",
+      openFullProgressButton: "Full Progress View",
+    },
     levelLabels: {
       new: "New",
       seen: "Seen",
@@ -1562,7 +1751,7 @@ const UK_MESSAGES: AppMessages = {
     myQuizzes: "Мої вікторини",
     myClasses: "Мої класи",
     lessons: "Уроки",
-    assignments: "Завдання",
+    assignments: "Домашнє завдання",
     progress: "Прогрес",
     plansAndReports: "Плани та звіти",
     plan: "План",
@@ -1816,6 +2005,25 @@ const UK_MESSAGES: AppMessages = {
       deleteAction: "Видалити",
       deleteAria: "Видалити вікторину",
       deleting: "Видалення...",
+      copyLinkAction: "Скопіювати посилання",
+      copiedLinkToast: "Посилання на вікторину скопійовано",
+      openQuizAction: "Відкрити",
+      moreTerms: (count: number) => `+ще ${count}`,
+    },
+    filters: {
+      searchPlaceholder:
+        "Пошук за назвою, граматичною темою або словом у вікторині...",
+      allTypes: "Усі типи",
+      allLevels: "Усі рівні",
+      sourceAll: "Усі вікторини",
+      sourceCustom: "Лише власні",
+      sourceReviews: "Лише повторення",
+      showingCount: (filtered: number, total: number) =>
+        `Показано ${filtered} із ${total} ${formatPluralizedCount("uk", total, { one: "вікторини", few: "вікторин", many: "вікторин" })}`,
+      clearFilters: "Скинути фільтри",
+      noMatchingQuizzesTitle: "Немає вікторин за вибраними фільтрами",
+      noMatchingQuizzesDescription:
+        "Спробуйте очистити пошук або обрати інший тип вправи чи рівень CEFR.",
     },
     noQuizzesTitle: "Поки немає вікторин",
     noQuizzesDescription:
@@ -1831,6 +2039,17 @@ const UK_MESSAGES: AppMessages = {
         `Видалено ${formatPluralizedCount("uk", count, { one: "сесію повторення", few: "сесії повторення", many: "сесій повторення" })}.`,
       emptySuccess: "Немає сесій повторення для видалення.",
       failed: "Не вдалося видалити сесії повторення",
+    },
+    deleteAllButton: "Видалити всі",
+    deleteAll: {
+      title: "Видалити всі вікторини",
+      description: (count: number) =>
+        `Ви впевнені, що хочете видалити всі ${formatPluralizedCount("uk", count, { one: "вікторину", few: "вікторини", many: "вікторин" })} з розділу "Мої вікторини"? Збережені запитання буде очищено, а історія та статистика залишаться доступними.`,
+      emptyDescription: "Немає вікторин для видалення.",
+      success: (count: number) =>
+        `Видалено ${formatPluralizedCount("uk", count, { one: "вікторину", few: "вікторини", many: "вікторин" })}.`,
+      emptySuccess: "Немає вікторин для видалення.",
+      failed: "Не вдалося видалити всі вікторини",
     },
   },
   createQuiz: {
@@ -2171,6 +2390,23 @@ const UK_MESSAGES: AppMessages = {
         `${formatPluralizedCount("uk", count, { one: "день", few: "дні", many: "днів" })} поспіль`,
       totalWordsTitle: "Усього слів у відстеженні",
       totalWordsDescription: "слів у вашій навчальній бібліотеці",
+      mobileGapFill: {
+        levelBadge: (level: string) => `Рівень ${level}`,
+        chooseLevelLabel: "Рівень",
+        createGapFillButton: "Створити вправу із пропусками",
+        createTranslationButton: "Створити переклад речень",
+        gapFillBadge: "Пропуски",
+        translationBadge: "Переклад речень",
+        pasteTitle: "Вставте свої слова",
+        pasteDescription: (level: string) =>
+          `Вставте слова та натисніть «Згенерувати» (${level}).`,
+        pastePlaceholder: "Вставте слова або нотатки з уроку сюди...",
+        generateButton: "Згенерувати",
+        generatingStepParsing: "Розпізнаємо ваші слова...",
+        generatingStepBuilding: "Створюємо вашу вправу...",
+        backButton: "Назад",
+        emptyInputError: "Спочатку вставте слова.",
+      },
     },
     tutor: {
       newQuizTitle: "Нова вікторина",
@@ -2190,11 +2426,42 @@ const UK_MESSAGES: AppMessages = {
       passiveButtonSingle: "Імпортувати пасивний словник",
       passiveButtonMultiple: "Обрати студента",
       studentsTitle: "Студенти",
-      enrolledStudents: "під’єднаних студентів",
+      enrolledStudents: "активних студентів",
       viewStudentsButton: "Переглянути студентів",
       quizzesCreatedTitle: "Створено вікторин",
       remainingThisMonth: (count: number) => `Цього місяця залишилося ${count}`,
       unlimited: "Без ліміту",
+      commandCenter: {
+        todayScheduleTitle: "Сьогоднішні та найближчі уроки",
+        todayScheduleDescription:
+          "Ваші найближчі заняття, час проведення та стан балансу учнів.",
+        todayBadge: "Сьогодні",
+        noUpcomingLessons:
+          "На найближчі 7 днів запланованих уроків немає.",
+        openScheduleButton: "Відкрити розклад",
+        lessonsLeftBadge: (count: number) =>
+          `Залишилось: ${formatPluralizedCount("uk", count, { one: "урок", few: "уроки", many: "уроків" })}`,
+        homeworkSnapshotTitle: "Активність після останнього уроку",
+        homeworkSnapshotDescription:
+          "Вправи, виконані активними учнями після останнього завершеного заняття.",
+        noActiveStudents:
+          "Під’єднайте активного учня, щоб бачити його активність.",
+        lastLessonLabel: (dateLabel: string) => `Останній урок: ${dateLabel}`,
+        noPastLessonLabel: "Завершених уроків ще немає (за 7 днів)",
+        quizzesDoneBadge: (count: number) =>
+          `${formatPluralizedCount("uk", count, { one: "вправа", few: "вправи", many: "вправ" })}`,
+        avgScoreBadge: (score: number) => `Сер. ${score}%`,
+        noActivitySinceLesson: "Немає вправ після останнього уроку",
+        openHistoryButton: "Переглянути історію",
+        balanceAlertsTitle: "Сповіщення про низький баланс",
+        balanceAlertsDescription:
+          "Активні учні, у яких залишилося 0 передплачених уроків або від’ємний баланс.",
+        allBalancesHealthy:
+          "У всіх активних учнів із встановленою ціною уроку є передплачений баланс.",
+        manageBalancesButton: "Керувати балансами",
+        studentHubButton: "Прогрес",
+        historyButton: "Історія",
+      },
     },
     admin: {
       quizzesCreatedTitle: "Створено вікторин",
@@ -2303,15 +2570,16 @@ const UK_MESSAGES: AppMessages = {
     },
   },
   assignments: {
-    title: "Завдання",
-    tutorDescription: "Керуйте призначеними вікторинами для своїх класів.",
+    title: "Домашнє завдання",
+    tutorDescription:
+      "Наочний огляд виконаних вправ та регулярності практики кожного активного учня після останнього завершеного уроку.",
     studentDescription: "Вікторини, які вам призначили викладачі.",
     reviewDescription: "Переглядайте роботи студентів і залишайте відгук.",
-    assignmentsTab: "Завдання",
+    assignmentsTab: "Домашнє завдання",
     reviewTab: "Перевірка",
-    noAssignmentsTitle: "Поки немає завдань",
+    noAssignmentsTitle: "Поки немає завдань для класів",
     noAssignmentsTutorDescription:
-      "Створіть перше завдання, обравши клас і вікторину.",
+      "Створіть формальне завдання, обравши клас і вікторину.",
     noAssignmentsStudentDescription:
       "Ваші викладачі ще не призначили жодної вікторини. Загляньте пізніше!",
     noClassesJoinedTitle: "Ви ще не приєдналися до жодного класу",
@@ -2326,7 +2594,48 @@ const UK_MESSAGES: AppMessages = {
     done: "Виконано",
     start: "Почати",
     retry: "Спробувати ще раз",
-    createAssignmentButton: "Створити завдання",
+    createAssignmentButton: "Завдання для класу",
+    homeworkTracker: {
+      studentsPracticedKpi: "Практикувалися",
+      studentsPracticedHelper: "після останнього завершеного уроку",
+      totalExercisesKpi: "Виконано вправ",
+      totalExercisesHelper: "усіма активними учнями після останнього уроку",
+      avgRegularityKpi: "Регулярність (7 дн.)",
+      avgRegularityHelper: "середня кількість активних днів за тиждень",
+      filterAll: "Усі активні учні",
+      filterPracticed: "Виконали ДЗ",
+      filterNeedsAttention: "Без активності",
+      searchPlaceholder: "Пошук учня за ім’ям...",
+      practicedBadge: "Виконано ДЗ",
+      noActivityBadge: "Немає вправ після уроку",
+      lastLessonLabel: (dateLabel: string) => `Останній урок: ${dateLabel}`,
+      noCompletedLessonYet:
+        "Завершених уроків ще немає (показано за 14 днів)",
+      nextLessonLabel: (dateLabel: string) => `Наступний урок: ${dateLabel}`,
+      exercisesMetric: "Вправи",
+      avgAccuracyMetric: "Сер. точність",
+      wordsPracticedMetric: "Слів опрацьовано",
+      timeSpentMetric: "Час практики",
+      regularityLabel: (activeDays: number) =>
+        `Регулярність за 7 дн.: ${activeDays}/7 дн.`,
+      copyReportSnippet: "Скопіювати звіт",
+      copiedReportToast: (name: string) =>
+        `Зведення домашнього завдання для ${name} скопійовано`,
+      showExercises: (count: number) =>
+        `Показати ${formatPluralizedCount("uk", count, { one: "вправу", few: "вправи", many: "вправ" })} після останнього уроку`,
+      hideExercises: "Сховати вправи",
+      reviewAttempt: "Перевірити",
+      openHistory: "Історія",
+      openProgress: "Прогрес",
+      noStudentsConnectedTitle: "Немає активних під’єднаних учнів",
+      noStudentsConnectedDescription:
+        "Під’єднайте активних учнів, щоб автоматично відстежувати вправи, які вони виконують між уроками.",
+      noMatchingStudents: "Немає учнів за вибраним фільтром.",
+      classAssignmentsSectionTitle: (count: number) =>
+        `Завдання для класів (${count})`,
+      classAssignmentsSectionDescription:
+        "Додаткові формальні завдання, прив’язані до групових класів.",
+    },
   },
   lessons: {
     title: "Уроки",
@@ -2638,19 +2947,90 @@ const UK_MESSAGES: AppMessages = {
     articleEditorRevokedLabel: "Не надано",
   },
   tutorMastery: {
-    title: "Засвоєння студентів",
+    title: "Засвоєння словника",
     description:
-      "Переглядайте, наскільки добре ваші студенти знають лексику в усіх класах, включно з пасивними свідченнями, імпортованими з текстів, які вони вже розуміють.",
-    noClassesTitle: "Поки немає класів",
+      "Єдина 3-рівнева система словникового запасу (Навчальний → Пасивний → Активний), п’ятикутник навичок і рекомендації для планування навчання активних студентів.",
+    noClassesTitle: "Поки немає активних студентів",
     noClassesDescription:
-      "Створіть клас і запросіть студентів, щоб побачити тут їхнє засвоєння слів.",
-    noStudentsTitle: "Немає зарахованих студентів",
+      "Під’єднайте активного студента на сторінці Мої студенти, щоб відстежувати його 3-рівневий словниковий запас.",
+    noStudentsTitle: "Немає активних під’єднаних студентів",
     noStudentsDescription:
-      "Ваші студенти з'являться тут, щойно приєднаються до класу.",
-    studentOverviewTitle: "Огляд студентів",
+      "Ваші активні студенти з’являться тут після підключення.",
+    studentOverviewTitle: "Деталізація засвоєння слів (рівні SRS 0–5)",
     studentOverviewDescription:
-      "Спочатку завантажуються короткі зведення по студентах. Розгорніть студента, щоб завантажити його слова. Еквівалентні слова - це сума одиночних слів із пасивних свідчень, яка використовується в оцінках пасивного словника.",
+      "Розгорніть картку студента, щоб переглянути, відредагувати або видалити окремі слова з практики.",
     unknownStudent: "Невідомо",
+    unified: {
+      allStudentsRosterTitle: "Активні студенти — Матриця 3 станів словника",
+      allStudentsRosterDescription:
+        "Порівнюйте Навчальний, Пасивний та Активний словниковий запас усіх активних учнів. Натисніть на учня, щоб відкрити його детальний профіль, п’ятикутник навичок і план дій.",
+      selectedBadge: "Вибрано",
+      targetBadge: (level: string) => `Ціль ${level}`,
+      levelProgressionBadge: (current: string, next: string | null) =>
+        next ? `${current} → ${next}` : current,
+      percentToNextLevel: (pct: number, nextLevel: string | null) =>
+        nextLevel ? `${pct}% до ${nextLevel}` : `${pct}% від C2`,
+      ofTargetToNextLevel: (
+        current: number,
+        target: number,
+        nextLevel: string | null,
+      ) => {
+        const remaining = Math.max(0, target - current);
+        return nextLevel
+          ? `${current.toLocaleString()} / ${target.toLocaleString()} до рівня ${nextLevel} (залишилось ${remaining.toLocaleString()})`
+          : `${current.toLocaleString()} / ${target.toLocaleString()} рівня C2 (залишилось ${remaining.toLocaleString()})`;
+      },
+      activeVocabLabel: "Активний словник",
+      activeVocabSublabel: "Використано в мовленні та вправах",
+      passiveVocabLabel: "Пасивний словник",
+      passiveVocabSublabel: "Розпізнається в текстах і вправах",
+      learningVocabLabel: "Навчальний словник",
+      learningVocabSublabel: "У процесі вивчення та повторення SRS",
+      ofTarget: (current: number, target: number) =>
+        `${current.toLocaleString()} / ${target.toLocaleString()} ціль`,
+      activationRateLabel: (rate: number) => `${rate}% коефіцієнт активації`,
+      wordsAndPhrasesLabel: (words: number, phrases: number) =>
+        `${words.toLocaleString()} слів · ${phrases.toLocaleString()} фраз`,
+      srsReviewDueLabel: (mastered: number, total: number) =>
+        `${mastered.toLocaleString()} засвоєно з ${total.toLocaleString()} слів SRS`,
+      practiceLearningButton: "Створити вправу",
+      manageDictionaryButton: "Керувати словником",
+      importPassiveButton: "Імпортувати текст / слова",
+      funnelTitle: (name: string) =>
+        `${name} — Воронка 3 станів словникового запасу`,
+      funnelDescription:
+        "Як слова переходять від початкового вивчення до пасивного розпізнавання та підтвердженого активного вживання.",
+      recommendationsTitle: "Рекомендації на основі даних і навчальний план",
+      recommendationsDescription:
+        "Конкретні наступні кроки на основі балансу 3 станів словника, засвоєної граматики та регулярності за 30 днів.",
+      vocabDiagnosticTitle: "1. Активація та баланс словникового запасу",
+      vocabDiagnosticActivate: (passivePct: number, activePct: number) =>
+        `Пасивне розпізнавання (${passivePct}% від цілі) випереджає активне вживання (${activePct}% від цілі). Зробіть акцент на розмовних завданнях, перекладі речень і вправах із пропусками для активації пасивної лексики.`,
+      vocabDiagnosticBuildPassive: (passivePct: number) =>
+        `Пасивний словник становить ${passivePct}% від цілі рівня. Імпортуйте тексти уроків або транскрипти до пасивного словника для розширення бази розпізнавання.`,
+      vocabDiagnosticConsolidateLearning: (learningCount: number) =>
+        `${learningCount} слів зараз перебувають у стані «Навчальний». Створіть цільову вікторину для повторення, щоб закріпити їх.`,
+      vocabDiagnosticBalanced: (activePct: number, passivePct: number) =>
+        `Збалансований розвиток (${activePct}% Активний / ${passivePct}% Пасивний від цілі CEFR). Продовжуйте поєднувати роботу з текстом і розмовну практику.`,
+      grammarDiagnosticTitle: "2. Пріоритетні граматичні теми для цільового рівня",
+      grammarDiagnosticSummary: (mastered: number, total: number, level: string) =>
+        `Засвоєно ${mastered}/${total} граматичних тем рівня ${level}.`,
+      grammarDiagnosticAllMastered:
+        "Усі граматичні теми для поточного цільового рівня CEFR позначено як засвоєні! Розгляньте перехід на наступний рівень CEFR.",
+      grammarDiagnosticNextTopicsLabel: "Рекомендовані наступні теми для опрацювання:",
+      regularityDiagnosticTitle: "3. Регулярність, точність і навчальні години",
+      regularityDiagnosticSummary: (
+        activeDays30: number,
+        avgScore: number,
+        totalHours: number,
+        targetHours: number,
+      ) =>
+        `${activeDays30} активних дн. за 30 дн. · ${avgScore}% сер. точність · ${totalHours} год / ${targetHours} год рівня.`,
+      workflowActionsTitle: "Пов’язаний робочий процес викладача",
+      openPlanButton: "Оновити план і звіт",
+      openHomeworkButton: "Перевірити ДЗ",
+      openFullProgressButton: "Повний прогрес",
+    },
     levelLabels: {
       new: "Нове",
       seen: "Бачив",

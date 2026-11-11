@@ -2038,6 +2038,7 @@ export interface Database {
           monthly_completed_lessons_target: number | null;
           monthly_new_mastery_words_target: number | null;
           monthly_average_score_target: number | null;
+          archived_at: string | null;
           created_at: string;
           connected_at: string | null;
           updated_at: string;
@@ -2060,6 +2061,7 @@ export interface Database {
           monthly_completed_lessons_target?: number | null;
           monthly_new_mastery_words_target?: number | null;
           monthly_average_score_target?: number | null;
+          archived_at?: string | null;
           created_at?: string;
           connected_at?: string | null;
           updated_at?: string;
@@ -2081,6 +2083,7 @@ export interface Database {
           monthly_completed_lessons_target?: number | null;
           monthly_new_mastery_words_target?: number | null;
           monthly_average_score_target?: number | null;
+          archived_at?: string | null;
           updated_at?: string;
         };
         Relationships: [
