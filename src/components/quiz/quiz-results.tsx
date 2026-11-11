@@ -23,6 +23,10 @@ import type { TranslationResult } from "./translation-player";
 import type { QuizConfig } from "@/types/quiz";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import {
+  ExplainWithAIButton,
+  useSyncExerciseAssistantContext,
+} from "@/components/quiz/exercise-assistant";
+import {
   getLearningLanguageLabel,
   getSourceLanguageLabel,
   normalizeLearningLanguage,
@@ -32,6 +36,7 @@ import {
 interface QuizResultsProps {
   type: "mcq" | "gap_fill" | "translation" | "text_translation";
   quizId: string;
+  cefrLevel?: string;
   timeSpentSeconds: number;
   mcqResults?: MCQResult[];
   gapFillResults?: GapFillResult[];
@@ -44,6 +49,7 @@ interface QuizResultsProps {
 export function QuizResults({
   type,
   quizId,
+  cefrLevel,
   timeSpentSeconds,
   mcqResults,
   gapFillResults,
@@ -123,6 +129,40 @@ export function QuizResults({
     textTranslationResults,
     translationResults,
   ]);
+
+  const firstMcq = mcqResults?.[0];
+  const firstGap = gapFillResults?.[0];
+  const firstTrans = translationResults?.[0];
+  const firstTextTrans = textTranslationResults?.[0];
+
+  useSyncExerciseAssistantContext({
+    itemKey: `results-${type}-0`,
+    quizType: "results",
+    cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+    targetLanguage: quizConfig?.targetLanguage,
+    sourceLanguage: quizConfig?.sourceLanguage,
+    isAnswered: true,
+    itemLabel: messages.quizSession.results.quizCompleteTitle,
+    questionText:
+      firstMcq?.question ??
+      firstGap?.sentence ??
+      firstTrans?.ukrainianSentence ??
+      firstTextTrans?.originalText,
+    userAnswer:
+      firstMcq?.selectedAnswer ??
+      firstGap?.userAnswer ??
+      firstTrans?.userTranslation ??
+      firstTextTrans?.userTranslation,
+    correctAnswer:
+      firstMcq?.correctAnswer ??
+      firstGap?.correctAnswer ??
+      firstTrans?.referenceTranslation ??
+      firstTextTrans?.referenceTranslation,
+    isCorrect: firstMcq?.isCorrect ?? firstGap?.isCorrect,
+    score: firstTrans?.score ?? firstTextTrans?.score,
+    feedback: firstTrans?.feedback ?? firstTextTrans?.feedback,
+  });
+
   if (type === "mcq" && mcqResults) {
     const correct = mcqResults.filter((r) => r.isCorrect).length;
     const total = mcqResults.length;
@@ -143,30 +183,48 @@ export function QuizResults({
             {mcqResults.map((result, index) => (
               <div
                 key={index}
-                className={`flex items-start gap-3 rounded-md p-3 ${
+                className={`flex flex-wrap items-start justify-between gap-3 rounded-md p-3 ${
                   result.isCorrect
                     ? "bg-green-50 dark:bg-green-950/30"
                     : "bg-red-50 dark:bg-red-950/30"
                 }`}
               >
-                {result.isCorrect ? (
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
-                ) : (
-                  <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-                )}
-                <div className="text-sm">
-                  <p className="mb-1 font-medium">{result.question}</p>
-                  <p>
-                    {messages.quizSession.results.yourAnswer}:{" "}
-                    <strong>{result.selectedAnswer || "—"}</strong>
-                  </p>
-                  {!result.isCorrect ? (
-                    <p className="text-muted-foreground">
-                      {messages.quizSession.results.correctAnswer}:{" "}
-                      <strong>{result.correctAnswer}</strong>
+                <div className="flex items-start gap-3">
+                  {result.isCorrect ? (
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+                  ) : (
+                    <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                  )}
+                  <div className="text-sm">
+                    <p className="mb-1 font-medium">{result.question}</p>
+                    <p>
+                      {messages.quizSession.results.yourAnswer}:{" "}
+                      <strong>{result.selectedAnswer || "—"}</strong>
                     </p>
-                  ) : null}
+                    {!result.isCorrect ? (
+                      <p className="text-muted-foreground">
+                        {messages.quizSession.results.correctAnswer}:{" "}
+                        <strong>{result.correctAnswer}</strong>
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
+                <ExplainWithAIButton
+                  contextOverride={{
+                    itemKey: `results-mcq-${result.questionId ?? index}`,
+                    quizType: "results",
+                    cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+                    targetLanguage: quizConfig?.targetLanguage,
+                    sourceLanguage: quizConfig?.sourceLanguage,
+                    isAnswered: true,
+                    itemLabel: `#${index + 1}`,
+                    questionText: result.question,
+                    targetTerm: result.originalTerm,
+                    userAnswer: result.selectedAnswer || undefined,
+                    correctAnswer: result.correctAnswer,
+                    isCorrect: result.isCorrect,
+                  }}
+                />
               </div>
             ))}
 
@@ -214,29 +272,50 @@ export function QuizResults({
             {gapFillResults.map((result, index) => (
               <div
                 key={index}
-                className={`flex items-start gap-3 p-3 rounded-md ${
+                className={`flex flex-wrap items-start justify-between gap-3 p-3 rounded-md ${
                   result.isCorrect
                     ? "bg-green-50 dark:bg-green-950/30"
                     : "bg-red-50 dark:bg-red-950/30"
                 }`}
               >
-                {result.isCorrect ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
-                )}
-                <div className="text-sm">
-                  <p>
-                    {messages.quizSession.results.yourAnswer}:{" "}
-                    <strong>{result.userAnswer}</strong>
-                  </p>
-                  {!result.isCorrect && (
-                    <p className="text-muted-foreground">
-                      {messages.quizSession.results.correctAnswer}:{" "}
-                      <strong>{result.correctAnswer}</strong>
-                    </p>
+                <div className="flex items-start gap-3">
+                  {result.isCorrect ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
                   )}
+                  <div className="text-sm">
+                    {result.sentence ? (
+                      <p className="mb-1 font-medium">{result.sentence}</p>
+                    ) : null}
+                    <p>
+                      {messages.quizSession.results.yourAnswer}:{" "}
+                      <strong>{result.userAnswer || "—"}</strong>
+                    </p>
+                    {!result.isCorrect && (
+                      <p className="text-muted-foreground">
+                        {messages.quizSession.results.correctAnswer}:{" "}
+                        <strong>{result.correctAnswer}</strong>
+                      </p>
+                    )}
+                  </div>
                 </div>
+                <ExplainWithAIButton
+                  contextOverride={{
+                    itemKey: `results-gap_fill-${result.questionId ?? index}`,
+                    quizType: "results",
+                    cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+                    targetLanguage: quizConfig?.targetLanguage,
+                    sourceLanguage: quizConfig?.sourceLanguage,
+                    isAnswered: true,
+                    itemLabel: `#${index + 1}`,
+                    questionText: result.sentence,
+                    targetTerm: result.correctAnswer,
+                    userAnswer: result.userAnswer || undefined,
+                    correctAnswer: result.correctAnswer,
+                    isCorrect: result.isCorrect,
+                  }}
+                />
               </div>
             ))}
 
@@ -285,22 +364,44 @@ export function QuizResults({
             {translationResults.map((result, index) => {
               return (
                 <div key={index} className="p-3 rounded-md bg-muted space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-medium">
                       {messages.quizSession.results.sentenceLabel(index + 1)}
                     </p>
-                    <Badge
-                      variant="outline"
-                      className={
-                        result.score >= 80
-                          ? "text-green-600"
-                          : result.score >= 50
-                            ? "text-orange-600"
-                            : "text-red-600"
-                      }
-                    >
-                      {result.score}/100
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className={
+                          result.score >= 80
+                            ? "text-green-600"
+                            : result.score >= 50
+                              ? "text-orange-600"
+                              : "text-red-600"
+                        }
+                      >
+                        {result.score}/100
+                      </Badge>
+                      <ExplainWithAIButton
+                        contextOverride={{
+                          itemKey: `results-translation-${result.questionId ?? index}`,
+                          quizType: "results",
+                          cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+                          targetLanguage: quizConfig?.targetLanguage,
+                          sourceLanguage: quizConfig?.sourceLanguage,
+                          isAnswered: true,
+                          itemLabel: messages.quizSession.results.sentenceLabel(
+                            index + 1,
+                          ),
+                          sourceSentence: stripMarkdownEmphasis(
+                            result.ukrainianSentence,
+                          ),
+                          userAnswer: result.userTranslation,
+                          correctAnswer: result.referenceTranslation,
+                          score: result.score,
+                          feedback: result.feedback,
+                        }}
+                      />
+                    </div>
                   </div>
                   <p className="text-sm">
                     {stripMarkdownEmphasis(result.ukrainianSentence)}
@@ -383,6 +484,26 @@ export function QuizResults({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex justify-end">
+              <ExplainWithAIButton
+                contextOverride={{
+                  itemKey: "results-text_translation-0",
+                  quizType: "results",
+                  cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+                  targetLanguage: quizConfig?.targetLanguage,
+                  sourceLanguage: quizConfig?.sourceLanguage,
+                  isAnswered: true,
+                  itemLabel:
+                    messages.quizSession.results.textTranslationCompleteTitle,
+                  sourceSentence: stripMarkdownEmphasis(result.originalText),
+                  userAnswer: result.userTranslation,
+                  correctAnswer: result.referenceTranslation,
+                  score: result.score,
+                  feedback: result.feedback,
+                }}
+              />
+            </div>
+
             <div className="rounded-md bg-muted p-4 space-y-2">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {messages.quizSession.results.sourceText(sourceLanguageLabel)}

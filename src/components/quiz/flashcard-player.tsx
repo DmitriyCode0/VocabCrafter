@@ -13,6 +13,10 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { FlashcardItem, QuizConfig } from "@/types/quiz";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import {
+  ExplainWithAIButton,
+  useSyncExerciseAssistantContext,
+} from "@/components/quiz/exercise-assistant";
+import {
   normalizeLearningLanguage,
   normalizeSourceLanguage,
 } from "@/lib/languages";
@@ -23,12 +27,14 @@ export interface FlashcardResult {
 
 interface FlashcardPlayerProps {
   cards: FlashcardItem[];
+  cefrLevel?: string;
   quizConfig?: QuizConfig;
   onComplete: (results: FlashcardResult[]) => void;
 }
 
 export function FlashcardPlayer({
   cards,
+  cefrLevel,
   quizConfig,
   onComplete,
 }: FlashcardPlayerProps) {
@@ -43,6 +49,22 @@ export function FlashcardPlayer({
   const progress = (Math.min(currentIndex + 1, cards.length) / cards.length) * 100;
   const remainingCount = Math.max(0, cards.length - currentIndex - 1);
   const isLastCard = currentIndex === cards.length - 1;
+
+  useSyncExerciseAssistantContext({
+    itemKey: `flashcard-${currentIndex}-${card?.term ?? ""}`,
+    quizType: "flashcards",
+    cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+    targetLanguage: quizConfig?.targetLanguage,
+    sourceLanguage: quizConfig?.sourceLanguage,
+    isAnswered: true,
+    itemLabel: messages.quizSession.flashcards.progress(
+      currentIndex + 1,
+      cards.length,
+    ),
+    targetTerm: card?.term,
+    definition: card?.definition,
+    example: card?.example,
+  });
 
   function goNext() {
     setSlideDirection(1);
@@ -68,16 +90,19 @@ export function FlashcardPlayer({
     <div className="mx-auto w-full max-w-6xl space-y-6">
       <div className="mx-auto max-w-4xl rounded-2xl border border-border/70 bg-card/50 px-4 py-4 shadow-none backdrop-blur-sm transition-shadow duration-300 hover:shadow-[0_14px_36px_rgba(15,23,42,0.06)] sm:px-5">
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-medium text-foreground">
-              {messages.quizSession.flashcards.progress(
-                currentIndex + 1,
-                cards.length,
-              )}
-            </span>
-            <span className="text-muted-foreground">
-              {messages.quizSession.flashcards.remaining(remainingCount)}
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-foreground">
+                {messages.quizSession.flashcards.progress(
+                  currentIndex + 1,
+                  cards.length,
+                )}
+              </span>
+              <span className="text-muted-foreground">
+                {messages.quizSession.flashcards.remaining(remainingCount)}
+              </span>
+            </div>
+            <ExplainWithAIButton />
           </div>
           <Progress value={progress} className="h-2.5" />
         </div>

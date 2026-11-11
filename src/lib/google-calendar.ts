@@ -741,8 +741,8 @@ function buildGoogleCalendarEventPayload(lesson: LessonGoogleCalendarSyncRow) {
     summary: lesson.title?.trim()
       ? `${getLessonDisplayTitle(lesson.title)} · ${studentName}`
       : lesson.student_id
-        ? `Lesson with ${studentName}`
-        : "One-time lesson",
+        ? `English ${studentName}`
+        : "English Lesson",
     description: descriptionLines.join("\n\n"),
     status: lesson.status === "cancelled" ? "cancelled" : "confirmed",
     attendees: attendees.length > 0 ? attendees : undefined,

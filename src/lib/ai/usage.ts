@@ -8,6 +8,7 @@ export type AIUsageFeature =
   | "review_activity"
   | "parse_input"
   | "evaluate"
+  | "exercise_assistant"
   | "progress_insights"
   | "monthly_report"
   | "passive_vocabulary_enrichment"

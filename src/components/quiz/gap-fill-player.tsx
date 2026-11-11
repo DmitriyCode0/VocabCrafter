@@ -16,16 +16,22 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import type { GapFillQuestion, QuizConfig } from "@/types/quiz";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
+import {
+  ExplainWithAIButton,
+  useSyncExerciseAssistantContext,
+} from "@/components/quiz/exercise-assistant";
 import { normalizeLearningLanguage } from "@/lib/languages";
 
 interface GapFillPlayerProps {
   questions: GapFillQuestion[];
+  cefrLevel?: string;
   quizConfig?: QuizConfig;
   onComplete: (results: GapFillResult[]) => void;
 }
 
 export interface GapFillResult {
   questionId: number;
+  sentence?: string;
   userAnswer: string;
   correctAnswer: string;
   isCorrect: boolean;
@@ -33,6 +39,7 @@ export interface GapFillResult {
 
 export function GapFillPlayer({
   questions,
+  cefrLevel,
   quizConfig,
   onComplete,
 }: GapFillPlayerProps) {
@@ -56,6 +63,7 @@ export function GapFillPlayer({
   const results: GapFillResult[] = questions
     .map((currentQuestion, index) => ({
       questionId: currentQuestion.id,
+      sentence: currentQuestion.sentence,
       userAnswer: answers[index] ?? "",
       correctAnswer: currentQuestion.correctAnswer,
       isCorrect:
@@ -69,6 +77,25 @@ export function GapFillPlayer({
     submitted &&
     userAnswer.trim().toLowerCase() === question.correctAnswer.toLowerCase();
   const allCompleted = completedCount === questions.length;
+
+  useSyncExerciseAssistantContext({
+    itemKey: `gap_fill-${question.id ?? currentIndex}`,
+    quizType: "gap_fill",
+    cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+    targetLanguage: quizConfig?.targetLanguage,
+    sourceLanguage: quizConfig?.sourceLanguage,
+    isAnswered: submitted,
+    itemLabel: messages.quizSession.gapFill.progress(
+      currentIndex + 1,
+      questions.length,
+    ),
+    questionText: question.sentence,
+    hint: question.hint,
+    targetTerm: question.correctAnswer,
+    userAnswer: userAnswer.trim() || undefined,
+    correctAnswer: question.correctAnswer,
+    isCorrect: submitted ? isCorrect : undefined,
+  });
 
   function handleSubmit() {
     if (!userAnswer.trim()) return;
@@ -247,32 +274,33 @@ export function GapFillPlayer({
 
           {submitted && (
             <div
-              className={`flex items-start gap-2 p-3 rounded-md ${
+              className={`flex flex-wrap items-center justify-between gap-3 p-3 rounded-md ${
                 isCorrect
                   ? "bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-300"
                   : "bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-300"
               }`}
             >
-              {isCorrect ? (
-                <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
-              ) : (
-                <XCircle className="h-5 w-5 mt-0.5 shrink-0" />
-              )}
-              <div>
+              <div className="flex items-start gap-2">
                 {isCorrect ? (
-                  <p className="font-medium">
-                    {messages.quizSession.gapFill.correct}
-                  </p>
+                  <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
                 ) : (
-                  <>
+                  <XCircle className="h-5 w-5 mt-0.5 shrink-0" />
+                )}
+                <div>
+                  {isCorrect ? (
+                    <p className="font-medium">
+                      {messages.quizSession.gapFill.correct}
+                    </p>
+                  ) : (
                     <p className="font-medium">
                       {messages.quizSession.gapFill.incorrect(
                         question.correctAnswer,
                       )}
                     </p>
-                  </>
-                )}
+                  )}
+                </div>
               </div>
+              <ExplainWithAIButton />
             </div>
           )}
         </CardContent>

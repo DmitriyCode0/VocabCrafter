@@ -21,6 +21,10 @@ import {
   normalizeSourceLanguage,
 } from "@/lib/languages";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
+import {
+  ExplainWithAIButton,
+  useSyncExerciseAssistantContext,
+} from "@/components/quiz/exercise-assistant";
 import { TranslationFeedbackList } from "@/components/quiz/translation-feedback-list";
 
 interface TranslationPlayerProps {
@@ -84,6 +88,28 @@ export function TranslationPlayer({
       : grammarTopic
         ? getGrammarTopicDisplayName(quizConfig, grammarTopic)
         : null);
+
+  const isAnswered = Boolean(evaluation && evaluation.score >= 0);
+
+  useSyncExerciseAssistantContext({
+    itemKey: `translation-${question.id ?? currentIndex}`,
+    quizType: "translation",
+    cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+    targetLanguage: quizConfig?.targetLanguage,
+    sourceLanguage: quizConfig?.sourceLanguage,
+    isAnswered,
+    itemLabel: messages.quizSession.translation.progress(
+      currentIndex + 1,
+      questions.length,
+    ),
+    sourceSentence: stripMarkdownEmphasis(question.ukrainianSentence),
+    targetTerm: question.sourceTerm,
+    grammarTopic: displayedGrammarTopic ?? undefined,
+    userAnswer: userTranslation.trim() || undefined,
+    correctAnswer: question.englishReference,
+    score: isAnswered ? evaluation?.score : undefined,
+    feedback: isAnswered ? evaluation?.feedback : undefined,
+  });
 
   /** Bold the target vocabulary word in the source sentence */
   function renderHighlightedSentence(
@@ -373,13 +399,16 @@ export function TranslationPlayer({
 
           {evaluation && evaluation.score >= 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-md bg-muted">
-                <span className="font-medium">{messages.common.score}</span>
-                <span
-                  className={`text-2xl font-bold ${getScoreColor(evaluation.score)}`}
-                >
-                  {evaluation.score}/100
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-md bg-muted">
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">{messages.common.score}</span>
+                  <span
+                    className={`text-2xl font-bold ${getScoreColor(evaluation.score)}`}
+                  >
+                    {evaluation.score}/100
+                  </span>
+                </div>
+                <ExplainWithAIButton />
               </div>
 
               {hasVisibleFeedback && (

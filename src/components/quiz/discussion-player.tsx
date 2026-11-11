@@ -6,6 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
+import {
+  ExplainWithAIButton,
+  useSyncExerciseAssistantContext,
+} from "@/components/quiz/exercise-assistant";
 import { toast } from "sonner";
 import { Loader2, RefreshCw } from "lucide-react";
 import type { DiscussionPrompt, QuizConfig, QuizTerm } from "@/types/quiz";
@@ -14,6 +18,7 @@ interface DiscussionPlayerProps {
   quizId: string;
   prompts: DiscussionPrompt[];
   vocabularyTerms?: QuizTerm[];
+  cefrLevel?: string;
   quizConfig?: QuizConfig;
   isOwner?: boolean;
   onPromptsChange?: (prompts: DiscussionPrompt[]) => void;
@@ -52,6 +57,7 @@ export function DiscussionPlayer({
   quizId,
   prompts,
   vocabularyTerms = [],
+  cefrLevel,
   quizConfig,
   isOwner = false,
   onPromptsChange,
@@ -67,6 +73,19 @@ export function DiscussionPlayer({
       prompt.sourceTerm ?? prompt.highlightText ?? vocabularyTerms[index]?.term
     );
   }
+
+  const firstPrompt = prompts[0];
+  useSyncExerciseAssistantContext({
+    itemKey: `discussion-${firstPrompt?.id ?? 0}`,
+    quizType: "discussion",
+    cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+    targetLanguage: quizConfig?.targetLanguage,
+    sourceLanguage: quizConfig?.sourceLanguage,
+    isAnswered: true,
+    itemLabel: messages.quizSession.discussion.title,
+    questionText: firstPrompt?.prompt,
+    targetTerm: firstPrompt ? getPromptTerm(firstPrompt, 0) : undefined,
+  });
 
   async function handleRegeneratePrompt(
     prompt: DiscussionPrompt,
@@ -199,7 +218,20 @@ export function DiscussionPlayer({
                     </Badge>
                   ) : null}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <ExplainWithAIButton
+                    contextOverride={{
+                      itemKey: `discussion-${prompt.id ?? index}`,
+                      quizType: "discussion",
+                      cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+                      targetLanguage: quizConfig?.targetLanguage,
+                      sourceLanguage: quizConfig?.sourceLanguage,
+                      isAnswered: true,
+                      itemLabel: `${messages.quizSession.discussion.title} #${index + 1}`,
+                      questionText: prompt.prompt,
+                      targetTerm: getPromptTerm(prompt, index),
+                    }}
+                  />
                   {isOwner && quizConfig ? (
                     <Button
                       type="button"

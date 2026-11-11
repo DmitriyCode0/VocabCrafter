@@ -16,6 +16,7 @@ import {
   type TextTranslationResult,
 } from "./text-translation-player";
 import { QuizResults } from "./quiz-results";
+import { ExerciseAssistantProvider } from "./exercise-assistant";
 import {
   Card,
   CardContent,
@@ -245,11 +246,17 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
 
   function renderWithTimer(children: React.ReactNode) {
     return (
-      <div className="space-y-4">
-        <SessionTimer elapsedSeconds={elapsedSeconds} />
-        {children}
-      </div>
+      <ExerciseAssistantProvider>
+        <div className="space-y-4">
+          <SessionTimer elapsedSeconds={elapsedSeconds} />
+          {children}
+        </div>
+      </ExerciseAssistantProvider>
     );
+  }
+
+  function renderResultsWithAssistant(children: React.ReactNode) {
+    return <ExerciseAssistantProvider>{children}</ExerciseAssistantProvider>;
   }
 
   function handleRestart() {
@@ -288,14 +295,16 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
 
   if (quiz.type === "mcq") {
     if (showResults) {
-      return (
+      return renderResultsWithAssistant(
         <QuizResults
           type="mcq"
           quizId={quiz.id}
+          cefrLevel={quiz.cefr_level}
+          quizConfig={quizConfig ?? undefined}
           timeSpentSeconds={completedTimeSpentSeconds}
           mcqResults={mcqResults}
           onRestart={handleRestart}
-        />
+        />,
       );
     }
 
@@ -303,6 +312,8 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
     return renderWithTimer(
       <MCQPlayer
         questions={questions}
+        cefrLevel={quiz.cefr_level}
+        quizConfig={quizConfig ?? undefined}
         onComplete={(results) => {
           setMcqResults(results);
           setCompletedTimeSpentSeconds(getCompletedElapsedSeconds());
@@ -350,6 +361,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
     return renderWithTimer(
       <FlashcardPlayer
         cards={cards}
+        cefrLevel={quiz.cefr_level}
         quizConfig={quizConfig ?? undefined}
         onComplete={handleFlashcardComplete}
       />,
@@ -358,14 +370,16 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
 
   if (quiz.type === "gap_fill") {
     if (showResults) {
-      return (
+      return renderResultsWithAssistant(
         <QuizResults
           type="gap_fill"
           quizId={quiz.id}
+          cefrLevel={quiz.cefr_level}
+          quizConfig={quizConfig ?? undefined}
           timeSpentSeconds={completedTimeSpentSeconds}
           gapFillResults={gapFillResults}
           onRestart={handleRestart}
-        />
+        />,
       );
     }
 
@@ -373,6 +387,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
     return renderWithTimer(
       <GapFillPlayer
         questions={questions}
+        cefrLevel={quiz.cefr_level}
         quizConfig={quizConfig ?? undefined}
         onComplete={(results) => {
           setGapFillResults(results);
@@ -385,15 +400,16 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
 
   if (quiz.type === "translation") {
     if (showResults) {
-      return (
+      return renderResultsWithAssistant(
         <QuizResults
           type="translation"
           quizId={quiz.id}
+          cefrLevel={quiz.cefr_level}
           timeSpentSeconds={completedTimeSpentSeconds}
           translationResults={translationResults}
           quizConfig={quizConfig ?? undefined}
           onRestart={handleRestart}
-        />
+        />,
       );
     }
 
@@ -415,15 +431,16 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
 
   if (quiz.type === "text_translation") {
     if (showResults) {
-      return (
+      return renderResultsWithAssistant(
         <QuizResults
           type="text_translation"
           quizId={quiz.id}
+          cefrLevel={quiz.cefr_level}
           timeSpentSeconds={completedTimeSpentSeconds}
           textTranslationResults={textTranslationResults}
           quizConfig={quizConfig ?? undefined}
           onRestart={handleRestart}
-        />
+        />,
       );
     }
 
@@ -482,6 +499,7 @@ export function QuizPlayer({ quiz, isOwner = false }: QuizPlayerProps) {
         quizId={quiz.id}
         prompts={discussionPrompts}
         vocabularyTerms={vocabularyTerms}
+        cefrLevel={quiz.cefr_level}
         quizConfig={quizConfig ?? undefined}
         isOwner={isOwner}
         onPromptsChange={setDiscussionPrompts}

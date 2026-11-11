@@ -10,6 +10,10 @@ import { Loader2 } from "lucide-react";
 import type { QuizConfig, TextTranslationContent } from "@/types/quiz";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import {
+  ExplainWithAIButton,
+  useSyncExerciseAssistantContext,
+} from "@/components/quiz/exercise-assistant";
+import {
   getLearningLanguageLabel,
   getSourceLanguageLabel,
   normalizeLearningLanguage,
@@ -59,6 +63,22 @@ export function TextTranslationPlayer({
     messages.common.studyLanguageNames[normalizedSourceLanguage] ||
     getSourceLanguageLabel(normalizedSourceLanguage);
   const progress = evaluation ? 100 : 50;
+  const isAnswered = Boolean(evaluation && evaluation.score >= 0);
+
+  useSyncExerciseAssistantContext({
+    itemKey: "text_translation-main",
+    quizType: "text_translation",
+    cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+    targetLanguage: quizConfig?.targetLanguage,
+    sourceLanguage: quizConfig?.sourceLanguage,
+    isAnswered,
+    itemLabel: messages.quizSession.textTranslation.progressLabel,
+    sourceSentence: content.originalText,
+    userAnswer: userTranslation.trim() || undefined,
+    correctAnswer: content.referenceTranslation,
+    score: isAnswered ? evaluation?.score : undefined,
+    feedback: isAnswered ? evaluation?.feedback : undefined,
+  });
 
   async function handleSubmit() {
     if (!userTranslation.trim()) {
@@ -213,13 +233,16 @@ export function TextTranslationPlayer({
 
           {evaluation && evaluation.score >= 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-md bg-muted p-3">
-                <span className="font-medium">{messages.common.score}</span>
-                <span
-                  className={`text-2xl font-bold ${getScoreColor(evaluation.score)}`}
-                >
-                  {evaluation.score}/100
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted p-3">
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">{messages.common.score}</span>
+                  <span
+                    className={`text-2xl font-bold ${getScoreColor(evaluation.score)}`}
+                  >
+                    {evaluation.score}/100
+                  </span>
+                </div>
+                <ExplainWithAIButton />
               </div>
 
               <div className="rounded-md bg-muted p-3 space-y-1">

@@ -707,6 +707,34 @@ const EN_MESSAGES = {
       ) =>
         `You know ${known} of ${total} terms.${learning > 0 ? ` ${formatPluralizedCount("en", learning, { one: "term", other: "terms" })} still need practice.` : ""}`,
     },
+    assistant: {
+      floatingButton: "Ask AI Tutor",
+      explainButton: "Explain with AI",
+      title: "AI Exercise Tutor",
+      subtitleHintMode: "Hint mode: guiding you without spoiling the answer",
+      subtitleExplainMode: "Full explanation mode: ask anything about this item",
+      hintModeBadge: "Hint Mode",
+      explainModeBadge: "Explain Mode",
+      currentContextLabel: "Current Question",
+      emptyStateTitle: "Have a question about this exercise?",
+      emptyStateHintDescription:
+        "Ask for a grammar tip, word nuance, or clue—I'll help you figure it out without giving away the answer.",
+      emptyStateExplainDescription:
+        "Ask why an answer is right or wrong, explore synonyms, or get extra examples.",
+      inputPlaceholder: "Ask about grammar, vocabulary, or your answer...",
+      sendButtonAria: "Send question",
+      clearChat: "Clear chat",
+      thinking: "Thinking...",
+      errorGeneric: "Could not get a response from AI Tutor. Please try again.",
+      quickPrompts: {
+        hint: "Give me a hint without spoiling the answer",
+        grammarRule: "What grammar rule applies here?",
+        vocabMeaning: "Explain the target vocabulary and usage",
+        whyCorrect: "Explain why this is the correct answer",
+        explainMistake: "Why was my answer wrong and how can I fix it?",
+        moreExamples: "Give me 2 more example sentences with this word",
+      },
+    },
   },
   dashboard: {
     welcomeBack: (name: string) => `Welcome back, ${name}`,
@@ -2349,6 +2377,34 @@ const UK_MESSAGES: AppMessages = {
         learning: number,
       ) =>
         `Ви знаєте ${known} із ${total} слів.${learning > 0 ? ` Ще ${formatPluralizedCount("uk", learning, { one: "слово", few: "слова", many: "слів" })} потребують практики.` : ""}`,
+    },
+    assistant: {
+      floatingButton: "Запитати AI-репетитора",
+      explainButton: "Пояснити з AI",
+      title: "AI-помічник у вправах",
+      subtitleHintMode: "Режим підказки: допомагаю без спойлерів правильної відповіді",
+      subtitleExplainMode: "Режим повного пояснення: запитуйте будь-що про це завдання",
+      hintModeBadge: "Підказка",
+      explainModeBadge: "Пояснення",
+      currentContextLabel: "Поточне питання",
+      emptyStateTitle: "Маєте запитання щодо цієї вправи?",
+      emptyStateHintDescription:
+        "Запитайте про граматичне правило, відтінок значення слова або підказку — я допоможу розібратися, не розкриваючи відповідь.",
+      emptyStateExplainDescription:
+        "Запитайте, чому відповідь правильна чи неправильна, дізнайтеся синоніми або попросіть додаткові приклади.",
+      inputPlaceholder: "Запитайте про граматику, лексику або вашу відповідь...",
+      sendButtonAria: "Надіслати запитання",
+      clearChat: "Очистити чат",
+      thinking: "Думаю...",
+      errorGeneric: "Не вдалося отримати відповідь від AI-помічника. Спробуйте ще раз.",
+      quickPrompts: {
+        hint: "Дай мені підказку, не відкриваючи правильну відповідь",
+        grammarRule: "Яке граматичне правило тут використовується?",
+        vocabMeaning: "Поясни цільову лексику та особливості її вживання",
+        whyCorrect: "Поясни, чому ця відповідь є правильною",
+        explainMistake: "Чому моя відповідь неправильна і як це виправити?",
+        moreExamples: "Наведи ще 2 приклади речень із цим словом",
+      },
     },
   },
   dashboard: {

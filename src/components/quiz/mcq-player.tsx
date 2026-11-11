@@ -13,7 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, ArrowLeft, ArrowRight } from "lucide-react";
-import type { MCQQuestion } from "@/types/quiz";
+import type { MCQQuestion, QuizConfig } from "@/types/quiz";
+import {
+  ExplainWithAIButton,
+  useSyncExerciseAssistantContext,
+} from "@/components/quiz/exercise-assistant";
 
 export interface MCQResult {
   questionId: number;
@@ -26,10 +30,17 @@ export interface MCQResult {
 
 interface MCQPlayerProps {
   questions: MCQQuestion[];
+  cefrLevel?: string;
+  quizConfig?: QuizConfig;
   onComplete: (results: MCQResult[]) => void;
 }
 
-export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
+export function MCQPlayer({
+  questions,
+  cefrLevel,
+  quizConfig,
+  onComplete,
+}: MCQPlayerProps) {
   const { messages } = useAppI18n();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<string[]>(() =>
@@ -57,6 +68,25 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
   const progress = (completedCount / questions.length) * 100;
   const isCorrect = submitted && selectedAnswer === question.correctAnswer;
   const allCompleted = completedCount === questions.length;
+
+  useSyncExerciseAssistantContext({
+    itemKey: `mcq-${question.id ?? currentIndex}`,
+    quizType: "mcq",
+    cefrLevel: cefrLevel ?? quizConfig?.cefrLevel,
+    targetLanguage: quizConfig?.targetLanguage,
+    sourceLanguage: quizConfig?.sourceLanguage,
+    isAnswered: submitted,
+    itemLabel: messages.quizSession.mcq.progress(
+      currentIndex + 1,
+      questions.length,
+    ),
+    questionText: question.question,
+    options: question.options,
+    targetTerm: question.originalTerm,
+    userAnswer: selectedAnswer || undefined,
+    correctAnswer: question.correctAnswer,
+    isCorrect: submitted ? isCorrect : undefined,
+  });
 
   function handleSelectAnswer(option: string) {
     if (submitted) {
@@ -235,37 +265,40 @@ export function MCQPlayer({ questions, onComplete }: MCQPlayerProps) {
 
           {submitted ? (
             <div
-              className={`flex items-start gap-2 rounded-md p-3 ${
+              className={`flex flex-wrap items-center justify-between gap-3 rounded-md p-3 ${
                 isCorrect
                   ? "bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-300"
                   : "bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-300"
               }`}
             >
-              {isCorrect ? (
-                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
-              ) : (
-                <XCircle className="mt-0.5 h-5 w-5 shrink-0" />
-              )}
-              <div>
+              <div className="flex items-start gap-2">
                 {isCorrect ? (
-                  <p className="font-medium">{messages.quizSession.mcq.correct}</p>
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
                 ) : (
-                  <>
-                    <p className="font-medium">
-                      {messages.quizSession.mcq.incorrect(question.correctAnswer)}
-                    </p>
-                    {selectedAnswer ? (
-                      <p className="text-sm opacity-90">
-                        {messages.quizSession.mcq.selected(selectedAnswer)}
-                      </p>
-                    ) : (
-                      <p className="text-sm opacity-90">
-                        {messages.quizSession.mcq.skipped}
-                      </p>
-                    )}
-                  </>
+                  <XCircle className="mt-0.5 h-5 w-5 shrink-0" />
                 )}
+                <div>
+                  {isCorrect ? (
+                    <p className="font-medium">{messages.quizSession.mcq.correct}</p>
+                  ) : (
+                    <>
+                      <p className="font-medium">
+                        {messages.quizSession.mcq.incorrect(question.correctAnswer)}
+                      </p>
+                      {selectedAnswer ? (
+                        <p className="text-sm opacity-90">
+                          {messages.quizSession.mcq.selected(selectedAnswer)}
+                        </p>
+                      ) : (
+                        <p className="text-sm opacity-90">
+                          {messages.quizSession.mcq.skipped}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
+              <ExplainWithAIButton />
             </div>
           ) : null}
         </CardContent>
