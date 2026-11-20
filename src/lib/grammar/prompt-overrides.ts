@@ -32,6 +32,7 @@ export interface GrammarTopicPromptConfig {
   effectiveGuidance: string;
   effectiveEvaluationInstructions: string;
   effectivePromptDetails: string;
+  hasUniqueInstructions: boolean;
   hasOverride: boolean;
   isCustom: boolean;
   isArchived: boolean;
@@ -98,7 +99,8 @@ function normalizeLearningLanguageValue(
   value: string | null | undefined,
   fallbackValue: LearningLanguage,
 ): LearningLanguage {
-  return value === "spanish" ? "spanish" : fallbackValue;
+  void value;
+  return fallbackValue;
 }
 
 function hasBuiltInOverride(
@@ -141,6 +143,7 @@ export function getDefaultGrammarTopicPromptConfig(
       defaultRule,
       defaultGuidance,
     ),
+    hasUniqueInstructions: Boolean(defaultGuidance.trim()),
     hasOverride: false,
     isCustom: false,
     isArchived: false,
@@ -190,6 +193,9 @@ export function applyGrammarTopicPromptOverride(
     effectivePromptDetails: buildGrammarPromptDetails(
       effectiveRule,
       effectiveGuidance,
+    ),
+    hasUniqueInstructions: Boolean(
+      effectiveGuidance.trim() || effectiveEvaluationInstructions.trim(),
     ),
     hasOverride: hasBuiltInOverride(override),
     isCustom,
@@ -328,7 +334,12 @@ export async function getGrammarTopicPromptCatalog(
   }
 
   const customTopics = Array.from(overrideMap.values())
-    .filter((row) => row.is_custom && !row.is_archived)
+    .filter(
+      (row) =>
+        row.is_custom &&
+        !row.is_archived &&
+        (!row.learning_language || row.learning_language === "english"),
+    )
     .map((row) => applyGrammarTopicPromptOverride(row.topic_key, row))
     .filter((topic) => topic.learningLanguage === language)
     .sort((left, right) => left.displayName.localeCompare(right.displayName));

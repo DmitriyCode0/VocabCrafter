@@ -4,11 +4,11 @@ import type { GrammarChallenge } from "@/types/quiz";
 function getGrammarDifficultyConstraint(difficulty: GrammarChallenge): string {
   switch (difficulty) {
     case "Simple":
-      return "Use the most basic form of this structure. Keep sentences short.";
+      return "Use the direct, core form of this structure without burying it in nested clauses.";
     case "Standard":
-      return "Use standard forms of this structure as demonstrated in the examples.";
+      return "Apply the exact syntactic pattern and time/context triggers required by this grammar structure.";
     case "Complex":
-      return "Combine this structure with others. Use in complex sentences with multiple clauses.";
+      return "Combine this structure naturally with nuanced clauses or contrast.";
   }
 }
 
@@ -35,7 +35,8 @@ export function formatGrammarRulesSection(
   });
 
   return `
-The content must specifically test the following grammatical structures. Follow the constraints precisely:
+The content must strictly enforce the following grammatical structure(s):
 ${rules.join("\n")}
+ANTI-CLICHÉ & ANTI-CLONING RULE: Treat the examples inside Rule Details strictly as structural templates. NEVER reuse the nouns, characters, verbs, or clichéd scenes from those examples (such as drinking coffee, working in an office, living in London, playing football, or liking spiders).
 `;
 }

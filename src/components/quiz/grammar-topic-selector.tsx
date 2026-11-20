@@ -10,6 +10,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 interface GrammarTopicOption {
   topicKey: string;
   displayName: string;
+  hasUniqueInstructions?: boolean;
 }
 
 interface GrammarTopicLevelGroup {
@@ -139,10 +140,18 @@ export function GrammarTopicSelector({
                           className="mt-0.5"
                         />
                         <span
-                          className={isPending ? "text-amber-900" : undefined}
+                          className={`flex-1 ${isPending ? "text-amber-900" : ""}`}
                         >
                           {topic.displayName}
                         </span>
+                        {topic.hasUniqueInstructions === false ? (
+                          <Badge
+                            variant="outline"
+                            className="ml-auto shrink-0 px-1.5 py-0 text-[10px] font-medium lowercase tracking-wide text-muted-foreground"
+                          >
+                            beta
+                          </Badge>
+                        ) : null}
                       </label>
                     );
                   })}

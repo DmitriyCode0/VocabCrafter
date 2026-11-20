@@ -41,6 +41,7 @@ const ENGLISH_GRAMMAR_TOPICS: Record<string, string[]> = {
     "This / That / These / Those",
     "Quantifiers many, much, little, few",
     "There is / There are",
+    "There vs It",
 
     // Adjectives & Adverbs
     "Comparative Adjectives",
@@ -226,30 +227,13 @@ const ENGLISH_GRAMMAR_TOPICS: Record<string, string[]> = {
   ],
 };
 
-const SPANISH_GRAMMAR_TOPICS: Record<string, string[]> = {
-  A1: [
-    "Spanish Subject Pronouns",
-    "Ser: basic identity and origin",
-    "Definite and Indefinite Articles",
-    "Noun Gender and Number",
-    "Adjective Agreement",
-    "Hay (there is / there are)",
-    "Regular -AR Verbs (Present)",
-    "Regular -ER and -IR Verbs (Present)",
-    "Tener: age and possession",
-    "Basic Negation with No",
-    "Simple Yes/No and Wh- Questions",
-    "Gustar: singular things",
-  ],
-};
-
 export const LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
 export function getGrammarTopicCatalog(
   language: LearningLanguage = "english",
 ): { level: string; topics: string[] }[] {
-  const topicMap =
-    language === "spanish" ? SPANISH_GRAMMAR_TOPICS : ENGLISH_GRAMMAR_TOPICS;
+  void language;
+  const topicMap = ENGLISH_GRAMMAR_TOPICS;
 
   return LEVEL_ORDER.filter((lvl) => topicMap[lvl]).map((lvl) => ({
     level: lvl,
@@ -265,7 +249,7 @@ export function getDefaultGrammarTopicDefinitions(
       topicKey,
       displayName: topicKey,
       level,
-      learningLanguage: language,
+      learningLanguage: "english",
     })),
   );
 }
@@ -275,12 +259,10 @@ export function getDefaultGrammarTopicDefinitionMap(): Map<
   DefaultGrammarTopicDefinition
 > {
   return new Map(
-    (["english", "spanish"] as const).flatMap((language) =>
-      getDefaultGrammarTopicDefinitions(language).map((definition) => [
-        definition.topicKey,
-        definition,
-      ]),
-    ),
+    getDefaultGrammarTopicDefinitions("english").map((definition) => [
+      definition.topicKey,
+      definition,
+    ]),
   );
 }
 
@@ -307,11 +289,9 @@ export function getUniqueGrammarTopicCatalog(
 export function getAllGrammarTopicKeys(): string[] {
   const seen = new Set<string>();
 
-  for (const language of ["english", "spanish"] as const) {
-    for (const { topics } of getUniqueGrammarTopicCatalog(language)) {
-      for (const topic of topics) {
-        seen.add(topic);
-      }
+  for (const { topics } of getUniqueGrammarTopicCatalog("english")) {
+    for (const topic of topics) {
+      seen.add(topic);
     }
   }
 

@@ -1,89 +1,6 @@
 export const GRAMMAR_RULES: Record<string, string> = {
   // ===== A1 =====
 
-  "Spanish Subject Pronouns": `Basic subject pronouns: yo, tu, el, ella, usted, nosotros/nosotras, vosotros/vosotras, ellos, ellas, ustedes.
-Use them to identify who performs the action. In Spanish they are often omitted, but at A1 they may be included for clarity.
-Examples:
-- Yo soy Ana.
-- Ella vive en Madrid.
-- Nosotros estudiamos espanol.`,
-
-  "Ser: basic identity and origin": `Use 'ser' for identity, nationality, origin, profession, and basic description.
-Present forms: soy, eres, es, somos, sois, son.
-Examples:
-- Soy estudiante.
-- Ella es de Ucrania.
-- Somos amigos.`,
-
-  "Definite and Indefinite Articles": `Definite articles: el, la, los, las. Indefinite articles: un, una, unos, unas.
-Articles must agree with the noun in gender and number.
-Examples:
-- el libro / la casa
-- un profesor / una amiga
-- los estudiantes / unas mesas`,
-
-  "Noun Gender and Number": `Spanish nouns are masculine or feminine and singular or plural.
-Many masculine nouns end in -o; many feminine nouns end in -a, but there are exceptions.
-Plural usually adds -s or -es.
-Examples:
-- amigo / amigos
-- casa / casas
-- profesor / profesores`,
-
-  "Adjective Agreement": `Adjectives must agree with the noun in gender and number.
-Examples:
-- un chico alto
-- una chica alta
-- libros interesantes
-- casas bonitas`,
-
-  "Hay (there is / there are)": `Use 'hay' to say that something exists.
-It works for both singular and plural.
-Examples:
-- Hay un libro en la mesa.
-- Hay dos estudiantes en la clase.
-- No hay leche.`,
-
-  "Regular -AR Verbs (Present)": `Present tense endings for regular -ar verbs: -o, -as, -a, -amos, -ais, -an.
-Examples with hablar:
-- hablo, hablas, habla, hablamos, hablais, hablan
-- Yo hablo espanol.
-- Ella trabaja en casa.`,
-
-  "Regular -ER and -IR Verbs (Present)": `Present tense endings for regular -er verbs: -o, -es, -e, -emos, -eis, -en.
-Present tense endings for regular -ir verbs: -o, -es, -e, -imos, -is, -en.
-Examples:
-- como / comes / come
-- vivo / vives / vive
-- Nosotros vivimos en Kyiv.`,
-
-  "Tener: age and possession": `Use 'tener' for possession and age.
-Present forms: tengo, tienes, tiene, tenemos, teneis, tienen.
-Examples:
-- Tengo un libro.
-- Ella tiene veinte anos.
-- Tenemos una clase hoy.`,
-
-  "Basic Negation with No": `Place 'no' before the conjugated verb to make a sentence negative.
-Examples:
-- No hablo frances.
-- Ella no es profesora.
-- No tenemos tiempo.`,
-
-  "Simple Yes/No and Wh- Questions": `Basic Spanish questions use rising intonation and can use question words like que, donde, cuando, quien, como.
-Use opening and closing question marks.
-Examples:
-- ?Hablas espanol?
-- ?Donde vives?
-- ?Como te llamas?`,
-
-  "Gustar: singular things": `Use 'gustar' with indirect object pronouns: me, te, le, nos, os, les.
-With one thing liked, use 'gusta'.
-Examples:
-- Me gusta el cafe.
-- Te gusta la musica.
-- No me gusta la lluvia.`,
-
   "Present Simple with verb: positive": `Structure: Subject + base verb (add -s/-es for he/she/it).
 Use for habits, routines, facts, and permanent states.
 Examples:
@@ -256,6 +173,17 @@ Examples:
 - There is a book on the table.
 - There are three cats in the garden.
 - Is there any milk? / There aren't any chairs.`,
+
+  "There vs It": `Use 'there' + be (there is/are/was/were) to say when or where something is, or that something exists or is happening for the first time.
+Use 'it' + be/verb to talk about times and dates, the weather, distance, 'It's / It was + adjective + to-infinitive', or to talk about something again after it was introduced.
+CRITICAL WARNING — We need ONE subject + verb per clause: never drop 'It' (say "It's fantastic!", NOT "Is fantastic!"), and never double a noun subject with "it's" (say "The worst part is...", NOT "The worst part it's...").
+Also note: initial existential 'There is/are' is grammatical and does not mean 'in that place' on its own — to say 'in that place' ("Там є..."), add a second locative 'there' at the end ("There is a butcher's there.").
+Examples:
+- There are some cups on the table. / There is a party tomorrow. / There was an accident.
+- It's 4th of July. / It's four o'clock. / It rained a lot yesterday. / It's four degrees.
+- How far is it? It's 2 kilometres from the hotel.
+- It's nice to see you again. / It was difficult to find the hotel.
+- There's a party tonight. It will be fun! / We saw a snake. It was very big.`,
 
   "Comparative Adjectives": `Structure: adjective + -er + than (short adj) OR more + adjective + than (long adj).
 Irregular: good → better, bad → worse, far → farther.
@@ -1031,6 +959,130 @@ Keep the time reference aligned with the form:
 - modal + be + adjective/noun for current state-based deduction
 Avoid obligation readings and avoid redundant hedging adverbs with the modal.
 Prefer natural, evidence-based reasoning over abstract or unsupported speculation.`,
+
+  "Present Simple with verb mix: +, -, ?": `Distribute positive (+), negative (- don't/doesn't), and question (? Do/Does...) forms cleanly across the items. Include routine frequency cues and vary between 3rd-person singular (-s/-es/doesn't/does) and plural/1st/2nd-person forms.`,
+
+  "Present Simple with verb: positive": `Require an action verb in Present Simple positive, mixing 3rd-person singular (-s/-es/-ies) and plural/1st/2nd-person base verbs with routine frequency markers ("щодня", "зазвичай", "щосуботи").`,
+
+  "Present Simple with verb: negative": `Every sentence must require Present Simple negative (don't / doesn't + base verb) for habits or preferences — NEVER use 'to be'.`,
+
+  "Present Simple with verb: questions": `Every sentence must require a Present Simple action question (Do / Does + subject + base verb?) or Wh- question ending with '?'.`,
+
+  "Present Simple Verb 'To Be' positive": `Use am/is/are ONLY with adjectives, nouns, or locations — never include another main action verb.`,
+
+  "Present Simple Verb 'To Be' negative": `Use am not / isn't / aren't ONLY with adjectives, nouns, or locations — never use don't/doesn't.`,
+
+  "Present Simple Verb 'To Be' questions": `Use inverted Am/Is/Are questions without do/does. Every sentence must end with a question mark.`,
+
+  "Present Simple 'To Be' vs 'To Do' mix: positive, negative, questions": `Contrast 'to be' state sentences (no action verb, no do/does) against action-verb sentences using do/does/don't/doesn't across +, -, and ? forms.`,
+
+  "Was / Were": `Require 'was/were/wasn't/weren't' for past states, locations, or feelings paired with a finished past time cue ("вчора ввечері", "минулої суботи"), including both statements and Was/Were questions.`,
+
+  "Can, Could": `Contrast present ability/permission ('can / can't') with past ability or polite requests ('could / couldn't').`,
+
+  Imperatives: `Require direct imperative commands/instructions (base verb...) and negative warnings (Don't + base verb...) with no grammatical subject.`,
+
+  "There is / There are": `Require existential 'There is / There are / There isn't / There aren't / Is there / Are there' anchored to a clear location or quantity.
+Do NOT translate dummy existential 'There is/are' as Ukrainian 'Там є' unless literally meaning 'in that place over there' — in which case English MUST end that clause with a second 'there' ("There is a butcher's there."). Otherwise omit 'Там' by placing the concrete location phrase cleanly ("На столі є...", "Біля мого дому є...").`,
+
+  "There vs It": `Keep sentences SHORT, NATURAL, and level-appropriate (e.g. 5–11 words at A1). Strictly match the part of speech & number of the target word:
+1. THERE for existence, location, or scheduled events: "There is/are/was/were/isn't/aren't + INDEFINITE noun (a/an/some/any/no + noun) + simple place/time" (e.g. "There is a new teacher at my school." / "There aren't any students in the classroom."). NEVER put definite possessives ("our/my/the") right after "There is/are".
+2. CRITICAL UKRAINIAN "ТАМ" vs "THERE" RULE: Do NOT translate dummy existential "There is/was..." as a mechanical "Там є/був..." when another place is stated (write "Біля мого дому був новий рибний магазин.", NOT "Там був новий рибний магазин біля мого дому."). Prefer natural location openings without "Там" (e.g. "На нашій вулиці є м'ясна лавка."). Only use leading "Там є/був..." in Ukrainian if you genuinely mean "in that place" — AND then the English sentence MUST include a second "there" at the end ("Там є м'ясна лавка. Вона дуже чиста." -> "There is a butcher's there. It is very clean.").
+3. IT + adjective + to-infinitive OR simple impersonal state: When the word is a verb/phrase or adjective, prefer natural sentences like "It is dangerous to [verb]..." or "I want to go home. It's late and I'm tired." NEVER glue unrelated weather/temperature clauses with "so" just to squeeze a verb in.
+4. THERE / noun -> IT back-reference & agreement: Introduce a SINGULAR noun in a short sentence, then refer to it with "It is / It's / It was + adjective" (e.g. "There's a park opposite my house. It is beautiful." / "I'm watching a new series. It's very good."). If the target noun is PLURAL, use "They are..." — NEVER singular "It is" for plural nouns.
+5. Keep ONE subject + verb per clause and strictly avoid passive voice, reported speech ("was asked if"), or stacked prepositional phrases at A1/A2.`,
+
+  "Should / Shouldn't": `Frame sentences around practical personal advice or recommendations ("Тобі варто...", "Йому не варто...") requiring 'should' or 'shouldn't'.`,
+
+  "May / Might (Possibility)": `Express ~50% uncertain present or future possibility ("Можливо..., але я ще не впевнений") requiring 'may' or 'might (not)'.`,
+
+  "Do vs Make": `Test natural collocations that clearly compel 'do' (task/chore/work) vs 'make' (create/decision/mistake/coffee/progress).`,
+
+  "Too / Enough": `Contrast excessive degree ("надто / занадто" -> 'too + adj/adv') against sufficiency ("достатньо / не вистачає" -> 'adj + enough' or 'enough + noun').`,
+
+  "Zero & First Conditional": `Contrast universal cause-and-effect truths (If + Present Simple, Present Simple) with specific real future conditions (If + Present Simple, will/can/might + V1).`,
+
+  "Reported Speech (Statements)": `Begin Ukrainian source sentences with indirect past reporting ("Вона сказала мені, що...", "Він пояснив, що...") so English requires tense backshift and pronoun/time adjustments.`,
+
+  "Reported Speech (Questions)": `Begin Ukrainian source sentences with indirect question reporting ("Він запитав мене, чи...", "Вона поцікавилася, коли...") so English uses statement word order with no do/did inversion and no question mark.`,
+
+  "Adjectives ending in -ed / -ing": `Contrast emotional reaction of a person (-ed: "почувався розчарованим/втомленим") against the quality of the cause (-ing: "фільм був нудним / день був виснажливим").`,
+
+  "So vs Such": `Distinguish 'so + adjective/adverb' (no noun inside the phrase) from 'such (a/an) + adjective + noun'.`,
+
+  "Reflexive Pronouns": `Require coreferential subject-object meaning ("себе", "сам(-а) собі", "самостійно") so reflexive pronouns (myself/herself/themselves) are obligatory.`,
+
+  "Narrative Tenses": `Construct a coherent mini-story combining at least two narrative tenses (e.g. background Past Continuous + interrupting Past Simple, or earlier cause in Past Perfect).`,
+
+  "Future Continuous": `Anchor to a specific moment in progress in the future ("Завтра о цій порі ми саме будемо...") requiring 'will be + V-ing'.`,
+
+  "Future Perfect": `Include a clear future deadline ("До кінця тижня ми вже завершимо...") requiring 'will have + V3'.`,
+
+  "Past Modals (Should have / Could have)": `Express past regret, criticism, or missed opportunity ("Тобі варто було вчора...", "Не треба було...", "Він міг би ще тоді...") requiring 'should (not) have / could have + V3'.`,
+
+  "Connectors of Contrast (Despite / In spite of)": `Phrase the Ukrainian concession ("Незважаючи на [іменник / те, що...]") so 'Despite / In spite of + noun phrase / V-ing' is natural over 'Although + clause'.`,
+
+  "Inverted Conditionals (Should / Had / Were)": `Use formal conditional framing ("Якщо раптом...", "Якби тоді...", "Якби їм довелося (офіційно)...") requiring formal 'Should / Had / Were + subject...' inversion with no 'if'.`,
+
+  "Present Continuous": `Every sentence must include an unmistakable immediate-present time or sensory cue in the source language (such as "зараз", "у цей момент", "Подивись!", "Послухай!") so the student clearly chooses Present Continuous over Present Simple. Never use stative verbs.`,
+
+  "Present Simple vs Continuous": `Every item testing Present Continuous must carry an immediate/temporary cue ("зараз", "сьогодні винятково", "цього тижня"); every item testing Present Simple must carry a routine/permanent cue ("зазвичай", "щотижня", "завжди").`,
+
+  "Past Simple": `Include a clear closed past time anchor in the source sentence (e.g. "вчора", "минулого місяця", "три дні тому") so it cannot be confused with Present Perfect.`,
+
+  "Past Simple vs Continuous": `For Past Continuous items, pair an ongoing background action in Ukrainian (imperfective past + "саме ... коли раптом") with a shorter Past Simple interruption, or two simultaneous ongoing past actions ("поки ...").`,
+
+  "Present Perfect Basics": `Include unmistakable Present Perfect triggers in Ukrainian such as "вже", "ще не", "щойно", "коли-небудь", "ніколи раніше", and NEVER include finished past time phrases like "вчора".`,
+
+  "Present Perfect vs Past Simple": `Present Perfect items MUST feature unfinished time, present consequence, or "вже/ще не/щойно/коли-небудь"; Past Simple items MUST feature a closed past time expression ("вчора", "минулого тижня", "у 2021 році").`,
+
+  "Past Simple vs Present Perfect": `Past Simple items MUST feature an explicit finished past time expression; Present Perfect items MUST feature unfinished time, "вже/ще не/щойно/коли-небудь", or a visible present consequence.`,
+
+  "Present Perfect Continuous": `MUST combine an explicit duration marker ("вже дві години", "з самого ранку", "протягом усього дня") with a present ongoing action or immediate physical evidence of recent continuous activity.`,
+
+  "Past Perfect": `MUST include two past events where the earlier event clearly precedes the later one ("До того часу як...", "Ще до того, як...", "Коли ми прийшли, ... вже ...").`,
+
+  "Future: Going to": `MUST signal a pre-decided plan/intention ("планує", "збирається", "вже вирішив") OR immediate physical evidence ("Подивись на... — ось-ось...").`,
+
+  "Future: Will": `MUST express an on-the-spot spontaneous decision ("Зачекай, я зараз..."), explicit promise ("Обіцяю..."), offer, or personal prediction ("Думаю / Напевно...").`,
+
+  "Future: Will vs Going to": `Clearly distinguish spontaneous decisions/promises/opinions (will) from pre-made plans/evidence (going to) using explicit Ukrainian context.`,
+
+  "Future: Present Continuous": `MUST describe a fixed, pre-arranged appointment or travel plan with a specific future time/date and personal involvement ("завтра о...", "ми вже домовилися/забронювали").`,
+
+  "Must / Have to": `Clearly distinguish personal inner necessity or strict prohibition ("суворо заборонено / не можна" -> mustn't) from external obligation ("за правилами змушений") or lack of obligation ("немає потреби / не обов'язково" -> don't/doesn't have to).`,
+
+  "Used to (Past Habits)": `MUST state a discontinued past habit or state with explicit contrast to the present ("Раніше ..., але тепер більше ні / а зараз вже не...").`,
+
+  "Used to / Be used to / Get used to": `Ensure unambiguous cues: discontinued past habit ("Раніше..."), current familiarity state ("вже звик до..."), or adaptation process ("поступово звикає до... / ще не звик").`,
+
+  "First Conditional": `Express a realistic future condition ("Якщо завтра/пізніше...") so Present Simple is required in the if-clause and will/can/may in the result clause.`,
+
+  "Second Conditional": `MUST use Ukrainian unreal present/future subjunctive ("Якби зараз/узагалі..., то ... б ...") so the student uses If + Past Simple, would + V1.`,
+
+  "Third Conditional": `MUST use Ukrainian unreal past subjunctive ("Якби тоді/вчора..., то ... б тоді ...") with clear past time reference so the student uses If + Past Perfect, would have + V3.`,
+
+  "Mixed Conditionals": `Contrast an unreal past condition with an explicit present result ("...то зараз би..."), or a permanent trait with a specific past result ("...то вчора б не...").`,
+
+  "Passive Voice (Simple)": `Frame the Ukrainian sentence around the affected object/recipient or use impersonal "-но/-то" passive phrasing so the student naturally makes the receiver the English grammatical subject.`,
+
+  "Passive Voice (Intermediate)": `Use object-focused passive framing requiring Continuous Passive (is/was being + V3), Perfect Passive (has/have been + V3), or Modal Passive (must/should/can be + V3).`,
+
+  "Causative (Have something done)": `Make clear that the subject arranged or paid someone else to perform a service ("віддав у ремонт", "підстригся у перукаря", "замовив перевірку") rather than doing it themselves.`,
+
+  "Wishes & Regrets (I wish / If only)": `Include explicit regret or unreal longing cues ("Шкода, що зараз...", "Якби ж то...", "Шкода, що вчора (не)...") matching present vs past wish tense shifts.`,
+
+  "Question Tags": `End the source sentence with a clear confirmation tag cue (", чи не так?" or ", правда ж?") matched to a clear statement.`,
+
+  "Inversion (Introduction)": `Lead with a negative/restrictive adverbial emphasis ("Ніколи ще...", "Рідко коли...", "Не лише..., а й...") forcing auxiliary-subject inversion in English.`,
+
+  "Inversion (Negative Adverbials)": `Lead with a formal negative/restrictive adverbial ("Щойно..., як...", "За жодних обставин...", "Лише після того, як...") forcing inverted English word order.`,
+
+  "Cleft Sentences (What I need is...)": `Emphasize the focused element in Ukrainian ("Те, що мені справді потрібно, — це...", "Саме він...") so a cleft structure is required.`,
+
+  "Cleft Sentences (It was... / What I need...)": `Emphasize a contrasted subject, time, or action ("Саме Олена...", "Те, що здивувало всіх, — це...") requiring It-cleft or Wh-cleft emphasis.`,
+
+  "Subjunctive Mood": `Use formal verbs/expressions of urgency or recommendation with 3rd-person singular subordinate subjects so base verb / "be" contrasts clearly with indicative -s ("наполягає, щоб він негайно...", "важливо, щоб вона була...").`,
 };
 
 export function buildGrammarPromptDetails(

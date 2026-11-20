@@ -11,6 +11,10 @@ import {
   getSpeechLanguageTag,
   type EnglishVariantPreference,
 } from "@/lib/languages";
+import {
+  useTtsPreference,
+  type TtsEngine,
+} from "@/components/providers/tts-preference-provider";
 
 interface BrowserTtsButtonProps {
   text: string;
@@ -20,6 +24,7 @@ interface BrowserTtsButtonProps {
   label?: string;
   className?: string;
   browserOnly?: boolean;
+  forceEngine?: TtsEngine;
 }
 
 export function BrowserTtsButton({
@@ -30,7 +35,9 @@ export function BrowserTtsButton({
   label = "Listen",
   className,
   browserOnly = false,
+  forceEngine,
 }: BrowserTtsButtonProps) {
+  const { engine } = useTtsPreference();
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -344,7 +351,10 @@ export function BrowserTtsButton({
       return;
     }
 
-    if (browserOnly) {
+    const effectiveEngine: TtsEngine =
+      forceEngine ?? (browserOnly ? "browser" : engine);
+
+    if (effectiveEngine === "browser") {
       setIsLoading(false);
       await speakWithBrowser(trimmedText);
       return;

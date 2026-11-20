@@ -11,7 +11,7 @@ const resolveQuizTermsSchema = z.object({
       definition: z.string(),
     }),
   ),
-  targetLanguage: z.enum(["english", "spanish"]).optional(),
+  targetLanguage: z.enum(["english"]).optional(),
   sourceLanguage: z.enum(["english", "ukrainian"]).optional(),
 });
 

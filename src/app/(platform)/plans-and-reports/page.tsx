@@ -299,6 +299,7 @@ export default async function PlansAndReportsPage({
       topicKey: topic.topicKey,
       displayName: topic.displayName,
       level,
+      hasUniqueInstructions: topic.hasUniqueInstructions,
     })),
   );
 

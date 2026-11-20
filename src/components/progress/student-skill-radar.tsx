@@ -124,7 +124,7 @@ function GrammarTopicsDropdown({
                     )}
                     <span
                       className={cn(
-                        "text-xs",
+                        "flex-1 text-xs",
                         topic.mastered
                           ? "font-medium text-foreground"
                           : "text-muted-foreground",
@@ -132,6 +132,14 @@ function GrammarTopicsDropdown({
                     >
                       {topic.label}
                     </span>
+                    {topic.hasUniqueInstructions === false && (
+                      <Badge
+                        variant="outline"
+                        className="h-4 px-1 text-[9px] font-medium lowercase text-muted-foreground"
+                      >
+                        beta
+                      </Badge>
+                    )}
                     {topic.source === "system" && topic.mastered && (
                       <Badge
                         variant="outline"

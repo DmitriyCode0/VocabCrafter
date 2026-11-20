@@ -34,7 +34,6 @@ const EN_MESSAGES = {
     },
     studyLanguageNames: {
       english: "English",
-      spanish: "Spanish",
       ukrainian: "Ukrainian",
     },
   },
@@ -103,7 +102,7 @@ const EN_MESSAGES = {
     cefrLevelLabel: "Level (CEFR)",
     cefrLevelPlaceholder: "Select your level",
     cefrLevelDescription:
-      "This determines quiz difficulty and available grammar topics. Spanish is currently limited to A1 for testing.",
+      "This determines quiz difficulty and available grammar topics.",
     appearanceTitle: "Appearance",
     appearanceDescription:
       "Customize how VocabCrafter 2.0 looks on your device.",
@@ -112,6 +111,34 @@ const EN_MESSAGES = {
   header: {
     toggleMenu: "Toggle menu",
     navigation: "Navigation",
+    askAssistant: "Ask AI",
+  },
+  siteAssistant: {
+    buttonLabel: "Ask Assistant",
+    title: "VocabCrafter AI Guide",
+    description: "Ask how anything works or where to find a feature.",
+    emptyTitle: "How can I help you navigate?",
+    emptySubtitle:
+      "Ask me where to find features, how Google Calendar sync works, or how to set up exercises.",
+    inputPlaceholder: "Ask how to use any feature...",
+    sendButtonAria: "Send question",
+    clearChat: "Clear chat",
+    thinking: "Searching guide...",
+    errorGeneric: "Could not get a response. Please try again.",
+    tutorQuickPrompts: [
+      "How do I connect Google Calendar & Meet?",
+      "How do I track student lesson balances?",
+      "How do I create a quiz from a student's passive words?",
+    ],
+    studentQuickPrompts: [
+      "How do I join my lesson with Google Meet?",
+      "How can I create a Gap-Fill exercise from screenshots?",
+      "Where can I see my progress and guided hours?",
+    ],
+    adminQuickPrompts: [
+      "Where can I manage platform grammar rules?",
+      "How do I view user analytics?",
+    ],
   },
   userMenu: {
     settings: "Settings",
@@ -119,6 +146,11 @@ const EN_MESSAGES = {
     appLanguage: "App language",
     appLanguageUpdated: "App language updated",
     appLanguageUpdateFailed: "Failed to update app language",
+    aiVoiceToggle: "AI Voice",
+    aiVoiceEnabled: "Neural Gemini voice",
+    browserVoiceDefault: "Browser speech (default)",
+    switchedToAiVoice: "Switched to Neural AI Voice",
+    switchedToBrowserVoice: "Switched to Browser Voice (Default)",
     theme: "Theme",
     signOut: "Sign out",
   },
@@ -161,7 +193,6 @@ const EN_MESSAGES = {
     dictionaryDescription:
       "Browse the shared dictionary built from passive vocabulary imports and future approved updates.",
     englishTopics: "English Topics",
-    spanishTopics: "Spanish Topics",
     topicCount: (count: number) =>
       formatPluralizedCount("en", count, { one: "topic", other: "topics" }),
     futureDevelopment: "Reserved for future development",
@@ -472,7 +503,6 @@ const EN_MESSAGES = {
     tutorDifficultyDescription: "Choose the CEFR difficulty for this quiz",
     studentDifficultyDescription:
       "Defaults to your profile level - override if needed",
-    spanishLimitedNote: "Spanish is currently limited to A1.",
     cefrDescriptions: {
       A1: "Beginner",
       A2: "Elementary",
@@ -1689,7 +1719,6 @@ const UK_MESSAGES: AppMessages = {
     },
     studyLanguageNames: {
       english: "Англійська",
-      spanish: "Іспанська",
       ukrainian: "Українська",
     },
   },
@@ -1758,7 +1787,7 @@ const UK_MESSAGES: AppMessages = {
     cefrLevelLabel: "Рівень (CEFR)",
     cefrLevelPlaceholder: "Оберіть свій рівень",
     cefrLevelDescription:
-      "Це визначає складність вікторин і доступні граматичні теми. Іспанська наразі обмежена рівнем A1 для тестування.",
+      "Це визначає складність вікторин і доступні граматичні теми.",
     appearanceTitle: "Вигляд",
     appearanceDescription:
       "Налаштуйте вигляд VocabCrafter 2.0 на своєму пристрої.",
@@ -1767,6 +1796,34 @@ const UK_MESSAGES: AppMessages = {
   header: {
     toggleMenu: "Відкрити меню",
     navigation: "Навігація",
+    askAssistant: "AI-гід",
+  },
+  siteAssistant: {
+    buttonLabel: "Запитати AI",
+    title: "AI-гід VocabCrafter",
+    description: "Запитуйте, як працює будь-яка функція або де її знайти.",
+    emptyTitle: "Чим я можу допомогти?",
+    emptySubtitle:
+      "Запитайте про синхронізацію Google Календаря, створення вправ зі скріншотів, баланс уроків або будь-що інше.",
+    inputPlaceholder: "Запитайте, як знайти чи налаштувати функцію...",
+    sendButtonAria: "Надіслати запитання",
+    clearChat: "Очистити чат",
+    thinking: "Шукаю відповідь...",
+    errorGeneric: "Не вдалося отримати відповідь. Спробуйте ще раз.",
+    tutorQuickPrompts: [
+      "Як підключити Google Календар та Google Meet?",
+      "Як вести баланс і передоплату уроків учнів?",
+      "Як створити вправу на основі пасивного словника учня?",
+    ],
+    studentQuickPrompts: [
+      "Як підключитися до уроку через Google Meet?",
+      "Як створити вправу Gap-Fill зі скріншотів?",
+      "Де переглянути мій прогрес і пройдені години?",
+    ],
+    adminQuickPrompts: [
+      "Де налаштовуються правила граматики на платформі?",
+      "Де переглянути аналітику користувачів?",
+    ],
   },
   userMenu: {
     settings: "Налаштування",
@@ -1774,6 +1831,11 @@ const UK_MESSAGES: AppMessages = {
     appLanguage: "Мова застосунку",
     appLanguageUpdated: "Мову застосунку оновлено",
     appLanguageUpdateFailed: "Не вдалося оновити мову застосунку",
+    aiVoiceToggle: "AI-озвучення",
+    aiVoiceEnabled: "Нейромережа Gemini",
+    browserVoiceDefault: "Голос браузера (типово)",
+    switchedToAiVoice: "Увімкнено нейромережевий AI-голос",
+    switchedToBrowserVoice: "Увімкнено стандартний голос браузера",
     theme: "Тема",
     signOut: "Вийти",
   },
@@ -1816,7 +1878,6 @@ const UK_MESSAGES: AppMessages = {
     dictionaryDescription:
       "Переглядайте спільний словник, сформований із пасивного словника та майбутніх затверджених змін.",
     englishTopics: "Англійські теми",
-    spanishTopics: "Іспанські теми",
     topicCount: (count: number) =>
       formatPluralizedCount("uk", count, {
         one: "тема",
@@ -2137,7 +2198,6 @@ const UK_MESSAGES: AppMessages = {
     tutorDifficultyDescription: "Оберіть рівень CEFR для цієї вікторини",
     studentDifficultyDescription:
       "За замовчуванням використовується рівень з профілю, але його можна змінити",
-    spanishLimitedNote: "Іспанська мова наразі обмежена рівнем A1.",
     cefrDescriptions: {
       A1: "Початковий",
       A2: "Елементарний",

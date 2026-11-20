@@ -32,10 +32,9 @@ import {
 
 interface GrammarRulesAdminProps {
   englishCatalog: { level: string; topics: GrammarTopicPromptConfig[] }[];
-  spanishCatalog: { level: string; topics: GrammarTopicPromptConfig[] }[];
 }
 
-type LanguageTab = "english" | "spanish";
+type LanguageTab = "english";
 
 function flattenTopics(
   catalog: { level: string; topics: GrammarTopicPromptConfig[] }[],
@@ -61,21 +60,15 @@ function sortTopics(topics: GrammarTopicPromptConfig[]) {
   });
 }
 
-export function GrammarRulesAdmin({
-  englishCatalog,
-  spanishCatalog,
-}: GrammarRulesAdminProps) {
+export function GrammarRulesAdmin({ englishCatalog }: GrammarRulesAdminProps) {
   const router = useRouter();
   const [activeLanguage, setActiveLanguage] = useState<LanguageTab>("english");
   const [search, setSearch] = useState("");
   const [topicsState, setTopicsState] = useState({
     english: sortTopics(flattenTopics(englishCatalog)),
-    spanish: sortTopics(flattenTopics(spanishCatalog)),
   });
   const [selectedTopicKey, setSelectedTopicKey] = useState<string | null>(
-    englishCatalog[0]?.topics[0]?.topicKey ??
-      spanishCatalog[0]?.topics[0]?.topicKey ??
-      null,
+    englishCatalog[0]?.topics[0]?.topicKey ?? null,
   );
   const [isCreatingTopic, setIsCreatingTopic] = useState(false);
   const [draftDisplayName, setDraftDisplayName] = useState("");
@@ -541,7 +534,6 @@ export function GrammarRulesAdmin({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <TabsList>
             <TabsTrigger value="english">English Topics</TabsTrigger>
-            <TabsTrigger value="spanish">Spanish Topics</TabsTrigger>
           </TabsList>
 
           <Input
@@ -552,7 +544,7 @@ export function GrammarRulesAdmin({
           />
         </div>
 
-        {(["english", "spanish"] as const).map((language) => (
+        {(["english"] as const).map((language) => (
           <TabsContent key={language} value={language}>
             <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
               <Card>
@@ -598,6 +590,15 @@ export function GrammarRulesAdmin({
                             </p>
                           </div>
                           <div className="flex flex-col items-end gap-1">
+                            {!topic.effectiveGuidance.trim() &&
+                              !topic.effectiveEvaluationInstructions.trim() && (
+                                <Badge
+                                  variant="outline"
+                                  className="px-1.5 py-0 text-[10px] font-medium lowercase tracking-wide text-muted-foreground"
+                                >
+                                  beta
+                                </Badge>
+                              )}
                             {topic.isCustom && (
                               <Badge variant="secondary">Custom</Badge>
                             )}

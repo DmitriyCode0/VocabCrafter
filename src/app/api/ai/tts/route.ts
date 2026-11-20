@@ -20,7 +20,7 @@ const BITS_PER_SAMPLE = 16;
 
 const requestSchema = z.object({
   text: z.string().trim().min(1).max(3000),
-  language: z.enum(["english", "spanish", "ukrainian"]).optional(),
+  language: z.enum(["english", "ukrainian"]).optional(),
   englishVariantPreference: z.enum(ENGLISH_VARIANT_PREFERENCES).optional(),
   voice: z.string().trim().optional(),
 });

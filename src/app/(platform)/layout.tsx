@@ -4,6 +4,7 @@ import type { Role } from "@/types/roles";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAuthenticatedUser } from "@/lib/rbac/require-role";
 import { AppLanguageProvider } from "@/components/providers/app-language-provider";
+import { TtsPreferenceProvider } from "@/components/providers/tts-preference-provider";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
@@ -30,22 +31,24 @@ export default async function PlatformLayout({
 
   return (
     <AppLanguageProvider appLanguage={appLanguage}>
-      <div className="flex h-dvh overflow-hidden">
-        <Sidebar profile={profile as Profile} />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <Header profile={profile as Profile} />
-          <main
-            className={`flex-1 overflow-y-auto p-4 md:p-6 md:pb-6 animate-page-enter ${
-              isStudent
-                ? "pb-6"
-                : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]"
-            }`}
-          >
-            {children}
-          </main>
+      <TtsPreferenceProvider>
+        <div className="flex h-dvh overflow-hidden">
+          <Sidebar profile={profile as Profile} />
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <Header profile={profile as Profile} />
+            <main
+              className={`flex-1 overflow-y-auto p-4 md:p-6 md:pb-6 animate-page-enter ${
+                isStudent
+                  ? "pb-6"
+                  : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]"
+              }`}
+            >
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
-      <MobileBottomNav role={profile.role as Role} />
+        <MobileBottomNav role={profile.role as Role} />
+      </TtsPreferenceProvider>
     </AppLanguageProvider>
   );
 }

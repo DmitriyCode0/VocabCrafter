@@ -23,6 +23,7 @@ import type { TranslationResult } from "./translation-player";
 import type { QuizConfig } from "@/types/quiz";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import {
+  AskAITutorButton,
   ExplainWithAIButton,
   useSyncExerciseAssistantContext,
 } from "@/components/quiz/exercise-assistant";
@@ -44,6 +45,26 @@ interface QuizResultsProps {
   textTranslationResults?: TextTranslationResult[];
   quizConfig?: QuizConfig;
   onRestart: () => void;
+}
+
+function ResultsCardHeader({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <CardHeader className="relative text-center">
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex w-full justify-end sm:absolute sm:right-6 sm:top-6 sm:w-auto">
+          <AskAITutorButton />
+        </div>
+        <CardTitle className="text-2xl sm:px-32">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </div>
+    </CardHeader>
+  );
 }
 
 export function QuizResults({
@@ -171,14 +192,14 @@ export function QuizResults({
     return (
       <div className="space-y-6">
         <Card>
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">
-              {messages.quizSession.results.quizCompleteTitle}
-            </CardTitle>
-            <CardDescription>
-              {messages.quizSession.results.scored(correct, total, percentage)}
-            </CardDescription>
-          </CardHeader>
+          <ResultsCardHeader
+            title={messages.quizSession.results.quizCompleteTitle}
+            description={messages.quizSession.results.scored(
+              correct,
+              total,
+              percentage,
+            )}
+          />
           <CardContent className="space-y-4">
             {mcqResults.map((result, index) => (
               <div
@@ -260,14 +281,14 @@ export function QuizResults({
     return (
       <div className="space-y-6">
         <Card>
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">
-              {messages.quizSession.results.quizCompleteTitle}
-            </CardTitle>
-            <CardDescription>
-              {messages.quizSession.results.scored(correct, total, percentage)}
-            </CardDescription>
-          </CardHeader>
+          <ResultsCardHeader
+            title={messages.quizSession.results.quizCompleteTitle}
+            description={messages.quizSession.results.scored(
+              correct,
+              total,
+              percentage,
+            )}
+          />
           <CardContent className="space-y-4">
             {gapFillResults.map((result, index) => (
               <div
@@ -352,14 +373,10 @@ export function QuizResults({
     return (
       <div className="space-y-6">
         <Card>
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">
-              {messages.quizSession.results.translationCompleteTitle}
-            </CardTitle>
-            <CardDescription>
-              {messages.quizSession.results.averageScore(avgScore)}
-            </CardDescription>
-          </CardHeader>
+          <ResultsCardHeader
+            title={messages.quizSession.results.translationCompleteTitle}
+            description={messages.quizSession.results.averageScore(avgScore)}
+          />
           <CardContent className="space-y-4">
             {translationResults.map((result, index) => {
               return (
@@ -475,14 +492,12 @@ export function QuizResults({
     return (
       <div className="space-y-6">
         <Card>
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">
-              {messages.quizSession.results.textTranslationCompleteTitle}
-            </CardTitle>
-            <CardDescription>
-              {messages.quizSession.results.scoreDescription(result.score)}
-            </CardDescription>
-          </CardHeader>
+          <ResultsCardHeader
+            title={messages.quizSession.results.textTranslationCompleteTitle}
+            description={messages.quizSession.results.scoreDescription(
+              result.score,
+            )}
+          />
           <CardContent className="space-y-4">
             <div className="flex justify-end">
               <ExplainWithAIButton

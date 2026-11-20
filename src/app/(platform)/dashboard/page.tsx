@@ -8,6 +8,11 @@ import {
   AdminDashboardSkeleton,
 } from "@/components/dashboard/skeletons";
 import { StudentMobileGapFillLauncher } from "@/components/dashboard/student-mobile-gap-fill-launcher";
+import { getGrammarTopicPromptCatalog } from "@/lib/grammar/prompt-overrides";
+import {
+  listStudentTutorPlans,
+  type StudentTutorPlanCard,
+} from "@/lib/progress/tutor-student-plan";
 import { getAuthenticatedUser } from "@/lib/rbac/require-role";
 
 export const dynamic = "force-dynamic";
@@ -35,17 +40,56 @@ export default async function DashboardPage() {
     const now = new Date();
     const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-    const { data: upcomingLessonRows } = await supabaseAdmin
-      .from("tutor_student_lessons")
-      .select(
-        "id, title, lesson_date, start_time, end_time, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
-      )
-      .eq("student_id", user.id)
-      .neq("status", "cancelled")
-      .gte("lesson_date", todayIso)
-      .order("lesson_date", { ascending: true })
-      .order("start_time", { ascending: true })
-      .limit(1);
+    const [
+      { data: upcomingLessonRows },
+      englishCatalog,
+      studentPlans,
+      grammarMasteryData,
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("tutor_student_lessons")
+        .select(
+          "id, title, lesson_date, start_time, end_time, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
+        )
+        .eq("student_id", user.id)
+        .neq("status", "cancelled")
+        .gte("lesson_date", todayIso)
+        .order("lesson_date", { ascending: true })
+        .order("start_time", { ascending: true })
+        .limit(1),
+      getGrammarTopicPromptCatalog("english"),
+      listStudentTutorPlans(user.id).catch((): StudentTutorPlanCard[] => []),
+      supabaseAdmin
+        .from("student_grammar_topic_mastery")
+        .select("topic_key")
+        .eq("student_id", user.id),
+    ]);
+
+    const planGrammarTopicKeys = Array.from(
+      new Set(
+        studentPlans.flatMap((plan) =>
+          (plan.plan.grammarTopicKeys ?? []).filter(
+            (k): k is string => typeof k === "string",
+          ),
+        ),
+      ),
+    );
+    const masteredGrammarTopicKeys = (
+      (grammarMasteryData.data ?? []) as Array<{ topic_key: string }>
+    ).map((row) => row.topic_key);
+
+    const grammarTopicCatalog = {
+      english: englishCatalog.map(({ level, topics }) => ({
+        level,
+        topics: topics.map(
+          ({ topicKey, displayName, hasUniqueInstructions }) => ({
+            topicKey,
+            displayName,
+            hasUniqueInstructions,
+          }),
+        ),
+      })),
+    };
 
     const rawNextLesson = upcomingLessonRows?.[0] as
       | {
@@ -78,12 +122,16 @@ export default async function DashboardPage() {
       <>
         {/* Mobile Student View: Focused Launcher + Next Lesson Google Meet banner */}
         <StudentMobileGapFillLauncher
+          userId={user.id}
           displayName={displayName}
           cefrLevel={profile.cefr_level}
           preferredLanguage={profile.preferred_language}
           sourceLanguage={profile.source_language}
           nextLesson={nextLesson}
           todayIso={todayIso}
+          grammarTopicCatalog={grammarTopicCatalog}
+          planGrammarTopicKeys={planGrammarTopicKeys}
+          masteredGrammarTopicKeys={masteredGrammarTopicKeys}
         />
 
         {/* Desktop / PC Student View: Full Dashboard */}

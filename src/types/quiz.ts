@@ -34,6 +34,7 @@ export interface QuizConfig {
   grammarTopicLabels?: Record<string, string>;
   grammarTopicEvaluationInstructions?: Record<string, string>;
   customTopic?: string;
+  avoidSentences?: string[];
 }
 
 // MCQ types

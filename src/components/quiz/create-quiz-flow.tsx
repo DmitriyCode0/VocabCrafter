@@ -74,6 +74,7 @@ type ActivityType =
 interface GrammarTopicOption {
   topicKey: string;
   displayName: string;
+  hasUniqueInstructions?: boolean;
 }
 
 interface GrammarTopicLevelGroup {
@@ -84,7 +85,6 @@ interface GrammarTopicLevelGroup {
 interface CreateQuizFlowProps {
   grammarTopicCatalog: {
     english: GrammarTopicLevelGroup[];
-    spanish: GrammarTopicLevelGroup[];
   };
   planGrammarTopicKeys?: string[];
   masteredGrammarTopicKeys?: string[];
@@ -153,16 +153,16 @@ export function CreateQuizFlow({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const availableGrammarLevels = grammarTopicCatalog[
-    targetLanguage === "spanish" ? "spanish" : "english"
-  ].filter(({ level }) => {
-    const levelIndex = CEFR_LEVELS.indexOf(level as CEFRLevel);
-    const selectedLevelIndex = CEFR_LEVELS.indexOf(cefrLevel);
+  const availableGrammarLevels = grammarTopicCatalog.english.filter(
+    ({ level }) => {
+      const levelIndex = CEFR_LEVELS.indexOf(level as CEFRLevel);
+      const selectedLevelIndex = CEFR_LEVELS.indexOf(cefrLevel);
 
-    return levelIndex !== -1 && selectedLevelIndex !== -1
-      ? levelIndex <= selectedLevelIndex
-      : false;
-  });
+      return levelIndex !== -1 && selectedLevelIndex !== -1
+        ? levelIndex <= selectedLevelIndex
+        : false;
+    },
+  );
   const availableTopicKeys = availableGrammarLevels.flatMap(({ topics }) =>
     topics.map((topic) => topic.topicKey),
   );
@@ -614,9 +614,6 @@ export function CreateQuizFlow({
                   {isTutor
                     ? messages.createQuiz.tutorDifficultyDescription
                     : messages.createQuiz.studentDifficultyDescription}
-                  {targetLanguage === "spanish"
-                    ? ` ${messages.createQuiz.spanishLimitedNote}`
-                    : ""}
                 </p>
               </div>
             </div>

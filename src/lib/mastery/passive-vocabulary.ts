@@ -1745,7 +1745,7 @@ export const passiveVocabularyImportSchema = z.object({
 });
 
 export const passiveVocabularyLibraryImportSchema = z.object({
-  targetLanguage: z.enum(["english", "spanish"]),
+  targetLanguage: z.enum(["english"]),
   sourceLabel: z.string().trim().max(160).optional(),
   items: z.array(passiveVocabularyImportItemSchema).min(1).max(500),
 });

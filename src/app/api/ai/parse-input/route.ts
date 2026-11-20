@@ -16,7 +16,7 @@ import {
 const requestSchema = z
   .object({
     text: z.string().max(10000).default(""),
-    targetLanguage: z.enum(["english", "spanish"]).optional(),
+    targetLanguage: z.enum(["english"]).optional(),
     sourceLanguage: z.enum(["english", "ukrainian"]).optional(),
     screenshots: z
       .array(

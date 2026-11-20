@@ -10,6 +10,15 @@ import type {
 import type { AppLanguage } from "@/lib/i18n/app-language";
 import { formatGrammarRulesSection } from "@/lib/grammar/prompt-sections";
 import {
+  CANDIDATE_ANGLES,
+  buildWordBlueprints,
+  formatAvoidSentencesSection,
+  getCandidateCountForQuiz,
+  getCefrSentenceCeiling,
+  shuffleArrayRandom,
+  type WordBlueprint,
+} from "@/lib/grammar/sentence-blueprints";
+import {
   getLearningLanguageLabel,
   getSourceLanguageLabel,
   normalizeLearningLanguage,
@@ -43,10 +52,10 @@ function formatTerms(
     .join("\n");
 }
 
-/** Shuffle array and take first `n` items */
+/** Always shuffle array unbiasedly and take up to `limit` items */
 export function shuffleAndSlice<T>(array: T[], limit: number): T[] {
-  const shuffled = [...array].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, Math.min(array.length, limit));
+  const shuffled = shuffleArrayRandom(array);
+  return shuffled.slice(0, Math.min(shuffled.length, limit));
 }
 
 // ─── Topic instruction ───────────────────────────────────────────
@@ -165,11 +174,12 @@ function getTranslationSentenceFormationRules(config: QuizConfig): string {
   const sourceSentenceRules =
     sourceLanguage === "ukrainian"
       ? `SOURCE-SENTENCE QUALITY POLICY:
-- The ${sourceLanguageLabel} sentence must be grammatically correct and natural, not a literal dictionary-form template.
-- Inflect Ukrainian nouns, adjectives, pronouns, numerals, and verbs correctly for case, number, gender, person, tense, and agreement.
-- Do NOT leave a Ukrainian word in its dictionary form if the sentence requires another form.
-- Prefer natural Ukrainian phrasing and agreement throughout the full sentence.
-- Good patterns: "Він не має паперової карти." and "Вони не працюють у великому аеропорту."`
+- The ${sourceLanguageLabel} sentence must be grammatically correct, idiomatic, and natural — never a stiff dictionary-form template.
+- Inflect Ukrainian nouns, adjectives, pronouns, numerals, and verbs accurately for case, number, gender, person, aspect (perfective vs imperfective), tense, and agreement.
+- Check direct objects after transitive verbs and infinitives carefully: feminine -а/-я nouns MUST take the accusative -у/-ю ending (e.g. "відвідати аптеку", "купити каву", NEVER nominative "відвідати аптека").
+- Do NOT leave a Ukrainian word in its dictionary form if the sentence requires another case/conjugation.
+- EXISTENTIAL "THERE" vs UKRAINIAN "ТАМ" RULE: NEVER translate dummy existential "There is/are/was/were" with a mechanical leading "Там" in Ukrainian when another location phrase is present (write "Біля мого дому був новий рибний магазин.", NOT "Там був новий рибний магазин біля мого дому."). Prefer natural location/event openings without "Там" (e.g. "На нашій вулиці є м'ясна лавка."). Only begin Ukrainian with "Там є/був..." if you genuinely mean "in that place over there" — AND in that case the ${targetLanguageLabel} reference sentence MUST include a second "there" at the end of that clause (e.g. "Там є м'ясна лавка. Вона дуже чиста." -> "There is a butcher's there. It is very clean.").
+- Vary sentence openings, time/place details, and natural conversational phrasing across every item.`
       : `SOURCE-SENTENCE QUALITY POLICY:
 - The ${sourceLanguageLabel} sentence must be fully grammatical and natural in the source language.
 - Use the correct inflected source-language word form that the sentence requires.`;
@@ -323,7 +333,45 @@ Always respond with valid JSON only. Do not include any markdown formatting or c
 
 // ─── Per-type prompt constructors ────────────────────────────────
 
-export function getMCQPrompt(terms: QuizTerm[], config: QuizConfig): string {
+function formatWordBlueprintsSection(
+  blueprints: WordBlueprint[],
+  targetLanguageLabel: string,
+  sourceLanguageLabel: string,
+  includeAngles: boolean,
+): string {
+  return blueprints
+    .map((bp, idx) => {
+      const lines = [
+        `${idx + 1}. Target Word (${targetLanguageLabel}): "${bp.term.term}" | ${sourceLanguageLabel} meaning: "${bp.term.definition}"`,
+        `   - Natural Context Hint: ${bp.everydayContextHint} — the sentence MUST emerge naturally from "${bp.term.term}"; NEVER force unrelated locations or random character names.`,
+      ];
+
+      if (bp.subRule) {
+        lines.push(`   - MANDATORY Grammar Sub-Rule: ${bp.subRule.label}`);
+        lines.push(`   - Required Structure: ${bp.subRule.requiredStructure}`);
+        lines.push(`   - Mandatory Source Cue: ${bp.subRule.sourceTriggers}`);
+        if (bp.subRule.forbiddenShortcuts) {
+          lines.push(`   - Avoid Shortcut: ${bp.subRule.forbiddenShortcuts}`);
+        }
+      }
+
+      if (includeAngles) {
+        const angles = CANDIDATE_ANGLES.slice(0, bp.candidateCount);
+        lines.push(
+          `   - Generate ${bp.candidateCount} distinct candidates varying by angle: ${angles.join(" | ")}`,
+        );
+      }
+
+      return lines.join("\n");
+    })
+    .join("\n\n");
+}
+
+export function getMCQPrompt(
+  terms: QuizTerm[],
+  config: QuizConfig,
+  precomputedBlueprints?: WordBlueprint[],
+): string {
   const { targetLanguageLabel, sourceLanguageLabel } =
     getLanguageContext(config);
   const difficultyInstruction = getDifficultyInstruction(
@@ -332,6 +380,12 @@ export function getMCQPrompt(terms: QuizTerm[], config: QuizConfig): string {
     "mcq",
   );
   const topicInstruction = getTopicInstruction(config.customTopic);
+  const avoidSection = formatAvoidSentencesSection(
+    config.avoidSentences,
+    config.sourceLanguage,
+  );
+  const blueprints =
+    precomputedBlueprints ?? buildWordBlueprints(terms, config, 1);
 
   return `You are an expert quiz creator specializing in ${targetLanguageLabel} vocabulary for language learners.
 Your task is to generate a multiple-choice quiz from a list of ${targetLanguageLabel} words and their ${sourceLanguageLabel} meanings.
@@ -339,14 +393,15 @@ The ${sourceLanguageLabel} meaning is provided ONLY to give you context for the 
 The difficulty of the vocabulary used in questions and incorrect options should be appropriate for a Student at CEFR ${config.cefrLevel} proficiency.
 ${difficultyInstruction}
 ${topicInstruction}
+${avoidSection}
 
-For each word in the provided list, create one question that tests its meaning. The question could be a definition, a synonym, an antonym, or a fill-in-the-blank sentence.
+For each word in the provided list, create one fresh, concise question that fits the target word naturally. The question could be a contextual fill-in-the-blank sentence, a realistic situation, a synonym, or a crisp definition check.
 Generate four options for each question: one correct answer and three plausible but incorrect distractors. Crucially, all four options should be of similar length and grammatical structure to prevent the correct answer from being obvious.
-Randomize the position of the correct answer across questions so it is not concentrated in one slot. Also vary question order instead of mirroring the input order.
+Randomize the position of the correct answer across questions so it is not concentrated in one slot. Also vary question style across items.
 Ensure the 'originalTerm' field matches the ${targetLanguageLabel} word from the input list exactly.
 
-Vocabulary terms:
-${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
+═══ WORD-BY-WORD BLUEPRINTS ═══
+${formatWordBlueprintsSection(blueprints, targetLanguageLabel, sourceLanguageLabel, false)}
 
 Respond with JSON in this exact format:
 {
@@ -365,6 +420,7 @@ Respond with JSON in this exact format:
 export function getGapFillPrompt(
   terms: QuizTerm[],
   config: QuizConfig,
+  precomputedBlueprints?: WordBlueprint[],
 ): string {
   const { targetLanguageLabel, sourceLanguageLabel } =
     getLanguageContext(config);
@@ -374,30 +430,55 @@ export function getGapFillPrompt(
     "gap_fill",
   );
   const topicInstruction = getTopicInstruction(config.customTopic);
+  const grammarRules = getGrammarRulesSection(
+    config.grammarTopics,
+    config.grammarChallenge,
+    config.grammarTopicDetails,
+    config.grammarTopicLabels,
+  );
+  const cefrCeiling = getCefrSentenceCeiling(config.cefrLevel);
+  const avoidSection = formatAvoidSentencesSection(
+    config.avoidSentences,
+    config.sourceLanguage,
+  );
+  const candidateCount = getCandidateCountForQuiz(terms.length, "gap_fill");
+  const blueprints =
+    precomputedBlueprints ??
+    buildWordBlueprints(terms, config, candidateCount);
 
   return `You are an expert quiz creator specializing in ${targetLanguageLabel} vocabulary for language learners.
-Your task is to generate a set of gap-fill (fill-in-the-blank) exercises from a list of ${targetLanguageLabel} words and their ${sourceLanguageLabel} meanings.
-The difficulty of the sentence structure and vocabulary should be appropriate for a Student at CEFR ${config.cefrLevel} proficiency.
+Your task is to generate high-variety gap-fill (fill-in-the-blank) exercises from a list of ${targetLanguageLabel} words and their ${sourceLanguageLabel} meanings.
+${cefrCeiling}
 ${difficultyInstruction}
+${grammarRules}
 ${topicInstruction}
+${avoidSection}
 
-For each word in the provided list, create one ${targetLanguageLabel.toUpperCase()} sentence that uses the word in a natural context. In the sentence, replace the target ${targetLanguageLabel} word with '___' to create a blank.
-- The 'correctAnswer' field should be the exact word that fits in the blank. This might be a conjugated form of the original term (e.g., 'goes' instead of 'go').
-- The 'sourceTerm' field MUST be the original ${targetLanguageLabel} word from the input list, exactly as provided.
-- The 'hint' field must be the original ${sourceLanguageLabel} meaning from the input list.
+═══ GENERATION RULES ═══
+1. For EACH vocabulary entry below, generate EXACTLY ${candidateCount} distinct, completely different ${targetLanguageLabel.toUpperCase()} candidate sentences inside its "candidates" array.
+2. Each sentence must be SHORT, natural, and strictly obey the CEFR ${config.cefrLevel} length and grammar ceiling above, varying the everyday situation and subject across candidates.
+3. In every candidate sentence, replace the target ${targetLanguageLabel} word with '___' to create a single clear blank.
+4. Make sure the context in each sentence clearly points to the intended meaning rather than being vague.
+5. In each candidate, "correctAnswer" must be the exact word/inflected form fitting the blank (e.g. 'placed', 'goes', 'negotiated').
+6. "sourceTerm" MUST match the original ${targetLanguageLabel} word from the input list exactly as provided.
+7. "hint" MUST be the original ${sourceLanguageLabel} meaning from the input list.
 
-Vocabulary terms:
-${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
+═══ WORD-BY-WORD GENERATION BLUEPRINTS ═══
+${formatWordBlueprintsSection(blueprints, targetLanguageLabel, sourceLanguageLabel, true)}
 
 Respond with JSON in this exact format:
 {
   "questions": [
     {
       "id": 1,
-      "sentence": "She ___ the book on the table.",
-      "correctAnswer": "placed",
-      "hint": "To put something in a specific position",
-      "sourceTerm": "place"
+      "sourceTerm": "place",
+      "hint": "класти / розмістити",
+      "candidates": [
+        {
+          "sentence": "Before leaving the kitchen, Maria ___ the warm pie on the cooling rack.",
+          "correctAnswer": "placed"
+        }
+      ]
     }
   ]
 }`;
@@ -406,6 +487,7 @@ Respond with JSON in this exact format:
 export function getTranslationPrompt(
   terms: QuizTerm[],
   config: QuizConfig,
+  precomputedBlueprints?: WordBlueprint[],
 ): string {
   const { targetLanguageLabel, sourceLanguageLabel } =
     getLanguageContext(config);
@@ -421,43 +503,46 @@ export function getTranslationPrompt(
     config.grammarTopicDetails,
     config.grammarTopicLabels,
   );
+  const cefrCeiling = getCefrSentenceCeiling(config.cefrLevel);
   const sentenceFormationRules = getTranslationSentenceFormationRules(config);
+  const avoidSection = formatAvoidSentencesSection(
+    config.avoidSentences,
+    config.sourceLanguage,
+  );
+  const candidateCount = getCandidateCountForQuiz(terms.length, "translation");
+  const blueprints =
+    precomputedBlueprints ??
+    buildWordBlueprints(terms, config, candidateCount);
 
-  const termList = terms
-    .map(
-      (t) =>
-        `  - ${targetLanguageLabel}: "${t.term}" | ${sourceLanguageLabel}: "${t.definition}"`,
-    )
-    .join("\n");
-
-  return `You are an expert in creating language translation exercises for ${targetLanguageLabel} learners working from ${sourceLanguageLabel}.
-Your task is to generate a set of exactly ${terms.length} translation challenges.
+  return `You are an expert in creating natural, concise language translation exercises for ${targetLanguageLabel} learners working from ${sourceLanguageLabel}.
+Your task is to generate ${terms.length} vocabulary translation entries, creating EXACTLY ${candidateCount} distinct, crisp sentence candidates per vocabulary word.
 
 ═══ MANDATORY RULES (VIOLATION = REJECTED OUTPUT) ═══
 
 RULE 1 — ONE VOCABULARY WORD PER SENTENCE:
-Each sentence must use EXACTLY ONE word/phrase from the provided vocabulary list. NEVER combine multiple vocabulary words in a single sentence.
+Each candidate sentence must use EXACTLY ONE word/phrase from the provided vocabulary list. NEVER combine multiple target vocabulary words in a single sentence.
 
-RULE 2 — VOCABULARY MUST BE PRESENT:
-The ${sourceLanguageLabel} meaning of the target vocabulary word MUST appear in the source sentence in the grammatically correct surface form that the sentence requires.
-- The word may be inflected, but it must remain clearly derived from the provided ${sourceLanguageLabel} meaning.
-- Example: if the source-language meaning is "карта", you may use "карти" or "картою" when the sentence requires it, but not a different noun.
-- Example: if the source-language meaning is "працювати", you may use "працюють" when the sentence requires that verb form.
+RULE 2 — VOCABULARY MUST BE PRESENT (NATURAL CORE PHRASE & EXACT CASE):
+The ${sourceLanguageLabel} meaning of the target vocabulary word MUST appear in "ukrainianSentence" in its grammatically correct surface form.
+- If the provided meaning is a short word/phrase (1–3 words), use it cleanly and inflect accurately as grammar requires (including feminine accusative -у/-ю after transitive verbs/infinitives, e.g. "відвідати аптеку", NEVER nominative "відвідати аптека").
+- If the provided meaning is a long dictionary gloss or explanation (4+ words, e.g. "імпульсивні витрати після періоду обмежень"), DO NOT paste the long definition verbatim! Extract and inflect its natural concise core phrase (e.g. "імпульсивні витрати") so the sentence reads naturally and stays short.
 
 RULE 3 — HIGHLIGHT THE TARGET WORD:
-Return the exact form of the source-language vocabulary word as it appears in your sentence in the "highlightText" field. This will be bolded in the UI for the student.
+Return the exact ${sourceLanguageLabel} target word/core phrase as it appears inside "ukrainianSentence" (matching its inflected ending, e.g. "аптеку") in the "highlightText" field.
 Do NOT wrap the word in markdown markers like **bold** or __underline__ inside "ukrainianSentence".
 
-RULE 4 — GRAMMAR TOPIC COMPLIANCE:
-The ${targetLanguageLabel.toUpperCase()} translation of each sentence MUST require the grammatical structure(s) listed below. The source sentence should be crafted so that translating it naturally into ${targetLanguageLabel} forces the student to use the target grammar.
-Before finalizing any question, reject it if a natural ${targetLanguageLabel} translation could avoid the target grammar topic.
-Only keep questions where the reference translation clearly demonstrates the requested grammar.
+RULE 4 — STRICT GRAMMAR & SUB-RULE COMPLIANCE:
+Each word below has an Assigned Grammar Sub-Rule and Mandatory Source Cue (when grammar topics are enabled).
+Every candidate for that word MUST strictly enforce that exact sub-rule and include clear ${sourceLanguageLabel} cues so translating naturally into ${targetLanguageLabel} uses the target grammar without ambiguity.
+Check number agreement carefully (singular noun -> singular it/is; plural noun -> plural are/they are; never use "our/my/the" directly after "there is/are").
+For existential "There is/are/was/were": NEVER start Ukrainian with dummy "Там є/був" when another location exists; prefer concrete places without "Там", OR if "Там" is used in Ukrainian ("Там є м'ясна лавка."), the ${targetLanguageLabel} reference MUST include a second "there" at the end ("There is a butcher's there.").
 
-RULE 5 — CEFR LEVEL COMPLIANCE:
-The student is at level **${config.cefrLevel}**. Sentence complexity, vocabulary (outside target words), and length MUST match this level. NEVER exceed it.
+RULE 5 — STRICT CEFR ${config.cefrLevel} SIMPLICITY & LENGTH CEILING:
+${cefrCeiling}
 
-RULE 6 — SENSIBLE SENTENCES:
-Every sentence must make logical sense in the real world. No absurd, nonsensical, or contradictory statements.
+RULE 6 — NATURAL EVERYDAY CONTEXTS & VARIETY:
+For each word, generate ${candidateCount} genuinely different everyday sentences built organically around that word's real meaning.
+NEVER glue unrelated clauses together (such as adding weather + "so...", random character names + "was asked if...", or irrelevant places like train rides) just to force complexity or variety. Simplicity and naturalness beat length!
 
 RULE 7 — INFLECTION AND SENTENCE FORMATION:
 ${sentenceFormationRules}
@@ -466,20 +551,25 @@ ${sentenceFormationRules}
 ${difficultyInstruction}
 ${grammarRules}
 ${topicInstruction}
+${avoidSection}
 
-═══ VOCABULARY LIST (one sentence per entry) ═══
-${termList}
+═══ WORD-BY-WORD GENERATION BLUEPRINTS ═══
+${formatWordBlueprintsSection(blueprints, targetLanguageLabel, sourceLanguageLabel, true)}
 
 ═══ OUTPUT FORMAT ═══
-Respond with JSON in this exact format:
+Respond with JSON in this exact format (include all ${candidateCount} distinct candidates in each "candidates" array):
 {
   "questions": [
     {
       "id": 1,
-      "ukrainianSentence": "${sourceLanguageLabel} sentence containing the target word",
-      "englishReference": "Natural ${targetLanguageLabel} translation demonstrating target grammar",
       "sourceTerm": "original ${targetLanguageLabel} word from the list exactly as provided",
-      "highlightText": "exact ${sourceLanguageLabel} word form as it appears in ukrainianSentence"
+      "candidates": [
+        {
+          "ukrainianSentence": "Short, natural ${sourceLanguageLabel} sentence matching CEFR ${config.cefrLevel}",
+          "englishReference": "Short, natural ${targetLanguageLabel} translation strictly demonstrating the assigned grammar rule",
+          "highlightText": "exact ${sourceLanguageLabel} word/phrase as it appears in ukrainianSentence"
+        }
+      ]
     }
   ]
 }`;
@@ -488,6 +578,7 @@ Respond with JSON in this exact format:
 export function getTextTranslationPrompt(
   terms: QuizTerm[],
   config: QuizConfig,
+  precomputedBlueprints?: WordBlueprint[],
 ): string {
   const { targetLanguageLabel, sourceLanguageLabel } =
     getLanguageContext(config);
@@ -503,6 +594,13 @@ export function getTextTranslationPrompt(
     config.grammarTopicDetails,
     config.grammarTopicLabels,
   );
+  const avoidSection = formatAvoidSentencesSection(
+    config.avoidSentences,
+    config.sourceLanguage,
+  );
+  const blueprints =
+    precomputedBlueprints ?? buildWordBlueprints(terms, config, 1);
+  const freshSettingSeed = blueprints[0]?.everydayContextHint ?? "everyday life";
 
   return `You are an expert in creating language translation exercises for ${targetLanguageLabel} learners working from ${sourceLanguageLabel}.
 Your task is to generate a short, cohesive text for translation.
@@ -513,11 +611,12 @@ CRITICAL LEVEL INSTRUCTION:
 
 CRITICAL INSTRUCTION:
 1. Create a cohesive text in ${sourceLanguageLabel.toUpperCase()} that is approximately 5 sentences long.
-2. The text should be on a single, clear topic.
+2. Unless a custom topic specifies otherwise, anchor the story around a fresh situation inspired by: "${freshSettingSeed}". Avoid generic textbook settings.
 3. Naturally incorporate several words from the provided vocabulary list. You DO NOT need to use all the words; prioritize creating a text that reads naturally.
 ${difficultyInstruction}
 ${grammarRules}
 ${topicInstruction}
+${avoidSection}
 4. After creating the ${sourceLanguageLabel} text, provide a correct and natural-sounding ${targetLanguageLabel.toUpperCase()} translation for the entire text.
 
 Vocabulary terms:
@@ -549,7 +648,7 @@ ${topicInstruction}
 Vocabulary terms:
 ${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
 
-Create term-definition pairs for matching. Use the provided terms and their definitions, but rephrase the definitions to test deeper understanding.
+Create term-definition pairs for matching. Use the provided terms and their definitions, but rephrase the definitions freshly to test deeper understanding.
 
 Respond with JSON in this exact format:
 {
@@ -565,20 +664,28 @@ Respond with JSON in this exact format:
 export function getFlashcardsPrompt(
   terms: QuizTerm[],
   config: QuizConfig,
+  precomputedBlueprints?: WordBlueprint[],
 ): string {
   const { targetLanguageLabel, sourceLanguageLabel } =
     getLanguageContext(config);
   const topicInstruction = getTopicInstruction(config.customTopic);
+  const avoidSection = formatAvoidSentencesSection(
+    config.avoidSentences,
+    config.sourceLanguage,
+  );
+  const blueprints =
+    precomputedBlueprints ?? buildWordBlueprints(terms, config, 1);
 
   return `Generate flashcard content using the following vocabulary terms.
 
 CEFR Level: ${config.cefrLevel}
 ${topicInstruction}
+${avoidSection}
 
-Vocabulary terms:
-${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
+═══ WORD-BY-WORD CONTEXT HINTS ═══
+${formatWordBlueprintsSection(blueprints, targetLanguageLabel, sourceLanguageLabel, false)}
 
-For each term, provide the definition and an example sentence using the term at the appropriate CEFR level.
+For each term, provide a clear definition and one short, vivid example sentence using the term at the CEFR ${config.cefrLevel} level.
 
 Respond with JSON in this exact format:
 {
@@ -595,6 +702,7 @@ Respond with JSON in this exact format:
 export function getDiscussionPrompt(
   terms: QuizTerm[],
   config: QuizConfig,
+  precomputedBlueprints?: WordBlueprint[],
 ): string {
   const { targetLanguageLabel, sourceLanguageLabel } =
     getLanguageContext(config);
@@ -604,19 +712,26 @@ export function getDiscussionPrompt(
     "discussion",
   );
   const topicInstruction = getTopicInstruction(config.customTopic);
+  const avoidSection = formatAvoidSentencesSection(
+    config.avoidSentences,
+    config.sourceLanguage,
+  );
+  const blueprints =
+    precomputedBlueprints ?? buildWordBlueprints(terms, config, 1);
 
   return `You are an expert in creating live speaking materials for ${targetLanguageLabel} language learners.
 Your task is to generate CEFR-level topic sentences for live discussion based on a list of ${targetLanguageLabel} words and their ${sourceLanguageLabel} meanings. The ${sourceLanguageLabel} meaning is for context only. All output must be in ${targetLanguageLabel.toUpperCase()}.
 The complexity and subject matter must be appropriate for a Student at CEFR ${config.cefrLevel} proficiency.
 ${difficultyInstruction}
 ${topicInstruction}
+${avoidSection}
 
 CRITICAL REQUIREMENTS:
-- Generate exactly one discussion sentence per input term.
+- Generate exactly one discussion sentence per input term, tailored to keep prompts fresh across varied everyday themes.
 - Each sentence must naturally include the corresponding target vocabulary item.
 - Keep each sentence concise and conversation-ready (one line).
 - Mix open-ended prompts and agree/disagree statements.
-- Keep topics practical and suitable for live speaking.
+- Keep topics practical and engaging for live speaking.
 - Return exactly ${terms.length} items in the "prompts" array.
 - Each item must include a numeric "id" starting at 1 and increasing by 1.
 - The "type" field must be exactly either "open-ended" or "agree-disagree".
@@ -624,8 +739,8 @@ CRITICAL REQUIREMENTS:
 - Each item must include a "highlightText" field equal to the exact vocabulary word or phrase as it appears in the prompt.
 - Do not add explanations, notes, markdown, or any keys other than "id", "prompt", "type", "sourceTerm", and "highlightText".
 
-Vocabulary terms:
-${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
+═══ WORD-BY-WORD BLUEPRINTS ═══
+${formatWordBlueprintsSection(blueprints, targetLanguageLabel, sourceLanguageLabel, false)}
 
 Respond with JSON in this exact format:
 {
@@ -760,7 +875,11 @@ Respond with JSON in this exact format:
 
 const PROMPT_MAP: Record<
   QuizType,
-  (terms: QuizTerm[], config: QuizConfig) => string
+  (
+    terms: QuizTerm[],
+    config: QuizConfig,
+    precomputedBlueprints?: WordBlueprint[],
+  ) => string
 > = {
   mcq: getMCQPrompt,
   gap_fill: getGapFillPrompt,
@@ -784,14 +903,28 @@ export const TERM_LIMITS: Record<QuizType, number> = {
   discussion: 10,
 };
 
+export function getQuizPromptWithBlueprints(
+  type: QuizType,
+  terms: QuizTerm[],
+  config: QuizConfig,
+): { prompt: string; blueprints: WordBlueprint[] } {
+  const promptFn = PROMPT_MAP[type];
+  const limit = TERM_LIMITS[type];
+  const selectedTerms = shuffleAndSlice(terms, limit);
+  const candidateCount =
+    type === "translation" || type === "translation_list" || type === "gap_fill"
+      ? getCandidateCountForQuiz(selectedTerms.length, type)
+      : 1;
+  const blueprints = buildWordBlueprints(selectedTerms, config, candidateCount);
+  const prompt = promptFn(selectedTerms, config, blueprints);
+
+  return { prompt, blueprints };
+}
+
 export function getQuizPrompt(
   type: QuizType,
   terms: QuizTerm[],
   config: QuizConfig,
 ): string {
-  const promptFn = PROMPT_MAP[type];
-  const limit = TERM_LIMITS[type];
-  const selectedTerms =
-    terms.length > limit ? shuffleAndSlice(terms, limit) : terms;
-  return promptFn(selectedTerms, config);
+  return getQuizPromptWithBlueprints(type, terms, config).prompt;
 }

@@ -1,4 +1,14 @@
 import { z } from "zod";
+import {
+  selectGapFillCandidate,
+  selectTranslationCandidate,
+  type TopicSubRuleSpec,
+} from "@/lib/grammar/sentence-blueprints";
+import type {
+  GapFillQuestion,
+  QuizType,
+  TranslationQuestion,
+} from "@/types/quiz";
 
 // MCQ validation
 const mcqQuestionSchema = z.object({
@@ -13,8 +23,8 @@ export const mcqResponseSchema = z.object({
   questions: z.array(mcqQuestionSchema),
 });
 
-// Gap-fill validation
-const gapFillQuestionSchema = z.object({
+// Gap-fill validation (supports multi-candidate randomization + flat backward compatibility)
+const flatGapFillQuestionSchema = z.object({
   id: z.number(),
   sentence: z.string(),
   correctAnswer: z.string(),
@@ -22,12 +32,43 @@ const gapFillQuestionSchema = z.object({
   sourceTerm: z.string(),
 });
 
+const multiCandidateGapFillQuestionSchema = z.object({
+  id: z.number(),
+  hint: z.string(),
+  sourceTerm: z.string(),
+  candidates: z
+    .array(
+      z.object({
+        sentence: z.string(),
+        correctAnswer: z.string(),
+      }),
+    )
+    .min(1),
+});
+
+const gapFillQuestionSchema = z
+  .union([multiCandidateGapFillQuestionSchema, flatGapFillQuestionSchema])
+  .transform((item): GapFillQuestion => {
+    if ("candidates" in item) {
+      const picked = selectGapFillCandidate(item.candidates);
+      return {
+        id: item.id,
+        sentence: picked.sentence,
+        correctAnswer: picked.correctAnswer,
+        hint: item.hint,
+        sourceTerm: item.sourceTerm,
+      };
+    }
+
+    return item;
+  });
+
 export const gapFillResponseSchema = z.object({
   questions: z.array(gapFillQuestionSchema),
 });
 
-// Translation validation
-const translationQuestionSchema = z.object({
+// Translation validation (supports multi-candidate randomization + sub-rule filtering)
+const flatTranslationQuestionSchema = z.object({
   id: z.number(),
   ukrainianSentence: z.string(),
   englishReference: z.string(),
@@ -38,9 +79,50 @@ const translationQuestionSchema = z.object({
   grammarValidationReason: z.string().optional(),
 });
 
-export const translationResponseSchema = z.object({
-  questions: z.array(translationQuestionSchema),
+const multiCandidateTranslationQuestionSchema = z.object({
+  id: z.number(),
+  sourceTerm: z.string(),
+  candidates: z
+    .array(
+      z.object({
+        ukrainianSentence: z.string(),
+        englishReference: z.string(),
+        highlightText: z.string().optional(),
+      }),
+    )
+    .min(1),
 });
+
+export function createTranslationResponseSchema(
+  subRulesByTerm?: Map<string, TopicSubRuleSpec>,
+) {
+  const questionSchema = z
+    .union([
+      multiCandidateTranslationQuestionSchema,
+      flatTranslationQuestionSchema,
+    ])
+    .transform((item): TranslationQuestion => {
+      if ("candidates" in item) {
+        const subRule = subRulesByTerm?.get(item.sourceTerm.toLowerCase());
+        const picked = selectTranslationCandidate(item.candidates, subRule);
+        return {
+          id: item.id,
+          sourceTerm: item.sourceTerm,
+          ukrainianSentence: picked.ukrainianSentence,
+          englishReference: picked.englishReference,
+          highlightText: picked.highlightText,
+        };
+      }
+
+      return item;
+    });
+
+  return z.object({
+    questions: z.array(questionSchema),
+  });
+}
+
+export const translationResponseSchema = createTranslationResponseSchema();
 
 // Text translation validation
 export const textTranslationResponseSchema = z.object({
@@ -91,8 +173,6 @@ export const evaluationResponseSchema = z.object({
 });
 
 // Schema map for quiz types
-import type { QuizType } from "@/types/quiz";
-
 const SCHEMA_MAP: Record<QuizType, z.ZodSchema> = {
   mcq: mcqResponseSchema,
   gap_fill: gapFillResponseSchema,

@@ -61,12 +61,6 @@ export const GEMINI_TTS_PREVIEW_SAMPLES = {
       text: "Hello. This is how your selected AI voice sounds during quiz playback.",
     },
   ],
-  spanish: [
-    {
-      label: "Quick Preview",
-      text: "Hola. Asi suena la voz de IA que elegiste para tus actividades.",
-    },
-  ],
 } as const;
 
 export type GeminiTtsVoice = (typeof GEMINI_TTS_VOICE_OPTIONS)[number]["value"];
@@ -76,9 +70,8 @@ export function getGeminiTtsVoiceOption(value?: string | null) {
 }
 
 export function getGeminiTtsPreviewSamples(language?: string | null) {
-  return language === "spanish"
-    ? GEMINI_TTS_PREVIEW_SAMPLES.spanish
-    : GEMINI_TTS_PREVIEW_SAMPLES.english;
+  void language;
+  return GEMINI_TTS_PREVIEW_SAMPLES.english;
 }
 
 export function normalizeGeminiTtsVoice(value?: string | null): GeminiTtsVoice {

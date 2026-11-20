@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Loader2, Plus, Save, Target, X } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -43,6 +44,7 @@ interface GrammarTopicOption {
   topicKey: string;
   displayName: string;
   level: string;
+  hasUniqueInstructions?: boolean;
 }
 
 interface MonthlyReportMetrics {
@@ -302,6 +304,7 @@ export function TutorStudentPlanWorkspace({
                     {availableGrammarTopics.map((topic) => (
                       <SelectItem key={topic.topicKey} value={topic.topicKey}>
                         {topic.displayName} ({topic.level})
+                        {topic.hasUniqueInstructions === false ? " · beta" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -339,6 +342,14 @@ export function TutorStudentPlanWorkspace({
                         className="inline-flex items-center gap-2 rounded-full border bg-muted/20 px-3 py-1.5 text-sm"
                       >
                         <span>{topic?.displayName ?? topicKey}</span>
+                        {topic?.hasUniqueInstructions === false ? (
+                          <Badge
+                            variant="outline"
+                            className="px-1.5 py-0 text-[10px] font-medium lowercase tracking-wide text-muted-foreground"
+                          >
+                            beta
+                          </Badge>
+                        ) : null}
                         {topic?.level ? (
                           <span className="rounded-full bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
                             {topic.level}

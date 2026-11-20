@@ -25,7 +25,7 @@ const requestSchema = z.object({
   config: z
     .object({
       cefrLevel: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]),
-      targetLanguage: z.enum(["english", "spanish"]).optional(),
+      targetLanguage: z.enum(["english"]).optional(),
       sourceLanguage: z.enum(["english", "ukrainian"]).optional(),
       vocabularyChallenge: z.enum(["Simple", "Standard", "Complex"]),
       grammarChallenge: z.enum(["Simple", "Standard", "Complex"]),

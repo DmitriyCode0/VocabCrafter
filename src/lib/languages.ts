@@ -2,7 +2,6 @@ import type { CEFRLevel } from "@/types/quiz";
 
 export const TARGET_LANGUAGE_OPTIONS = [
   { value: "english", label: "English" },
-  { value: "spanish", label: "Spanish" },
 ] as const;
 
 export const SOURCE_LANGUAGE_OPTIONS = [
@@ -29,10 +28,7 @@ export const ALL_CEFR_LEVELS: CEFRLevel[] = [
 export function normalizeLearningLanguage(
   value?: string | null,
 ): LearningLanguage {
-  if (value === "spanish" || value === "es") {
-    return "spanish";
-  }
-
+  void value;
   return "english";
 }
 
@@ -67,25 +63,21 @@ export function getSourceLanguageLabel(value?: string | null) {
 }
 
 export function getAllowedCefrLevels(language?: string | null): CEFRLevel[] {
-  return normalizeLearningLanguage(language) === "spanish"
-    ? ["A1"]
-    : ALL_CEFR_LEVELS;
+  void language;
+  return ALL_CEFR_LEVELS;
 }
 
 export function getDefaultCefrLevelForLanguage(
   language?: string | null,
 ): CEFRLevel {
-  return normalizeLearningLanguage(language) === "spanish" ? "A1" : "B1";
+  void language;
+  return "B1";
 }
 
 export function getSpeechLanguageTag(
   language?: string | null,
   englishVariantPreference?: string | null,
 ) {
-  if (language === "spanish" || language === "es") {
-    return "es-ES";
-  }
-
   if (language === "ukrainian" || language === "uk") {
     return "uk-UA";
   }

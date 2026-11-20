@@ -254,6 +254,105 @@ const GRAMMAR_LIBRARY_TOPIC_CONTENT: Record<string, GrammarLibraryTopicContent> 
       ],
     },
   },
+  "There vs It": {
+    summary:
+      "Use 'there' to introduce that something exists or is somewhere, and use 'it' for times, dates, weather, distance, 'It's + adj + to-infinitive', and referring back to something already mentioned.",
+    formula:
+      "There is/are/was + noun (+ place/time) | It is/was + time/weather/distance/adj + to-verb",
+    note: "Remember: every English clause needs ONE subject + verb. Never drop 'It' (say 'It's fantastic!', NOT 'Is fantastic!'), and never double the subject (say 'The worst part is...', NOT 'The worst part it's...').",
+    sections: [
+      {
+        title: "Use THERE",
+        items: [
+          "To say when or where something is: There are some cups on the table. / There is a party tomorrow.",
+          "To say something exists or is happening: There is a problem. / There was an accident.",
+        ],
+      },
+      {
+        title: "Use IT",
+        items: [
+          "To talk about times and dates: It's 4th of July. / It's my birthday. / It's four o'clock. It's very late.",
+          "To talk about the weather: It rained a lot yesterday. / It's four degrees.",
+          "To talk about distance: How far is it? It's 2 kilometres from the hotel.",
+          "Use it's + adjective + to-infinitive: It's nice to see you again. / It was difficult to find the hotel.",
+          "To talk about something again: There's a party tonight. It will be fun! / We saw a snake. It was very big.",
+        ],
+      },
+      {
+        title: "We need ONE subject + verb",
+        items: [
+          'Do not double the subject: "The worst part it\'s the speaking." ❌ -> "The worst part is the speaking." ✅',
+          'Do not drop the subject "It": "I love their music. Is fantastic!" ❌ -> "I love their music. It\'s fantastic!" ✅',
+        ],
+      },
+    ],
+    examples: [
+      {
+        sentence: "There are some cups on the table.",
+        note: "THERE: saying where something is",
+      },
+      {
+        sentence: "There was an accident.",
+        note: "THERE: saying something happened",
+      },
+      {
+        sentence: "It's 4th of July. It's my birthday.",
+        note: "IT: times and dates",
+      },
+      {
+        sentence: "It rained a lot yesterday. It's four degrees.",
+        note: "IT: weather and temperature",
+      },
+      {
+        sentence: "How far is it? It's 2 kilometres from the hotel.",
+        note: "IT: distance",
+      },
+      {
+        sentence: "It was difficult to find the hotel.",
+        note: "IT + adjective + to-infinitive",
+      },
+      {
+        sentence: "We saw a snake. It was very big.",
+        note: "IT: talking about something again",
+      },
+    ],
+    quiz: {
+      questions: [
+        {
+          question: "Complete the sentence: '___ a party tonight. ___ will be fun!'",
+          options: [
+            { id: "a", label: "It's / There" },
+            { id: "b", label: "There's / It" },
+            { id: "c", label: "There's / Is" },
+          ],
+          correctOptionId: "b",
+          explanation:
+            "Use 'There's' to introduce an event happening, then 'It' to talk about it again (and never drop the subject 'It'!).",
+        },
+        {
+          question: "Choose the correct sentence without a double subject.",
+          options: [
+            { id: "a", label: "The worst part it's the speaking." },
+            { id: "b", label: "The worst part is the speaking." },
+            { id: "c", label: "Is the worst part the speaking." },
+          ],
+          correctOptionId: "b",
+          explanation:
+            "We need ONE subject + verb. Since 'The worst part' is already the subject, do not add 'it' before 'is'.",
+        },
+        {
+          question: "Complete: 'How far ___? ___ 2 kilometres from the hotel.'",
+          options: [
+            { id: "a", label: "is there / There's" },
+            { id: "b", label: "is it / It's" },
+            { id: "c", label: "is / Is" },
+          ],
+          correctOptionId: "b",
+          explanation: "Always use 'it' when asking about or stating distance.",
+        },
+      ],
+    },
+  },
 };
 
 export function getGrammarLibraryTopicContent(topicKey: string) {

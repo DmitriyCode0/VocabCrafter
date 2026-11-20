@@ -501,6 +501,7 @@ export default function SettingsPage() {
                   language={learningLanguage}
                   englishVariantPreference={englishVariantPreference}
                   voice={aiVoice}
+                  forceEngine="ai"
                   label={messages.settings.aiVoice.playPreview}
                   className="w-full justify-center md:w-auto"
                 />
@@ -570,6 +571,7 @@ export default function SettingsPage() {
                 language={learningLanguage}
                 englishVariantPreference={englishVariantPreference}
                 voice={aiVoice}
+                forceEngine="ai"
                 label={messages.settings.aiVoice.playPreview}
                 className="w-full justify-center"
               />

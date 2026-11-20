@@ -7,10 +7,13 @@ import {
   generateJsonFromGeminiWithUsage,
   GEMINI_MODEL,
 } from "@/lib/gemini/client";
-import { getQuizPrompt, getSystemInstruction } from "@/lib/gemini/prompts";
+import {
+  getQuizPromptWithBlueprints,
+  getSystemInstruction,
+} from "@/lib/gemini/prompts";
+import type { TopicSubRuleSpec } from "@/lib/grammar/sentence-blueprints";
 import { checkAIQuota, incrementAICalls } from "@/lib/ai/quota";
 import { recordAIUsageEvent } from "@/lib/ai/usage";
-import { normalizeLearningLanguage } from "@/lib/languages";
 import {
   resolveGrammarTopicLabels,
   resolveGrammarTopicPromptDetails,
@@ -18,14 +21,13 @@ import {
 import type {
   DiscussionPrompt,
   GenerateQuizRequest,
-  QuizConfig,
   QuizTerm,
 } from "@/types/quiz";
 import { z } from "zod";
 import {
+  createTranslationResponseSchema,
   mcqResponseSchema,
   gapFillResponseSchema,
-  translationResponseSchema,
   textTranslationResponseSchema,
   matchingResponseSchema,
   flashcardsResponseSchema,
@@ -57,7 +59,7 @@ const requestSchema = z.object({
     .max(50),
   config: z.object({
     cefrLevel: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]),
-    targetLanguage: z.enum(["english", "spanish"]).optional(),
+    targetLanguage: z.enum(["english"]).optional(),
     sourceLanguage: z.enum(["english", "ukrainian"]).optional(),
     vocabularyChallenge: z.enum(["Simple", "Standard", "Complex"]),
     grammarChallenge: z.enum(["Simple", "Standard", "Complex"]),
@@ -296,25 +298,16 @@ function normalizeDiscussionPromptType(
   return "open-ended";
 }
 
-function buildDiscussionUsageInstruction(
-  term: string,
-  config: QuizConfig,
-): string {
-  return normalizeLearningLanguage(config.targetLanguage) === "spanish"
-    ? `Usa \"${term}\" en tu respuesta.`
-    : `Use \"${term}\" in your answer.`;
+function buildDiscussionUsageInstruction(term: string): string {
+  return `Use \"${term}\" in your answer.`;
 }
 
-function ensurePromptReferencesTerm(
-  promptText: string,
-  term: string,
-  config: QuizConfig,
-) {
+function ensurePromptReferencesTerm(promptText: string, term: string) {
   if (promptText.toLowerCase().includes(term.toLowerCase())) {
     return promptText;
   }
 
-  const suffix = buildDiscussionUsageInstruction(term, config);
+  const suffix = buildDiscussionUsageInstruction(term);
   const base = /[.!?]$/.test(promptText) ? promptText : `${promptText}.`;
   return `${base} ${suffix}`;
 }
@@ -322,12 +315,9 @@ function ensurePromptReferencesTerm(
 function buildFallbackDiscussionPrompt(
   term: QuizTerm,
   index: number,
-  config: QuizConfig,
 ): DiscussionPrompt {
   const promptType: DiscussionPrompt["type"] =
     index % 2 === 0 ? "open-ended" : "agree-disagree";
-  const isSpanish =
-    normalizeLearningLanguage(config.targetLanguage) === "spanish";
 
   if (promptType === "agree-disagree") {
     return {
@@ -335,9 +325,7 @@ function buildFallbackDiscussionPrompt(
       type: promptType,
       sourceTerm: term.term,
       highlightText: term.term,
-      prompt: isSpanish
-        ? `Di si estas de acuerdo o no: \"${term.term}\" es importante en la vida diaria. Explica tu opinion.`
-        : `Agree or disagree: \"${term.term}\" is important in everyday life. Explain your opinion.`,
+      prompt: `Agree or disagree: \"${term.term}\" is important in everyday life. Explain your opinion.`,
     };
   }
 
@@ -346,17 +334,11 @@ function buildFallbackDiscussionPrompt(
     type: promptType,
     sourceTerm: term.term,
     highlightText: term.term,
-    prompt: isSpanish
-      ? `Usa \"${term.term}\" en tu respuesta y describe una situacion real relacionada con esta palabra.`
-      : `Use \"${term.term}\" in your answer and describe a real situation related to it.`,
+    prompt: `Use \"${term.term}\" in your answer and describe a real situation related to it.`,
   };
 }
 
-function normalizeDiscussionContent(
-  rawContent: unknown,
-  terms: QuizTerm[],
-  config: QuizConfig,
-) {
+function normalizeDiscussionContent(rawContent: unknown, terms: QuizTerm[]) {
   let rawPrompts: unknown[] = [];
 
   if (Array.isArray(rawContent)) {
@@ -381,7 +363,7 @@ function normalizeDiscussionContent(
     const promptText = extractDiscussionPromptText(candidate);
 
     if (!promptText) {
-      return buildFallbackDiscussionPrompt(term, index, config);
+      return buildFallbackDiscussionPrompt(term, index);
     }
 
     const rawType =
@@ -391,7 +373,7 @@ function normalizeDiscussionContent(
 
     return {
       id: index + 1,
-      prompt: ensurePromptReferencesTerm(promptText, term.term, config),
+      prompt: ensurePromptReferencesTerm(promptText, term.term),
       type: normalizeDiscussionPromptType(rawType, promptText),
       sourceTerm: term.term,
       highlightText: term.term,
@@ -401,12 +383,92 @@ function normalizeDiscussionContent(
   return discussionResponseSchema.parse({ prompts });
 }
 
-function buildFallbackDiscussionContent(terms: QuizTerm[], config: QuizConfig) {
+function buildFallbackDiscussionContent(terms: QuizTerm[]) {
   return discussionResponseSchema.parse({
     prompts: terms.map((term, index) =>
-      buildFallbackDiscussionPrompt(term, index, config),
+      buildFallbackDiscussionPrompt(term, index),
     ),
   });
+}
+
+async function fetchRecentSentencesToAvoid(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  type: QuizType,
+  terms: QuizTerm[],
+): Promise<string[]> {
+  try {
+    const termSet = new Set(terms.map((t) => t.term.trim().toLowerCase()));
+    const { data: recentQuizzes, error } = await supabase
+      .from("quizzes")
+      .select("generated_content")
+      .eq("creator_id", userId)
+      .eq("type", type)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(8);
+
+    if (error || !recentQuizzes) {
+      return [];
+    }
+
+    const collected: string[] = [];
+    const seen = new Set<string>();
+
+    const pushIfNew = (candidate: unknown) => {
+      if (typeof candidate !== "string") return;
+      const trimmed = candidate.trim();
+      if (!trimmed || seen.has(trimmed)) return;
+      seen.add(trimmed);
+      collected.push(trimmed);
+    };
+
+    for (const quiz of recentQuizzes) {
+      const content = quiz.generated_content as Record<string, unknown> | null;
+      if (!content) continue;
+
+      if (Array.isArray(content.questions)) {
+        for (const item of content.questions) {
+          if (!item || typeof item !== "object") continue;
+          const record = item as Record<string, unknown>;
+          const termKey = String(
+            record.sourceTerm ?? record.originalTerm ?? "",
+          )
+            .trim()
+            .toLowerCase();
+          if (termKey && termSet.size > 0 && !termSet.has(termKey)) continue;
+
+          pushIfNew(record.englishReference);
+          pushIfNew(record.ukrainianSentence);
+          pushIfNew(record.sentence);
+          pushIfNew(record.question);
+        }
+      }
+
+      if (Array.isArray(content.prompts)) {
+        for (const item of content.prompts) {
+          if (!item || typeof item !== "object") continue;
+          const record = item as Record<string, unknown>;
+          const termKey = String(record.sourceTerm ?? "").trim().toLowerCase();
+          if (termKey && termSet.size > 0 && !termSet.has(termKey)) continue;
+          pushIfNew(record.prompt);
+        }
+      }
+
+      if (content.content && typeof content.content === "object") {
+        const inner = content.content as Record<string, unknown>;
+        pushIfNew(inner.originalText);
+      }
+
+      if (collected.length >= 15) {
+        break;
+      }
+    }
+
+    return collected.slice(0, 15);
+  } catch {
+    return [];
+  }
 }
 
 export async function POST(request: Request) {
@@ -459,8 +521,25 @@ export async function POST(request: Request) {
     config.grammarTopicLabels = await resolveGrammarTopicLabels(
       config.grammarTopics,
     );
+    config.avoidSentences = await fetchRecentSentencesToAvoid(
+      supabase,
+      user.id,
+      type,
+      terms,
+    );
 
-    const prompt = getQuizPrompt(type, terms, config);
+    const { prompt, blueprints } = getQuizPromptWithBlueprints(
+      type,
+      terms,
+      config,
+    );
+    const subRulesByTerm = new Map<string, TopicSubRuleSpec>();
+    for (const bp of blueprints) {
+      if (bp.subRule) {
+        subRulesByTerm.set(bp.term.term.toLowerCase(), bp.subRule);
+      }
+    }
+    const translationSchema = createTranslationResponseSchema(subRulesByTerm);
     const systemInstruction = getSystemInstruction(config);
     const thinkingConfig = getQuizThinkingConfig(type);
 
@@ -471,9 +550,9 @@ export async function POST(request: Request) {
     const SCHEMA_MAP: Record<QuizType, z.ZodSchema> = {
       mcq: mcqResponseSchema,
       gap_fill: gapFillResponseSchema,
-      translation: translationResponseSchema,
+      translation: translationSchema,
       text_translation: textTranslationResponseSchema,
-      translation_list: translationResponseSchema,
+      translation_list: translationSchema,
       matching: matchingResponseSchema,
       flashcards: flashcardsResponseSchema,
       discussion: discussionResponseSchema,
@@ -487,6 +566,14 @@ export async function POST(request: Request) {
       | null = null;
     let cachedContentUsed = Boolean(cacheResolution.cachedContent);
     let cachedContentTokenCount = 0;
+
+    const creativeTemperature =
+      type === "translation" ||
+      type === "translation_list" ||
+      type === "gap_fill" ||
+      type === "text_translation"
+        ? 0.85
+        : 0.7;
 
     const buildGenerateOptions = (temperature: number) => ({
       prompt,
@@ -528,8 +615,7 @@ export async function POST(request: Request) {
 
         generatedContent = normalizeDiscussionContent(
           result.data,
-          terms,
-          config,
+          blueprints.map((bp) => bp.term),
         );
         usageSnapshot = result.usageSnapshot;
         cachedContentTokenCount =
@@ -539,14 +625,16 @@ export async function POST(request: Request) {
           "Discussion generation fell back to deterministic prompts:",
           error,
         );
-        generatedContent = buildFallbackDiscussionContent(terms, config);
+        generatedContent = buildFallbackDiscussionContent(
+          blueprints.map((bp) => bp.term),
+        );
       }
     } else {
       let result: Awaited<ReturnType<typeof generateFromGeminiWithUsage>>;
 
       try {
         result = await generateFromGeminiWithUsage(
-          buildGenerateOptions(0.7),
+          buildGenerateOptions(creativeTemperature),
           SCHEMA_MAP[type],
         );
       } catch (error) {
@@ -565,7 +653,7 @@ export async function POST(request: Request) {
           {
             prompt,
             systemInstruction,
-            temperature: 0.7,
+            temperature: creativeTemperature,
             thinkingConfig,
           },
           SCHEMA_MAP[type],

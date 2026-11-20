@@ -33,21 +33,13 @@ export default async function LibraryPage() {
   }
 
   const messages = getAppMessages(normalizeAppLanguage(profile.app_language));
-  const [englishCatalog, spanishCatalog] = await Promise.all([
-    getGrammarTopicPromptCatalog("english"),
-    getGrammarTopicPromptCatalog("spanish"),
-  ]);
+  const englishCatalog = await getGrammarTopicPromptCatalog("english");
 
   const languageSections: LibraryGrammarBrowserSection[] = [
     {
       id: "english",
       title: messages.library.englishTopics,
       levels: englishCatalog,
-    },
-    {
-      id: "spanish",
-      title: messages.library.spanishTopics,
-      levels: spanishCatalog,
     },
   ];
 

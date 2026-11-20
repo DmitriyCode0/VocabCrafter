@@ -227,7 +227,6 @@ export function OnboardingForm() {
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   This helps us tailor quizzes to your proficiency level.
-                  Spanish is currently limited to A1 for testing.
                 </p>
               </div>
             </>

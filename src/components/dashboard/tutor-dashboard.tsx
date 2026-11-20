@@ -392,16 +392,6 @@ export async function TutorDashboard({
                           {cc.lessonsLeftBadge(lessonsLeft)}
                         </Badge>
                       ) : null}
-                      {lesson.student_id ? (
-                        <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
-                          <Link
-                            href={`/results?student=${lesson.student_id}`}
-                            prefetch={false}
-                          >
-                            {cc.studentHubButton}
-                          </Link>
-                        </Button>
-                      ) : null}
                     </div>
                   </div>
                 );

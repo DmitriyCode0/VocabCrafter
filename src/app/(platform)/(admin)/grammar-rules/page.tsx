@@ -26,15 +26,7 @@ export default async function GrammarRulesPage() {
     redirect("/dashboard");
   }
 
-  const [englishCatalog, spanishCatalog] = await Promise.all([
-    getGrammarTopicPromptCatalog("english"),
-    getGrammarTopicPromptCatalog("spanish"),
-  ]);
+  const englishCatalog = await getGrammarTopicPromptCatalog("english");
 
-  return (
-    <GrammarRulesAdmin
-      englishCatalog={englishCatalog}
-      spanishCatalog={spanishCatalog}
-    />
-  );
+  return <GrammarRulesAdmin englishCatalog={englishCatalog} />;
 }

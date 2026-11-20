@@ -16,7 +16,10 @@ import {
   type TextTranslationResult,
 } from "./text-translation-player";
 import { QuizResults } from "./quiz-results";
-import { ExerciseAssistantProvider } from "./exercise-assistant";
+import {
+  AskAITutorButton,
+  ExerciseAssistantProvider,
+} from "./exercise-assistant";
 import {
   Card,
   CardContent,
@@ -83,14 +86,15 @@ function formatElapsedSeconds(totalSeconds: number) {
 
 function SessionTimer({ elapsedSeconds }: { elapsedSeconds: number }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-sm shadow-sm">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/60 px-4 py-2.5 text-sm shadow-sm">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Clock3 className="h-4 w-4" />
         <span>Session timer</span>
+        <span className="font-mono text-base font-semibold text-foreground">
+          {formatElapsedSeconds(elapsedSeconds)}
+        </span>
       </div>
-      <span className="font-mono text-base font-semibold text-foreground">
-        {formatElapsedSeconds(elapsedSeconds)}
-      </span>
+      <AskAITutorButton />
     </div>
   );
 }

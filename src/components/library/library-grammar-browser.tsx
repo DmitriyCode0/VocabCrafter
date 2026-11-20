@@ -113,9 +113,6 @@ export function LibraryGrammarBrowser({ sections }: LibraryGrammarBrowserProps) 
                 <SelectItem value="english">
                   {messages.common.studyLanguageNames.english}
                 </SelectItem>
-                <SelectItem value="spanish">
-                  {messages.common.studyLanguageNames.spanish}
-                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -206,11 +203,21 @@ export function LibraryGrammarBrowser({ sections }: LibraryGrammarBrowserProps) 
                                     <CardDescription>{topic.topicKey}</CardDescription>
                                   ) : null}
                                 </div>
-                                {topic.isCustom ? (
-                                  <Badge variant="secondary">
-                                    {messages.library.customTopicBadge}
-                                  </Badge>
-                                ) : null}
+                                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                  {!topic.hasUniqueInstructions ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="px-1.5 py-0 text-[10px] font-medium lowercase tracking-wide text-muted-foreground"
+                                    >
+                                      beta
+                                    </Badge>
+                                  ) : null}
+                                  {topic.isCustom ? (
+                                    <Badge variant="secondary">
+                                      {messages.library.customTopicBadge}
+                                    </Badge>
+                                  ) : null}
+                                </div>
                               </div>
                             </CardHeader>
                             <CardContent className="flex flex-1">

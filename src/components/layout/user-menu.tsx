@@ -20,8 +20,11 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Languages, LogOut, Settings } from "lucide-react";
+import { Languages, LogOut, Settings, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Switch } from "@/components/ui/switch";
+import { useTtsPreference } from "@/components/providers/tts-preference-provider";
+import { cn } from "@/lib/utils";
 import type { Profile } from "@/types/database";
 import type { Role } from "@/types/roles";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +36,7 @@ interface UserMenuProps {
 export function UserMenu({ profile }: UserMenuProps) {
   const router = useRouter();
   const { messages } = useAppI18n();
+  const { engine, setEngine } = useTtsPreference();
   const supabase = createClient();
   const [isUpdatingLanguage, setIsUpdatingLanguage] = useState(false);
   const selectedAppLanguage = normalizeAppLanguage(profile.app_language);
@@ -141,6 +145,43 @@ export function UserMenu({ profile }: UserMenuProps) {
             </DropdownMenuRadioGroup>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        <div
+          className="flex items-center justify-between px-2 py-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-2">
+            <Sparkles
+              className={cn(
+                "h-4 w-4 shrink-0",
+                engine === "ai" ? "text-primary" : "text-muted-foreground",
+              )}
+            />
+            <div className="flex flex-col text-left">
+              <span className="text-sm font-medium">
+                {messages.userMenu.aiVoiceToggle}
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                {engine === "ai"
+                  ? messages.userMenu.aiVoiceEnabled
+                  : messages.userMenu.browserVoiceDefault}
+              </span>
+            </div>
+          </div>
+          <Switch
+            checked={engine === "ai"}
+            onCheckedChange={(checked) => {
+              const next = checked ? "ai" : "browser";
+              setEngine(next);
+              if (checked) {
+                toast.success(messages.userMenu.switchedToAiVoice);
+              } else {
+                toast.info(messages.userMenu.switchedToBrowserVoice);
+              }
+            }}
+            aria-label={messages.userMenu.aiVoiceToggle}
+          />
+        </div>
         <DropdownMenuSeparator />
         <div className="flex items-center justify-between px-2 py-1.5">
           <span className="text-sm">{messages.userMenu.theme}</span>

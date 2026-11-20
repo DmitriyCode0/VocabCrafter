@@ -1,7 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, type ChangeEvent, type ClipboardEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -36,11 +43,26 @@ import {
   StudentGoogleMeetBanner,
   type StudentNextLesson,
 } from "@/components/dashboard/student-google-meet-banner";
+import { GrammarTopicSelector } from "@/components/quiz/grammar-topic-selector";
 import { QuizWordPicker } from "@/components/quiz/quiz-word-picker";
 import type { CEFRLevel, QuizTerm } from "@/types/quiz";
 
 type MobileActivityType = "gap_fill" | "translation";
 type InputTab = "manual" | "from_quiz";
+
+interface GrammarTopicOption {
+  topicKey: string;
+  displayName: string;
+  hasUniqueInstructions?: boolean;
+}
+
+interface GrammarTopicLevelGroup {
+  level: string;
+  topics: GrammarTopicOption[];
+}
+
+const CEFR_LEVELS: CEFRLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
+const GRAMMAR_TOPIC_STORAGE_KEY = "vocab-crafter:last-grammar-topic";
 
 const MAX_SCREENSHOTS = 3;
 const MAX_SCREENSHOT_SIZE_BYTES = 5 * 1024 * 1024;
@@ -85,26 +107,39 @@ function readFileAsDataUrl(file: File) {
 
 
 interface StudentMobileGapFillLauncherProps {
+  userId?: string;
   displayName: string;
   cefrLevel?: string | null;
   preferredLanguage?: string | null;
   sourceLanguage?: string | null;
   nextLesson?: StudentNextLesson | null;
   todayIso?: string;
+  grammarTopicCatalog?: {
+    english: GrammarTopicLevelGroup[];
+  };
+  planGrammarTopicKeys?: string[];
+  masteredGrammarTopicKeys?: string[];
 }
 
 export function StudentMobileGapFillLauncher({
+  userId,
   displayName,
   cefrLevel: rawCefrLevel,
   preferredLanguage,
   sourceLanguage: rawSourceLanguage,
   nextLesson = null,
   todayIso = "",
+  grammarTopicCatalog,
+  planGrammarTopicKeys,
+  masteredGrammarTopicKeys,
 }: StudentMobileGapFillLauncherProps) {
   const router = useRouter();
   const { messages, appLanguage } = useAppI18n();
   const t = messages.dashboard.student.mobileGapFill;
 
+  const grammarTopicStorageKey = userId
+    ? `${GRAMMAR_TOPIC_STORAGE_KEY}:${userId}`
+    : GRAMMAR_TOPIC_STORAGE_KEY;
   const targetLanguage = normalizeLearningLanguage(preferredLanguage);
   const sourceLanguage = normalizeSourceLanguage(rawSourceLanguage);
   const allowedCefrLevels = getAllowedCefrLevels(targetLanguage);
@@ -119,6 +154,7 @@ export function StudentMobileGapFillLauncher({
     useState<MobileActivityType>("gap_fill");
   const [selectedLevel, setSelectedLevel] =
     useState<CEFRLevel>(resolvedCefrLevel);
+  const [grammarTopics, setGrammarTopics] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [screenshots, setScreenshots] = useState<ScreenshotDraft[]>([]);
   const [statusStep, setStatusStep] = useState<"idle" | "parsing" | "building">(
@@ -128,6 +164,67 @@ export function StudentMobileGapFillLauncher({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isWorking = statusStep !== "idle";
+
+  const availableGrammarLevels = useMemo(
+    () =>
+      (grammarTopicCatalog?.english ?? []).filter(({ level }) => {
+        const levelIndex = CEFR_LEVELS.indexOf(level as CEFRLevel);
+        const selectedLevelIndex = CEFR_LEVELS.indexOf(selectedLevel);
+
+        return levelIndex !== -1 && selectedLevelIndex !== -1
+          ? levelIndex <= selectedLevelIndex
+          : false;
+      }),
+    [grammarTopicCatalog, selectedLevel],
+  );
+
+  const availableTopicKeys = useMemo(
+    () =>
+      availableGrammarLevels.flatMap(({ topics }) =>
+        topics.map((topic) => topic.topicKey),
+      ),
+    [availableGrammarLevels],
+  );
+
+  useEffect(() => {
+    if (
+      mode !== "paste" ||
+      activityType !== "translation" ||
+      grammarTopics.length > 0
+    ) {
+      return;
+    }
+
+    const savedTopic = window.localStorage.getItem(grammarTopicStorageKey);
+    if (savedTopic && availableTopicKeys.includes(savedTopic)) {
+      setGrammarTopics([savedTopic]);
+    }
+  }, [
+    activityType,
+    availableTopicKeys,
+    grammarTopicStorageKey,
+    grammarTopics.length,
+    mode,
+  ]);
+
+  useEffect(() => {
+    if (
+      grammarTopics.length > 0 &&
+      !availableTopicKeys.includes(grammarTopics[0])
+    ) {
+      setGrammarTopics([]);
+    }
+  }, [availableTopicKeys, grammarTopics]);
+
+  function handleGrammarTopicsChange(nextTopics: string[]) {
+    setGrammarTopics(nextTopics);
+    const selectedTopic = nextTopics[0];
+    if (selectedTopic) {
+      window.localStorage.setItem(grammarTopicStorageKey, selectedTopic);
+    } else {
+      window.localStorage.removeItem(grammarTopicStorageKey);
+    }
+  }
 
   function openActivity(type: MobileActivityType) {
     setActivityType(type);
@@ -226,6 +323,12 @@ export function StudentMobileGapFillLauncher({
         ? ((await resolveRes.json()) as { terms: QuizTerm[] }).terms
         : terms;
 
+      const isTranslation = activityType === "translation";
+      const grammarTopicLabels = Object.fromEntries(
+        availableGrammarLevels.flatMap(({ topics }) =>
+          topics.map((topic) => [topic.topicKey, topic.displayName]),
+        ),
+      );
       const config = {
         cefrLevel: selectedLevel,
         studentProfileCefrLevel: resolvedCefrLevel,
@@ -236,6 +339,12 @@ export function StudentMobileGapFillLauncher({
         grammarChallenge: "Standard" as const,
         teacherPersona: "standard" as const,
         timedMode: false,
+        grammarTopics:
+          isTranslation && grammarTopics.length > 0 ? grammarTopics : undefined,
+        grammarTopicLabels:
+          isTranslation && grammarTopics.length > 0
+            ? grammarTopicLabels
+            : undefined,
       };
 
       const genRes = await fetch("/api/ai/generate-quiz", {
@@ -459,6 +568,24 @@ export function StudentMobileGapFillLauncher({
               })}
             </div>
 
+            {activityType === "translation" &&
+            availableGrammarLevels.length > 0 ? (
+              <div
+                className={cn(
+                  "rounded-xl border bg-muted/20 p-3",
+                  isWorking && "pointer-events-none opacity-60",
+                )}
+              >
+                <GrammarTopicSelector
+                  levels={availableGrammarLevels}
+                  selectedTopics={grammarTopics}
+                  onTopicsChange={handleGrammarTopicsChange}
+                  planTopicKeys={planGrammarTopicKeys}
+                  masteredTopicKeys={masteredGrammarTopicKeys}
+                />
+              </div>
+            ) : null}
+
             <div className="grid grid-cols-2 gap-1.5 rounded-lg border bg-muted/40 p-1">
               <button
                 type="button"
@@ -513,7 +640,7 @@ export function StudentMobileGapFillLauncher({
                   placeholder={t.pastePlaceholder}
                   disabled={isWorking}
                   rows={6}
-                  autoFocus
+                  autoFocus={activityType !== "translation"}
                   className="min-h-[150px] resize-none rounded-xl text-base leading-relaxed"
                 />
 

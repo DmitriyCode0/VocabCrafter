@@ -79,6 +79,7 @@ interface ExerciseAssistantContextValue {
     customPrompt?: string,
   ) => void;
   isOpen: boolean;
+  currentMessagesCount: number;
 }
 
 const ExerciseAssistantContext =
@@ -347,6 +348,8 @@ export function ExerciseAssistantProvider({
     activeContext?.targetTerm ||
     null;
 
+  const currentMessagesCount = currentMessages.length;
+
   const contextValue = useMemo<ExerciseAssistantContextValue>(
     () => ({
       activeContext,
@@ -354,8 +357,16 @@ export function ExerciseAssistantProvider({
       openAssistant,
       explainWithAI,
       isOpen,
+      currentMessagesCount,
     }),
-    [activeContext, setActiveContext, openAssistant, explainWithAI, isOpen],
+    [
+      activeContext,
+      setActiveContext,
+      openAssistant,
+      explainWithAI,
+      isOpen,
+      currentMessagesCount,
+    ],
   );
 
   const lastMessage = currentMessages[currentMessages.length - 1];
@@ -367,24 +378,6 @@ export function ExerciseAssistantProvider({
   return (
     <ExerciseAssistantContext.Provider value={contextValue}>
       {children}
-
-      {/* Floating AI Tutor Trigger Button */}
-      <div className="fixed bottom-5 right-5 z-40">
-        <Button
-          type="button"
-          size="lg"
-          onClick={() => openAssistant()}
-          className="h-12 rounded-full px-4 shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98] sm:px-5"
-        >
-          <Sparkles className="mr-2 h-4 w-4" />
-          <span className="font-medium">{t.floatingButton}</span>
-          {currentMessages.length > 0 ? (
-            <span className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-foreground/20 px-1.5 text-xs font-semibold">
-              {currentMessages.length}
-            </span>
-          ) : null}
-        </Button>
-      </div>
 
       {/* Slide-out AI Tutor Drawer */}
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -607,6 +600,47 @@ export function useSyncExerciseAssistantContext(
     if (!setActiveContext) return;
     setActiveContext(JSON.parse(serialized) as ExerciseAssistantContextData);
   }, [serialized, setActiveContext]);
+}
+
+/**
+ * Button to open the AI Tutor drawer for the active exercise without floating over content.
+ */
+export function AskAITutorButton({
+  className,
+  size = "sm",
+  variant = "outline",
+}: {
+  className?: string;
+  size?: "default" | "sm" | "lg" | "icon";
+  variant?: "default" | "outline" | "secondary" | "ghost";
+}) {
+  const assistant = useExerciseAssistant();
+  const { messages } = useAppI18n();
+
+  if (!assistant) return null;
+
+  return (
+    <Button
+      type="button"
+      variant={variant}
+      size={size}
+      onClick={() => assistant.openAssistant()}
+      className={cn(
+        "gap-1.5 border-primary/25 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary",
+        className,
+      )}
+    >
+      <Sparkles className="h-3.5 w-3.5 shrink-0" />
+      <span className="font-medium">
+        {messages.quizSession.assistant.floatingButton}
+      </span>
+      {assistant.currentMessagesCount > 0 ? (
+        <span className="ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/20 px-1 text-[11px] font-semibold">
+          {assistant.currentMessagesCount}
+        </span>
+      ) : null}
+    </Button>
+  );
 }
 
 /**

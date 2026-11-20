@@ -15,20 +15,18 @@ export default async function NewQuizPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [englishCatalog, spanishCatalog, studentPlans, grammarMasteryData] =
-    await Promise.all([
-      getGrammarTopicPromptCatalog("english"),
-      getGrammarTopicPromptCatalog("spanish"),
-      user
-        ? listStudentTutorPlans(user.id).catch((): StudentTutorPlanCard[] => [])
-        : Promise.resolve([] as StudentTutorPlanCard[]),
-      user
-        ? createAdminClient()
-            .from("student_grammar_topic_mastery")
-            .select("topic_key")
-            .eq("student_id", user.id)
-        : Promise.resolve({ data: null }),
-    ]);
+  const [englishCatalog, studentPlans, grammarMasteryData] = await Promise.all([
+    getGrammarTopicPromptCatalog("english"),
+    user
+      ? listStudentTutorPlans(user.id).catch((): StudentTutorPlanCard[] => [])
+      : Promise.resolve([] as StudentTutorPlanCard[]),
+    user
+      ? createAdminClient()
+          .from("student_grammar_topic_mastery")
+          .select("topic_key")
+          .eq("student_id", user.id)
+      : Promise.resolve({ data: null }),
+  ]);
 
   const planGrammarTopicKeys: string[] = Array.from(
     new Set(
@@ -46,16 +44,10 @@ export default async function NewQuizPage() {
   const grammarTopicCatalog = {
     english: englishCatalog.map(({ level, topics }) => ({
       level,
-      topics: topics.map(({ topicKey, displayName }) => ({
+      topics: topics.map(({ topicKey, displayName, hasUniqueInstructions }) => ({
         topicKey,
         displayName,
-      })),
-    })),
-    spanish: spanishCatalog.map(({ level, topics }) => ({
-      level,
-      topics: topics.map(({ topicKey, displayName }) => ({
-        topicKey,
-        displayName,
+        hasUniqueInstructions,
       })),
     })),
   };

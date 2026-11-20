@@ -176,6 +176,14 @@ export default async function GrammarTopicArticlePage({
               <Badge variant="secondary">
                 {messages.common.studyLanguageNames[topic.learningLanguage]}
               </Badge>
+              {!topic.hasUniqueInstructions ? (
+                <Badge
+                  variant="outline"
+                  className="px-1.5 py-0 text-[11px] font-medium lowercase tracking-wide text-muted-foreground"
+                >
+                  beta
+                </Badge>
+              ) : null}
               {topic.isCustom ? (
                 <Badge variant="secondary">{messages.library.customTopicBadge}</Badge>
               ) : null}

@@ -276,6 +276,7 @@ export interface GrammarTopicMasteryItem {
   topicKey: string;
   label: string;
   level: string;
+  hasUniqueInstructions?: boolean;
   mastered: boolean;
   source: "system" | "tutor" | null;
   attempts: number;
@@ -1985,6 +1986,7 @@ export async function getStudentProgressSnapshot(
         topicKey: topic.topicKey,
         label: topic.displayName,
         level,
+        hasUniqueInstructions: topic.hasUniqueInstructions,
       })),
   );
   const availableGrammarTopicMap = new Map(
@@ -2052,6 +2054,7 @@ export async function getStudentProgressSnapshot(
         topicKey: topic.topicKey,
         label: topic.label,
         level: topic.level,
+        hasUniqueInstructions: topic.hasUniqueInstructions,
         mastered,
         source: systemMastered ? "system" : (tutorSource ?? null),
         attempts: stats?.attempts ?? 0,
