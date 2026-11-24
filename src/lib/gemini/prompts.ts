@@ -405,6 +405,7 @@ ${formatWordBlueprintsSection(blueprints, targetLanguageLabel, sourceLanguageLab
 
 Respond with JSON in this exact format:
 {
+  "suggestedTitle": "Short 2-4 word thematic title for this vocabulary set (e.g. 'Travel & Airport', 'Everyday Phrasal Verbs')",
   "questions": [
     {
       "id": 1,
@@ -468,6 +469,7 @@ ${formatWordBlueprintsSection(blueprints, targetLanguageLabel, sourceLanguageLab
 
 Respond with JSON in this exact format:
 {
+  "suggestedTitle": "Short 2-4 word thematic title summarizing these vocabulary words (e.g. 'Daily Kitchen Actions', 'City & Travel')",
   "questions": [
     {
       "id": 1,
@@ -559,6 +561,7 @@ ${formatWordBlueprintsSection(blueprints, targetLanguageLabel, sourceLanguageLab
 ═══ OUTPUT FORMAT ═══
 Respond with JSON in this exact format (include all ${candidateCount} distinct candidates in each "candidates" array):
 {
+  "suggestedTitle": "Short 2-4 word thematic title summarizing these vocabulary words (e.g. 'Local Shops & Places', 'Daily Routine')",
   "questions": [
     {
       "id": 1,
@@ -624,6 +627,7 @@ ${formatTerms(terms, targetLanguageLabel, sourceLanguageLabel)}
 
 Respond with JSON in this exact format:
 {
+  "suggestedTitle": "Short 2-4 word thematic title for this reading passage",
   "content": {
     "originalText": "${sourceLanguageLabel} paragraph here",
     "referenceTranslation": "${targetLanguageLabel} translation here"
@@ -744,6 +748,7 @@ ${formatWordBlueprintsSection(blueprints, targetLanguageLabel, sourceLanguageLab
 
 Respond with JSON in this exact format:
 {
+  "suggestedTitle": "Short 2-4 word thematic discussion title",
   "prompts": [
     {
       "id": 1,

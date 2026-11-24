@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarDays, PlusCircle } from "lucide-react";
+import { CalendarDays, Crown, PlusCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  getPlanBadgeClassName,
+  getPlanDisplayName,
+  normalizePlanKey,
+} from "@/lib/plans";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAppMessages } from "@/lib/i18n/messages";
 import type { Role } from "@/types/roles";
@@ -140,9 +146,22 @@ export default async function DashboardPage() {
         {/* Desktop / PC Student View: Full Dashboard */}
         <div className="hidden space-y-6 md:block">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {messages.dashboard.welcomeBack(displayName)}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-2xl font-bold tracking-tight">
+                {messages.dashboard.welcomeBack(displayName)}
+              </h1>
+              <Link href="/billing" prefetch={false}>
+                <Badge
+                  variant="outline"
+                  className={`gap-1 text-xs font-semibold ${getPlanBadgeClassName(profile.plan)}`}
+                >
+                  {normalizePlanKey(profile.plan) === "premium" ? (
+                    <Crown className="h-3 w-3 shrink-0" />
+                  ) : null}
+                  {getPlanDisplayName(profile.plan)}
+                </Badge>
+              </Link>
+            </div>
             <p className="text-muted-foreground">
               {messages.dashboard.roleDescriptions.student}
             </p>
@@ -194,9 +213,22 @@ export default async function DashboardPage() {
         }
       >
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">
-            {messages.dashboard.welcomeBack(displayName)}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight">
+              {messages.dashboard.welcomeBack(displayName)}
+            </h1>
+            <Link href="/billing" prefetch={false}>
+              <Badge
+                variant="outline"
+                className={`gap-1 text-xs font-semibold ${getPlanBadgeClassName(profile.plan)}`}
+              >
+                {normalizePlanKey(profile.plan) === "premium" ? (
+                  <Crown className="h-3 w-3 shrink-0" />
+                ) : null}
+                {getPlanDisplayName(profile.plan)}
+              </Badge>
+            </Link>
+          </div>
           <p className="text-sm text-muted-foreground">
             {role === "tutor" && messages.dashboard.roleDescriptions.tutor}
             {role === "superadmin" &&
@@ -206,6 +238,11 @@ export default async function DashboardPage() {
 
         {role === "tutor" ? (
           <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/tense-detector" prefetch={false}>
+                {messages.nav.tenseDetector}
+              </Link>
+            </Button>
             <Button asChild variant="outline" size="sm">
               <Link href="/lessons" prefetch={false}>
                 <CalendarDays className="mr-2 h-4 w-4" />

@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import { QuizPlayer } from "@/components/quiz/quiz-player";
 import { QuizHeader } from "@/components/quiz/quiz-header";
+import { resolveQuizDisplayTitle } from "@/lib/quiz/quiz-title";
 import type { Quiz } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,11 @@ export default async function QuizDetailPage({
     <div className="space-y-6">
       <QuizHeader
         quizId={quiz.id}
-        title={quiz.title}
+        title={resolveQuizDisplayTitle({
+          title: quiz.title,
+          vocabularyTerms: quiz.vocabulary_terms,
+          config: quiz.config,
+        })}
         type={quiz.type}
         isOwner={quiz.creator_id === user.id}
       />

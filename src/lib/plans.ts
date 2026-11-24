@@ -191,3 +191,26 @@ export function fmtLimit(n: number): string {
   if (!isFinite(n)) return "∞";
   return n.toLocaleString();
 }
+
+export function normalizePlanKey(planKey?: string | null): PlanKey {
+  if (planKey === "pro" || planKey === "premium" || planKey === "free") {
+    return planKey;
+  }
+  return "free";
+}
+
+export function getPlanDisplayName(planKey?: string | null): string {
+  return DEFAULT_PLANS[normalizePlanKey(planKey)].name;
+}
+
+export function getPlanBadgeClassName(planKey?: string | null): string {
+  const key = normalizePlanKey(planKey);
+  switch (key) {
+    case "premium":
+      return "border-amber-500/40 bg-amber-500/15 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20";
+    case "pro":
+      return "border-primary/40 bg-primary/15 text-primary hover:bg-primary/20";
+    default:
+      return "border-border/70 bg-muted/50 text-muted-foreground hover:bg-muted";
+  }
+}

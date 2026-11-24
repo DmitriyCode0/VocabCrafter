@@ -20,7 +20,15 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Languages, LogOut, Palette, Settings, Sparkles } from "lucide-react";
+import {
+  CreditCard,
+  Crown,
+  Languages,
+  LogOut,
+  Palette,
+  Settings,
+  Sparkles,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -29,6 +37,11 @@ import {
   useColorTheme,
 } from "@/components/providers/color-theme-provider";
 import { useTtsPreference } from "@/components/providers/tts-preference-provider";
+import {
+  getPlanBadgeClassName,
+  getPlanDisplayName,
+  normalizePlanKey,
+} from "@/lib/plans";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types/database";
 import type { Role } from "@/types/roles";
@@ -78,6 +91,10 @@ export function UserMenu({ profile }: UserMenuProps) {
     router.refresh();
   };
 
+  const planKey = normalizePlanKey(profile.plan);
+  const planName = getPlanDisplayName(planKey);
+  const planBadgeClass = getPlanBadgeClassName(planKey);
+
   const initials = profile.full_name
     ? profile.full_name
         .split(" ")
@@ -101,9 +118,20 @@ export function UserMenu({ profile }: UserMenuProps) {
           <p className="text-sm font-medium leading-none">
             {profile.full_name || profile.email}
           </p>
-          <Badge variant="secondary" className="mt-1 text-xs">
-            {messages.common.roleNames[profile.role as Role]}
-          </Badge>
+          <div className="mt-1 flex items-center gap-1.5">
+            <Badge variant="secondary" className="text-[11px]">
+              {messages.common.roleNames[profile.role as Role]}
+            </Badge>
+            <Badge
+              variant="outline"
+              className={cn("gap-1 text-[11px] font-semibold", planBadgeClass)}
+            >
+              {planKey === "premium" ? (
+                <Crown className="h-2.5 w-2.5 shrink-0" />
+              ) : null}
+              {planName}
+            </Badge>
+          </div>
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -113,12 +141,29 @@ export function UserMenu({ profile }: UserMenuProps) {
         className="w-60"
       >
         <DropdownMenuLabel>
-          <p className="text-sm font-medium">
-            {profile.full_name || profile.email}
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-sm font-medium">
+              {profile.full_name || profile.email}
+            </p>
+            <Badge
+              variant="outline"
+              className={cn("shrink-0 gap-1 text-[10px] font-semibold", planBadgeClass)}
+            >
+              {planKey === "premium" ? (
+                <Crown className="h-2.5 w-2.5 shrink-0" />
+              ) : null}
+              {planName}
+            </Badge>
+          </div>
+          <p className="truncate text-xs text-muted-foreground">
+            {profile.email}
           </p>
-          <p className="text-xs text-muted-foreground">{profile.email}</p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => router.push("/billing")}>
+          <CreditCard className="mr-2 h-4 w-4" />
+          {messages.userMenu.membershipBilling}
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/settings")}>
           <Settings className="mr-2 h-4 w-4" />
           {messages.userMenu.settings}

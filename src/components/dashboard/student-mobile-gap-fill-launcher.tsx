@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppI18n } from "@/components/providers/app-language-provider";
-import { formatDateForAppLanguage } from "@/lib/i18n/format";
+import { buildFallbackQuizTitle } from "@/lib/quiz/quiz-title";
 import {
   getAllowedCefrLevels,
   getDefaultCefrLevelForLanguage,
@@ -134,7 +134,7 @@ export function StudentMobileGapFillLauncher({
   masteredGrammarTopicKeys,
 }: StudentMobileGapFillLauncherProps) {
   const router = useRouter();
-  const { messages, appLanguage } = useAppI18n();
+  const { messages } = useAppI18n();
   const t = messages.dashboard.student.mobileGapFill;
 
   const grammarTopicStorageKey = userId
@@ -362,15 +362,27 @@ export function StudentMobileGapFillLauncher({
         throw new Error(data?.error || "Failed to generate exercise");
       }
 
-      const { content } = (await genRes.json()) as {
+      const { content, suggestedTitle } = (await genRes.json()) as {
         content: Record<string, unknown>;
+        suggestedTitle?: string;
       };
+
+      const primaryTopicLabel =
+        isTranslation && grammarTopics.length > 0
+          ? grammarTopicLabels[grammarTopics[0]]
+          : null;
+      const resolvedTitle =
+        suggestedTitle?.trim() ||
+        buildFallbackQuizTitle({
+          terms: resolvedTerms,
+          grammarTopicLabel: primaryTopicLabel,
+        });
 
       const saveRes = await fetch("/api/quizzes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: `${messages.createQuiz.defaultTitlePrefix} - ${formatDateForAppLanguage(appLanguage, new Date())}`,
+          title: resolvedTitle,
           type: activityType,
           cefrLevel: selectedLevel,
           vocabularyTerms: resolvedTerms,

@@ -23,6 +23,12 @@ import type {
   GenerateQuizRequest,
   QuizTerm,
 } from "@/types/quiz";
+import {
+  buildFallbackQuizTitle,
+  extractCustomTopicFromConfig,
+  extractGrammarTopicLabelFromConfig,
+  normalizeSuggestedQuizTitle,
+} from "@/lib/quiz/quiz-title";
 import { z } from "zod";
 import {
   createTranslationResponseSchema,
@@ -380,7 +386,18 @@ function normalizeDiscussionContent(rawContent: unknown, terms: QuizTerm[]) {
     } satisfies DiscussionPrompt;
   });
 
-  return discussionResponseSchema.parse({ prompts });
+  const rawSuggestedTitle =
+    rawContent &&
+    typeof rawContent === "object" &&
+    !Array.isArray(rawContent) &&
+    typeof (rawContent as Record<string, unknown>).suggestedTitle === "string"
+      ? ((rawContent as Record<string, unknown>).suggestedTitle as string).trim()
+      : undefined;
+
+  return discussionResponseSchema.parse({
+    ...(rawSuggestedTitle ? { suggestedTitle: rawSuggestedTitle } : {}),
+    prompts,
+  });
 }
 
 function buildFallbackDiscussionContent(terms: QuizTerm[]) {
@@ -688,7 +705,28 @@ export async function POST(request: Request) {
       await incrementAICalls(user.id);
     }
 
-    return NextResponse.json({ content: generatedContent });
+    const grammarTopicLabel = extractGrammarTopicLabelFromConfig(config);
+    const customTopic = extractCustomTopicFromConfig(config);
+    const fallbackTitle = buildFallbackQuizTitle({
+      terms,
+      grammarTopicLabel,
+      customTopic,
+    });
+    const rawSuggestedTitle =
+      generatedContent &&
+      typeof generatedContent === "object" &&
+      "suggestedTitle" in generatedContent &&
+      typeof (generatedContent as { suggestedTitle?: unknown }).suggestedTitle ===
+        "string"
+        ? (generatedContent as { suggestedTitle: string }).suggestedTitle
+        : null;
+    const suggestedTitle = normalizeSuggestedQuizTitle({
+      suggestedTitle: rawSuggestedTitle,
+      grammarTopicLabel,
+      fallbackTitle,
+    });
+
+    return NextResponse.json({ content: generatedContent, suggestedTitle });
   } catch (error) {
     if (error instanceof z.ZodError) {
       console.error("Quiz generation validation error:", error.flatten());

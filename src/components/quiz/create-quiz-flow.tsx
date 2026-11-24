@@ -29,7 +29,7 @@ import { QuizWordPicker } from "@/components/quiz/quiz-word-picker";
 import { GrammarTopicSelector } from "@/components/quiz/grammar-topic-selector";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import { useUser } from "@/hooks/use-user";
-import { formatDateForAppLanguage } from "@/lib/i18n/format";
+import { buildFallbackQuizTitle } from "@/lib/quiz/quiz-title";
 import {
   getAllowedCefrLevels,
   getDefaultCefrLevelForLanguage,
@@ -126,7 +126,7 @@ export function CreateQuizFlow({
   masteredGrammarTopicKeys,
 }: CreateQuizFlowProps) {
   const router = useRouter();
-  const { messages, appLanguage } = useAppI18n();
+  const { messages } = useAppI18n();
   const { profile } = useUser();
   const grammarTopicStorageKey = profile?.id
     ? `${GRAMMAR_TOPIC_STORAGE_KEY}:${profile.id}`
@@ -323,6 +323,7 @@ export function CreateQuizFlow({
       };
 
       let content: Record<string, unknown>;
+      let aiSuggestedTitle: string | null = null;
 
       if (selectedActivity === "flashcards") {
         // Build flashcards directly from terms — no AI needed
@@ -348,18 +349,30 @@ export function CreateQuizFlow({
           throw new Error(data.error || "Failed to generate quiz");
         }
 
-        const result = await res.json();
+        const result = (await res.json()) as {
+          content: Record<string, unknown>;
+          suggestedTitle?: string;
+        };
         content = result.content;
+        aiSuggestedTitle = result.suggestedTitle?.trim() || null;
       }
+
+      const primaryTopicLabel =
+        grammarTopics.length > 0 ? grammarTopicLabels[grammarTopics[0]] : null;
+      const resolvedTitle =
+        title.trim() ||
+        aiSuggestedTitle ||
+        buildFallbackQuizTitle({
+          terms: resolvedTerms,
+          grammarTopicLabel: primaryTopicLabel,
+        });
 
       // Save quiz to Supabase
       const saveRes = await fetch("/api/quizzes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title:
-            title ||
-            `${messages.createQuiz.defaultTitlePrefix} - ${formatDateForAppLanguage(appLanguage, new Date())}`,
+          title: resolvedTitle,
           type: selectedActivity,
           cefrLevel,
           vocabularyTerms: resolvedTerms,

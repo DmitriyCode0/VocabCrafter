@@ -20,6 +20,7 @@ const mcqQuestionSchema = z.object({
 });
 
 export const mcqResponseSchema = z.object({
+  suggestedTitle: z.string().trim().max(80).optional(),
   questions: z.array(mcqQuestionSchema),
 });
 
@@ -64,6 +65,7 @@ const gapFillQuestionSchema = z
   });
 
 export const gapFillResponseSchema = z.object({
+  suggestedTitle: z.string().trim().max(80).optional(),
   questions: z.array(gapFillQuestionSchema),
 });
 
@@ -118,6 +120,7 @@ export function createTranslationResponseSchema(
     });
 
   return z.object({
+    suggestedTitle: z.string().trim().max(80).optional(),
     questions: z.array(questionSchema),
   });
 }
@@ -126,6 +129,7 @@ export const translationResponseSchema = createTranslationResponseSchema();
 
 // Text translation validation
 export const textTranslationResponseSchema = z.object({
+  suggestedTitle: z.string().trim().max(80).optional(),
   content: z.object({
     originalText: z.string(),
     referenceTranslation: z.string(),
@@ -163,6 +167,7 @@ const discussionPromptSchema = z.object({
 });
 
 export const discussionResponseSchema = z.object({
+  suggestedTitle: z.string().trim().max(80).optional(),
   prompts: z.array(discussionPromptSchema),
 });
 

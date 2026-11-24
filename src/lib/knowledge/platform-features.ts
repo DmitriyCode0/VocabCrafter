@@ -360,6 +360,33 @@ export const APP_FEATURE_REGISTRY: AppFeatureEntry[] = [
     ],
   },
   {
+    id: "tense-detector",
+    title: "Interactive Tense Detector (Tutor Whiteboard)",
+    category: "exercises",
+    roles: ["tutor"],
+    href: "/tense-detector",
+    summary:
+      "Interactive draggable timeline graph for tutors to demonstrate Past Perfect, Conditionals (1st/2nd/3rd/Mixed), Interrupted Continuous Actions, and Core Tenses live during lessons.",
+    howTo: [
+      "Open Tense Detector (/tense-detector) from the sidebar.",
+      "Pick a topic module (Past Perfect & Sequence, Conditionals 3-2-1, Interrupted Action, or Core Tense Grid).",
+      "Drag the color-coded ✕ markers along the timeline (or click any tick) to watch the arrows, tense formula, and all 3 example sentences update in real time.",
+      "Toggle Presentation Mode for larger screen-share text or click Listen on any sentence.",
+    ],
+    keywords: [
+      "tense detector",
+      "timeline",
+      "conditionals",
+      "past perfect",
+      "backshift",
+      "grammar whiteboard",
+      "continuous",
+      "детектор часів",
+      "часи",
+      "умовні речення",
+    ],
+  },
+  {
     id: "billing-and-usage",
     title: "AI Usage, Billing & Plans",
     category: "billing",

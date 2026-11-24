@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import { formatDateForAppLanguage } from "@/lib/i18n/format";
+import { resolveQuizDisplayTitle } from "@/lib/quiz/quiz-title";
 import { Loader2, FileText } from "lucide-react";
 import type { QuizTerm } from "@/types/quiz";
 
@@ -23,6 +24,7 @@ interface QuizItem {
   type: string;
   cefr_level: string;
   vocabulary_terms: QuizTerm[];
+  config?: unknown;
   created_at: string;
 }
 
@@ -90,7 +92,13 @@ export function QuizWordPicker({ onSelect }: QuizWordPickerProps) {
           >
             <CardHeader className="flex-row items-center justify-between p-4">
               <div>
-                <CardTitle className="text-base">{quiz.title}</CardTitle>
+                <CardTitle className="text-base">
+                  {resolveQuizDisplayTitle({
+                    title: quiz.title,
+                    vocabularyTerms: quiz.vocabulary_terms,
+                    config: quiz.config,
+                  })}
+                </CardTitle>
                 <CardDescription>
                   {messages.createQuiz.quizWordPicker.quizMeta(
                     quiz.vocabulary_terms.length,

@@ -37,6 +37,7 @@ import {
   getGrammarTopicDisplayName,
   getPrimaryGrammarTopic,
 } from "@/lib/utils";
+import { resolveQuizDisplayTitle } from "@/lib/quiz/quiz-title";
 import { formatDateForAppLanguage } from "@/lib/i18n/format";
 
 export type QuizListItem = Omit<Quiz, "generated_content"> & {
@@ -68,6 +69,11 @@ export function QuizCard({ quiz }: QuizCardProps) {
   const grammarTopic = grammarTopicKey
     ? getGrammarTopicDisplayName(quiz.config, grammarTopicKey)
     : null;
+  const displayTitle = resolveQuizDisplayTitle({
+    title: quiz.title,
+    vocabularyTerms: quiz.vocabulary_terms,
+    config: quiz.config,
+  });
   const typeLabel =
     messages.quizzes.typeLabels[
       quiz.type as keyof typeof messages.quizzes.typeLabels
@@ -138,7 +144,7 @@ export function QuizCard({ quiz }: QuizCardProps) {
               className="mt-2 block group-hover:text-primary transition-colors"
             >
               <CardTitle className="line-clamp-2 text-base leading-snug">
-                {quiz.title}
+                {displayTitle}
               </CardTitle>
             </Link>
 
@@ -220,7 +226,7 @@ export function QuizCard({ quiz }: QuizCardProps) {
           <DialogHeader>
             <DialogTitle>{messages.quizzes.card.deleteTitle}</DialogTitle>
             <DialogDescription>
-              {messages.quizzes.card.deleteDescription(quiz.title)}
+              {messages.quizzes.card.deleteDescription(displayTitle)}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

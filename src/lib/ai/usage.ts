@@ -15,6 +15,7 @@ export type AIUsageFeature =
   | "passive_vocabulary_enrichment"
   | "lesson_transcript"
   | "classroom_transcript"
+  | "tense_detector"
   | "tts";
 
 export type AIUsageRequestType = "text" | "tts";

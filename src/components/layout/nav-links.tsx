@@ -24,6 +24,7 @@ import {
   FileText,
   LibraryBig,
   Loader2,
+  Clock,
 } from "lucide-react";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import {
@@ -174,6 +175,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/library",
     icon: SHARED_PAGE_ICONS.library,
     roles: ["tutor", "superadmin"],
+  },
+  {
+    labelKey: "tenseDetector",
+    href: "/tense-detector",
+    icon: Clock,
+    roles: ["tutor"],
   },
   // Admin items
   {
