@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { CalendarDays, PlusCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAppMessages } from "@/lib/i18n/messages";
 import type { Role } from "@/types/roles";
@@ -183,15 +186,40 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {messages.dashboard.welcomeBack(displayName)}
-        </h1>
-        <p className="text-muted-foreground">
-          {role === "tutor" && messages.dashboard.roleDescriptions.tutor}
-          {role === "superadmin" &&
-            messages.dashboard.roleDescriptions.superadmin}
-        </p>
+      <div
+        className={
+          role === "tutor"
+            ? "flex flex-col gap-4 border-b border-border/50 pb-4 lg:flex-row lg:items-center lg:justify-between"
+            : undefined
+        }
+      >
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">
+            {messages.dashboard.welcomeBack(displayName)}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {role === "tutor" && messages.dashboard.roleDescriptions.tutor}
+            {role === "superadmin" &&
+              messages.dashboard.roleDescriptions.superadmin}
+          </p>
+        </div>
+
+        {role === "tutor" ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/lessons" prefetch={false}>
+                <CalendarDays className="mr-2 h-4 w-4" />
+                {messages.dashboard.tutor.commandCenter.openScheduleButton}
+              </Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/quizzes/new" prefetch={false}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                {messages.dashboard.tutor.createQuizButton}
+              </Link>
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {dashboardContent}

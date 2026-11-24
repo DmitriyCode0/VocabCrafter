@@ -23,23 +23,20 @@ export function LessonsPageHeader({
   scheduleHref,
 }: LessonsPageHeaderProps) {
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-          <p className="text-muted-foreground">{description}</p>
-        </div>
-
-        {actions ? (
-          <div className="flex items-center gap-2">{actions}</div>
-        ) : null}
+    <div className="flex flex-col gap-4 border-b border-border/50 pb-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>
       </div>
 
-      <LessonsSectionTabs
-        role={role}
-        currentSection={currentSection}
-        scheduleHref={scheduleHref}
-      />
+      <div className="flex flex-wrap items-center gap-2.5">
+        <LessonsSectionTabs
+          role={role}
+          currentSection={currentSection}
+          scheduleHref={scheduleHref}
+        />
+        {actions}
+      </div>
     </div>
   );
 }

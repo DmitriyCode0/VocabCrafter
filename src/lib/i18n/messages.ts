@@ -151,6 +151,14 @@ const EN_MESSAGES = {
     browserVoiceDefault: "Browser speech (default)",
     switchedToAiVoice: "Switched to Neural AI Voice",
     switchedToBrowserVoice: "Switched to Browser Voice (Default)",
+    colorPalette: "Color Palette",
+    colorPaletteNames: {
+      forest: "Classic Forest",
+      "slate-emerald": "Slate & Emerald",
+      "midnight-indigo": "Midnight Indigo",
+      "warm-terracotta": "Warm Terracotta",
+      "deep-ocean": "Deep Ocean",
+    },
     theme: "Theme",
     signOut: "Sign out",
   },
@@ -849,6 +857,39 @@ const EN_MESSAGES = {
       quizzesCreatedTitle: "Quizzes Created",
       remainingThisMonth: (count: number) => `${count} remaining this month`,
       unlimited: "Unlimited",
+      plansReportsTitle: "Plans & Reports",
+      plansReportsDescription:
+        "Track student learning plans and monthly progress summaries",
+      plansReportsButton: "Open Plans",
+      kpi: {
+        nextLessonTitle: "Today & Next Up",
+        noUpcomingTitle: "All caught up",
+        todayAndWeek: (todayCount: number, weekCount: number) =>
+          `${todayCount} today · ${weekCount} next 7d`,
+        activeStudentsTitle: "Active Students",
+        practicedCount: (practiced: number, total: number) =>
+          `${practiced} of ${total} practiced recently`,
+        homeworkActivityTitle: "Homework Done",
+        homeworkAvgSummary: (avgScore: number | null, activeCount: number) =>
+          avgScore !== null
+            ? `Avg ${avgScore}% across ${activeCount} active`
+            : `${activeCount} active since last lesson`,
+        monthlyQuizzesTitle: "Monthly Quizzes",
+      },
+      balanceBanner: {
+        healthyBadge: "Healthy",
+        alertBadge: (count: number) =>
+          `${count} ${count === 1 ? "alert" : "alerts"}`,
+      },
+      activityFilters: {
+        all: "All",
+        practiced: "Practiced",
+        inactive: "No Activity",
+        emptyPracticed:
+          "None of your connected students have completed homework since their last lesson yet.",
+        emptyInactive:
+          "Every active student has completed at least one exercise since their last lesson!",
+      },
       commandCenter: {
         todayScheduleTitle: "Today & Upcoming Lessons",
         todayScheduleDescription:
@@ -1836,6 +1877,14 @@ const UK_MESSAGES: AppMessages = {
     browserVoiceDefault: "Голос браузера (типово)",
     switchedToAiVoice: "Увімкнено нейромережевий AI-голос",
     switchedToBrowserVoice: "Увімкнено стандартний голос браузера",
+    colorPalette: "Кольорова палітра",
+    colorPaletteNames: {
+      forest: "Класичний ліс",
+      "slate-emerald": "Графіт і смарагд",
+      "midnight-indigo": "Нічний індиго",
+      "warm-terracotta": "Тепла теракота",
+      "deep-ocean": "Глибокий океан",
+    },
     theme: "Тема",
     signOut: "Вийти",
   },
@@ -2553,6 +2602,39 @@ const UK_MESSAGES: AppMessages = {
       quizzesCreatedTitle: "Створено вікторин",
       remainingThisMonth: (count: number) => `Цього місяця залишилося ${count}`,
       unlimited: "Без ліміту",
+      plansReportsTitle: "Плани та звіти",
+      plansReportsDescription:
+        "Відстежуйте навчальні плани учнів і місячні підсумки прогресу",
+      plansReportsButton: "Відкрити плани",
+      kpi: {
+        nextLessonTitle: "Найближчий урок",
+        noUpcomingTitle: "Усе виконано",
+        todayAndWeek: (todayCount: number, weekCount: number) =>
+          `${todayCount} сьогодні · ${weekCount} на 7 днів`,
+        activeStudentsTitle: "Активні учні",
+        practicedCount: (practiced: number, total: number) =>
+          `${practiced} із ${total} практикувалися нещодавно`,
+        homeworkActivityTitle: "Виконано вправ",
+        homeworkAvgSummary: (avgScore: number | null, activeCount: number) =>
+          avgScore !== null
+            ? `Сер. ${avgScore}% серед ${activeCount} активних`
+            : `${activeCount} активних після останнього уроку`,
+        monthlyQuizzesTitle: "Вікторин за місяць",
+      },
+      balanceBanner: {
+        healthyBadge: "У нормі",
+        alertBadge: (count: number) =>
+          `${formatPluralizedCount("uk", count, { one: "сповіщення", few: "сповіщення", many: "сповіщень" })}`,
+      },
+      activityFilters: {
+        all: "Усі",
+        practiced: "Практика",
+        inactive: "Без вправ",
+        emptyPracticed:
+          "Ще жоден активний учень не виконав домашнє завдання після останнього уроку.",
+        emptyInactive:
+          "Усі активні учні вже виконали принаймні одну вправу після останнього уроку!",
+      },
       commandCenter: {
         todayScheduleTitle: "Сьогоднішні та найближчі уроки",
         todayScheduleDescription:

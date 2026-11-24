@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ColorThemeProvider } from "@/components/providers/color-theme-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,6 +22,8 @@ export const viewport: Viewport = {
   themeColor: "#15803d",
 };
 
+const COLOR_THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("vocab-crafter:color-theme");if(t&&t!=="forest"){document.documentElement.dataset.colorTheme=t;}}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -28,15 +31,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: COLOR_THEME_INIT_SCRIPT }} />
+      </head>
       <body
         className={`${geistSans.variable} antialiased`}
       >
         <NextTopLoader
-          color="oklch(0.5234 0.1347 144.1672)"
+          color="var(--primary)"
           showSpinner={false}
           height={3}
         />
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <ColorThemeProvider>{children}</ColorThemeProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

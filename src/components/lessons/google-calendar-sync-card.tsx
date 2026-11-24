@@ -7,13 +7,7 @@ import { CalendarDays, ExternalLink, Link2Off } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface GoogleCalendarSyncCardProps {
   available: boolean;
@@ -82,88 +76,108 @@ export function GoogleCalendarSyncCard({
     }
   }
 
+  const isConnected = Boolean(available && connection);
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CalendarDays className="h-4 w-4" />
-              Google Calendar Sync
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Automatically mirror lesson create, reschedule, and delete changes
-              to your Google Calendar.
-            </CardDescription>
+    <div
+      className={cn(
+        "rounded-xl border border-border/70 bg-card/60 px-4 py-3 shadow-xs transition-colors",
+        isConnected && "border-primary/30 bg-primary/[0.05]",
+      )}
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3 sm:items-center">
+          <div
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background/60 text-muted-foreground",
+              isConnected && "border-primary/30 bg-primary/15 text-primary",
+            )}
+          >
+            <CalendarDays className="h-4 w-4" />
           </div>
 
-          <Badge variant={connection ? "default" : "outline"}>
-            {available
-              ? connection
-                ? "Connected"
-                : "Disconnected"
-              : "Unavailable"}
-          </Badge>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4 text-sm">
-        {!available ? (
-          <p className="text-muted-foreground">
-            Google Calendar sync is not configured in this environment yet.
-          </p>
-        ) : connection ? (
-          <>
-            <div className="space-y-1 text-muted-foreground">
-              <p>
-                Connected account: {connection.googleEmail || "Google account"}
-              </p>
-              <p>Calendar: {connection.calendarId}</p>
-              {connectedAtLabel ? <p>Connected: {connectedAtLabel}</p> : null}
-              {lastSyncedAtLabel ? (
-                <p>Last successful sync: {lastSyncedAtLabel}</p>
-              ) : null}
+          <div className="min-w-0 space-y-0.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold tracking-tight">
+                Google Calendar Sync
+              </h3>
+              <Badge
+                variant={isConnected ? "default" : "outline"}
+                className={cn(
+                  "gap-1.5 text-[11px]",
+                  isConnected &&
+                    "border-emerald-500/30 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20",
+                )}
+              >
+                {isConnected ? (
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                ) : null}
+                {available
+                  ? connection
+                    ? "Connected"
+                    : "Disconnected"
+                  : "Unavailable"}
+              </Badge>
             </div>
 
-            {connection.lastSyncError ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
-                {connection.lastSyncError}
-              </div>
-            ) : null}
+            {!available ? (
+              <p className="text-xs text-muted-foreground">
+                Google Calendar sync is not configured in this environment yet.
+              </p>
+            ) : connection ? (
+              <p className="truncate text-xs text-muted-foreground">
+                <span>{connection.googleEmail || "Google account"}</span>
+                <span> · Calendar: {connection.calendarId}</span>
+                {lastSyncedAtLabel ? (
+                  <span> · Last sync {lastSyncedAtLabel}</span>
+                ) : connectedAtLabel ? (
+                  <span> · Connected {connectedAtLabel}</span>
+                ) : null}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Mirror lesson creation, reschedules, and cancellations to your
+                Google Calendar automatically.
+              </p>
+            )}
+          </div>
+        </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" asChild>
+        {available ? (
+          connection ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" asChild>
                 <Link href={connectHref}>
-                  <ExternalLink className="mr-2 h-4 w-4" />
+                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                   Reconnect
                 </Link>
               </Button>
               <Button
                 variant="outline"
+                size="sm"
                 onClick={handleDisconnect}
                 disabled={isDisconnecting}
               >
-                <Link2Off className="mr-2 h-4 w-4" />
+                <Link2Off className="mr-1.5 h-3.5 w-3.5" />
                 {isDisconnecting ? "Disconnecting..." : "Disconnect"}
               </Button>
             </div>
-          </>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-muted-foreground">
-              Connect your Google account once, then new lessons, date changes,
-              and deletions will sync automatically.
-            </p>
-
-            <Button asChild>
+          ) : (
+            <Button size="sm" asChild className="shrink-0">
               <Link href={connectHref}>
-                <ExternalLink className="mr-2 h-4 w-4" />
+                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                 Connect Google Calendar
               </Link>
             </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )
+        ) : null}
+      </div>
+
+      {available && connection?.lastSyncError ? (
+        <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+          {connection.lastSyncError}
+        </div>
+      ) : null}
+    </div>
   );
 }

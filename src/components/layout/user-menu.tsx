@@ -20,9 +20,14 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Languages, LogOut, Settings, Sparkles } from "lucide-react";
+import { Languages, LogOut, Palette, Settings, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Switch } from "@/components/ui/switch";
+import {
+  COLOR_THEMES,
+  type ColorThemeId,
+  useColorTheme,
+} from "@/components/providers/color-theme-provider";
 import { useTtsPreference } from "@/components/providers/tts-preference-provider";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types/database";
@@ -37,6 +42,7 @@ export function UserMenu({ profile }: UserMenuProps) {
   const router = useRouter();
   const { messages } = useAppI18n();
   const { engine, setEngine } = useTtsPreference();
+  const { colorTheme, setColorTheme } = useColorTheme();
   const supabase = createClient();
   const [isUpdatingLanguage, setIsUpdatingLanguage] = useState(false);
   const selectedAppLanguage = normalizeAppLanguage(profile.app_language);
@@ -104,7 +110,7 @@ export function UserMenu({ profile }: UserMenuProps) {
         id="user-menu-content"
         aria-labelledby="user-menu-trigger"
         align="end"
-        className="w-56"
+        className="w-60"
       >
         <DropdownMenuLabel>
           <p className="text-sm font-medium">
@@ -183,6 +189,45 @@ export function UserMenu({ profile }: UserMenuProps) {
           />
         </div>
         <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Palette className="mr-2 h-4 w-4" />
+            {messages.userMenu.colorPalette}
+            <span
+              className="ml-auto mr-1.5 inline-block h-3 w-3 rounded-full border border-border/80"
+              style={{
+                backgroundColor:
+                  COLOR_THEMES.find((t) => t.id === colorTheme)?.accentHex ??
+                  "#4CAF50",
+              }}
+            />
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="w-52">
+            <DropdownMenuRadioGroup
+              value={colorTheme}
+              onValueChange={(value) => setColorTheme(value as ColorThemeId)}
+            >
+              {COLOR_THEMES.map((option) => (
+                <DropdownMenuRadioItem
+                  key={option.id}
+                  value={option.id}
+                  onSelect={(event) => event.preventDefault()}
+                  className="gap-2"
+                >
+                  <span
+                    className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-white/20 shadow-2xs"
+                    style={{
+                      background: `linear-gradient(135deg, ${option.surfaceHex} 45%, ${option.accentHex} 45%)`,
+                    }}
+                  />
+                  <span className="truncate">
+                    {messages.userMenu.colorPaletteNames[option.id]}
+                  </span>
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <div className="flex items-center justify-between px-2 py-1.5">
           <span className="text-sm">{messages.userMenu.theme}</span>
           <ThemeToggle />

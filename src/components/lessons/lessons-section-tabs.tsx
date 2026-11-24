@@ -59,6 +59,10 @@ export function LessonsSectionTabs({
           },
         ];
 
+  if (sections.length <= 1) {
+    return null;
+  }
+
   return (
     <Tabs
       value={currentSection}
@@ -72,19 +76,9 @@ export function LessonsSectionTabs({
         setLoadingTab(nextSection.value);
         router.push(nextSection.href);
       }}
-      className="w-full pb-3"
+      className="w-auto"
     >
-      <TabsList
-        variant="line"
-        className={cn(
-          "mx-auto grid h-auto w-full max-w-4xl rounded-none border-b border-border/60 bg-transparent p-0",
-          sections.length === 1
-            ? "grid-cols-1"
-            : sections.length === 2
-              ? "grid-cols-2"
-              : "grid-cols-3",
-        )}
-      >
+      <TabsList className="inline-flex h-auto items-center gap-1 rounded-xl border border-border/70 bg-card/70 p-1 shadow-xs">
         {sections.map((section) => {
           const Icon = section.icon;
 
@@ -92,14 +86,19 @@ export function LessonsSectionTabs({
             <TabsTrigger
               key={section.value}
               value={section.value}
-              className="h-14 rounded-none px-3 pb-4 text-sm font-semibold sm:text-base lg:text-lg after:bottom-[-1px]"
+              className={cn(
+                "h-9 gap-2 rounded-lg border border-transparent px-3.5 py-1.5 text-sm font-medium text-muted-foreground transition-all after:hidden",
+                "hover:bg-accent/30 hover:text-foreground",
+                "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-xs",
+                "dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-primary dark:data-[state=active]:text-primary-foreground",
+              )}
             >
               {loadingTab === section.value ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Icon className="h-5 w-5" />
+                <Icon className="h-4 w-4" />
               )}
-              {section.label}
+              <span>{section.label}</span>
             </TabsTrigger>
           );
         })}

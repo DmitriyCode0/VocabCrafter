@@ -10,18 +10,17 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  CustomizableDashboard,
-  DashboardCustomizableItem,
-} from "@/components/dashboard/customizable-dashboard";
 import Link from "next/link";
 import {
-  AlertTriangle,
   Activity,
-  BookOpen,
+  AlertTriangle,
+  ArrowRight,
   BookMarked,
+  BookOpen,
   CalendarClock,
   CheckCircle2,
+  ClipboardList,
+  Clock3,
   GraduationCap,
   MessageSquare,
   PlusCircle,
@@ -36,7 +35,11 @@ import {
   getLessonDisplayTitle,
 } from "@/lib/lessons";
 import { getTutorLessonBalanceSummaries } from "@/lib/lessons-server";
-import { AnimatedCard } from "@/components/ui/animated-dashboard";
+import {
+  TutorHomeworkActivityCard,
+  type StudentHomeworkSnapshotItem,
+} from "@/components/dashboard/tutor-homework-activity-card";
+import { cn } from "@/lib/utils";
 import type { AppMessages } from "@/lib/i18n/messages";
 
 function pct(used: number, total: number) {
@@ -152,7 +155,7 @@ export async function TutorDashboard({
       .lte("lesson_date", nextWeekIso)
       .order("lesson_date", { ascending: true })
       .order("start_time", { ascending: true })
-      .limit(8),
+      .limit(12),
     supabaseAdmin
       .from("tutor_student_lessons")
       .select("student_id, lesson_date, end_time, updated_at")
@@ -194,11 +197,16 @@ export async function TutorDashboard({
       (summary.lessonPriceCents > 0 && (summary.lessonsLeft ?? 0) <= 0),
   );
 
-  const upcomingLessons = (
-    (upcomingLessonsData ?? []) as UpcomingLessonRow[]
-  ).slice(0, 5);
+  const allUpcomingLessons = (upcomingLessonsData ?? []) as UpcomingLessonRow[];
+  const upcomingLessons = allUpcomingLessons.slice(0, 6);
+  const todayLessonsCount = allUpcomingLessons.filter(
+    (lesson) => lesson.lesson_date === todayIso,
+  ).length;
+  const nextUpcomingLesson =
+    allUpcomingLessons.find((lesson) => lesson.status === "planned") ??
+    allUpcomingLessons[0] ??
+    null;
 
-  // Map each active student's latest completed lesson date & cutoff timestamp
   const lastLessonByStudentId = new Map<
     string,
     { lessonDate: string; cutoffMs: number }
@@ -226,7 +234,9 @@ export async function TutorDashboard({
     attemptsByStudentId.set(attempt.student_id, existing);
   }
 
-  const studentHomeworkSnapshots = activeConnections
+  const cc = messages.dashboard.tutor.commandCenter;
+
+  const studentHomeworkMetrics = activeConnections
     .map((connection) => {
       const profile = connection.student_profile as {
         full_name: string | null;
@@ -249,32 +259,62 @@ export async function TutorDashboard({
           attempt.max_score !== null &&
           attempt.max_score > 0,
       );
+      const weightedScoreSum = scoredAttempts.reduce(
+        (acc, item) => acc + ((item.score ?? 0) / (item.max_score ?? 1)) * 100,
+        0,
+      );
       const avgScore =
         scoredAttempts.length > 0
-          ? Math.round(
-              scoredAttempts.reduce(
-                (acc, item) =>
-                  acc + ((item.score ?? 0) / (item.max_score ?? 1)) * 100,
-                0,
-              ) / scoredAttempts.length,
-            )
+          ? Math.round(weightedScoreSum / scoredAttempts.length)
           : null;
 
       return {
-        studentId: connection.student_id,
-        studentName,
-        lastLessonDate: lastLesson?.lessonDate ?? null,
-        exercisesCount: studentAttempts.length,
-        avgScore,
+        snapshot: {
+          studentId: connection.student_id,
+          studentName,
+          lastLessonLabel: lastLesson
+            ? cc.lastLessonLabel(formatShortLessonDate(lastLesson.lessonDate))
+            : cc.noPastLessonLabel,
+          exercisesCount: studentAttempts.length,
+          avgScore,
+        } satisfies StudentHomeworkSnapshotItem,
+        weightedScoreSum,
+        scoredAttemptsCount: scoredAttempts.length,
       };
     })
     .sort(
       (left, right) =>
-        right.exercisesCount - left.exercisesCount ||
-        left.studentName.localeCompare(right.studentName, undefined, {
-          sensitivity: "base",
-        }),
+        right.snapshot.exercisesCount - left.snapshot.exercisesCount ||
+        left.snapshot.studentName.localeCompare(
+          right.snapshot.studentName,
+          undefined,
+          { sensitivity: "base" },
+        ),
     );
+
+  const studentHomeworkSnapshots = studentHomeworkMetrics.map(
+    (entry) => entry.snapshot,
+  );
+  const studentsWithRecentPractice = studentHomeworkSnapshots.filter(
+    (item) => item.exercisesCount > 0,
+  ).length;
+  const totalHomeworkExercises = studentHomeworkSnapshots.reduce(
+    (sum, item) => sum + item.exercisesCount,
+    0,
+  );
+  const totalWeightedScore = studentHomeworkMetrics.reduce(
+    (sum, entry) => sum + entry.weightedScoreSum,
+    0,
+  );
+  const totalScoredAttempts = studentHomeworkMetrics.reduce(
+    (sum, entry) => sum + entry.scoredAttemptsCount,
+    0,
+  );
+
+  const overallHomeworkAvg =
+    totalScoredAttempts > 0
+      ? Math.round(totalWeightedScore / totalScoredAttempts)
+      : null;
 
   const quizLimit = plan.quizzesPerMonth;
   const quizPercentage = pct(monthlyQuizCount ?? 0, quizLimit);
@@ -297,27 +337,289 @@ export async function TutorDashboard({
         ? messages.dashboard.tutor.passiveButtonSingle
         : messages.dashboard.tutor.passiveButtonMultiple;
 
-  const cc = messages.dashboard.tutor.commandCenter;
+  const tutorI18n = messages.dashboard.tutor;
+  const kpi = tutorI18n.kpi;
+
+  const nextLessonName = nextUpcomingLesson
+    ? nextUpcomingLesson.student_profile?.full_name ||
+      nextUpcomingLesson.student_profile?.email ||
+      getLessonDisplayTitle(nextUpcomingLesson.title)
+    : null;
 
   return (
-    <div className="space-y-6">
-      {/* Tutor Command Center: Schedule, Homework Since Last Lesson, Balance Alerts */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* 1. Today & Upcoming Lessons */}
-        <Card className="flex flex-col">
+    <div className="space-y-5">
+      {/* Row 1: 4-Card Bento KPI Strip */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {/* KPI 1: Today & Next Up */}
+        <Card className="border-border/70 bg-card/70 shadow-xs">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {kpi.nextLessonTitle}
+            </CardTitle>
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Clock3 className="h-3.5 w-3.5" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {nextUpcomingLesson && nextLessonName ? (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-base font-semibold">
+                    {nextLessonName}
+                  </span>
+                  {nextUpcomingLesson.meet_url ? (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="h-6 shrink-0 border-emerald-500/30 bg-emerald-500/10 px-2 text-[11px] text-emerald-500 hover:bg-emerald-500/20 hover:text-emerald-400"
+                    >
+                      <a
+                        href={nextUpcomingLesson.meet_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Video className="mr-1 h-3 w-3" />
+                        Meet
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                  {nextUpcomingLesson.lesson_date === todayIso
+                    ? cc.todayBadge
+                    : formatShortLessonDate(nextUpcomingLesson.lesson_date)}{" "}
+                  ·{" "}
+                  {formatLessonTimeRange(
+                    nextUpcomingLesson.start_time,
+                    nextUpcomingLesson.end_time,
+                  )}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-base font-semibold">
+                  {kpi.noUpcomingTitle}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {kpi.todayAndWeek(
+                    todayLessonsCount,
+                    allUpcomingLessons.length,
+                  )}
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* KPI 2: Active Students */}
+        <Card
+          data-tour-id="tutor-students"
+          className="border-border/70 bg-card/70 shadow-xs"
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {kpi.activeStudentsTitle}
+            </CardTitle>
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-sky-500/10 text-sky-400">
+              <GraduationCap className="h-3.5 w-3.5" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-2xl font-bold tabular-nums">
+                {totalStudents}
+              </div>
+              <Link
+                href="/students"
+                prefetch={false}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                {tutorI18n.viewStudentsButton}
+              </Link>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {kpi.practicedCount(studentsWithRecentPractice, totalStudents)}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* KPI 3: Homework Activity */}
+        <Card className="border-border/70 bg-card/70 shadow-xs">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {kpi.homeworkActivityTitle}
+            </CardTitle>
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-400">
+              <Activity className="h-3.5 w-3.5" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold tabular-nums">
+              {totalHomeworkExercises}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {kpi.homeworkAvgSummary(
+                overallHomeworkAvg,
+                studentsWithRecentPractice,
+              )}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* KPI 4: Monthly Quizzes */}
+        <Card className="border-border/70 bg-card/70 shadow-xs">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {kpi.monthlyQuizzesTitle}
+            </CardTitle>
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-amber-500/10 text-amber-400">
+              <BookOpen className="h-3.5 w-3.5" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-2xl font-bold tabular-nums">
+                {(monthlyQuizCount ?? 0).toLocaleString()}{" "}
+                <span className="text-sm font-normal text-muted-foreground">
+                  / {fmtLimit(quizLimit)}
+                </span>
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                {isFinite(quizLimit)
+                  ? tutorI18n.remainingThisMonth(
+                      Math.max(0, quizLimit - (monthlyQuizCount ?? 0)),
+                    )
+                  : tutorI18n.unlimited}
+              </span>
+            </div>
+            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all",
+                  isQuizOver
+                    ? "bg-destructive"
+                    : isQuizWarning
+                      ? "bg-amber-500"
+                      : "bg-primary",
+                )}
+                style={{ width: `${Math.min(quizPercentage, 100)}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Row 2: Compact Balance Status Strip */}
+      <div
+        className={cn(
+          "rounded-xl border px-4 py-3 shadow-xs transition-colors",
+          lowBalanceStudents.length > 0
+            ? "border-amber-500/35 bg-amber-500/[0.06]"
+            : "border-border/70 bg-card/60",
+        )}
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3 sm:items-center">
+            <div
+              className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border",
+                lowBalanceStudents.length > 0
+                  ? "border-amber-500/30 bg-amber-500/15 text-amber-500"
+                  : "border-emerald-500/30 bg-emerald-500/15 text-emerald-500",
+              )}
+            >
+              {lowBalanceStudents.length > 0 ? (
+                <AlertTriangle className="h-4 w-4" />
+              ) : (
+                <Wallet className="h-4 w-4" />
+              )}
+            </div>
+
+            <div className="min-w-0 space-y-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-semibold tracking-tight">
+                  {cc.balanceAlertsTitle}
+                </h2>
+                {lowBalanceStudents.length > 0 ? (
+                  <Badge
+                    variant="destructive"
+                    className="gap-1.5 text-[11px]"
+                  >
+                    {tutorI18n.balanceBanner.alertBadge(
+                      lowBalanceStudents.length,
+                    )}
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className="gap-1.5 border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-500"
+                  >
+                    <CheckCircle2 className="h-3 w-3" />
+                    {tutorI18n.balanceBanner.healthyBadge}
+                  </Badge>
+                )}
+              </div>
+
+              {lowBalanceStudents.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {cc.allBalancesHealthy}
+                </p>
+              ) : (
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {lowBalanceStudents.map((student) => (
+                    <Badge
+                      key={student.participantId}
+                      variant="outline"
+                      className="border-amber-500/30 bg-background/60 text-xs font-medium"
+                    >
+                      <span>{student.participantName}</span>
+                      <span className="mx-1 text-muted-foreground">·</span>
+                      <span className="text-amber-500 tabular-nums">
+                        {formatLessonCurrency(student.balanceCents)} (
+                        {cc.lessonsLeftBadge(student.lessonsLeft ?? 0)})
+                      </span>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+          >
+            <Link href="/lessons/balance" prefetch={false}>
+              {cc.manageBalancesButton}
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* Row 3: 2-Column Main Workspace */}
+      <div className="grid gap-4 lg:grid-cols-12">
+        {/* Left (5 cols): Today & Upcoming Lessons */}
+        <Card className="flex flex-col border-border/70 bg-card/70 shadow-xs lg:col-span-5">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <CalendarClock className="h-5 w-5 text-primary" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <CalendarClock className="h-4 w-4" />
+                </div>
                 <CardTitle className="text-base">
                   {cc.todayScheduleTitle}
                 </CardTitle>
               </div>
-              <Badge variant="outline">{upcomingLessons.length}</Badge>
+              <Badge variant="secondary" className="text-xs font-medium">
+                {upcomingLessons.length}
+              </Badge>
             </div>
             <CardDescription>{cc.todayScheduleDescription}</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 space-y-2.5">
+          <CardContent className="flex-1 space-y-2">
             {upcomingLessons.length === 0 ? (
               <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
                 {cc.noUpcomingLessons}
@@ -342,7 +644,12 @@ export async function TutorDashboard({
                 return (
                   <div
                     key={lesson.id}
-                    className="flex items-center justify-between gap-2 rounded-lg border bg-card/60 px-3 py-2.5 text-sm"
+                    className={cn(
+                      "flex items-center justify-between gap-2 rounded-lg border border-border/70 border-l-[3px] px-3 py-2.5 text-sm transition-colors",
+                      isToday
+                        ? "border-l-primary bg-primary/[0.06] hover:bg-primary/[0.1]"
+                        : "border-l-sky-500 bg-background/40 hover:bg-accent/20",
+                    )}
                   >
                     <div className="min-w-0 space-y-0.5">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -350,16 +657,22 @@ export async function TutorDashboard({
                           {studentName}
                         </span>
                         {isToday ? (
-                          <Badge variant="default" className="h-5 px-1.5 text-[10px]">
+                          <Badge
+                            variant="default"
+                            className="h-5 px-1.5 text-[10px]"
+                          >
                             {cc.todayBadge}
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                          <Badge
+                            variant="secondary"
+                            className="h-5 px-1.5 text-[10px]"
+                          >
                             {formatShortLessonDate(lesson.lesson_date)}
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground tabular-nums">
                         {formatLessonTimeRange(
                           lesson.start_time,
                           lesson.end_time,
@@ -372,7 +685,7 @@ export async function TutorDashboard({
                           asChild
                           variant="outline"
                           size="sm"
-                          className="h-7 border-emerald-500/30 bg-emerald-500/10 px-2 text-xs text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300"
+                          className="h-7 border-emerald-500/30 bg-emerald-500/10 px-2 text-xs text-emerald-500 hover:bg-emerald-500/20 hover:text-emerald-400"
                         >
                           <a
                             href={lesson.meet_url}
@@ -387,7 +700,7 @@ export async function TutorDashboard({
                       {lessonsLeft !== null ? (
                         <Badge
                           variant={isLowBalance ? "destructive" : "outline"}
-                          className="text-[11px]"
+                          className="text-[11px] tabular-nums"
                         >
                           {cc.lessonsLeftBadge(lessonsLeft)}
                         </Badge>
@@ -398,321 +711,144 @@ export async function TutorDashboard({
               })
             )}
           </CardContent>
-          <CardFooter className="pt-2">
-            <Button asChild variant="outline" className="w-full">
+          <CardFooter className="border-t border-border/40 pt-3">
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="ml-auto text-xs"
+            >
               <Link href="/lessons" prefetch={false}>
                 {cc.openScheduleButton}
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Link>
             </Button>
           </CardFooter>
         </Card>
 
-        {/* 2. Activity Since Last Lesson (Homework Snapshot) */}
-        <Card className="flex flex-col">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">
-                  {cc.homeworkSnapshotTitle}
+        {/* Right (7 cols): Activity Since Last Lesson with Filter Tabs */}
+        <div className="lg:col-span-7">
+          <TutorHomeworkActivityCard items={studentHomeworkSnapshots} />
+        </div>
+      </div>
+
+      {/* Row 4: 4 Compact Quick-Action Tiles */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card
+          data-tour-id="tutor-new-quiz"
+          className="flex flex-col justify-between border-border/70 bg-card/70 shadow-xs"
+        >
+          <CardHeader className="pb-2">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <PlusCircle className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5">
+                <CardTitle className="text-sm font-semibold">
+                  {tutorI18n.newQuizTitle}
                 </CardTitle>
+                <CardDescription className="text-xs">
+                  {tutorI18n.newQuizDescription}
+                </CardDescription>
               </div>
-              <Badge variant="outline">{studentHomeworkSnapshots.length}</Badge>
             </div>
-            <CardDescription>{cc.homeworkSnapshotDescription}</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 space-y-2.5">
-            {studentHomeworkSnapshots.length === 0 ? (
-              <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                {cc.noActiveStudents}
-              </div>
-            ) : (
-              <div className="max-h-[300px] space-y-2 overflow-y-auto pr-1">
-                {studentHomeworkSnapshots.map((item) => (
-                  <div
-                    key={item.studentId}
-                    className="flex items-center justify-between gap-2 rounded-lg border bg-card/60 px-3 py-2.5 text-sm"
-                  >
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="truncate font-medium">{item.studentName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.lastLessonDate
-                          ? cc.lastLessonLabel(
-                              formatShortLessonDate(item.lastLessonDate),
-                            )
-                          : cc.noPastLessonLabel}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                      {item.exercisesCount > 0 ? (
-                        <>
-                          <Badge variant="secondary" className="text-[11px]">
-                            {cc.quizzesDoneBadge(item.exercisesCount)}
-                          </Badge>
-                          {item.avgScore !== null ? (
-                            <Badge
-                              variant="outline"
-                              className="border-emerald-500/40 text-[11px] text-emerald-600 dark:text-emerald-400"
-                            >
-                              {cc.avgScoreBadge(item.avgScore)}
-                            </Badge>
-                          ) : null}
-                        </>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          {cc.noActivitySinceLesson}
-                        </span>
-                      )}
-                      <Button
-                        asChild
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                      >
-                        <Link
-                          href={`/history?student=${item.studentId}`}
-                          prefetch={false}
-                        >
-                          {cc.historyButton}
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
           <CardFooter className="pt-2">
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/history" prefetch={false}>
-                {cc.openHistoryButton}
+            <Button asChild size="sm" className="w-full">
+              <Link href="/quizzes/new" prefetch={false}>
+                {tutorI18n.createQuizButton}
               </Link>
             </Button>
           </CardFooter>
         </Card>
 
-        {/* 3. Low Balance Alerts */}
-        <Card className="flex flex-col">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">
-                  {cc.balanceAlertsTitle}
+        <Card
+          data-tour-id="tutor-review"
+          className="flex flex-col justify-between border-border/70 bg-card/70 shadow-xs"
+        >
+          <CardHeader className="pb-2">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-500/10 text-sky-400">
+                <MessageSquare className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5">
+                <CardTitle className="text-sm font-semibold">
+                  {tutorI18n.reviewTitle}
                 </CardTitle>
+                <CardDescription className="text-xs">
+                  {tutorI18n.reviewDescription}
+                </CardDescription>
               </div>
-              <Badge
-                variant={
-                  lowBalanceStudents.length > 0 ? "destructive" : "outline"
-                }
-              >
-                {lowBalanceStudents.length}
-              </Badge>
             </div>
-            <CardDescription>{cc.balanceAlertsDescription}</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 space-y-2.5">
-            {lowBalanceStudents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-                <p>{cc.allBalancesHealthy}</p>
-              </div>
-            ) : (
-              <div className="max-h-[300px] space-y-2 overflow-y-auto pr-1">
-                {lowBalanceStudents.map((student) => (
-                  <div
-                    key={student.participantId}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-sm"
-                  >
-                    <div className="min-w-0 space-y-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                        <span className="truncate font-medium">
-                          {student.participantName}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {formatLessonCurrency(student.balanceCents)} ·{" "}
-                        {formatLessonCurrency(student.lessonPriceCents)} / lesson
-                      </p>
-                    </div>
-                    <Badge variant="destructive" className="shrink-0 text-[11px]">
-                      {cc.lessonsLeftBadge(student.lessonsLeft ?? 0)}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
           <CardFooter className="pt-2">
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/lessons/balance" prefetch={false}>
-                {cc.manageBalancesButton}
+            <Button asChild variant="outline" size="sm" className="w-full">
+              <Link href="/assignments/review" prefetch={false}>
+                {tutorI18n.reviewButton}
+              </Link>
+            </Button>
+          </CardFooter>
+        </Card>
+
+        <Card
+          data-tour-id="tutor-passive-recognition"
+          className="flex flex-col justify-between border-border/70 bg-card/70 shadow-xs"
+        >
+          <CardHeader className="pb-2">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                <BookMarked className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5">
+                <CardTitle className="text-sm font-semibold">
+                  {tutorI18n.passiveTitle}
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  {passiveImportDescription}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardFooter className="pt-2">
+            {connectedStudentIds.length > 0 ? (
+              <Button asChild variant="outline" size="sm" className="w-full">
+                <Link href={passiveImportHref} prefetch={false}>
+                  {passiveImportButtonLabel}
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" className="w-full" disabled>
+                {passiveImportButtonLabel}
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
+
+        <Card className="flex flex-col justify-between border-border/70 bg-card/70 shadow-xs">
+          <CardHeader className="pb-2">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
+                <ClipboardList className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5">
+                <CardTitle className="text-sm font-semibold">
+                  {tutorI18n.plansReportsTitle}
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  {tutorI18n.plansReportsDescription}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardFooter className="pt-2">
+            <Button asChild variant="outline" size="sm" className="w-full">
+              <Link href="/plans-and-reports" prefetch={false}>
+                {tutorI18n.plansReportsButton}
               </Link>
             </Button>
           </CardFooter>
         </Card>
       </div>
-
-      {/* Quick Actions & Customizable Cards */}
-      <CustomizableDashboard
-        storageKey={`vocab-crafter.dashboard-layout:tutor:${userId}`}
-        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-      >
-        <DashboardCustomizableItem
-          id="new-quiz"
-          title={messages.dashboard.tutor.newQuizTitle}
-        >
-          <AnimatedCard>
-            <Card data-tour-id="tutor-new-quiz">
-              <CardHeader className="flex flex-row items-center gap-2">
-                <PlusCircle className="h-5 w-5 text-primary" />
-                <div>
-                  <CardTitle className="text-base">
-                    {messages.dashboard.tutor.newQuizTitle}
-                  </CardTitle>
-                  <CardDescription>
-                    {messages.dashboard.tutor.newQuizDescription}
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardFooter className="mt-auto justify-center">
-                <Button asChild className="w-full">
-                  <Link href="/quizzes/new" prefetch={false}>
-                    {messages.dashboard.tutor.createQuizButton}
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          </AnimatedCard>
-        </DashboardCustomizableItem>
-
-        <DashboardCustomizableItem
-          id="review"
-          title={messages.dashboard.tutor.reviewTitle}
-        >
-          <AnimatedCard>
-            <Card data-tour-id="tutor-review">
-              <CardHeader className="flex flex-row items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-primary" />
-                <div>
-                  <CardTitle className="text-base">
-                    {messages.dashboard.tutor.reviewTitle}
-                  </CardTitle>
-                  <CardDescription>
-                    {messages.dashboard.tutor.reviewDescription}
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardFooter className="mt-auto justify-center">
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/assignments/review" prefetch={false}>
-                    {messages.dashboard.tutor.reviewButton}
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          </AnimatedCard>
-        </DashboardCustomizableItem>
-
-        <DashboardCustomizableItem
-          id="passive-vocabulary"
-          title={messages.dashboard.tutor.passiveTitle}
-        >
-          <AnimatedCard>
-            <Card data-tour-id="tutor-passive-recognition">
-              <CardHeader className="flex flex-row items-center gap-2">
-                <BookMarked className="h-5 w-5 text-primary" />
-                <div>
-                  <CardTitle className="text-base">
-                    {messages.dashboard.tutor.passiveTitle}
-                  </CardTitle>
-                  <CardDescription>{passiveImportDescription}</CardDescription>
-                </div>
-              </CardHeader>
-              <CardFooter className="mt-auto justify-center">
-                {connectedStudentIds.length > 0 ? (
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href={passiveImportHref} prefetch={false}>
-                      {passiveImportButtonLabel}
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button variant="outline" className="w-full" disabled>
-                    {passiveImportButtonLabel}
-                  </Button>
-                )}
-              </CardFooter>
-            </Card>
-          </AnimatedCard>
-        </DashboardCustomizableItem>
-
-        <DashboardCustomizableItem
-          id="students"
-          title={messages.dashboard.tutor.studentsTitle}
-        >
-          <AnimatedCard>
-            <Card data-tour-id="tutor-students">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {messages.dashboard.tutor.studentsTitle}
-                </CardTitle>
-                <GraduationCap className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalStudents}</div>
-                <p className="text-xs text-muted-foreground">
-                  {messages.dashboard.tutor.enrolledStudents}
-                </p>
-              </CardContent>
-              <CardFooter className="mt-auto justify-center">
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/students" prefetch={false}>
-                    {messages.dashboard.tutor.viewStudentsButton}
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          </AnimatedCard>
-        </DashboardCustomizableItem>
-
-        <DashboardCustomizableItem
-          id="quizzes-created"
-          title={messages.dashboard.tutor.quizzesCreatedTitle}
-        >
-          <AnimatedCard>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {messages.dashboard.tutor.quizzesCreatedTitle}
-                </CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="text-2xl font-bold">
-                  {(monthlyQuizCount ?? 0).toLocaleString()}{" "}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    / {fmtLimit(quizLimit)}
-                  </span>
-                </div>
-                <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={`h-full rounded-full transition-all ${isQuizOver ? "bg-red-500" : isQuizWarning ? "bg-amber-500" : "bg-blue-500"}`}
-                    style={{ width: `${Math.min(quizPercentage, 100)}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {isFinite(quizLimit)
-                    ? messages.dashboard.tutor.remainingThisMonth(
-                        Math.max(0, quizLimit - (monthlyQuizCount ?? 0)),
-                      )
-                    : messages.dashboard.tutor.unlimited}
-                </p>
-              </CardContent>
-            </Card>
-          </AnimatedCard>
-        </DashboardCustomizableItem>
-      </CustomizableDashboard>
     </div>
   );
 }
