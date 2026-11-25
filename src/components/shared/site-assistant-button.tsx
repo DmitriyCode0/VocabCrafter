@@ -4,11 +4,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowUpRight,
+  CircleHelp,
   Compass,
   Loader2,
   MessageSquarePlus,
   Send,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useAppI18n } from "@/components/providers/app-language-provider";
@@ -186,7 +186,7 @@ export function SiteAssistantButton({ role }: { role: Role }) {
           size="sm"
           className="h-8 gap-1.5 border-primary/25 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary"
         >
-          <Sparkles className="h-3.5 w-3.5 shrink-0" />
+          <CircleHelp className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span className="text-xs font-medium">{t.buttonLabel}</span>
         </Button>
       </SheetTrigger>
@@ -229,7 +229,7 @@ export function SiteAssistantButton({ role }: { role: Role }) {
           {chatMessages.length === 0 && !isLoading ? (
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Sparkles className="h-5 w-5" />
+                <CircleHelp className="h-5 w-5" aria-hidden="true" />
               </div>
               <p className="text-sm font-semibold text-foreground">
                 {t.emptyTitle}

@@ -1,6 +1,6 @@
 export type MarkerColor = "amber" | "sky" | "emerald";
 
-export type DetectorMode = "aspects" | "conditionals" | "reported";
+export type DetectorMode = "aspects" | "conditionals" | "reported" | "passive";
 
 export interface MarkerStyleSpec {
   badge: string;
@@ -43,10 +43,11 @@ export const MARKER_STYLES: Record<MarkerColor, MarkerStyleSpec> = {
 export interface SentenceSegment {
   text: string;
   color?: MarkerColor;
+  strikethrough?: boolean;
 }
 
 /**
- * Parses `[[primary]]`, `{{secondary}}`, and `<<tertiary>>` marker spans into highlighted segments.
+ * Parses `[[primary]]`, `{{secondary}}`, `<<tertiary>>`, and `~~strikethrough~~` spans into segments.
  */
 export function parseTaggedSentence(
   tagged: string,
@@ -54,7 +55,8 @@ export function parseTaggedSentence(
   secondaryColor: MarkerColor = "sky",
   tertiaryColor: MarkerColor = "amber",
 ): { plainText: string; segments: SentenceSegment[] } {
-  const tokenRegex = /(\[\[[\s\S]*?\]\]|\{\{[\s\S]*?\}\}|<<[\s\S]*?>>)/g;
+  const tokenRegex =
+    /(\[\[[\s\S]*?\]\]|\{\{[\s\S]*?\}\}|<<[\s\S]*?>>|~~[\s\S]*?~~)/g;
   const parts = tagged.split(tokenRegex).filter((part) => part.length > 0);
 
   const segments: SentenceSegment[] = parts.map((part) => {
@@ -66,6 +68,9 @@ export function parseTaggedSentence(
     }
     if (part.startsWith("<<") && part.endsWith(">>")) {
       return { text: part.slice(2, -2), color: tertiaryColor };
+    }
+    if (part.startsWith("~~") && part.endsWith("~~")) {
+      return { text: part.slice(2, -2), strikethrough: true };
     }
     return { text: part };
   });
@@ -1484,3 +1489,527 @@ export interface ReportedSentenceTemplate {
   labelUk: string;
   forms: Record<ReportedCategory, ReportedFormEntry>;
 }
+
+// ============================================================================
+// SECTION 4: PASSIVE VOICE (SIMPLE CONVERSION + MODALS + INFINITIVES + GERUNDS)
+// ============================================================================
+
+export type PassiveCategory = "basic" | "modal_perfect" | "infinitive" | "gerund";
+
+export type PassiveVoiceFocus = "active" | "passive";
+
+export type PassiveDerivationStep = 1 | 2 | 3;
+
+export interface PassiveCategoryMeta {
+  id: PassiveCategory;
+  labelUk: string;
+  shortLabelUk: string;
+  formulaBadge: string;
+  headerTitleUk: string;
+  subtitleUk: string;
+  structureFormula: string;
+  functionsUk: string[];
+  modeKind: "conversion" | "derivation";
+}
+
+export interface PassivePreset {
+  id: string;
+  category: PassiveCategory;
+  label: string;
+  badgeText: string;
+  functionUk: string;
+  activeTagged: string;
+  bridgeLabel: string;
+  passiveTagged: string;
+  altPassiveTagged?: string;
+  altPassiveNoteUk?: string;
+  focusPosition: Record<PassiveVoiceFocus, number>;
+  verbPatternTitle?: string;
+  verbPatternExplanationUk?: string;
+  ukThoughtCue?: string;
+  bridgeStepTagged?: string;
+  step2NoteUk?: string;
+  step3NoteUk?: string;
+}
+
+export interface PassiveFormEntry {
+  activeTagged: string;
+  passiveTagged: string;
+  bridgeLabel: string;
+  badgeText: string;
+  functionUk: string;
+  altPassiveTagged?: string;
+  altPassiveNoteUk?: string;
+  verbPatternTitle?: string;
+  verbPatternExplanationUk?: string;
+  ukThoughtCue?: string;
+  bridgeStepTagged?: string;
+  step2NoteUk?: string;
+  step3NoteUk?: string;
+}
+
+export interface PassiveSentenceTemplate {
+  id: string;
+  labelUk: string;
+  forms: Record<PassiveCategory, PassiveFormEntry>;
+}
+
+export const PASSIVE_CATEGORIES: PassiveCategoryMeta[] = [
+  {
+    id: "basic",
+    labelUk: "Базовий пасив",
+    shortLabelUk: "be + V3 · прості часи",
+    formulaBadge: "S + be + V3",
+    headerTitleUk: "Пасивний стан · Базова трансформація",
+    subtitleUk: "Пряме перетворення Active → Passive, 2 додатки та прийменники",
+    structureFormula: "Object → Subject + be (у часі) + V3 + (by agent)",
+    functionsUk: [
+      "Акцент на дії та об'єкті, а не на виконавці",
+      "Невідомий, очевидний або неозначений виконавець (people / they)",
+      "Збереження прийменника після дієслова (knocked over, spoken to)",
+    ],
+    modeKind: "conversion",
+  },
+  {
+    id: "modal_perfect",
+    labelUk: "Modals + have",
+    shortLabelUk: "модальні в минулому",
+    formulaBadge: "modal + have been + V3",
+    headerTitleUk: "Пасивний стан · Модальні в минулому",
+    subtitleUk: "Оцінка або припущення щодо пасивної дії в минулому",
+    structureFormula: "Subject + could / must / should / might + have been + V3",
+    functionsUk: [
+      "Припущення або впевненість щодо минулої події (must / might)",
+      "Можливість або докір у минулому (could / should have been done)",
+    ],
+    modeKind: "conversion",
+  },
+  {
+    id: "infinitive",
+    labelUk: "З інфінітивом",
+    shortLabelUk: "(not) to be + V3",
+    formulaBadge: "Verb + (not) to be + V3",
+    headerTitleUk: "Пасивний стан · Інфінітив (to be + V3)",
+    subtitleUk: "Згортання підрядного речення після дієслів моделі V + to V0",
+    structureFormula: "Trigger Verb (want / expect / seem) + (not) to be + V3",
+    functionsUk: [
+      "Після дієслів і іменників, що керують інфінітивом з to",
+      "Спрощення конструкції типу «я хочу, щоб мені...» у природне to be + V3",
+    ],
+    modeKind: "derivation",
+  },
+  {
+    id: "gerund",
+    labelUk: "З герундієм",
+    shortLabelUk: "(not) being + V3",
+    formulaBadge: "Verb / Prep + being + V3",
+    headerTitleUk: "Пасивний стан · Герундій (being + V3)",
+    subtitleUk: "Згортання підрядного речення після дієслів ставлення й прийменників",
+    structureFormula: "Trigger Verb / Preposition (hate / remember / of) + being + V3",
+    functionsUk: [
+      "Після дієслів емоцій, пам'яті та уникнення (hate, remember, avoid)",
+      "Після будь-якого прийменника (afraid of, without, before)",
+    ],
+    modeKind: "derivation",
+  },
+];
+
+export const PASSIVE_PRESETS: PassivePreset[] = [
+  // ---- BASIC CONVERSION (Tenses + Screenshot 1 special cases) ----
+  {
+    id: "basic-present-simple",
+    category: "basic",
+    label: "Present Simple",
+    badgeText: "am / is / are + V3",
+    functionUk: "Регулярний або постійний факт у пасиві — змінюємо лише be у Present Simple.",
+    activeTagged: "Millions of tourists [[visit]] <<Kyiv>> {{every year}}.",
+    bridgeLabel: "Object → Subject · am / is / are + V3",
+    passiveTagged: "<<Kyiv>> [[is visited]] by millions of tourists {{every year}}.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "basic-past-simple",
+    category: "basic",
+    label: "Past Simple",
+    badgeText: "was / were + V3",
+    functionUk: "Завершена дія в минулому з фокусом на результаті чи об'єкті.",
+    activeTagged: "A famous architect [[designed]] <<this bridge>> {{in 1920}}.",
+    bridgeLabel: "Object → Subject · was / were + V3",
+    passiveTagged: "<<This bridge>> [[was designed]] by a famous architect {{in 1920}}.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "basic-present-continuous",
+    category: "basic",
+    label: "Present Continuous",
+    badgeText: "is being + V3",
+    functionUk: "Процес просто зараз: додаємо being перед V3, щоб зберегти тривалість.",
+    activeTagged: "Mechanics [[are repairing]] <<my car>> {{right now}}.",
+    bridgeLabel: "is / are + being + V3",
+    passiveTagged: "<<My car>> [[is being repaired]] {{right now}}.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "basic-present-perfect",
+    category: "basic",
+    label: "Present Perfect",
+    badgeText: "has been + V3",
+    functionUk: "Результат на цей момент: між have/has та V3 обов'язково з'являється been.",
+    activeTagged: "They [[have already published]] <<the report>>.",
+    bridgeLabel: "have / has + been + V3",
+    passiveTagged: "<<The report>> [[has already been published]].",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "basic-future-simple",
+    category: "basic",
+    label: "Future Simple",
+    badgeText: "will be + V3",
+    functionUk: "Майбутня пасивна дія або офіційне оголошення.",
+    activeTagged: "The team [[will announce]] <<the winner>> {{tomorrow}}.",
+    bridgeLabel: "will + be + V3",
+    passiveTagged: "<<The winner>> [[will be announced]] {{tomorrow}}.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "basic-two-objects",
+    category: "basic",
+    label: "2 objects",
+    badgeText: "2 пасивні підмети",
+    functionUk: "Дієслово з двома додатками: будь-який із них може стати підметом у пасиві.",
+    activeTagged: "He [[gave]] <<this task>> {{to them}} 2 weeks ago.",
+    bridgeLabel: "Непрямий або прямий додаток → Subject",
+    passiveTagged: "<<They>> [[were given]] <<this task>> {{2 weeks ago}}.",
+    altPassiveTagged: "<<This task>> [[was given]] {{to them}} 2 weeks ago.",
+    altPassiveNoteUk:
+      "Обидва варіанти правильні: частіше підметом стає особа (They were given...), але можна винести і предмет (This task was given to them...).",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "basic-prepositions",
+    category: "basic",
+    label: "Prepositions",
+    badgeText: "Verb + Preposition",
+    functionUk: "Фразовий прийменник нерозривно лишається поруч із дієсловом у V3.",
+    activeTagged: "The cat [[knocked]] {{over}} <<the vase on the table>>.",
+    bridgeLabel: "Прийменник лишається після дієслова",
+    passiveTagged: "<<The vase on the table>> [[was knocked]] {{over}} by the cat.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "basic-vague-subject",
+    category: "basic",
+    label: "Vague subject",
+    badgeText: "It is said / S + is believed to",
+    functionUk: "Загальний підмет (People / They say) прибираємо через безособову чи інфінітивну форму.",
+    activeTagged: "<<People>> [[believe]] Mohan is the best doctor in town.",
+    bridgeLabel: "People believe → is believed to / It is believed",
+    passiveTagged: "<<Mohan>> [[is believed]] {{to be}} the best doctor in town.",
+    altPassiveTagged:
+      "<<It>> [[is believed]] that Mohan is the best doctor in town. / <<It>> [[is said]] that the earth is round.",
+    altPassiveNoteUk:
+      "Дієслова думки й чуток (say, believe, assume) з неозначеним підметом people/they дають дві моделі: безособову (It is said/believed that...) або особову (Mohan is believed to be...).",
+    focusPosition: { active: 15, passive: 85 },
+  },
+
+  // ---- MODALS + HAVE (Screenshot 1 bottom-middle) ----
+  {
+    id: "modal-could-have",
+    category: "modal_perfect",
+    label: "could have been",
+    badgeText: "could + have been + V3",
+    functionUk: "Можливість у минулому, яка могла бути реалізована.",
+    activeTagged: "Someone [[could have done]] <<it>> {{yesterday}}.",
+    bridgeLabel: "could + have + been + V3",
+    passiveTagged: "<<It>> [[could have been done]] {{yesterday}}.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "modal-must-have",
+    category: "modal_perfect",
+    label: "must have been",
+    badgeText: "must + have been + V3",
+    functionUk: "Логічний висновок або висока впевненість щодо минулої дії.",
+    activeTagged: "The team [[must have completed]] <<the project>> {{by the deadline}}.",
+    bridgeLabel: "must + have + been + V3",
+    passiveTagged: "<<The project>> [[must have been completed]] {{by the deadline}}.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "modal-should-have",
+    category: "modal_perfect",
+    label: "should have been",
+    badgeText: "should + have been + V3",
+    functionUk: "Докір або нереалізована рекомендація щодо минулого.",
+    activeTagged: "They [[should have checked]] <<the contract>> {{earlier}}.",
+    bridgeLabel: "should + have + been + V3",
+    passiveTagged: "<<The contract>> [[should have been checked]] {{earlier}}.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "modal-might-have",
+    category: "modal_perfect",
+    label: "might have been",
+    badgeText: "might + have been + V3",
+    functionUk: "Ймовірне припущення про подію, що вже сталася.",
+    activeTagged: "Someone [[might have left]] <<the door>> {{open}}.",
+    bridgeLabel: "might + have + been + V3",
+    passiveTagged: "<<The door>> [[might have been left]] {{open}}.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+
+  // ---- WITH INFINITIVES (Screenshot 1 top-right & Screenshot 2 bottom) ----
+  {
+    id: "inf-want-tell",
+    category: "infinitive",
+    label: "want to be told",
+    badgeText: "want + to be + V3",
+    functionUk: "Згортання конструкції «хочу, щоб мені сказали» у пасивний інфінітив.",
+    ukThoughtCue: "Я хочу, щоб мені сказали, що робити",
+    activeTagged: "I <<want>> that {{others}} [[tell]] me what to do.",
+    bridgeStepTagged: "I <<want>> ~~that I am~~ [[told]] ~~by others~~ what to do.",
+    bridgeLabel: "Скорочуємо that I am + by others → to be told",
+    passiveTagged: "I <<want>> [[to be told]] what to do.",
+    verbPatternTitle: "want + to + V0",
+    verbPatternExplanationUk:
+      "Дієслово want в англійській керує інфінітивом із to (want to do / want someone to do), а не підрядним реченням із that. Коли той самий підмет I отримує дію над собою, замість важкого «that I am told» ставимо пасивний інфінітив to be told.",
+    step2NoteUk:
+      "Переводимо підрядне речення у пасив (I am told) і відкидаємо зайве that I am та неозначеного агента by others.",
+    step3NoteUk:
+      "Модель дієслова want вимагає інфінітив із to, тому дієслово be повертається в початкову форму: to be + V3.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "inf-work-to-be-done",
+    category: "infinitive",
+    label: "work to be done",
+    badgeText: "noun + to be + V3",
+    functionUk: "Пасивний інфінітив як означення після іменника (що треба зробити).",
+    ukThoughtCue: "Ходімо, є робота, яку потрібно зробити!",
+    activeTagged: "Come on, there is <<work>> [[to do]]!",
+    bridgeStepTagged: "Come on, there is <<work>> ~~that should be~~ [[done]] ~~by us~~!",
+    bridgeLabel: "noun + to do → noun + to be done",
+    passiveTagged: "Come on, there is <<work>> [[to be done]]!",
+    verbPatternTitle: "noun (work / tasks) + to + V0",
+    verbPatternExplanationUk:
+      "Після іменників на кшталт work, a lot, nothing вживаємо означення-інфінітив із to. Варіант to be done звучить природніше, коли фокус саме на роботі, яку мають виконати (а не на тому, хто її робить).",
+    step2NoteUk:
+      "Розкриваємо зміст як пасив над роботою (work that is/should be done) і прибираємо сполучник that + be.",
+    step3NoteUk:
+      "Залишаємо пасивний інфінітив to be done безпосередньо після іменника work.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "inf-expect-invite",
+    category: "infinitive",
+    label: "expect to be invited",
+    badgeText: "expect + to be + V3",
+    functionUk: "Очікування пасивної дії, спрямованої на підмет.",
+    ukThoughtCue: "Вона очікує, що її запросять на конференцію",
+    activeTagged: "She <<expects>> that {{they}} [[will invite]] her to the conference.",
+    bridgeStepTagged: "She <<expects>> ~~that she will be~~ [[invited]] ~~by them~~ to the conference.",
+    bridgeLabel: "expect + that she will be → expect to be + V3",
+    passiveTagged: "She <<expects>> [[to be invited]] to the conference.",
+    verbPatternTitle: "expect + to + V0",
+    verbPatternExplanationUk:
+      "Дієслова планування й очікування (expect, hope, promise, refuse) поєднуються з інфінітивом із to. Якщо підмет сам стає об'єктом дії, використовуємо форму to be invited замість підрядного речення з that.",
+    step2NoteUk:
+      "Змінюємо підрядну частину на пасив (she will be invited) та скорочуємо повтор підмета й by them.",
+    step3NoteUk:
+      "З'єднуємо expect з пасивним інфінітивом to be + V3, зберігаючи модель дієслова expect.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "inf-not-to-be",
+    category: "infinitive",
+    label: "not to be disturbed",
+    badgeText: "not to be + V3",
+    functionUk: "Заперечна форма пасивного інфінітива: частка not стоїть перед to.",
+    ukThoughtCue: "Він сподівається, що його не потурбують під час зустрічі",
+    activeTagged: "He <<hopes>> that {{no one}} [[disturbs]] him during the meeting.",
+    bridgeStepTagged: "He <<hopes>> ~~that he is~~ {{not}} [[disturbed]] ~~by anyone~~ during the meeting.",
+    bridgeLabel: "Заперечення not + to be + V3",
+    passiveTagged: "He <<hopes>> {{not}} [[to be disturbed]] during the meeting.",
+    verbPatternTitle: "hope + (not) + to + V0",
+    verbPatternExplanationUk:
+      "Дієслово hope вимагає інфінітива з to. У заперечній формі частка not завжди передує інфінітиву — ставимо not перед to (not to be disturbed).",
+    step2NoteUk:
+      "Перетворюємо заперечне підрядне речення у пасив (he is not disturbed) і викреслюємо зайві слова.",
+    step3NoteUk:
+      "Виносимо not перед маркером інфінітива to: not to be disturbed.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "inf-perfect-seem",
+    category: "infinitive",
+    label: "to have been sent",
+    badgeText: "to have been + V3",
+    functionUk: "Перфектний пасивний інфінітив для дії, яка відбулася раніше за теперішній висновок.",
+    ukThoughtCue: "Здається, що лист надіслали вчора",
+    activeTagged: "It <<seems>> that {{someone}} [[sent]] the letter {{yesterday}}.",
+    bridgeStepTagged: "The letter <<seems>> ~~that it was~~ [[sent]] ~~by someone~~ {{yesterday}}.",
+    bridgeLabel: "seem + минула дія → to have been + V3",
+    passiveTagged: "The letter <<seems>> [[to have been sent]] {{yesterday}}.",
+    verbPatternTitle: "seem / appear + to + V0 (perfect: to have been V3)",
+    verbPatternExplanationUk:
+      "Дієслово seem вимагає інфінітива з to. Оскільки надсилання листа сталося вчора (раніше за теперішнє враження seems), беремо перфектну форму пасивного інфінітива: to have been sent.",
+    step2NoteUk:
+      "Виносимо об'єкт the letter у позицію підмета перед seems та прибираємо that it was і by someone.",
+    step3NoteUk:
+      "Щоб показати передування дії в минулому (yesterday), ставимо to have been + V3.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+
+  // ---- WITH GERUNDS (Screenshot 2 top & Screenshot 1 bottom-right) ----
+  {
+    id: "ger-hate-spoken-to",
+    category: "gerund",
+    label: "being spoken to",
+    badgeText: "hate + being + V3 (+ prep)",
+    functionUk: "Згортання «коли зі мною говорять» у пасивний герундій зі збереженням прийменника to.",
+    ukThoughtCue: "Я ненавиджу, коли до мене говорять, наче до дитини",
+    activeTagged: "I <<hate>> when {{people}} [[speak]] {{to me}} as if I'm a child.",
+    bridgeStepTagged: "I <<hate>> ~~when I am~~ [[spoken]] {{to}} ~~by people~~ as if I'm a child.",
+    bridgeLabel: "Скорочуємо when I am + by people → being spoken to",
+    passiveTagged: "I <<hate>> [[being spoken]] {{to}} as if I'm a child.",
+    verbPatternTitle: "hate / love / dislike + V-ing",
+    verbPatternExplanationUk:
+      "Дієслово hate керує герундієм (hate doing) для загального ставлення. Оскільки мовець — пасивний об'єкт дії, підрядне речення згортається у пасивний герундій being spoken, а прийменник to лишається при дієслові.",
+    step2NoteUk:
+      "Спочатку ставимо підрядну частину у пасив (when I am spoken to by people), далі прибираємо when I am і by people, але зберігаємо прийменник to.",
+    step3NoteUk:
+      "Після hate потрібен герундій (V-ing), тому am замінюється на being → being spoken to.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "ger-remember-taken",
+    category: "gerund",
+    label: "remember being taken",
+    badgeText: "remember + being + V3",
+    functionUk: "Спогад про минулу дію, яка відбулася над мовцем.",
+    ukThoughtCue: "Я пам'ятаю, як мене везли до лікарні",
+    activeTagged: "I <<remember>> how {{they}} [[took]] me to the hospital.",
+    bridgeStepTagged: "I <<remember>> ~~how I was~~ [[taken]] ~~by them~~ to the hospital.",
+    bridgeLabel: "remember + how I was taken → being taken",
+    passiveTagged: "I <<remember>> [[being taken]] to the hospital.",
+    verbPatternTitle: "remember + V-ing (спогад про минуле)",
+    verbPatternExplanationUk:
+      "Дієслово remember змінює значення залежно від моделі: remember + to V0 (не забути зробити), remember + V-ing (пам'ятати пережите). Тут ідеться про спогад, тому ставимо пасивний герундій being taken.",
+    step2NoteUk:
+      "Переводимо спогад у пасив (how I was taken by them) і викреслюємо зайве how I was та by them.",
+    step3NoteUk:
+      "Отримуємо чітку форму спогаду: remember being taken.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "ger-avoid-seen",
+    category: "gerund",
+    label: "avoid being seen",
+    badgeText: "avoid + being + V3",
+    functionUk: "Уникнення небажаної дії щодо себе.",
+    ukThoughtCue: "Вона уникала того, щоб її помітили в аеропорту",
+    activeTagged: "She <<avoided>> that {{reporters}} [[saw]] her at the airport.",
+    bridgeStepTagged: "She <<avoided>> ~~that she was~~ [[seen]] ~~by reporters~~ at the airport.",
+    bridgeLabel: "avoid + V-ing → avoid being + V3",
+    passiveTagged: "She <<avoided>> [[being seen]] at the airport.",
+    verbPatternTitle: "avoid + V-ing (без інфінітива)",
+    verbPatternExplanationUk:
+      "Після дієслова avoid в англійській можливий лише герундій (V-ing); інфінітив з to є грубою помилкою. У пасиві форма avoid V-ing перетворюється на avoid being seen.",
+    step2NoteUk:
+      "Змінюємо підрядне речення у пасив і відкидаємо that she was та by reporters.",
+    step3NoteUk:
+      "Узгоджуємо з моделлю avoid + V-ing → being seen.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "ger-preposition-afraid",
+    category: "gerund",
+    label: "afraid of being criticized",
+    badgeText: "preposition + being + V3",
+    functionUk: "Пасивний герундій після будь-якого прийменника.",
+    ukThoughtCue: "Він боїться, що його розкритикують на зустрічі",
+    activeTagged: "He <<is afraid of>> {{colleagues}} [[criticizing]] him at the meeting.",
+    bridgeStepTagged: "He <<is afraid of>> ~~that he is~~ [[criticized]] ~~by colleagues~~ at the meeting.",
+    bridgeLabel: "Preposition (of) + being + V3",
+    passiveTagged: "He <<is afraid of>> [[being criticized]] at the meeting.",
+    verbPatternTitle: "Preposition (of / about / without) + V-ing",
+    verbPatternExplanationUk:
+      "Залізний verb pattern: після будь-якого прийменника (of, about, in, without) дієслово вживається у формі герундія (V-ing). Коли дія пасивна, після прийменника завжди стоїть being + V3.",
+    step2NoteUk:
+      "Фіксуємо об'єкт дії (він сам) і прибираємо зайвий повтор підмета та виконавця.",
+    step3NoteUk:
+      "Після прийменника of ставимо пасивний герундій being criticized.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+  {
+    id: "ger-not-being-invited",
+    category: "gerund",
+    label: "not being invited",
+    badgeText: "not + being + V3",
+    functionUk: "Заперечна форма пасивного герундія з not перед being.",
+    ukThoughtCue: "Їм не подобається, коли їх не запрошують на командні події",
+    activeTagged: "They <<dislike>> when {{people}} don't [[invite]] them to team events.",
+    bridgeStepTagged: "They <<dislike>> ~~when they are~~ {{not}} [[invited]] ~~by people~~ to team events.",
+    bridgeLabel: "dislike + not + being + V3",
+    passiveTagged: "They <<dislike>> {{not}} [[being invited]] to team events.",
+    verbPatternTitle: "dislike / mind + (not) + V-ing",
+    verbPatternExplanationUk:
+      "Дієслово dislike завжди керує герундієм (dislike doing). Для заперечення в пасивному герундії частка not ставиться безпосередньо перед being: not being invited.",
+    step2NoteUk:
+      "Згортаємо заперечне підрядне речення, лишаючи маркер заперечення not перед дієсловом.",
+    step3NoteUk:
+      "Перетворюємо are → being згідно з моделлю dislike + V-ing: not being invited.",
+    focusPosition: { active: 15, passive: 85 },
+  },
+];
+
+export const PASSIVE_SENTENCE_TEMPLATES: PassiveSentenceTemplate[] = [
+  {
+    id: "help",
+    labelUk: "Підтримка (support)",
+    forms: {
+      basic: {
+        activeTagged: "The mentor [[supports]] <<the students>> {{every week}}.",
+        passiveTagged: "<<The students>> [[are supported]] by the mentor {{every week}}.",
+        bridgeLabel: "Present Simple: am / is / are + V3",
+        badgeText: "are + V3",
+        functionUk: "Регулярна дія у теперішньому пасиві.",
+      },
+      modal_perfect: {
+        activeTagged: "The mentor [[could have supported]] <<the students>> {{earlier}}.",
+        passiveTagged: "<<The students>> [[could have been supported]] {{earlier}}.",
+        bridgeLabel: "could + have been + V3",
+        badgeText: "modal + have been + V3",
+        functionUk: "Нереалізована можливість підтримки в минулому.",
+      },
+      infinitive: {
+        ukThoughtCue: "Студенти хочуть, щоб їх підтримували",
+        activeTagged: "The students <<want>> that {{mentors}} [[support]] them.",
+        bridgeStepTagged: "The students <<want>> ~~that they are~~ [[supported]] ~~by mentors~~.",
+        passiveTagged: "The students <<want>> [[to be supported]].",
+        bridgeLabel: "want + to + V0 → to be supported",
+        badgeText: "want + to be + V3",
+        functionUk: "Дієслово want вимагає пасивного інфінітива.",
+        verbPatternTitle: "want + to + V0",
+        verbPatternExplanationUk:
+          "Дієслово want завжди приймає інфінітив з to, тому пасивна форма — to be supported.",
+        step2NoteUk: "Прибираємо that they are та неозначеного агента by mentors.",
+        step3NoteUk: "Оформлюємо фінал як пасивний інфінітив to be supported.",
+      },
+      gerund: {
+        ukThoughtCue: "Студентам подобається, коли їх підтримують",
+        activeTagged: "The students <<enjoy>> when {{mentors}} [[support]] them.",
+        bridgeStepTagged: "The students <<enjoy>> ~~when they are~~ [[supported]] ~~by mentors~~.",
+        passiveTagged: "The students <<enjoy>> [[being supported]].",
+        bridgeLabel: "enjoy + V-ing → being supported",
+        badgeText: "enjoy + being + V3",
+        functionUk: "Дієслово enjoy вимагає пасивного герундія.",
+        verbPatternTitle: "enjoy + V-ing",
+        verbPatternExplanationUk:
+          "Після enjoy вживається виключно герундій (V-ing), тому в пасиві отримуємо being supported.",
+        step2NoteUk: "Викреслюємо зайве when they are та by mentors.",
+        step3NoteUk: "Замінюємо are на герундій being: enjoy being supported.",
+      },
+    },
+  },
+];

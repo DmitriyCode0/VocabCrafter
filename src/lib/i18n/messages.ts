@@ -111,10 +111,10 @@ const EN_MESSAGES = {
   header: {
     toggleMenu: "Toggle menu",
     navigation: "Navigation",
-    askAssistant: "Ask AI",
+    askAssistant: "Site Assistant",
   },
   siteAssistant: {
-    buttonLabel: "Ask Assistant",
+    buttonLabel: "Site Assistant",
     title: "VocabCrafter AI Guide",
     description: "Ask how anything works or where to find a feature.",
     emptyTitle: "How can I help you navigate?",
@@ -1839,10 +1839,10 @@ const UK_MESSAGES: AppMessages = {
   header: {
     toggleMenu: "Відкрити меню",
     navigation: "Навігація",
-    askAssistant: "AI-гід",
+    askAssistant: "Помічник сайту",
   },
   siteAssistant: {
-    buttonLabel: "Запитати AI",
+    buttonLabel: "Помічник сайту",
     title: "AI-гід VocabCrafter",
     description: "Запитуйте, як працює будь-яка функція або де її знайти.",
     emptyTitle: "Чим я можу допомогти?",

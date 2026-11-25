@@ -467,6 +467,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
@@ -480,18 +481,17 @@
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
 }
 
 .skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--muted) 25%,
-    var(--accent) 50%,
-    var(--muted) 75%
-  );
+  background: linear-gradient(90deg,
+      var(--muted) 25%,
+      var(--accent) 50%,
+      var(--muted) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.8s ease-in-out infinite;
 }
@@ -594,6 +594,7 @@ a[data-slot="badge"]:hover {
     opacity: 0;
     transform: translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -621,19 +622,52 @@ a[data-slot="badge"]:hover {
 /*  Focus ring animation                                              */
 /* ------------------------------------------------------------------ */
 @keyframes ring-pulse {
+
   0%,
   100% {
     box-shadow: 0 0 0 0 oklch(0.52 0.13 144 / 0.4);
   }
+
   50% {
     box-shadow: 0 0 0 4px oklch(0.52 0.13 144 / 0);
   }
 }
 
 /* ------------------------------------------------------------------ */
+/*  Smooth eye-friendly Dark <-> Light & palette theme transitions    */
+/* ------------------------------------------------------------------ */
+html[data-theme-transitioning="true"] *,
+html[data-theme-transitioning="true"] *::before,
+html[data-theme-transitioning="true"] *::after {
+  transition: none !important;
+}
+
+html[data-theme-transitioning="true"]::view-transition-group(root),
+html[data-theme-transitioning="true"]::view-transition-old(root),
+html[data-theme-transitioning="true"]::view-transition-new(root) {
+  animation-duration: 1000ms;
+  animation-timing-function: ease-in-out;
+  mix-blend-mode: normal;
+}
+
+html.theme-color-transition,
+html.theme-color-transition *,
+html.theme-color-transition *::before,
+html.theme-color-transition *::after {
+  transition:
+    background-color 1000ms ease-in-out,
+    color 1000ms ease-in-out,
+    border-color 1000ms ease-in-out,
+    fill 1000ms ease-in-out,
+    stroke 1000ms ease-in-out,
+    box-shadow 1000ms ease-in-out !important;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Reduced motion: disable animations for accessibility              */
 /* ------------------------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {

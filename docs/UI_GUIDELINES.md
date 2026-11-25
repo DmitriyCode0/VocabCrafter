@@ -23,7 +23,7 @@ Every screen or component update is evaluated against five practical criteria:
    - Prefer Flexbox (`flex flex-wrap items-center justify-between gap-3`) or named CSS Grid tracks (`grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1fr)]`) so neighboring elements naturally wrap or stay aligned.
 
 4. **Action Placement Hierarchy**
-   - **Top Header Bar (`src/components/layout/header.tsx`)**: Global, 1-click ambient tools used from any page (`Ask Assistant`, `How It Works`, `HeaderThemeControls` for Color Palette + Light/Dark mode, and `UserMenu`).
+   - **Top Header Bar (`src/components/layout/header.tsx`)**: Global, 1-click ambient tools used from any page (`Site Assistant` with a `CircleHelp` question-mark icon, `HeaderThemeControls` for Color Palette + Light/Dark mode, and `UserMenu`; legacy `"How It Works"` walkthrough drawers were retired in favor of the single `Site Assistant`).
    - **Quick Profile Menu (`src/components/layout/user-menu.tsx`)**: Strictly account & session essentials (`Membership & Billing`, `App language`, `Sign out`).
    - **Sidebar (`src/components/layout/nav-links.tsx`)**: Route navigation, including `/settings`.
    - **Settings Page (`src/app/(platform)/settings/page.tsx`)**: Persistent configuration (profile, study languages, CEFR level, AI Voice engine toggle & voice selector).
@@ -59,9 +59,9 @@ Match `LessonsSectionTabs` and `HeaderThemeControls`:
 
 ### C. Stable-Height Symmetric Grids (Dashboards & Whiteboards)
 When presenting contextual panels of varying length (such as time markers, tense functions, and AI feedback) above a primary visualization:
-- Header Row 1: Left-aligned identity (`Clock` icon + `CardTitle` + highlighted `Структура` badge) with workspace action (`Скинути`) on the far right via `justify-between`.
-- Header Row 2: Fixed desktop height (`lg:h-[160px]`) symmetric grid:
-  - Equal outer columns (`minmax(0,1fr)`) frame a centered middle column (`minmax(0,1.15fr)`).
+- Header Row 1: Note that shadcn's `CardHeader` sets `items-start` by default — always include `items-stretch` on a custom `flex-col` `CardHeader` and `w-full` on inner rows so left-aligned identity (`Clock` icon + `CardTitle` + `Структура` badge) and right-aligned actions (`Скинути` with `justify-between` + `ml-auto`) stay pinned cleanly to opposite corners.
+- Header Row 2: Fixed desktop height (`lg:h-[160px]`) symmetric grid (`w-full`):
+  - Equal outer columns (`minmax(0,1fr)`) frame a centered middle column (`minmax(0,1.15fr)`). On tabs where 4 quick category selectors replace the contextual boxes (e.g., `Непряма мова`), span them across columns 1–2 (`lg:col-span-2` in a 2×2 grid) beside the fixed right AI panel.
   - Every card uses `flex h-full min-h-0 flex-col rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5`.
   - Use `my-auto` inside a flex scrollport (`flex min-h-0 w-full flex-1 overflow-y-auto`) when content should stay centered when short and scroll safely from the top when taller than the panel.
 
@@ -75,6 +75,7 @@ On desktop views (`src/app/(platform)/settings/page.tsx`):
 ## 3. Theming, Color Tokens & Semantic Cues
 
 - **Theme Parity**: All surfaces must work seamlessly across Light/Dark modes and all 5 curated palettes (`forest`, `slate-emerald`, `midnight-indigo`, `warm-terracotta`, `deep-ocean`). Rely on semantic CSS variables (`bg-background`, `bg-card`, `border-border/60`, `text-foreground`, `text-muted-foreground`, `text-primary`) defined in `src/app/globals.css`.
+- **Smooth Eye-Friendly Theme Transitions**: Wrap Dark ↔ Light and Color Palette switches in `runWithThemeTransition` (`src/lib/theme-transition.ts`) so the whole viewport crossfades gently over `1000ms` (`1s`, `ease-in-out`) via the View Transitions API (with CSS fallback and `prefers-reduced-motion` bypass) instead of flashing abruptly.
 - **Hydration-Safe Theme Reading**: Client theme controls must gate DOM theme attributes/resolved theme reads with `useSyncExternalStore` (see `HeaderThemeControls` and `ThemeToggle`) to avoid hydration mismatches and React Compiler lint violations.
 - **Semantic Teaching Highlights** (pair translucent fills with readable text contrast in both light and dark modes):
   - **Emerald** (`border-emerald-500/... bg-emerald-500/... text-emerald-700 dark:text-emerald-300`): Primary verb forms, active grammatical functions (`У реченні`), positive validation (`Правильно`).

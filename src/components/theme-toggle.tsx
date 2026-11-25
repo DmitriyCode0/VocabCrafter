@@ -3,6 +3,7 @@
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
+import { runWithThemeTransition } from "@/lib/theme-transition";
 import { Moon, Sun, Monitor } from "lucide-react";
 
 export function ThemeToggle() {
@@ -22,9 +23,26 @@ export function ThemeToggle() {
   }
 
   function cycle() {
-    if (theme === "light") setTheme("dark");
-    else if (theme === "dark") setTheme("system");
-    else setTheme("light");
+    const nextTheme =
+      theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
+    const resolvedNext =
+      nextTheme === "system"
+        ? window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light"
+        : nextTheme;
+
+    runWithThemeTransition(
+      () => {
+        const root = document.documentElement;
+        root.classList.remove("light", "dark");
+        root.classList.add(resolvedNext);
+        setTheme(nextTheme);
+      },
+      () => {
+        document.documentElement.style.colorScheme = resolvedNext;
+      },
+    );
   }
 
   return (

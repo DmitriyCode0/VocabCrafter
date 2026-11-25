@@ -11,6 +11,8 @@ import {
   sanitizeConditionalSlots,
   type AspectCellKey,
   type ConditionalVariantKey,
+  type PassiveCategory,
+  type PassiveFormEntry,
   type ReportedCategory,
   type ReportedFormEntry,
 } from "@/lib/grammar/tense-detector-data";
@@ -46,27 +48,54 @@ const REPORTED_CATEGORY_KEYS: readonly ReportedCategory[] = [
   "imperative",
 ];
 
+const PASSIVE_CATEGORY_KEYS: readonly PassiveCategory[] = [
+  "basic",
+  "modal_perfect",
+  "infinitive",
+  "gerund",
+];
+
 const requestSchema = z.object({
   sentence: z.string().trim().min(2).max(400),
-  preferredMode: z.enum(["aspects", "conditionals", "reported"]).optional(),
+  preferredMode: z
+    .enum(["aspects", "conditionals", "reported", "passive"])
+    .optional(),
 });
 
 const reportedFormEntrySchema = z.object({
   directTagged: z.string().trim().min(1),
   reportedTagged: z.string().trim().min(1),
-  directBadge: z.string().trim().optional(),
-  reportedBadge: z.string().trim().optional(),
-  bridgeLabelUk: z.string().trim().optional(),
+  directBadge: z.string().trim().nullable().optional().catch(null),
+  reportedBadge: z.string().trim().nullable().optional().catch(null),
+  bridgeLabelUk: z.string().trim().nullable().optional().catch(null),
   directSlot: z.union([z.literal(0), z.literal(1), z.literal(2)]).catch(2),
   reportedSlot: z.union([z.literal(0), z.literal(1), z.literal(2)]).catch(1),
   hasBackshift: z.boolean().catch(true),
+});
+
+const passiveFormEntrySchema = z.object({
+  activeTagged: z.string().trim().nullable().optional().catch(null),
+  passiveTagged: z.string().trim().nullable().optional().catch(null),
+  active: z.string().trim().nullable().optional().catch(null),
+  passive: z.string().trim().nullable().optional().catch(null),
+  bridgeLabel: z.string().trim().nullable().optional().catch(null),
+  badgeText: z.string().trim().nullable().optional().catch(null),
+  functionUk: z.string().trim().nullable().optional().catch(null),
+  altPassiveTagged: z.string().trim().nullable().optional().catch(null),
+  altPassiveNoteUk: z.string().trim().nullable().optional().catch(null),
+  verbPatternTitle: z.string().trim().nullable().optional().catch(null),
+  verbPatternExplanationUk: z.string().trim().nullable().optional().catch(null),
+  ukThoughtCue: z.string().trim().nullable().optional().catch(null),
+  bridgeStepTagged: z.string().trim().nullable().optional().catch(null),
+  step2NoteUk: z.string().trim().nullable().optional().catch(null),
+  step3NoteUk: z.string().trim().nullable().optional().catch(null),
 });
 
 const aiResponseSchema = z.object({
   isCorrect: z.boolean(),
   correctedSentence: z.string().trim().min(1),
   shortLabelUk: z.string().trim().min(1).max(60),
-  detectedMode: z.enum(["aspects", "conditionals", "reported"]),
+  detectedMode: z.enum(["aspects", "conditionals", "reported", "passive"]),
   detectedTitle: z.string().trim().min(1).max(100),
   explanationUk: z.string().trim().min(1).max(1200),
   time: z.enum(["past", "present", "future"]).catch("present"),
@@ -91,12 +120,20 @@ const aiResponseSchema = z.object({
   reportedCategory: z
     .enum(["statement", "yes_no_question", "wh_question", "imperative"])
     .catch("statement"),
+  passiveCategory: z
+    .enum(["basic", "modal_perfect", "infinitive", "gerund"])
+    .catch("basic"),
   aspectForms: z.record(z.string(), z.string()).nullable().optional(),
   conditionalForms: z.record(z.string(), z.string()).nullable().optional(),
   reportedForms: z
     .record(z.string(), reportedFormEntrySchema)
     .nullable()
     .optional(),
+  passiveForms: z
+    .record(z.string(), passiveFormEntrySchema)
+    .nullable()
+    .optional()
+    .catch(null),
 });
 
 function normalizeAspectForms(
@@ -161,7 +198,13 @@ const REPORTED_DEFAULT_BADGES: Record<
 };
 
 function normalizeReportedForms(
-  rawForms: Record<string, Partial<ReportedFormEntry>> | null | undefined,
+  rawForms:
+    | Record<
+        string,
+        { [K in keyof ReportedFormEntry]?: ReportedFormEntry[K] | null }
+      >
+    | null
+    | undefined,
   fallbackSentence: string,
 ): Record<ReportedCategory, ReportedFormEntry> {
   const entries = REPORTED_CATEGORY_KEYS.map((key) => {
@@ -205,6 +248,110 @@ function normalizeReportedForms(
   return Object.fromEntries(entries) as Record<
     ReportedCategory,
     ReportedFormEntry
+  >;
+}
+
+const PASSIVE_DEFAULT_BADGES: Record<
+  PassiveCategory,
+  { badge: string; bridge: string; fnUk: string }
+> = {
+  basic: {
+    badge: "be + V3",
+    bridge: "Object → Subject · be + V3",
+    fnUk: "Фокус на дії та об'єкті у пасивному стані.",
+  },
+  modal_perfect: {
+    badge: "modal + have been + V3",
+    bridge: "modal + have been + V3",
+    fnUk: "Припущення або можливість у минулому.",
+  },
+  infinitive: {
+    badge: "to be + V3",
+    bridge: "Скорочення підрядного речення → to be + V3",
+    fnUk: "Керування дієслова моделлю V + to + V0.",
+  },
+  gerund: {
+    badge: "being + V3",
+    bridge: "Скорочення підрядного речення → being + V3",
+    fnUk: "Керування дієслова або прийменника моделлю V-ing.",
+  },
+};
+
+function ensureHighlighted(text: string): string {
+  if (
+    text.includes("[[") ||
+    text.includes("<<") ||
+    text.includes("{{") ||
+    text.includes("~~")
+  ) {
+    return text;
+  }
+  return `[[${text}]]`;
+}
+
+function normalizePassiveForms(
+  rawForms:
+    | Record<
+        string,
+        Partial<{
+          activeTagged: string | null;
+          passiveTagged: string | null;
+          active: string | null;
+          passive: string | null;
+          bridgeLabel: string | null;
+          badgeText: string | null;
+          functionUk: string | null;
+          altPassiveTagged: string | null;
+          altPassiveNoteUk: string | null;
+          verbPatternTitle: string | null;
+          verbPatternExplanationUk: string | null;
+          ukThoughtCue: string | null;
+          bridgeStepTagged: string | null;
+          step2NoteUk: string | null;
+          step3NoteUk: string | null;
+        }>
+      >
+    | null
+    | undefined,
+  fallbackPassiveSentence: string,
+  originalSentence: string,
+): Record<PassiveCategory, PassiveFormEntry> {
+  const entries = PASSIVE_CATEGORY_KEYS.map((key) => {
+    const candidate = rawForms?.[key];
+    const defaults = PASSIVE_DEFAULT_BADGES[key];
+    const rawActive =
+      candidate?.activeTagged?.trim() ||
+      candidate?.active?.trim() ||
+      originalSentence.trim() ||
+      fallbackPassiveSentence;
+    const rawPassive =
+      candidate?.passiveTagged?.trim() ||
+      candidate?.passive?.trim() ||
+      fallbackPassiveSentence;
+    return [
+      key,
+      {
+        activeTagged: ensureHighlighted(rawActive),
+        passiveTagged: ensureHighlighted(rawPassive),
+        bridgeLabel: candidate?.bridgeLabel?.trim() || defaults.bridge,
+        badgeText: candidate?.badgeText?.trim() || defaults.badge,
+        functionUk: candidate?.functionUk?.trim() || defaults.fnUk,
+        altPassiveTagged: candidate?.altPassiveTagged?.trim() || undefined,
+        altPassiveNoteUk: candidate?.altPassiveNoteUk?.trim() || undefined,
+        verbPatternTitle: candidate?.verbPatternTitle?.trim() || undefined,
+        verbPatternExplanationUk:
+          candidate?.verbPatternExplanationUk?.trim() || undefined,
+        ukThoughtCue: candidate?.ukThoughtCue?.trim() || undefined,
+        bridgeStepTagged: candidate?.bridgeStepTagged?.trim() || undefined,
+        step2NoteUk: candidate?.step2NoteUk?.trim() || undefined,
+        step3NoteUk: candidate?.step3NoteUk?.trim() || undefined,
+      } satisfies PassiveFormEntry,
+    ] as const;
+  });
+
+  return Object.fromEntries(entries) as Record<
+    PassiveCategory,
+    PassiveFormEntry
   >;
 }
 
@@ -277,11 +424,23 @@ YOUR TASKS:
    - Set "correctedSentence": the natural, grammatically correct English version of the sentence (keep the same meaning and core vocabulary). If a state verb was in Continuous, convert it to Simple or Perfect (e.g. "I have been being busy" -> "I have been busy", "I am knowing" -> "I know").
 2. Ukrainian explanation ("explanationUk") & short label ("shortLabelUk"):
    - Write "shortLabelUk" as a crisp 2-4 word Ukrainian topic name (e.g., "Сигналізація вдома", "Зайнятість на тижні", "Купівля будинку").
-   - Write "explanationUk" VERY BRIEFLY in simple, accessible Ukrainian (1-2 short sentences MAX, under 35 words):
-     * If isStateVerb is true: briefly note that this is a state verb (дієслово стану), so it uses Simple/Perfect instead of Continuous (-ing).
+   - Write "explanationUk" VERY BRIEFLY in simple, accessible Ukrainian (1-2 short sentences MAX, under 45 words):
+     * If detectedMode === "aspects" and isStateVerb is true: briefly note that this is a state verb (дієслово стану), so it uses Simple/Perfect instead of Continuous (-ing).
+     * If detectedMode === "passive": write 1-2 crisp Ukrainian sentences explaining (a) the passive structure used (or fixed/converted), (b) the exact Verb Pattern of the trigger verb/preposition when relevant (e.g., "Дієслово want керує інфінітивом з to (want + to V0), тому в пасиві вживаємо to be told"), and (c) any kept preposition, 2-object choice, or dropped vague agent.
      * Otherwise concisely name any fix and why the tense or conditional applies.
 3. Graph Mode & Coordinates:
-   - If CURRENT BOARD TAB is "reported" OR the sentence is in Indirect/Reported Speech (uses "said", "told", "asked if/whether", "asked where/when/what", "told/asked me (not) to"):
+   - If CURRENT BOARD TAB is "passive" OR the sentence clearly demonstrates Passive Voice (uses be + V3, modal + have been + V3, passive infinitive to be + V3 / to have been + V3, or passive gerund being + V3):
+     * "detectedMode": "passive"
+     * "passiveCategory":
+       - "modal_perfect" if modal + have (been) + V3 (e.g. could/must/should/might have been done)
+       - "infinitive" if trigger verb/noun takes infinitive with to + passive (to be + V3 / not to be + V3 / to have been + V3, e.g. want to be told, work to be done, seems to have been sent, or broken calque like "I want that others tell me" / "I want being told")
+       - "gerund" if trigger verb/preposition takes -ing + passive (being + V3 / not being + V3, e.g. hate being spoken to, remember being taken, avoid being seen, afraid of being criticized, or calque "hate when people speak to me" / "avoid to be seen")
+       - "basic" for standard passive tenses (am/is/are/was/were/will be/is being/has been + V3), 2 objects, prepositions after verbs, vague subject ("People say / believe..."), or Active sentences converted to simple Passive on the passive tab.
+     * STRICT GRAMMAR & VERB PATTERN CHECK FOR PASSIVE:
+       - Valid Passive input (including short complete clauses like "I want to be told", "There is work to be done", "I hate being spoken to"): set "isCorrect": true, keep "correctedSentence" as clean natural Passive English, and classify into the exact "passiveCategory".
+       - Valid Active input on "passive" tab (e.g. "The cat knocked over the vase", "He gave this task to them", "People say the earth is round"): set "isCorrect": true, put the natural Passive conversion in "correctedSentence", and explain the Active → Passive shift in "explanationUk".
+       - Broken Passive / Verb-Pattern / Calque input (e.g. "I want being told", "I want that others tell me", "She avoided to be seen", dropped preposition like "I hate being spoken as if I'm a child", missing "been" in "It could have done yesterday"): set "isCorrect": false, put the corrected natural Passive sentence in "correctedSentence", and explain the fix + verb pattern in "explanationUk".
+   - Else if CURRENT BOARD TAB is "reported" OR the sentence is in Indirect/Reported Speech (uses "said", "told", "asked if/whether", "asked where/when/what", "told/asked me (not) to"):
      * "detectedMode": "reported"
      * "reportedCategory": "statement" | "yes_no_question" | "wh_question" | "imperative"
      * STRICT GRAMMAR CHECK FOR REPORTED SPEECH:
@@ -298,7 +457,7 @@ YOUR TASKS:
      * "time": "past" | "present" | "future"
      * "isContinuous": true ONLY if isStateVerb is false AND it is Continuous or Perfect Continuous; if isStateVerb is true, ALWAYS set "isContinuous": false
      * "isPerfect": true if Perfect or Perfect Continuous, else false
-   - Set "detectedTitle" to the English grammar name (e.g. "Past Perfect", "2nd Conditional", "Reported Statement", "Reported Yes/No Question", "Reported Imperative").
+   - Set "detectedTitle" to the English grammar name (e.g. "Past Perfect", "2nd Conditional", "Reported Statement", "Passive Simple", "Passive Modals + Have", "Passive Infinitive", "Passive Gerund").
    - If detectedMode === "aspects", set "detectedUseCaseIndex" (0-based integer) picking which function from the matching cell below best describes this sentence's usage; otherwise set null:
 ${useCasesGuide}
 4. Generate morphed timeline forms so the user can drag ✕ on the graph and watch THEIR sentence adapt!
@@ -319,13 +478,25 @@ ${useCasesGuide}
        - {{...}} (sky): shifted pronouns and time/place perspective cues (e.g., {{now}}/{{then}}, {{today}}/{{that day}}, {{yesterday}}/{{the day before}}, {{tomorrow}}/{{the next day}}, {{here}}/{{there}}, {{I}}/{{he}}/{{she}})
      * Set directSlot (2=Present/Future in direct quote, 1=Past Simple/Present Perfect in direct quote) and reportedSlot (1=Past backshifted from Present, 0=Past Perfect backshifted from Past/Present Perfect, 2=Imperative / unchanged modal).
      * Example for yes_no_question: { "directTagged": "'<<Did they>> [[arrive]] {{yesterday}}?'", "reportedTagged": "He asked me <<if/whether they>> [[had arrived]] {{the day before}}.", "directBadge": "YES/NO QUESTION", "reportedBadge": "'IF/WHETHER' + S + V", "bridgeLabelUk": "if / whether + прямий порядок", "directSlot": 1, "reportedSlot": 0, "hasBackshift": true }
+   - If detectedMode === "passive": fill ALL 4 keys of "passiveForms" (${PASSIVE_CATEGORY_KEYS.join(", ")}), adapting the user's core topic/verbs across basic passive, modals + have, passive infinitive, and passive gerund.
+     * EVERY category object ("basic", "modal_perfect", "infinitive", "gerund") MUST use exact property names "activeTagged", "passiveTagged", "bridgeLabel", "badgeText", "functionUk", plus "verbPatternTitle" and "verbPatternExplanationUk" explaining the verb pattern of the verbs used.
+     * Keep the user's actual sentence and core verbs intact in the matching "passiveCategory".
+     * Tag ONLY with:
+       - [[...]] (emerald): passive or active core verb phrase (e.g., [[is visited]], [[to be told]], [[being spoken]], [[could have been done]])
+       - <<...>> (amber): trigger verb (e.g., <<want>>, <<hate>>, <<remember>>, <<avoid>>) or promoted subject / object
+       - {{...}} (sky): preposition kept with verb (e.g., {{to}}, {{over}}), time cue, or negation {{not}}
+       - ~~...~~ (ONLY in "bridgeStepTagged"): struck-through redundant clause/agent dropped in Step 2 (e.g., "I <<hate>> ~~when I am~~ [[spoken]] {{to}} ~~by people~~ as if I'm a child.")
+     * For "infinitive" and "gerund": ALWAYS provide non-null "ukThoughtCue" (Ukrainian thought starter), "bridgeStepTagged" (Step 2 intermediate passive with ~~...~~), "verbPatternTitle" (exact pattern of the trigger verb/head from the user's sentence, e.g. "hate + V-ing", "want + to + V0", "afraid of + V-ing"), "verbPatternExplanationUk" (1-2 clear Ukrainian sentences explaining WHY that specific verb/preposition requires infinitive or gerund and how passive fits it), "step2NoteUk", and "step3NoteUk".
+     * If the "basic" form has 2 objects or a vague subject ("People say / believe..."), also populate "altPassiveTagged" and "altPassiveNoteUk".
+     * Example for "basic": { "activeTagged": "Someone [[tells]] <<me>> the news.", "passiveTagged": "<<I>> [[am told]] the news.", "bridgeLabel": "Object → Subject · am / is / are + V3", "badgeText": "am + V3", "functionUk": "Фокус на тому, хто отримує інформацію.", "verbPatternTitle": null, "verbPatternExplanationUk": null, "altPassiveTagged": null, "altPassiveNoteUk": null }
+     * Example for "infinitive": { "ukThoughtCue": "Я хочу, щоб мені сказали", "activeTagged": "I <<want>> that {{others}} [[tell]] me.", "bridgeStepTagged": "I <<want>> ~~that I am~~ [[told]] ~~by others~~.", "passiveTagged": "I <<want>> [[to be told]].", "bridgeLabel": "Скорочуємо that I am + by others → to be told", "badgeText": "want + to be + V3", "functionUk": "Керування дієслова want моделлю з to-інфінітивом.", "verbPatternTitle": "want + to + V0", "verbPatternExplanationUk": "Дієслово want вимагає після себе інфінітива з to, тому пасивна форма — to be told.", "step2NoteUk": "Прибираємо that I am та неозначеного агента by others.", "step3NoteUk": "Після want ставимо пасивний інфінітив to be + V3." }
 
 Respond ONLY with valid JSON matching this exact structure:
 {
   "isCorrect": boolean,
   "correctedSentence": "string",
   "shortLabelUk": "string",
-  "detectedMode": "aspects" | "conditionals" | "reported",
+  "detectedMode": "aspects" | "conditionals" | "reported" | "passive",
   "detectedTitle": "string",
   "explanationUk": "string",
   "time": "past" | "present" | "future",
@@ -337,9 +508,16 @@ Respond ONLY with valid JSON matching this exact structure:
   "presentMode": "unreal" | "zero",
   "detectedUseCaseIndex": number | null,
   "reportedCategory": "statement" | "yes_no_question" | "wh_question" | "imperative",
+  "passiveCategory": "basic" | "modal_perfect" | "infinitive" | "gerund",
   "aspectForms": { "past_simple": "...", ... all 12 keys } | null,
   "conditionalForms": { "zero": "...", ... all 6 keys } | null,
-  "reportedForms": { "statement": { ... }, "yes_no_question": { ... }, "wh_question": { ... }, "imperative": { ... } } | null
+  "reportedForms": { "statement": { ... }, "yes_no_question": { ... }, "wh_question": { ... }, "imperative": { ... } } | null,
+  "passiveForms": {
+    "basic": { "activeTagged": "...", "passiveTagged": "...", "bridgeLabel": "...", "badgeText": "...", "functionUk": "...", "altPassiveTagged": null, "altPassiveNoteUk": null, "verbPatternTitle": null, "verbPatternExplanationUk": null },
+    "modal_perfect": { "activeTagged": "...", "passiveTagged": "...", "bridgeLabel": "...", "badgeText": "...", "functionUk": "...", "verbPatternTitle": null, "verbPatternExplanationUk": null },
+    "infinitive": { "activeTagged": "...", "passiveTagged": "...", "bridgeLabel": "...", "badgeText": "...", "functionUk": "...", "ukThoughtCue": "...", "bridgeStepTagged": "...", "verbPatternTitle": "...", "verbPatternExplanationUk": "...", "step2NoteUk": "...", "step3NoteUk": "..." },
+    "gerund": { "activeTagged": "...", "passiveTagged": "...", "bridgeLabel": "...", "badgeText": "...", "functionUk": "...", "ukThoughtCue": "...", "bridgeStepTagged": "...", "verbPatternTitle": "...", "verbPatternExplanationUk": "...", "step2NoteUk": "...", "step3NoteUk": "..." }
+  } | null
 }`;
 
     const { data: result, usageSnapshot } = await generateFromGeminiWithUsage(
@@ -398,6 +576,7 @@ Respond ONLY with valid JSON matching this exact structure:
       presentMode: result.presentMode,
       detectedUseCaseIndex: validUseCaseIndex,
       reportedCategory: result.reportedCategory,
+      passiveCategory: result.passiveCategory,
       aspectForms:
         result.detectedMode === "aspects"
           ? normalizeAspectForms(
@@ -418,6 +597,14 @@ Respond ONLY with valid JSON matching this exact structure:
           ? normalizeReportedForms(
               result.reportedForms,
               result.correctedSentence,
+            )
+          : undefined,
+      passiveForms:
+        result.detectedMode === "passive"
+          ? normalizePassiveForms(
+              result.passiveForms,
+              result.correctedSentence,
+              sentence,
             )
           : undefined,
     });

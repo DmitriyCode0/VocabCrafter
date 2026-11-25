@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Moon, Palette, Sun } from "lucide-react";
 import {
   DropdownMenu,
@@ -18,6 +19,7 @@ import {
   useColorTheme,
 } from "@/components/providers/color-theme-provider";
 import { useAppI18n } from "@/components/providers/app-language-provider";
+import { runWithThemeTransition } from "@/lib/theme-transition";
 
 const FOCUS_RING_CLASS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background";
@@ -26,6 +28,7 @@ export function HeaderThemeControls() {
   const { resolvedTheme, setTheme } = useTheme();
   const { colorTheme, setColorTheme } = useColorTheme();
   const { appLanguage, messages } = useAppI18n();
+  const reduceMotion = useReducedMotion();
   const mounted = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -79,7 +82,13 @@ export function HeaderThemeControls() {
           <DropdownMenuSeparator />
           <DropdownMenuRadioGroup
             value={colorTheme}
-            onValueChange={(value) => setColorTheme(value as ColorThemeId)}
+            onValueChange={(value) => {
+              const nextPalette = value as ColorThemeId;
+              if (nextPalette === colorTheme) return;
+              runWithThemeTransition(() => {
+                setColorTheme(nextPalette);
+              });
+            }}
           >
             {COLOR_THEMES.map((option) => (
               <DropdownMenuRadioItem
@@ -108,16 +117,48 @@ export function HeaderThemeControls() {
       <button
         type="button"
         disabled={!mounted}
-        onClick={() => setTheme(isDark ? "light" : "dark")}
+        onClick={() => {
+          const nextTheme = isDark ? "light" : "dark";
+          runWithThemeTransition(
+            () => {
+              const root = document.documentElement;
+              root.classList.remove("light", "dark");
+              root.classList.add(nextTheme);
+              setTheme(nextTheme);
+            },
+            () => {
+              document.documentElement.style.colorScheme = nextTheme;
+            },
+          );
+        }}
         aria-label={toggleLabel}
         title={toggleLabel}
-        className={`inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent/30 hover:text-foreground disabled:opacity-50 ${FOCUS_RING_CLASS}`}
+        className={`relative inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-lg text-muted-foreground transition-colors hover:bg-accent/30 hover:text-foreground disabled:opacity-50 ${FOCUS_RING_CLASS}`}
       >
-        {isDark ? (
-          <Moon className="h-3.5 w-3.5" aria-hidden="true" />
-        ) : (
-          <Sun className="h-3.5 w-3.5" aria-hidden="true" />
-        )}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={isDark ? "moon" : "sun"}
+            initial={
+              reduceMotion ? false : { opacity: 0, rotate: -60, scale: 0.7 }
+            }
+            animate={{ opacity: 1, rotate: 0, scale: 1 }}
+            exit={
+              reduceMotion ? undefined : { opacity: 0, rotate: 60, scale: 0.7 }
+            }
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
+            }
+            className="inline-flex items-center justify-center"
+          >
+            {isDark ? (
+              <Moon className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <Sun className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+          </motion.span>
+        </AnimatePresence>
       </button>
     </div>
   );

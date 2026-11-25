@@ -16,6 +16,7 @@ import {
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowLeftRight,
   ArrowRight,
   Check,
   CheckCircle2,
@@ -49,6 +50,8 @@ import {
   getAspectCellKey,
   MARKER_STYLES,
   parseTaggedSentence,
+  PASSIVE_CATEGORIES,
+  PASSIVE_PRESETS,
   REPORTED_CATEGORIES,
   REPORTED_PRESETS,
   REPORTED_TIME_COLUMNS,
@@ -70,6 +73,11 @@ import {
   type ConditionalSlot,
   type ConditionalVariantKey,
   type DetectorMode,
+  type PassiveCategory,
+  type PassiveDerivationStep,
+  type PassiveFormEntry,
+  type PassiveSentenceTemplate,
+  type PassiveVoiceFocus,
   type ReportedCategory,
   type ReportedFormEntry,
   type ReportedPerspective,
@@ -95,9 +103,11 @@ interface AIAnalysisResult {
   presentMode: ConditionalPresentMode;
   detectedUseCaseIndex?: number | null;
   reportedCategory?: ReportedCategory;
+  passiveCategory?: PassiveCategory;
   aspectForms?: Record<AspectCellKey, string>;
   conditionalForms?: Record<ConditionalVariantKey, string>;
   reportedForms?: Record<ReportedCategory, ReportedFormEntry>;
+  passiveForms?: Record<PassiveCategory, PassiveFormEntry>;
 }
 
 const FOCUS_RING_CLASS =
@@ -161,6 +171,16 @@ function HighlightedSegments({
   return (
     <>
       {segments.map((seg, segIdx) => {
+        if (seg.strikethrough) {
+          return (
+            <span
+              key={segIdx}
+              className="mx-0.5 inline-block rounded bg-rose-500/10 px-1 py-0.5 text-rose-600 line-through decoration-rose-500/90 decoration-2 dark:bg-rose-500/15 dark:text-rose-300/85"
+            >
+              {seg.text}
+            </span>
+          );
+        }
         if (!seg.color) {
           return <span key={segIdx}>{seg.text}</span>;
         }
@@ -224,6 +244,25 @@ export function TenseDetectorClient() {
     useState<ReportedSentenceTemplate | null>(null);
   const [draggingReportedMarker, setDraggingReportedMarker] = useState(false);
   const reportedTrackRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Passive Voice State ──────────────────────────────────────────
+  const [passiveCategory, setPassiveCategory] =
+    useState<PassiveCategory>("basic");
+  const [selectedPassivePresetIds, setSelectedPassivePresetIds] = useState<
+    Record<PassiveCategory, string>
+  >({
+    basic: "basic-present-simple",
+    modal_perfect: "modal-could-have",
+    infinitive: "inf-want-tell",
+    gerund: "ger-hate-spoken-to",
+  });
+  const [passiveFocus, setPassiveFocus] =
+    useState<PassiveVoiceFocus>("passive");
+  const [passiveStep, setPassiveStep] = useState<PassiveDerivationStep>(3);
+  const [customPassiveSentence, setCustomPassiveSentence] =
+    useState<PassiveSentenceTemplate | null>(null);
+  const [draggingPassiveMarker, setDraggingPassiveMarker] = useState(false);
+  const passiveTrackRef = useRef<HTMLDivElement | null>(null);
 
   // ── AI Sentence Helper State ─────────────────────────────────────
   const [inputSentence, setInputSentence] = useState("");
@@ -328,10 +367,57 @@ export function TenseDetectorClient() {
     hasPerspectiveShift: hasPerspectiveTokens,
   });
 
+  // ── Derived Passive Voice State ──────────────────────────────────
+  const activePassiveCategoryMeta =
+    PASSIVE_CATEGORIES.find((item) => item.id === passiveCategory) ??
+    PASSIVE_CATEGORIES[0];
+  const passiveCategoryPresets = PASSIVE_PRESETS.filter(
+    (preset) => preset.category === passiveCategory,
+  );
+  const activePassivePreset =
+    passiveCategoryPresets.find(
+      (preset) => preset.id === selectedPassivePresetIds[passiveCategory],
+    ) ?? passiveCategoryPresets[0];
+  const activePassiveEntry: PassiveFormEntry = customPassiveSentence
+    ? customPassiveSentence.forms[passiveCategory]
+    : activePassivePreset;
+  const passiveActiveParsed = parseTaggedSentence(
+    activePassiveEntry.activeTagged,
+    "emerald",
+    "sky",
+    "amber",
+  );
+  const passiveResultParsed = parseTaggedSentence(
+    activePassiveEntry.passiveTagged,
+    "emerald",
+    "sky",
+    "amber",
+  );
+  const passiveBridgeParsed = activePassiveEntry.bridgeStepTagged
+    ? parseTaggedSentence(
+        activePassiveEntry.bridgeStepTagged,
+        "emerald",
+        "sky",
+        "amber",
+      )
+    : null;
+  const passiveAltParsed = activePassiveEntry.altPassiveTagged
+    ? parseTaggedSentence(
+        activePassiveEntry.altPassiveTagged,
+        "emerald",
+        "sky",
+        "amber",
+      )
+    : null;
+
   // ── Shared Smooth Spring Transitions ─────────────────────────────
   const aspectSpring = getSpringTransition(draggingAspectMarker, reduceMotion);
   const reportedSpring = getSpringTransition(
     draggingReportedMarker,
+    reduceMotion,
+  );
+  const passiveSpring = getSpringTransition(
+    draggingPassiveMarker,
     reduceMotion,
   );
   const condIfSpring = getSpringTransition(
@@ -511,6 +597,59 @@ export function TenseDetectorClient() {
     }
   }
 
+  function handlePassivePointerDown(event: PointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDraggingPassiveMarker(true);
+  }
+
+  function handlePassivePointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!draggingPassiveMarker || !passiveTrackRef.current) return;
+    const rect = passiveTrackRef.current.getBoundingClientRect();
+    const ratio = Math.min(
+      1,
+      Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width)),
+    );
+    if (activePassiveCategoryMeta.modeKind === "conversion") {
+      setPassiveFocus(ratio < 0.5 ? "active" : "passive");
+    } else {
+      const slot = clientXToColumnSlot(event.clientX, rect);
+      setPassiveStep((slot + 1) as PassiveDerivationStep);
+    }
+  }
+
+  function handlePassiveMarkerKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+  ) {
+    if (activePassiveCategoryMeta.modeKind === "conversion") {
+      if (event.key === "ArrowLeft" || event.key === "Home") {
+        event.preventDefault();
+        setPassiveFocus("active");
+      } else if (event.key === "ArrowRight" || event.key === "End") {
+        event.preventDefault();
+        setPassiveFocus("passive");
+      } else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        setPassiveFocus((prev) => (prev === "active" ? "passive" : "active"));
+      }
+      return;
+    }
+
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setPassiveStep((prev) => Math.max(1, prev - 1) as PassiveDerivationStep);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setPassiveStep((prev) => Math.min(3, prev + 1) as PassiveDerivationStep);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      setPassiveStep(1);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      setPassiveStep(3);
+    }
+  }
+
   function handleResetCurrent() {
     setAiResult(null);
     setAiError(null);
@@ -524,7 +663,7 @@ export function TenseDetectorClient() {
       setCondIfSlot(2);
       setCondResultSlot(2);
       setCondPresentMode("unreal");
-    } else {
+    } else if (mode === "reported") {
       setCustomReportedSentence(null);
       setReportedCategory("statement");
       setSelectedReportedPresetIds({
@@ -534,6 +673,17 @@ export function TenseDetectorClient() {
         imperative: "imp_pos",
       });
       setReportedPerspective("reported");
+    } else {
+      setCustomPassiveSentence(null);
+      setPassiveCategory("basic");
+      setSelectedPassivePresetIds({
+        basic: "basic-present-simple",
+        modal_perfect: "modal-could-have",
+        infinitive: "inf-want-tell",
+        gerund: "ger-hate-spoken-to",
+      });
+      setPassiveFocus("passive");
+      setPassiveStep(3);
     }
   }
 
@@ -557,9 +707,27 @@ export function TenseDetectorClient() {
       setCondIfSlot(sanitized.ifSlot);
       setCondResultSlot(sanitized.resultSlot);
       setCondPresentMode(result.presentMode);
-    } else {
+    } else if (result.detectedMode === "reported") {
       setReportedCategory(result.reportedCategory ?? "statement");
       setReportedPerspective("reported");
+      if (result.reportedForms) {
+        setCustomReportedSentence({
+          id: `ai-${Date.now()}`,
+          labelUk: result.shortLabelUk || "Речення на дошці",
+          forms: result.reportedForms,
+        });
+      }
+    } else {
+      setPassiveCategory(result.passiveCategory ?? "basic");
+      setPassiveFocus("passive");
+      setPassiveStep(3);
+      if (result.passiveForms) {
+        setCustomPassiveSentence({
+          id: `ai-${Date.now()}`,
+          labelUk: result.shortLabelUk || "Речення на дошці",
+          forms: result.passiveForms,
+        });
+      }
     }
   }
 
@@ -631,6 +799,15 @@ export function TenseDetectorClient() {
           labelUk: result.shortLabelUk || "Речення на дошці",
           forms: result.reportedForms,
         });
+      } else if (
+        result.detectedMode === "passive" &&
+        result.passiveForms
+      ) {
+        setCustomPassiveSentence({
+          id: uniqueId,
+          labelUk: result.shortLabelUk || "Речення на дошці",
+          forms: result.passiveForms,
+        });
       }
 
       setInputSentence("");
@@ -646,7 +823,9 @@ export function TenseDetectorClient() {
       ? activeCellMeta.formula
       : mode === "conditionals"
         ? activeCondMeta.formula
-        : activeReportedCategoryMeta.formula;
+        : mode === "reported"
+          ? activeReportedCategoryMeta.formula
+          : activePassiveCategoryMeta.structureFormula;
 
   const condIfPosMeta = CONDITIONAL_POSITIONS[condIfSlot];
   const condResultPosMeta = CONDITIONAL_POSITIONS[condResultSlot];
@@ -748,6 +927,31 @@ export function TenseDetectorClient() {
               Непряма мова
             </span>
           </button>
+          <button
+            type="button"
+            aria-pressed={mode === "passive"}
+            onClick={() => setMode("passive")}
+            className={cn(
+              "relative inline-flex items-center rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors",
+              FOCUS_RING_CLASS,
+              mode === "passive"
+                ? "text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {mode === "passive" ? (
+              <motion.span
+                layoutId="detector-mode-pill"
+                transition={getSpringTransition(false, reduceMotion)}
+                aria-hidden="true"
+                className="absolute inset-0 rounded-lg bg-primary shadow-xs"
+              />
+            ) : null}
+            <span className="relative z-10 inline-flex items-center gap-1.5">
+              <ArrowLeftRight className="h-4 w-4" aria-hidden="true" />
+              Пасивний стан
+            </span>
+          </button>
         </div>
       </div>
 
@@ -776,7 +980,9 @@ export function TenseDetectorClient() {
                 ? "Введіть умовне речення англійською для перевірки (напр. If I won the lottery...)"
                 : mode === "reported"
                   ? "Введіть пряму чи непряму мову для перевірки (напр. When did they arrive? або He asked me where was Tom)"
-                  : "Введіть англійське речення для перевірки (навіть з помилкою)..."
+                  : mode === "passive"
+                    ? "Введіть пасив чи актив для розбору (напр. I want to be told..., I hate being spoken to... або The cat knocked over the vase)"
+                    : "Введіть англійське речення для перевірки (навіть з помилкою)..."
             }
             className="h-11 bg-card pl-10 pr-10 text-sm shadow-xs sm:text-base"
             maxLength={400}
@@ -820,9 +1026,9 @@ export function TenseDetectorClient() {
 
       {/* ── ОСНОВНА РОБОЧА ПАНЕЛЬ ─────────────────────────────────────── */}
       <Card className="overflow-hidden border-border/70 bg-card/70 shadow-sm">
-        <CardHeader className="flex flex-col gap-3.5 border-b border-border/50 bg-card/40 px-4 py-4 sm:px-6">
-          {/* Рядок 1: Назва часу + структура ліворуч, кнопка скидання праворуч */}
-          <div className="flex min-h-[40px] flex-wrap items-center justify-between gap-3">
+        <CardHeader className="flex flex-col items-stretch gap-3.5 border-b border-border/50 bg-card/40 px-4 py-4 sm:px-6">
+          {/* Рядок 1: Назва часу + структура ліворуч, кнопка скидання завжди праворуч */}
+          <div className="flex min-h-[40px] w-full flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2.5 text-left">
               <Clock
                 className="h-5 w-5 shrink-0 text-primary"
@@ -833,7 +1039,9 @@ export function TenseDetectorClient() {
                   ? activeCellMeta.tenseName
                   : mode === "conditionals"
                     ? activeCondMeta.nameUk
-                    : activeReportedCategoryMeta.headerTitleUk}
+                    : mode === "reported"
+                      ? activeReportedCategoryMeta.headerTitleUk
+                      : activePassiveCategoryMeta.headerTitleUk}
               </CardTitle>
 
               {/* Виразний рядок структури (виділений блок прямо біля назви часу) */}
@@ -852,7 +1060,7 @@ export function TenseDetectorClient() {
               variant="outline"
               size="sm"
               onClick={handleResetCurrent}
-              className="h-8 shrink-0 gap-1.5 px-3 text-xs"
+              className="ml-auto h-8 shrink-0 gap-1.5 px-3 text-xs"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               Скинути
@@ -860,329 +1068,356 @@ export function TenseDetectorClient() {
           </div>
 
           {/* Рядок 2: Симетрична 3-колонкова панель фіксованої висоти (без зсуву графіка) */}
-          <div className="grid grid-cols-1 gap-3 lg:h-[160px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-3.5">
-            {/* Ліва колонка: Типові маркери часу або режим умовних речень */}
-            {mode === "aspects" ? (
+          <div className="grid w-full grid-cols-1 gap-3 lg:h-[160px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-3.5">
+            {mode === "reported" ? (
               <div
-                aria-label="Типові маркери часу"
-                className="flex h-full min-h-0 flex-col rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5 text-left"
+                role="group"
+                aria-label="Вибір типу непрямої мови"
+                className="grid h-full min-h-0 grid-cols-1 gap-2.5 sm:grid-cols-2 lg:col-span-2"
               >
-                <div className="mb-2 flex min-h-[18px] shrink-0 items-center justify-between gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Типові маркери часу
-                  </span>
-                  {hasActiveTimeMarker ? (
-                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-sky-600 dark:text-sky-300">
-                      <span
-                        aria-hidden="true"
-                        className="h-2 w-2 rounded-full bg-sky-400"
-                      />
-                      На графіку
-                    </span>
-                  ) : null}
-                </div>
-                <div className="flex min-h-0 flex-1 flex-wrap content-start gap-1.5 overflow-y-auto pr-0.5">
-                  {resolvedTimeMarkers.map((marker) => (
-                    <span
-                      key={marker.label}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors",
-                        marker.isActive
-                          ? cn(
-                              MARKER_STYLES.sky.badge,
-                              "font-semibold shadow-xs ring-1 ring-sky-400/40",
-                            )
-                          : "border-border/60 bg-card/65 font-medium text-muted-foreground",
-                      )}
-                    >
-                      {marker.isActive ? (
-                        <span
-                          aria-hidden="true"
-                          className="h-1.5 w-1.5 rounded-full bg-sky-400"
-                        />
-                      ) : null}
-                      {marker.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : mode === "conditionals" ? (
-              <div
-                aria-label="Режим умовних речень"
-                className="flex h-full min-h-0 flex-col rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5 text-left"
-              >
-                <div className="mb-2 flex min-h-[18px] shrink-0 items-center justify-between gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Режим умови
-                  </span>
-                </div>
-                <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 overflow-y-auto">
-                  <label className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium">
-                    {condLinked ? (
-                      <Link2
-                        className="h-3.5 w-3.5 text-primary"
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <Link2Off
-                        className="h-3.5 w-3.5 text-amber-400"
-                        aria-hidden="true"
-                      />
-                    )}
-                    <span>
-                      {condLinked ? "Чисті (1 · 2 · 3)" : "Міксовані (2 ↔ 3)"}
-                    </span>
-                    <Switch
-                      checked={condLinked}
-                      onCheckedChange={(checked) => {
-                        setCondLinked(checked);
-                        if (checked) {
-                          if (condIfSlot === 2 || condResultSlot === 2) {
-                            setCondIfSlot(2);
-                            setCondResultSlot(2);
-                          } else {
-                            setCondResultSlot(condIfSlot);
-                          }
-                        } else {
-                          setCondIfSlot(0);
-                          setCondResultSlot(1);
-                        }
+                {REPORTED_CATEGORIES.map((cat) => {
+                  const isSelected = reportedCategory === cat.key;
+                  return (
+                    <button
+                      key={cat.key}
+                      type="button"
+                      onClick={() => {
+                        setReportedCategory(cat.key);
+                        setReportedPerspective("reported");
                       }}
-                    />
-                  </label>
-
-                  {condIfSlot === 1 && condResultSlot === 1 ? (
-                    <div
-                      role="group"
-                      aria-label="Тип умови для позиції 2"
-                      className="inline-flex w-fit rounded-lg border border-border/70 bg-background/50 p-0.5 text-xs"
-                    >
-                      <button
-                        type="button"
-                        aria-pressed={condPresentMode === "unreal"}
-                        onClick={() => setCondPresentMode("unreal")}
-                        className={cn(
-                          "rounded-md px-2.5 py-1 font-medium transition-colors",
-                          FOCUS_RING_CLASS,
-                          condPresentMode === "unreal"
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        Нереальна (2nd)
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={condPresentMode === "zero"}
-                        onClick={() => setCondPresentMode("zero")}
-                        className={cn(
-                          "rounded-md px-2.5 py-1 font-medium transition-colors",
-                          FOCUS_RING_CLASS,
-                          condPresentMode === "zero"
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        Реальний факт (Zero)
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ) : (
-              <div
-                aria-label="Перспектива часу й місця"
-                className="flex h-full min-h-0 flex-col rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5 text-left"
-              >
-                <div className="mb-2 flex min-h-[18px] shrink-0 items-center justify-between gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Перспектива часу й місця
-                  </span>
-                  {hasActiveReportedExpression ? (
-                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-sky-600 dark:text-sky-300">
-                      <span
-                        aria-hidden="true"
-                        className="h-2 w-2 rounded-full bg-sky-400"
-                      />
-                      У реченні
-                    </span>
-                  ) : null}
-                </div>
-                <div className="flex min-h-0 flex-1 flex-wrap content-start gap-1.5 overflow-y-auto pr-0.5">
-                  {resolvedReportedExpressions.map((expr) => (
-                    <span
-                      key={expr.label}
+                      aria-pressed={isSelected}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-[11px] transition-colors",
-                        expr.isActive
-                          ? cn(
-                              MARKER_STYLES.sky.badge,
-                              "font-semibold shadow-xs ring-1 ring-sky-400/40",
-                            )
-                          : "border-border/60 bg-card/65 font-medium text-muted-foreground",
+                        "relative flex h-full min-h-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border px-3.5 py-2 text-center transition-colors",
+                        FOCUS_RING_CLASS,
+                        isSelected
+                          ? "border-transparent"
+                          : "border-border/70 bg-background/55 hover:border-border hover:bg-accent/20",
                       )}
                     >
-                      {expr.isActive ? (
-                        <span
+                      {isSelected ? (
+                        <motion.span
+                          layoutId="reported-active-ring"
+                          transition={getSpringTransition(false, reduceMotion)}
                           aria-hidden="true"
-                          className="h-1.5 w-1.5 rounded-full bg-sky-400"
+                          className="pointer-events-none absolute inset-0 rounded-xl border-2 border-primary bg-primary/[0.11] shadow-xs"
                         />
                       ) : null}
-                      {expr.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Центральна колонка: Функції або Компоненти перетворення */}
-            <div
-              aria-label={
-                mode === "reported"
-                  ? "Компоненти непрямої мови"
-                  : "Функції (коли вживаємо)"
-              }
-              className="flex h-full min-h-0 flex-col items-center rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5 text-center"
-            >
-              <div className="mb-1.5 flex min-h-[18px] w-full shrink-0 items-center justify-between gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  {mode === "reported"
-                    ? "Компоненти перетворення"
-                    : "Функції (коли вживаємо)"}
-                </span>
-                {mode === "aspects" && hasActiveUseCase ? (
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-emerald-600 dark:text-emerald-300">
-                    <span
-                      aria-hidden="true"
-                      className="h-2 w-2 rounded-full bg-emerald-400"
-                    />
-                    У реченні
-                  </span>
-                ) : mode === "reported" ? (
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-emerald-600 dark:text-emerald-300">
-                    <span
-                      aria-hidden="true"
-                      className="h-2 w-2 rounded-full bg-emerald-400"
-                    />
-                    Активні
-                  </span>
-                ) : null}
-              </div>
-              <div className="flex min-h-0 w-full flex-1 overflow-y-auto">
-                {mode === "aspects" ? (
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.div
-                      key={`uses-${activeCellKey}`}
-                      initial={reduceMotion ? false : { opacity: 0, y: 3 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={reduceMotion ? undefined : { opacity: 0, y: -3 }}
-                      transition={getCrossfadeTransition(reduceMotion)}
-                      className="my-auto flex w-full flex-wrap items-center justify-center gap-1.5"
-                    >
-                      {resolvedUseCases.map((useCase) => (
-                        <span
-                          key={useCase.label}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-                            useCase.isActive
-                              ? "border-emerald-500/60 bg-emerald-500/20 font-semibold text-emerald-800 shadow-xs ring-1 ring-emerald-400/45 dark:text-emerald-200"
-                              : activeAspectParsed
-                                ? "border-border/60 bg-card/55 font-medium text-muted-foreground opacity-75"
-                                : "border-emerald-500/30 bg-emerald-500/10 font-medium text-emerald-700 dark:text-emerald-300",
-                          )}
-                        >
-                          {useCase.isActive ? (
-                            <span
-                              aria-hidden="true"
-                              className="h-1.5 w-1.5 rounded-full bg-emerald-400"
-                            />
-                          ) : null}
-                          {useCase.label}
-                        </span>
-                      ))}
-                    </motion.div>
-                  </AnimatePresence>
-                ) : mode === "conditionals" ? (
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.div
-                      key={`cond-uses-${activeCondKey}`}
-                      initial={reduceMotion ? false : { opacity: 0, y: 3 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={reduceMotion ? undefined : { opacity: 0, y: -3 }}
-                      transition={getCrossfadeTransition(reduceMotion)}
-                      className="my-auto flex w-full flex-col items-center justify-center gap-2"
-                    >
-                      <p className="text-xs leading-snug text-foreground/90 sm:text-sm">
-                        {activeCondMeta.explanationUk}
-                      </p>
-                      <div className="flex flex-wrap items-center justify-center gap-1.5">
+                      <div className="relative z-10 flex w-full items-center justify-center gap-2">
                         <span
                           className={cn(
-                            "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
-                            MARKER_STYLES.amber.badge,
+                            "text-sm font-bold tracking-tight",
+                            isSelected ? "text-primary" : "text-foreground",
                           )}
                         >
-                          IF · {activeCondMeta.ifClauseTense}
+                          {cat.title}
                         </span>
                         <span
+                          aria-hidden="true"
                           className={cn(
-                            "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
-                            MARKER_STYLES.emerald.badge,
+                            "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors",
+                            isSelected
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border/80 bg-background/60",
                           )}
                         >
-                          RESULT · {activeCondMeta.resultClauseTense}
+                          {isSelected ? <Check className="h-2.5 w-2.5" /> : null}
                         </span>
                       </div>
-                    </motion.div>
-                  </AnimatePresence>
-                ) : (
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.div
-                      key={`rep-components-${reportedCategory}-${activeReportedEntry.hasBackshift}`}
-                      initial={reduceMotion ? false : { opacity: 0, y: 3 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={reduceMotion ? undefined : { opacity: 0, y: -3 }}
-                      transition={getCrossfadeTransition(reduceMotion)}
-                      className="my-auto flex w-full flex-wrap items-center justify-center gap-1.5"
+                      <span className="relative z-10 text-xs leading-snug text-muted-foreground">
+                        {cat.explanationUk}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : mode === "passive" ? (
+              <div
+                role="group"
+                aria-label="Вибір структури пасивного стану"
+                className="grid h-full min-h-0 grid-cols-1 gap-2.5 sm:grid-cols-2 lg:col-span-2"
+              >
+                {PASSIVE_CATEGORIES.map((cat) => {
+                  const isSelected = passiveCategory === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        setPassiveCategory(cat.id);
+                        setPassiveFocus("passive");
+                        setPassiveStep(3);
+                      }}
+                      aria-pressed={isSelected}
+                      className={cn(
+                        "relative flex h-full min-h-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border px-3.5 py-2 text-center transition-colors",
+                        FOCUS_RING_CLASS,
+                        isSelected
+                          ? "border-transparent"
+                          : "border-border/70 bg-background/55 hover:border-border hover:bg-accent/20",
+                      )}
                     >
-                      {resolvedReportedComponents.map((comp) => {
-                        const dotColorClass =
-                          comp.color === "emerald"
-                            ? "bg-emerald-400"
-                            : comp.color === "amber"
-                              ? "bg-amber-400"
-                              : "bg-sky-400";
-                        return (
+                      {isSelected ? (
+                        <motion.span
+                          layoutId="passive-active-ring"
+                          transition={getSpringTransition(false, reduceMotion)}
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0 rounded-xl border-2 border-primary bg-primary/[0.11] shadow-xs"
+                        />
+                      ) : null}
+                      <div className="relative z-10 flex w-full items-center justify-center gap-2">
+                        <span
+                          className={cn(
+                            "text-sm font-bold tracking-tight",
+                            isSelected ? "text-primary" : "text-foreground",
+                          )}
+                        >
+                          {cat.labelUk}
+                        </span>
+                        <code className="rounded bg-background/80 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
+                          {cat.formulaBadge}
+                        </code>
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors",
+                            isSelected
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border/80 bg-background/60",
+                          )}
+                        >
+                          {isSelected ? <Check className="h-2.5 w-2.5" /> : null}
+                        </span>
+                      </div>
+                      <span className="relative z-10 line-clamp-1 text-xs leading-snug text-muted-foreground">
+                        {cat.shortLabelUk}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <>
+                {/* Ліва колонка: Типові маркери часу або режим умовних речень */}
+                {mode === "aspects" ? (
+                  <div
+                    aria-label="Типові маркери часу"
+                    className="flex h-full min-h-0 flex-col rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5 text-left"
+                  >
+                    <div className="mb-2 flex min-h-[18px] shrink-0 items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Типові маркери часу
+                      </span>
+                      {hasActiveTimeMarker ? (
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-sky-600 dark:text-sky-300">
                           <span
-                            key={comp.key}
+                            aria-hidden="true"
+                            className="h-2 w-2 rounded-full bg-sky-400"
+                          />
+                          На графіку
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="flex min-h-0 flex-1 flex-wrap content-start gap-1.5 overflow-y-auto pr-0.5">
+                      {resolvedTimeMarkers.map((marker) => (
+                        <span
+                          key={marker.label}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors",
+                            marker.isActive
+                              ? cn(
+                                  MARKER_STYLES.sky.badge,
+                                  "font-semibold shadow-xs ring-1 ring-sky-400/40",
+                                )
+                              : "border-border/60 bg-card/65 font-medium text-muted-foreground",
+                          )}
+                        >
+                          {marker.isActive ? (
+                            <span
+                              aria-hidden="true"
+                              className="h-1.5 w-1.5 rounded-full bg-sky-400"
+                            />
+                          ) : null}
+                          {marker.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    aria-label="Режим умовних речень"
+                    className="flex h-full min-h-0 flex-col rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5 text-left"
+                  >
+                    <div className="mb-2 flex min-h-[18px] shrink-0 items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Режим умови
+                      </span>
+                    </div>
+                    <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 overflow-y-auto">
+                      <label className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium">
+                        {condLinked ? (
+                          <Link2
+                            className="h-3.5 w-3.5 text-primary"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <Link2Off
+                            className="h-3.5 w-3.5 text-amber-400"
+                            aria-hidden="true"
+                          />
+                        )}
+                        <span>
+                          {condLinked ? "Чисті (1 · 2 · 3)" : "Міксовані (2 ↔ 3)"}
+                        </span>
+                        <Switch
+                          checked={condLinked}
+                          onCheckedChange={(checked) => {
+                            setCondLinked(checked);
+                            if (checked) {
+                              if (condIfSlot === 2 || condResultSlot === 2) {
+                                setCondIfSlot(2);
+                                setCondResultSlot(2);
+                              } else {
+                                setCondResultSlot(condIfSlot);
+                              }
+                            } else {
+                              setCondIfSlot(0);
+                              setCondResultSlot(1);
+                            }
+                          }}
+                        />
+                      </label>
+
+                      {condIfSlot === 1 && condResultSlot === 1 ? (
+                        <div
+                          role="group"
+                          aria-label="Тип умови для позиції 2"
+                          className="inline-flex w-fit rounded-lg border border-border/70 bg-background/50 p-0.5 text-xs"
+                        >
+                          <button
+                            type="button"
+                            aria-pressed={condPresentMode === "unreal"}
+                            onClick={() => setCondPresentMode("unreal")}
                             className={cn(
-                              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-                              comp.isActive
-                                ? cn(
-                                    MARKER_STYLES[comp.color].badge,
-                                    "font-semibold shadow-xs",
-                                  )
-                                : "border-border/60 bg-card/55 font-medium text-muted-foreground opacity-60",
+                              "rounded-md px-2.5 py-1 font-medium transition-colors",
+                              FOCUS_RING_CLASS,
+                              condPresentMode === "unreal"
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:text-foreground",
                             )}
                           >
-                            {comp.isActive ? (
-                              <span
-                                aria-hidden="true"
-                                className={cn(
-                                  "h-1.5 w-1.5 rounded-full",
-                                  dotColorClass,
-                                )}
-                              />
-                            ) : null}
-                            {comp.label}
-                          </span>
-                        );
-                      })}
-                    </motion.div>
-                  </AnimatePresence>
+                            Нереальна (2nd)
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={condPresentMode === "zero"}
+                            onClick={() => setCondPresentMode("zero")}
+                            className={cn(
+                              "rounded-md px-2.5 py-1 font-medium transition-colors",
+                              FOCUS_RING_CLASS,
+                              condPresentMode === "zero"
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:text-foreground",
+                            )}
+                          >
+                            Реальний факт (Zero)
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
                 )}
-              </div>
-            </div>
+
+                {/* Центральна колонка: Функції (коли вживаємо) */}
+                <div
+                  aria-label="Функції (коли вживаємо)"
+                  className="flex h-full min-h-0 flex-col items-center rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5 text-center"
+                >
+                  <div className="mb-1.5 flex min-h-[18px] w-full shrink-0 items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Функції (коли вживаємо)
+                    </span>
+                    {mode === "aspects" && hasActiveUseCase ? (
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-emerald-600 dark:text-emerald-300">
+                        <span
+                          aria-hidden="true"
+                          className="h-2 w-2 rounded-full bg-emerald-400"
+                        />
+                        У реченні
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex min-h-0 w-full flex-1 overflow-y-auto">
+                    {mode === "aspects" ? (
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.div
+                          key={`uses-${activeCellKey}`}
+                          initial={reduceMotion ? false : { opacity: 0, y: 3 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={reduceMotion ? undefined : { opacity: 0, y: -3 }}
+                          transition={getCrossfadeTransition(reduceMotion)}
+                          className="my-auto flex w-full flex-wrap items-center justify-center gap-1.5"
+                        >
+                          {resolvedUseCases.map((useCase) => (
+                            <span
+                              key={useCase.label}
+                              className={cn(
+                                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                                useCase.isActive
+                                  ? "border-emerald-500/60 bg-emerald-500/20 font-semibold text-emerald-800 shadow-xs ring-1 ring-emerald-400/45 dark:text-emerald-200"
+                                  : activeAspectParsed
+                                    ? "border-border/60 bg-card/55 font-medium text-muted-foreground opacity-75"
+                                    : "border-emerald-500/30 bg-emerald-500/10 font-medium text-emerald-700 dark:text-emerald-300",
+                              )}
+                            >
+                              {useCase.isActive ? (
+                                <span
+                                  aria-hidden="true"
+                                  className="h-1.5 w-1.5 rounded-full bg-emerald-400"
+                                />
+                              ) : null}
+                              {useCase.label}
+                            </span>
+                          ))}
+                        </motion.div>
+                      </AnimatePresence>
+                    ) : (
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.div
+                          key={`cond-uses-${activeCondKey}`}
+                          initial={reduceMotion ? false : { opacity: 0, y: 3 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={reduceMotion ? undefined : { opacity: 0, y: -3 }}
+                          transition={getCrossfadeTransition(reduceMotion)}
+                          className="my-auto flex w-full flex-col items-center justify-center gap-2"
+                        >
+                          <p className="text-xs leading-snug text-foreground/90 sm:text-sm">
+                            {activeCondMeta.explanationUk}
+                          </p>
+                          <div className="flex flex-wrap items-center justify-center gap-1.5">
+                            <span
+                              className={cn(
+                                "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+                                MARKER_STYLES.amber.badge,
+                              )}
+                            >
+                              IF · {activeCondMeta.ifClauseTense}
+                            </span>
+                            <span
+                              className={cn(
+                                "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+                                MARKER_STYLES.emerald.badge,
+                              )}
+                            >
+                              RESULT · {activeCondMeta.resultClauseTense}
+                            </span>
+                          </div>
+                        </motion.div>
+                      </AnimatePresence>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Права колонка: Зворотний зв'язок AI (перенесено з-під інпуту) */}
             <div
@@ -1211,7 +1446,11 @@ export function TenseDetectorClient() {
                     </span>
                   </div>
                   <div className="flex min-h-0 flex-1 items-center justify-center text-center text-xs text-muted-foreground">
-                    AI аналізує час, аспект і граматичну будову...
+                    {mode === "passive"
+                      ? "AI визначає пасивну конструкцію, verb pattern і кроки утворення..."
+                      : mode === "reported"
+                        ? "AI перевіряє узгодження часів, порядок слів і маркери..."
+                        : "AI аналізує час, аспект і граматичну будову..."}
                   </div>
                 </>
               ) : aiError ? (
@@ -1236,7 +1475,13 @@ export function TenseDetectorClient() {
                     {aiError}
                   </div>
                 </div>
-              ) : aiResult ? (
+              ) : aiResult ? (() => {
+                const normalizeCompare = (s: string) =>
+                  s.trim().replace(/[.!?]+$/, "").toLowerCase();
+                const hasTransformedSentence =
+                  normalizeCompare(aiResult.originalSentence) !==
+                  normalizeCompare(aiResult.correctedSentence);
+                return (
                 <div
                   role="status"
                   aria-live="polite"
@@ -1253,7 +1498,9 @@ export function TenseDetectorClient() {
                             className="mr-1 h-3 w-3"
                             aria-hidden="true"
                           />
-                          Правильно
+                          {hasTransformedSentence
+                            ? "Правильно · Конвертовано"
+                            : "Правильно"}
                         </Badge>
                       ) : (
                         <Badge
@@ -1290,9 +1537,17 @@ export function TenseDetectorClient() {
                         size="sm"
                         className="h-6 px-2 text-[11px]"
                         onClick={() => applyAIResultToGraph(aiResult)}
-                        aria-label="Показати на графіку"
+                        aria-label={
+                          aiResult.detectedMode === "passive" ||
+                          aiResult.detectedMode === "reported"
+                            ? "Показати розбір на дошці"
+                            : "Показати на графіку"
+                        }
                       >
-                        На графік
+                        {aiResult.detectedMode === "passive" ||
+                        aiResult.detectedMode === "reported"
+                          ? "До розбору"
+                          : "На графік"}
                       </Button>
                       <button
                         type="button"
@@ -1324,13 +1579,29 @@ export function TenseDetectorClient() {
                           {aiResult.correctedSentence}
                         </span>
                       </div>
+                    ) : hasTransformedSentence ? (
+                      <div className="rounded-lg border border-emerald-500/30 bg-background/65 px-2.5 py-1 text-xs">
+                        <span className="text-muted-foreground">
+                          {aiResult.originalSentence}
+                        </span>{" "}
+                        <span
+                          className="text-emerald-600 dark:text-emerald-400"
+                          aria-hidden="true"
+                        >
+                          →
+                        </span>{" "}
+                        <span className="font-semibold text-foreground">
+                          {aiResult.correctedSentence}
+                        </span>
+                      </div>
                     ) : null}
                     <p className="text-xs leading-snug text-muted-foreground">
                       {aiResult.explanationUk}
                     </p>
                   </div>
                 </div>
-              ) : (
+                );
+              })() : (
                 <>
                   <div className="mb-1.5 flex min-h-[18px] shrink-0 items-center gap-1.5">
                     <Sparkles
@@ -2126,68 +2397,6 @@ export function TenseDetectorClient() {
           {/* ════════════════════════════════════════════════════════════ */}
           {mode === "reported" ? (
             <div className="space-y-4">
-              {/* 4 перемикачі типів непрямої мови */}
-              <div
-                role="group"
-                aria-label="Вибір типу непрямої мови"
-                className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4"
-              >
-                {REPORTED_CATEGORIES.map((cat) => {
-                  const isSelected = reportedCategory === cat.key;
-                  return (
-                    <button
-                      key={cat.key}
-                      type="button"
-                      onClick={() => {
-                        setReportedCategory(cat.key);
-                        setReportedPerspective("reported");
-                      }}
-                      aria-pressed={isSelected}
-                      className={cn(
-                        "relative flex flex-col items-center justify-between gap-1.5 overflow-hidden rounded-xl border px-3.5 py-3 text-center transition-colors",
-                        FOCUS_RING_CLASS,
-                        isSelected
-                          ? "border-transparent"
-                          : "border-border/70 bg-background/55 hover:border-border hover:bg-accent/20",
-                      )}
-                    >
-                      {isSelected ? (
-                        <motion.span
-                          layoutId="reported-active-ring"
-                          transition={getSpringTransition(false, reduceMotion)}
-                          aria-hidden="true"
-                          className="pointer-events-none absolute inset-0 rounded-xl border-2 border-primary bg-primary/[0.11] shadow-xs"
-                        />
-                      ) : null}
-                      <div className="relative z-10 flex w-full items-center justify-center gap-2">
-                        <span
-                          className={cn(
-                            "text-sm font-bold tracking-tight",
-                            isSelected ? "text-primary" : "text-foreground",
-                          )}
-                        >
-                          {cat.title}
-                        </span>
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors",
-                            isSelected
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border/80 bg-background/60",
-                          )}
-                        >
-                          {isSelected ? <Check className="h-2.5 w-2.5" /> : null}
-                        </span>
-                      </div>
-                      <span className="relative z-10 text-xs leading-snug text-muted-foreground">
-                        {cat.explanationUk}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
               {/* Смуга вибору правила (з таблиць VERB FORMS / QUESTIONS / IMPERATIVES) */}
               <div className="flex min-h-[38px] flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-background/40 px-3 py-1.5">
                 {customReportedSentence ? (
@@ -2534,31 +2743,633 @@ export function TenseDetectorClient() {
                   </div>
                 </div>
 
-                {/* Частина C: Коротка 3-колірна легенда компонентів */}
-                <div className="flex flex-wrap items-center justify-center gap-4 pt-0.5 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      aria-hidden="true"
-                      className="h-2.5 w-2.5 rounded-full bg-emerald-400"
-                    />
-                    Зсув часу (Backshift) / (not) to + V0
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      aria-hidden="true"
-                      className="h-2.5 w-2.5 rounded-full bg-amber-400"
-                    />
-                    if / whether · прямий порядок S + V (без &quot;?&quot;)
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      aria-hidden="true"
-                      className="h-2.5 w-2.5 rounded-full bg-sky-400"
-                    />
-                    Дистанція: час · місце · особи
-                  </span>
+                {/* Частина C: Підсвічені компоненти перетворення та зміна перспективи часу/місця */}
+                <div
+                  aria-label="Активні компоненти перетворення"
+                  className="flex flex-wrap items-center justify-center gap-1.5 pt-0.5"
+                >
+                  {resolvedReportedComponents.map((comp) => {
+                    const dotColorClass =
+                      comp.color === "emerald"
+                        ? "bg-emerald-400"
+                        : comp.color === "amber"
+                          ? "bg-amber-400"
+                          : "bg-sky-400";
+                    return (
+                      <span
+                        key={comp.key}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                          comp.isActive
+                            ? cn(
+                                MARKER_STYLES[comp.color].badge,
+                                "font-semibold shadow-xs",
+                              )
+                            : "border-border/60 bg-card/55 font-medium text-muted-foreground opacity-55",
+                        )}
+                      >
+                        {comp.isActive ? (
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "h-1.5 w-1.5 rounded-full",
+                              dotColorClass,
+                            )}
+                          />
+                        ) : null}
+                        {comp.label}
+                      </span>
+                    );
+                  })}
+                  {resolvedReportedExpressions
+                    .filter((expr) => expr.isActive)
+                    .map((expr) => (
+                      <span
+                        key={expr.label}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold shadow-xs",
+                          MARKER_STYLES.sky.badge,
+                        )}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-1.5 rounded-full bg-sky-400"
+                        />
+                        {expr.label}
+                      </span>
+                    ))}
                 </div>
               </div>
+            </div>
+          ) : null}
+
+          {mode === "passive" ? (
+            <div className="space-y-4">
+              {/* Підтипи / приклади пасивного стану */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                {customPassiveSentence ? (
+                  <button
+                    type="button"
+                    onClick={() => setCustomPassiveSentence(null)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-lg border border-primary/50 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary shadow-xs transition-colors hover:bg-primary/20",
+                      FOCUS_RING_CLASS,
+                    )}
+                    title="Натисніть, щоб повернутися до вбудованих прикладів"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                    Ваше речення: {customPassiveSentence.labelUk}
+                    <X className="ml-0.5 h-3 w-3 opacity-75" aria-hidden="true" />
+                  </button>
+                ) : null}
+                {passiveCategoryPresets.map((preset) => {
+                  const isActivePreset =
+                    !customPassiveSentence && activePassivePreset.id === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setCustomPassiveSentence(null);
+                        setSelectedPassivePresetIds((prev) => ({
+                          ...prev,
+                          [passiveCategory]: preset.id,
+                        }));
+                        setPassiveFocus("passive");
+                        setPassiveStep(3);
+                      }}
+                      aria-pressed={isActivePreset}
+                      className={cn(
+                        "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                        FOCUS_RING_CLASS,
+                        isActivePreset
+                          ? "border-primary/55 bg-primary/15 font-semibold text-primary shadow-xs"
+                          : "border-border/70 bg-background/55 text-muted-foreground hover:border-border hover:text-foreground",
+                      )}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activePassiveCategoryMeta.modeKind === "conversion" ? (
+                <>
+                  {activePassiveEntry.verbPatternExplanationUk ? (
+                    <div className="rounded-2xl border border-amber-500/35 bg-amber-500/[0.06] px-4 py-2.5 shadow-xs">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Layers
+                          className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300"
+                          aria-hidden="true"
+                        />
+                        <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                          Особливість дієслова
+                        </span>
+                        {activePassiveEntry.verbPatternTitle ? (
+                          <code className="rounded-md border border-amber-500/40 bg-background/80 px-2 py-0.5 font-mono text-xs font-bold text-foreground">
+                            {activePassiveEntry.verbPatternTitle}
+                          </code>
+                        ) : null}
+                      </div>
+                      <p className="mt-1.5 text-xs leading-relaxed text-foreground/90 sm:text-sm">
+                        {activePassiveEntry.verbPatternExplanationUk}
+                      </p>
+                    </div>
+                  ) : null}
+                  {/* Пряма трансформація Active ↔ Passive */}
+                  <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+                    {/* Картка 1: Активний стан */}
+                    <button
+                      type="button"
+                      onClick={() => setPassiveFocus("active")}
+                      className={cn(
+                        "flex h-full flex-col justify-between gap-3 rounded-2xl border p-4 text-left transition-all",
+                        FOCUS_RING_CLASS,
+                        passiveFocus === "active"
+                          ? "border-amber-500/55 bg-amber-500/[0.06] shadow-sm ring-1 ring-amber-500/20"
+                          : "border-border/65 bg-background/45 opacity-80 hover:opacity-100",
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                          1. Активний стан (Active Voice)
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                            MARKER_STYLES.amber.badge,
+                          )}
+                        >
+                          Фокус на виконавці
+                        </span>
+                      </div>
+                      <AnimatePresence mode="wait">
+                        <motion.p
+                          key={`pa-${passiveCategory}-${activePassiveEntry.activeTagged}`}
+                          initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                          transition={{ duration: 0.18 }}
+                          className="text-base font-medium leading-relaxed text-foreground sm:text-lg"
+                        >
+                          <HighlightedSegments
+                            segments={passiveActiveParsed.segments}
+                          />
+                        </motion.p>
+                      </AnimatePresence>
+                      <div className="text-xs text-muted-foreground">
+                        Підмет виконує дію над об&apos;єктом.
+                      </div>
+                    </button>
+
+                    {/* Центральний міст трансформації */}
+                    <div className="flex flex-col items-center justify-center gap-1.5 px-1 py-1">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/40 bg-primary/12 text-primary shadow-xs">
+                        <ArrowRight
+                          className="h-4 w-4 rotate-90 lg:rotate-0"
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <span className="max-w-[190px] rounded-full border border-border/70 bg-background/75 px-2.5 py-1 text-center text-[11px] font-semibold leading-tight text-muted-foreground">
+                        {activePassiveEntry.bridgeLabel}
+                      </span>
+                    </div>
+
+                    {/* Картка 2: Пасивний стан */}
+                    <button
+                      type="button"
+                      onClick={() => setPassiveFocus("passive")}
+                      className={cn(
+                        "flex h-full flex-col justify-between gap-3 rounded-2xl border p-4 text-left transition-all",
+                        FOCUS_RING_CLASS,
+                        passiveFocus === "passive"
+                          ? "border-emerald-500/55 bg-emerald-500/[0.06] shadow-sm ring-1 ring-emerald-500/20"
+                          : "border-border/65 bg-background/45 opacity-80 hover:opacity-100",
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                          2. Пасивний стан (Passive Voice)
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide",
+                            MARKER_STYLES.emerald.badge,
+                          )}
+                        >
+                          {activePassiveEntry.badgeText}
+                        </span>
+                      </div>
+                      <AnimatePresence mode="wait">
+                        <motion.p
+                          key={`pp-${passiveCategory}-${activePassiveEntry.passiveTagged}`}
+                          initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                          transition={{ duration: 0.18 }}
+                          className="text-base font-medium leading-relaxed text-foreground sm:text-lg"
+                        >
+                          <HighlightedSegments
+                            segments={passiveResultParsed.segments}
+                          />
+                        </motion.p>
+                      </AnimatePresence>
+                      {passiveAltParsed ? (
+                        <div className="rounded-xl border border-sky-500/30 bg-sky-500/[0.06] px-3 py-2 text-xs">
+                          <span className="font-bold text-sky-700 dark:text-sky-300">
+                            Альтернативний варіант:{" "}
+                          </span>
+                          <span className="text-foreground">
+                            <HighlightedSegments
+                              segments={passiveAltParsed.segments}
+                              badgeClassName="text-[11px] px-1 py-0"
+                            />
+                          </span>
+                          {activePassiveEntry.altPassiveNoteUk ? (
+                            <p className="mt-1 leading-snug text-muted-foreground">
+                              {activePassiveEntry.altPassiveNoteUk}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">
+                          Об&apos;єкт стає підметом, у фокусі — сама дія або результат.
+                        </div>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Пояснення функції */}
+                  <div className="flex justify-center">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/60 px-3.5 py-1 text-xs font-medium text-muted-foreground">
+                      <span
+                        aria-hidden="true"
+                        className="h-1.5 w-1.5 rounded-full bg-primary"
+                      />
+                      {activePassiveEntry.functionUk}
+                    </span>
+                  </div>
+
+                  {/* Інтерактивний 2-позиційний слайдер фокусу Active ↔ Passive */}
+                  <div
+                    ref={passiveTrackRef}
+                    onPointerMove={handlePassivePointerMove}
+                    onPointerUp={() => setDraggingPassiveMarker(false)}
+                    onPointerCancel={() => setDraggingPassiveMarker(false)}
+                    className="relative h-[112px] select-none overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-b from-background/65 via-background/35 to-background/65 touch-none"
+                  >
+                    <div className="grid h-full grid-cols-2 divide-x divide-border/40">
+                      <button
+                        type="button"
+                        onClick={() => setPassiveFocus("active")}
+                        className={cn(
+                          "flex flex-col items-center justify-start pt-3 text-center transition-colors",
+                          FOCUS_RING_CLASS,
+                          passiveFocus === "active"
+                            ? "bg-amber-500/[0.06]"
+                            : "hover:bg-accent/15",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "text-xs font-bold uppercase tracking-wider",
+                            passiveFocus === "active"
+                              ? "text-amber-700 dark:text-amber-300"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          Акцент на виконавці · Active
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPassiveFocus("passive")}
+                        className={cn(
+                          "flex flex-col items-center justify-start pt-3 text-center transition-colors",
+                          FOCUS_RING_CLASS,
+                          passiveFocus === "passive"
+                            ? "bg-emerald-500/[0.06]"
+                            : "hover:bg-accent/15",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "text-xs font-bold uppercase tracking-wider",
+                            passiveFocus === "passive"
+                              ? "text-emerald-700 dark:text-emerald-300"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          Акцент на об&apos;єкті й дії · Passive
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Горизонтальна вісь */}
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-[25%] top-[62%] h-0.5 -translate-y-1/2 rounded-full bg-gradient-to-r from-amber-500/50 via-primary/45 to-emerald-500/60"
+                    />
+
+                    {/* Рухомий GPU-маркер */}
+                    <motion.div
+                      animate={{
+                        x: passiveFocus === "active" ? "-25%" : "25%",
+                      }}
+                      transition={passiveSpring}
+                      className="pointer-events-none absolute inset-0"
+                    >
+                      <div className="absolute left-1/2 top-[62%] -translate-x-1/2 -translate-y-1/2">
+                        <button
+                          type="button"
+                          role="slider"
+                          aria-label="Перемикач фокусу: Активний або Пасивний стан"
+                          aria-valuemin={0}
+                          aria-valuemax={1}
+                          aria-valuenow={passiveFocus === "active" ? 0 : 1}
+                          aria-valuetext={
+                            passiveFocus === "active"
+                              ? "Активний стан"
+                              : "Пасивний стан"
+                          }
+                          onPointerDown={handlePassivePointerDown}
+                          onKeyDown={handlePassiveMarkerKeyDown}
+                          className={cn(
+                            "pointer-events-auto flex h-9 w-9 cursor-grab items-center justify-center rounded-full border-2 shadow-md transition-transform active:scale-95 active:cursor-grabbing",
+                            FOCUS_RING_CLASS,
+                            passiveFocus === "active"
+                              ? "border-amber-500 bg-amber-500 text-white"
+                              : "border-emerald-500 bg-emerald-500 text-white",
+                          )}
+                        >
+                          <ArrowLeftRight className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Пояснення Verb Pattern для дієслова з речення */}
+                  <div className="rounded-2xl border border-amber-500/35 bg-amber-500/[0.06] px-4 py-3.5 shadow-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Layers
+                          className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300"
+                          aria-hidden="true"
+                        />
+                        <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                          Verb Pattern · Керування дієслова
+                        </span>
+                        {activePassiveEntry.verbPatternTitle ? (
+                          <code className="rounded-md border border-amber-500/40 bg-background/80 px-2 py-0.5 font-mono text-xs font-bold text-foreground">
+                            {activePassiveEntry.verbPatternTitle}
+                          </code>
+                        ) : null}
+                      </div>
+                      <span
+                        className={cn(
+                          "rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-bold",
+                          MARKER_STYLES.emerald.badge,
+                        )}
+                      >
+                        {passiveCategory === "infinitive"
+                          ? "Infinitive: (not) to be + V3"
+                          : "Gerund: (not) being + V3"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed text-foreground/90">
+                      {activePassiveEntry.verbPatternExplanationUk ??
+                        activePassiveEntry.functionUk}
+                    </p>
+                    {activePassiveEntry.ukThoughtCue ? (
+                      <div className="mt-2.5 inline-flex flex-wrap items-center gap-1.5 rounded-lg border border-border/60 bg-background/75 px-2.5 py-1 text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground/80">
+                          Думка українською:
+                        </span>
+                        <span className="italic">
+                          «{activePassiveEntry.ukThoughtCue}»
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* Покрокове виведення: Крок 1 → Крок 2 (з викресленням) → Крок 3 */}
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                    {/* Крок 1 */}
+                    <button
+                      type="button"
+                      onClick={() => setPassiveStep(1)}
+                      className={cn(
+                        "flex flex-col justify-between gap-2.5 rounded-2xl border p-4 text-left transition-all",
+                        FOCUS_RING_CLASS,
+                        passiveStep === 1
+                          ? "border-amber-500/60 bg-amber-500/[0.06] shadow-sm ring-1 ring-amber-500/20"
+                          : "border-border/65 bg-background/45 hover:border-border",
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                          Крок 1 · Повний актив
+                        </span>
+                        <span className="rounded border border-border/60 bg-background/70 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                          Active Clause
+                        </span>
+                      </div>
+                      <AnimatePresence mode="wait">
+                        <motion.p
+                          key={`pstep1-${passiveCategory}-${activePassiveEntry.activeTagged}`}
+                          initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                          transition={{ duration: 0.18 }}
+                          className="text-sm font-medium leading-relaxed text-foreground sm:text-base"
+                        >
+                          <HighlightedSegments
+                            segments={passiveActiveParsed.segments}
+                          />
+                        </motion.p>
+                      </AnimatePresence>
+                      <p className="text-xs leading-snug text-muted-foreground">
+                        Дослівна розгорнута думка з підрядним реченням і загальним виконавцем.
+                      </p>
+                    </button>
+
+                    {/* Крок 2 */}
+                    <button
+                      type="button"
+                      onClick={() => setPassiveStep(2)}
+                      className={cn(
+                        "flex flex-col justify-between gap-2.5 rounded-2xl border p-4 text-left transition-all",
+                        FOCUS_RING_CLASS,
+                        passiveStep === 2
+                          ? "border-sky-500/60 bg-sky-500/[0.06] shadow-sm ring-1 ring-sky-500/20"
+                          : "border-border/65 bg-background/45 hover:border-border",
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+                          Крок 2 · Скорочення пасиву
+                        </span>
+                        <span className="rounded border border-rose-500/35 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300">
+                          Викидаємо зайве
+                        </span>
+                      </div>
+                      <AnimatePresence mode="wait">
+                        <motion.p
+                          key={`pstep2-${passiveCategory}-${activePassiveEntry.bridgeStepTagged ?? activePassiveEntry.passiveTagged}`}
+                          initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                          transition={{ duration: 0.18 }}
+                          className="text-sm font-medium leading-relaxed text-foreground sm:text-base"
+                        >
+                          <HighlightedSegments
+                            segments={
+                              (passiveBridgeParsed ?? passiveResultParsed)
+                                .segments
+                            }
+                          />
+                        </motion.p>
+                      </AnimatePresence>
+                      <p className="text-xs leading-snug text-muted-foreground">
+                        {activePassiveEntry.step2NoteUk ??
+                          "Прибираємо сполучник підрядного, повтор підмета та зайве by + агент, зберігаючи прийменник."}
+                      </p>
+                    </button>
+
+                    {/* Крок 3 */}
+                    <button
+                      type="button"
+                      onClick={() => setPassiveStep(3)}
+                      className={cn(
+                        "flex flex-col justify-between gap-2.5 rounded-2xl border p-4 text-left transition-all",
+                        FOCUS_RING_CLASS,
+                        passiveStep === 3
+                          ? "border-emerald-500/60 bg-emerald-500/[0.07] shadow-sm ring-1 ring-emerald-500/25"
+                          : "border-border/65 bg-background/45 hover:border-border",
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                          Крок 3 · Природний результат
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded border px-1.5 py-0.5 font-mono text-[10px] font-bold",
+                            MARKER_STYLES.emerald.badge,
+                          )}
+                        >
+                          {activePassiveEntry.badgeText}
+                        </span>
+                      </div>
+                      <AnimatePresence mode="wait">
+                        <motion.p
+                          key={`pstep3-${passiveCategory}-${activePassiveEntry.passiveTagged}`}
+                          initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                          transition={{ duration: 0.18 }}
+                          className="text-sm font-medium leading-relaxed text-foreground sm:text-base"
+                        >
+                          <HighlightedSegments
+                            segments={passiveResultParsed.segments}
+                          />
+                        </motion.p>
+                      </AnimatePresence>
+                      <p className="text-xs leading-snug text-muted-foreground">
+                        {activePassiveEntry.step3NoteUk ??
+                          "Ставимо пасив у форму, яку вимагає керуюче слово (to be + V3 або being + V3)."}
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Інтерактивний 3-кроковий трек виведення форми */}
+                  <div
+                    ref={passiveTrackRef}
+                    onPointerMove={handlePassivePointerMove}
+                    onPointerUp={() => setDraggingPassiveMarker(false)}
+                    onPointerCancel={() => setDraggingPassiveMarker(false)}
+                    className="relative h-[112px] select-none overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-b from-background/65 via-background/35 to-background/65 touch-none"
+                  >
+                    <div className="grid h-full grid-cols-3 divide-x divide-border/40">
+                      {(
+                        [
+                          { step: 1 as const, label: "Крок 1 · Повний актив" },
+                          { step: 2 as const, label: "Крок 2 · Скорочення" },
+                          {
+                            step: 3 as const,
+                            label:
+                              passiveCategory === "infinitive"
+                                ? "Крок 3 · to be + V3"
+                                : "Крок 3 · being + V3",
+                          },
+                        ] as const
+                      ).map((col) => {
+                        const isActiveStep = passiveStep === col.step;
+                        return (
+                          <button
+                            key={col.step}
+                            type="button"
+                            onClick={() => setPassiveStep(col.step)}
+                            className={cn(
+                              "flex flex-col items-center justify-start pt-3 text-center transition-colors",
+                              FOCUS_RING_CLASS,
+                              isActiveStep
+                                ? "bg-primary/[0.06]"
+                                : "hover:bg-accent/15",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "text-[11px] font-bold uppercase tracking-wider sm:text-xs",
+                                isActiveStep
+                                  ? "text-primary"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              {col.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-[16.6667%] top-[62%] h-0.5 -translate-y-1/2 rounded-full bg-gradient-to-r from-amber-500/50 via-sky-500/55 to-emerald-500/65"
+                    />
+
+                    <motion.div
+                      animate={{
+                        x: `${getColumnCenterPercent((passiveStep - 1) as 0 | 1 | 2) - 50}%`,
+                      }}
+                      transition={passiveSpring}
+                      className="pointer-events-none absolute inset-0"
+                    >
+                      <div className="absolute left-1/2 top-[62%] -translate-x-1/2 -translate-y-1/2">
+                        <button
+                          type="button"
+                          role="slider"
+                          aria-label="Крок виведення пасивного інфінітива або герундія"
+                          aria-valuemin={1}
+                          aria-valuemax={3}
+                          aria-valuenow={passiveStep}
+                          aria-valuetext={`Крок ${passiveStep} з 3`}
+                          onPointerDown={handlePassivePointerDown}
+                          onKeyDown={handlePassiveMarkerKeyDown}
+                          className={cn(
+                            "pointer-events-auto flex h-9 w-9 cursor-grab items-center justify-center rounded-full border-2 border-primary bg-primary text-xs font-bold text-primary-foreground shadow-md transition-transform active:scale-95 active:cursor-grabbing",
+                            FOCUS_RING_CLASS,
+                          )}
+                        >
+                          {passiveStep}
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                </>
+              )}
             </div>
           ) : null}
         </CardContent>

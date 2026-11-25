@@ -13,7 +13,6 @@ import { useAppI18n } from "@/components/providers/app-language-provider";
 import { NavLinks } from "./nav-links";
 import { HeaderThemeControls } from "./header-theme-controls";
 import { UserMenu } from "./user-menu";
-import { PageHowItWorksButton } from "@/components/shared/page-how-it-works";
 import { SiteAssistantButton } from "@/components/shared/site-assistant-button";
 import type { Profile } from "@/types/database";
 import type { Role } from "@/types/roles";
@@ -75,9 +74,6 @@ export function Header({ profile }: HeaderProps) {
 
       <div className="flex items-center gap-2">
         <SiteAssistantButton role={profile.role as Role} />
-        <div className={isStudent ? "hidden md:block" : undefined}>
-          <PageHowItWorksButton role={profile.role as Role} />
-        </div>
         <HeaderThemeControls />
         <UserMenu profile={profile} />
       </div>
