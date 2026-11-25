@@ -16,6 +16,7 @@ import {
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowRight,
   Check,
   CheckCircle2,
   Clock,
@@ -24,6 +25,7 @@ import {
   Link2,
   Link2Off,
   Loader2,
+  MessageSquareQuote,
   RotateCcw,
   Sparkles,
   Wand2,
@@ -34,13 +36,11 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
 import {
   ASPECT_DEFINITIONS,
   ASPECT_MATRIX_META,
@@ -49,6 +49,13 @@ import {
   getAspectCellKey,
   MARKER_STYLES,
   parseTaggedSentence,
+  REPORTED_CATEGORIES,
+  REPORTED_PRESETS,
+  REPORTED_TIME_COLUMNS,
+  resolveActiveReportedComponents,
+  resolveActiveReportedExpressions,
+  resolveActiveTimeMarkers,
+  resolveActiveUseCases,
   resolveAspectType,
   resolveConditionalVariantKey,
   sanitizeConditionalSlots,
@@ -63,6 +70,10 @@ import {
   type ConditionalSlot,
   type ConditionalVariantKey,
   type DetectorMode,
+  type ReportedCategory,
+  type ReportedFormEntry,
+  type ReportedPerspective,
+  type ReportedSentenceTemplate,
   type SentenceSegment,
 } from "@/lib/grammar/tense-detector-data";
 import { cn } from "@/lib/utils";
@@ -82,8 +93,11 @@ interface AIAnalysisResult {
   ifSlot: ConditionalSlot;
   resultSlot: ConditionalSlot;
   presentMode: ConditionalPresentMode;
+  detectedUseCaseIndex?: number | null;
+  reportedCategory?: ReportedCategory;
   aspectForms?: Record<AspectCellKey, string>;
   conditionalForms?: Record<ConditionalVariantKey, string>;
+  reportedForms?: Record<ReportedCategory, ReportedFormEntry>;
 }
 
 const FOCUS_RING_CLASS =
@@ -102,16 +116,26 @@ function getSpringTransition(
   if (isDragging) {
     return {
       type: "spring",
-      stiffness: 760,
-      damping: 42,
-      mass: 0.6,
+      stiffness: 680,
+      damping: 40,
+      mass: 0.5,
     };
   }
   return {
     type: "spring",
-    stiffness: 380,
-    damping: 32,
-    mass: 0.8,
+    stiffness: 340,
+    damping: 30,
+    mass: 0.75,
+  };
+}
+
+function getCrossfadeTransition(reduceMotion: boolean | null): Transition {
+  if (reduceMotion) {
+    return { duration: 0 };
+  }
+  return {
+    duration: 0.16,
+    ease: [0.22, 1, 0.36, 1],
   };
 }
 
@@ -183,6 +207,24 @@ export function TenseDetectorClient() {
   >(null);
   const condTrackRef = useRef<HTMLDivElement | null>(null);
 
+  // ── Reported Speech State ────────────────────────────────────────
+  const [reportedCategory, setReportedCategory] =
+    useState<ReportedCategory>("statement");
+  const [selectedReportedPresetIds, setSelectedReportedPresetIds] = useState<
+    Record<ReportedCategory, string>
+  >({
+    statement: "stmt_pres_cont",
+    yes_no_question: "yn_past",
+    wh_question: "wh_past",
+    imperative: "imp_pos",
+  });
+  const [reportedPerspective, setReportedPerspective] =
+    useState<ReportedPerspective>("reported");
+  const [customReportedSentence, setCustomReportedSentence] =
+    useState<ReportedSentenceTemplate | null>(null);
+  const [draggingReportedMarker, setDraggingReportedMarker] = useState(false);
+  const reportedTrackRef = useRef<HTMLDivElement | null>(null);
+
   // ── AI Sentence Helper State ─────────────────────────────────────
   const [inputSentence, setInputSentence] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -214,6 +256,23 @@ export function TenseDetectorClient() {
   const activeAspectParsed = activeAspectTagged
     ? parseTaggedSentence(activeAspectTagged, "emerald", "sky")
     : null;
+  const resolvedTimeMarkers = resolveActiveTimeMarkers(
+    activeCellKey,
+    activeAspectParsed,
+  );
+  const hasActiveTimeMarker = resolvedTimeMarkers.some(
+    (marker) => marker.isActive,
+  );
+  const resolvedUseCases = resolveActiveUseCases(
+    activeCellKey,
+    activeAspectParsed,
+    {
+      isStateVerb,
+      detectedCellKey: customAspectSentence?.detectedCellKey,
+      detectedUseCaseIndex: customAspectSentence?.detectedUseCaseIndex,
+    },
+  );
+  const hasActiveUseCase = resolvedUseCases.some((item) => item.isActive);
 
   // ── Derived Conditionals State ───────────────────────────────────
   const activeCondKey = resolveConditionalVariantKey(
@@ -226,12 +285,55 @@ export function TenseDetectorClient() {
   const activeCondParts = activeCondTagged
     ? splitConditionalSentence(activeCondTagged)
     : null;
-  const activeCondPlainText = activeCondTagged
-    ? parseTaggedSentence(activeCondTagged).plainText
-    : "";
+
+  // ── Derived Reported Speech State ────────────────────────────────
+  const activeReportedCategoryMeta =
+    REPORTED_CATEGORIES.find((item) => item.key === reportedCategory) ??
+    REPORTED_CATEGORIES[0];
+  const reportedCategoryPresets = REPORTED_PRESETS.filter(
+    (preset) => preset.category === reportedCategory,
+  );
+  const activeReportedPreset =
+    reportedCategoryPresets.find(
+      (preset) => preset.id === selectedReportedPresetIds[reportedCategory],
+    ) ?? reportedCategoryPresets[0];
+  const activeReportedEntry: ReportedFormEntry = customReportedSentence
+    ? customReportedSentence.forms[reportedCategory]
+    : activeReportedPreset;
+  const directParsed = parseTaggedSentence(
+    activeReportedEntry.directTagged,
+    "emerald",
+    "sky",
+    "amber",
+  );
+  const reportedParsed = parseTaggedSentence(
+    activeReportedEntry.reportedTagged,
+    "emerald",
+    "sky",
+    "amber",
+  );
+  const resolvedReportedExpressions = resolveActiveReportedExpressions(
+    directParsed.plainText,
+    reportedParsed.plainText,
+  );
+  const hasActiveReportedExpression = resolvedReportedExpressions.some(
+    (item) => item.isActive,
+  );
+  const hasPerspectiveTokens =
+    hasActiveReportedExpression ||
+    reportedParsed.segments.some((segment) => segment.color === "sky");
+  const resolvedReportedComponents = resolveActiveReportedComponents({
+    category: reportedCategory,
+    hasBackshift: activeReportedEntry.hasBackshift,
+    hasPerspectiveShift: hasPerspectiveTokens,
+  });
 
   // ── Shared Smooth Spring Transitions ─────────────────────────────
   const aspectSpring = getSpringTransition(draggingAspectMarker, reduceMotion);
+  const reportedSpring = getSpringTransition(
+    draggingReportedMarker,
+    reduceMotion,
+  );
   const condIfSpring = getSpringTransition(
     draggingCondMarker === "if",
     reduceMotion,
@@ -267,6 +369,19 @@ export function TenseDetectorClient() {
   const condIfPct = getColumnCenterPercent(condIfSlot);
   const condResultPct = getColumnCenterPercent(condResultSlot);
   const condMaxSlot: ConditionalSlot = condLinked ? 2 : 1;
+
+  // ── Timeline Coordinates (Reported Speech Mode) ──────────────────
+  const reportedDirectPct = getColumnCenterPercent(
+    activeReportedEntry.directSlot,
+  );
+  const reportedTargetPct = getColumnCenterPercent(
+    activeReportedEntry.reportedSlot,
+  );
+  const reportedActiveSlot =
+    reportedPerspective === "direct"
+      ? activeReportedEntry.directSlot
+      : activeReportedEntry.reportedSlot;
+  const reportedMarkerPct = getColumnCenterPercent(reportedActiveSlot);
 
   // ── Drag & Keyboard Handlers ─────────────────────────────────────
   function handleAspectPointerDown(event: PointerEvent<HTMLButtonElement>) {
@@ -356,15 +471,69 @@ export function TenseDetectorClient() {
     }
   }
 
+  function handleReportedPointerDown(event: PointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDraggingReportedMarker(true);
+  }
+
+  function handleReportedPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!draggingReportedMarker || !reportedTrackRef.current) return;
+    if (activeReportedEntry.directSlot === activeReportedEntry.reportedSlot) {
+      return;
+    }
+    const rect = reportedTrackRef.current.getBoundingClientRect();
+    const ratio = Math.min(
+      1,
+      Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width)),
+    );
+    const directDist = Math.abs(
+      ratio - getColumnCenterPercent(activeReportedEntry.directSlot) / 100,
+    );
+    const reportedDist = Math.abs(
+      ratio - getColumnCenterPercent(activeReportedEntry.reportedSlot) / 100,
+    );
+    setReportedPerspective(reportedDist <= directDist ? "reported" : "direct");
+  }
+
+  function handleReportedMarkerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "ArrowLeft" || event.key === "Home") {
+      event.preventDefault();
+      setReportedPerspective("reported");
+    } else if (event.key === "ArrowRight" || event.key === "End") {
+      event.preventDefault();
+      setReportedPerspective("direct");
+    } else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setReportedPerspective((prev) =>
+        prev === "reported" ? "direct" : "reported",
+      );
+    }
+  }
+
   function handleResetCurrent() {
+    setAiResult(null);
+    setAiError(null);
     if (mode === "aspects") {
+      setCustomAspectSentence(null);
       setAspectTime("present");
-      setActiveAspect(isStateVerb ? "simple" : "continuous");
-    } else {
+      setActiveAspect("continuous");
+    } else if (mode === "conditionals") {
+      setCustomCondSentence(null);
       setCondLinked(true);
       setCondIfSlot(2);
       setCondResultSlot(2);
       setCondPresentMode("unreal");
+    } else {
+      setCustomReportedSentence(null);
+      setReportedCategory("statement");
+      setSelectedReportedPresetIds({
+        statement: "stmt_pres_cont",
+        yes_no_question: "yn_past",
+        wh_question: "wh_past",
+        imperative: "imp_pos",
+      });
+      setReportedPerspective("reported");
     }
   }
 
@@ -378,7 +547,7 @@ export function TenseDetectorClient() {
           result.isPerfect,
         ),
       );
-    } else {
+    } else if (result.detectedMode === "conditionals") {
       const sanitized = sanitizeConditionalSlots(
         result.ifSlot,
         result.resultSlot,
@@ -388,6 +557,9 @@ export function TenseDetectorClient() {
       setCondIfSlot(sanitized.ifSlot);
       setCondResultSlot(sanitized.resultSlot);
       setCondPresentMode(result.presentMode);
+    } else {
+      setReportedCategory(result.reportedCategory ?? "statement");
+      setReportedPerspective("reported");
     }
   }
 
@@ -426,11 +598,18 @@ export function TenseDetectorClient() {
 
       const uniqueId = `custom-${Date.now()}`;
       if (result.detectedMode === "aspects" && result.aspectForms) {
+        const detectedAspect = resolveAspectType(
+          result.isStateVerb ? false : result.isContinuous,
+          result.isPerfect,
+        );
+        const detectedCellKey = getAspectCellKey(result.time, detectedAspect);
         setCustomAspectSentence({
           id: uniqueId,
           labelUk: result.shortLabelUk || "Речення на дошці",
           isCustom: true,
           isStateVerb: Boolean(result.isStateVerb),
+          detectedCellKey,
+          detectedUseCaseIndex: result.detectedUseCaseIndex ?? null,
           forms: result.aspectForms,
         });
       } else if (
@@ -443,6 +622,15 @@ export function TenseDetectorClient() {
           isCustom: true,
           forms: result.conditionalForms,
         });
+      } else if (
+        result.detectedMode === "reported" &&
+        result.reportedForms
+      ) {
+        setCustomReportedSentence({
+          id: uniqueId,
+          labelUk: result.shortLabelUk || "Речення на дошці",
+          forms: result.reportedForms,
+        });
       }
 
       setInputSentence("");
@@ -454,7 +642,11 @@ export function TenseDetectorClient() {
   }
 
   const activeStructureFormula =
-    mode === "aspects" ? activeCellMeta.formula : activeCondMeta.formula;
+    mode === "aspects"
+      ? activeCellMeta.formula
+      : mode === "conditionals"
+        ? activeCondMeta.formula
+        : activeReportedCategoryMeta.formula;
 
   const condIfPosMeta = CONDITIONAL_POSITIONS[condIfSlot];
   const condResultPosMeta = CONDITIONAL_POSITIONS[condResultSlot];
@@ -475,412 +667,687 @@ export function TenseDetectorClient() {
           </Badge>
         </div>
 
-        {/* Перемикач між Аспектами та Умовними реченнями */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div
-            role="group"
-            aria-label="Режим інтерактивної дошки"
-            className="inline-flex rounded-xl border border-border/70 bg-muted/40 p-1"
+        {/* Перемикач між Аспектами, Умовними реченнями та Непрямою мовою */}
+        <div
+          role="group"
+          aria-label="Режим інтерактивної дошки"
+          className="inline-flex flex-wrap rounded-xl border border-border/70 bg-card/70 p-1 shadow-xs"
+        >
+          <button
+            type="button"
+            aria-pressed={mode === "aspects"}
+            onClick={() => setMode("aspects")}
+            className={cn(
+              "relative inline-flex items-center rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors",
+              FOCUS_RING_CLASS,
+              mode === "aspects"
+                ? "text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
           >
-            <button
-              type="button"
-              aria-pressed={mode === "aspects"}
-              onClick={() => setMode("aspects")}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors",
-                FOCUS_RING_CLASS,
-                mode === "aspects"
-                  ? "bg-primary text-primary-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
+            {mode === "aspects" ? (
+              <motion.span
+                layoutId="detector-mode-pill"
+                transition={getSpringTransition(false, reduceMotion)}
+                aria-hidden="true"
+                className="absolute inset-0 rounded-lg bg-primary shadow-xs"
+              />
+            ) : null}
+            <span className="relative z-10 inline-flex items-center gap-1.5">
               <Layers className="h-4 w-4" aria-hidden="true" />
               Аспекти (Часи)
-            </button>
-            <button
-              type="button"
-              aria-pressed={mode === "conditionals"}
-              onClick={() => setMode("conditionals")}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors",
-                FOCUS_RING_CLASS,
-                mode === "conditionals"
-                  ? "bg-primary text-primary-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "conditionals"}
+            onClick={() => setMode("conditionals")}
+            className={cn(
+              "relative inline-flex items-center rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors",
+              FOCUS_RING_CLASS,
+              mode === "conditionals"
+                ? "text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {mode === "conditionals" ? (
+              <motion.span
+                layoutId="detector-mode-pill"
+                transition={getSpringTransition(false, reduceMotion)}
+                aria-hidden="true"
+                className="absolute inset-0 rounded-lg bg-primary shadow-xs"
+              />
+            ) : null}
+            <span className="relative z-10 inline-flex items-center gap-1.5">
               <GitBranch className="h-4 w-4" aria-hidden="true" />
               Умовні речення
-            </button>
-          </div>
-
-          <Button
+            </span>
+          </button>
+          <button
             type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleResetCurrent}
+            aria-pressed={mode === "reported"}
+            onClick={() => setMode("reported")}
+            className={cn(
+              "relative inline-flex items-center rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors",
+              FOCUS_RING_CLASS,
+              mode === "reported"
+                ? "text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
           >
-            <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" />
-            Скинути
-          </Button>
+            {mode === "reported" ? (
+              <motion.span
+                layoutId="detector-mode-pill"
+                transition={getSpringTransition(false, reduceMotion)}
+                aria-hidden="true"
+                className="absolute inset-0 rounded-lg bg-primary shadow-xs"
+              />
+            ) : null}
+            <span className="relative z-10 inline-flex items-center gap-1.5">
+              <MessageSquareQuote className="h-4 w-4" aria-hidden="true" />
+              Непряма мова
+            </span>
+          </button>
         </div>
       </div>
 
       {/* ── Чистий рядок введення + AI-перевірка граматики ── */}
-      <div className="space-y-2.5">
-        <form
-          onSubmit={(e) => handleSubmitAISentence(e)}
-          className="flex flex-col gap-2 sm:flex-row"
-        >
-          <div className="relative flex-1">
-            <label
-              htmlFor="tense-detector-sentence-input"
-              className="sr-only"
-            >
-              Речення англійською для граматичної перевірки
-            </label>
-            <Wand2
-              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary"
-              aria-hidden="true"
-            />
-            <Input
-              id="tense-detector-sentence-input"
-              value={inputSentence}
-              onChange={(e) => setInputSentence(e.target.value)}
-              placeholder={
-                mode === "conditionals"
-                  ? "Введіть умовне речення англійською для перевірки (напр. If I won the lottery...)"
+      <form
+        onSubmit={(e) => handleSubmitAISentence(e)}
+        className="flex flex-col gap-2 sm:flex-row"
+      >
+        <div className="relative flex-1">
+          <label
+            htmlFor="tense-detector-sentence-input"
+            className="sr-only"
+          >
+            Речення англійською для граматичної перевірки
+          </label>
+          <Wand2
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary"
+            aria-hidden="true"
+          />
+          <Input
+            id="tense-detector-sentence-input"
+            value={inputSentence}
+            onChange={(e) => setInputSentence(e.target.value)}
+            placeholder={
+              mode === "conditionals"
+                ? "Введіть умовне речення англійською для перевірки (напр. If I won the lottery...)"
+                : mode === "reported"
+                  ? "Введіть пряму чи непряму мову для перевірки (напр. When did they arrive? або He asked me where was Tom)"
                   : "Введіть англійське речення для перевірки (навіть з помилкою)..."
-              }
-              className="h-11 bg-card pl-10 pr-10 text-sm shadow-xs sm:text-base"
-              maxLength={400}
-              disabled={isAnalyzing}
-            />
-            {inputSentence.length > 0 && !isAnalyzing ? (
-              <button
-                type="button"
-                onClick={() => setInputSentence("")}
-                aria-label="Очистити поле введення"
-                className={cn(
-                  "absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground",
-                  FOCUS_RING_CLASS,
-                )}
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
-            ) : null}
-          </div>
-          <Button
-            type="submit"
-            disabled={isAnalyzing || inputSentence.trim().length < 2}
-            className="h-11 shrink-0 px-5"
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2
-                  className="mr-2 h-4 w-4 animate-spin"
-                  aria-hidden="true"
-                />
-                Перевіряю...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
-                Перевірити
-              </>
-            )}
-          </Button>
-        </form>
-
-        {aiError ? (
-          <div
-            role="alert"
-            className="flex items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-          >
-            <span>{aiError}</span>
+            }
+            className="h-11 bg-card pl-10 pr-10 text-sm shadow-xs sm:text-base"
+            maxLength={400}
+            disabled={isAnalyzing}
+          />
+          {inputSentence.length > 0 && !isAnalyzing ? (
             <button
               type="button"
-              onClick={() => setAiError(null)}
-              aria-label="Закрити повідомлення про помилку"
+              onClick={() => setInputSentence("")}
+              aria-label="Очистити поле введення"
               className={cn(
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-destructive/15",
+                "absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground",
                 FOCUS_RING_CLASS,
               )}
             >
-              <X className="h-3.5 w-3.5" aria-hidden="true" />
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
-          </div>
-        ) : null}
-
-        <AnimatePresence initial={false}>
-          {aiResult ? (
-            <motion.div
-              key="ai-result-banner"
-              role="status"
-              aria-live="polite"
-              initial={reduceMotion ? false : { opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
-              transition={
-                reduceMotion ? { duration: 0 } : { duration: 0.2, ease: "easeOut" }
-              }
-              className={cn(
-                "rounded-xl border px-4 py-3 text-sm",
-                aiResult.isCorrect
-                  ? "border-emerald-500/35 bg-emerald-500/[0.07]"
-                  : "border-amber-500/40 bg-amber-500/[0.07]",
-              )}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  {aiResult.isCorrect ? (
-                    <Badge
-                      variant="outline"
-                      className="border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                    >
-                      <CheckCircle2
-                        className="mr-1 h-3.5 w-3.5"
-                        aria-hidden="true"
-                      />
-                      Правильно
-                    </Badge>
-                  ) : (
-                    <Badge
-                      variant="outline"
-                      className="border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                    >
-                      <AlertTriangle
-                        className="mr-1 h-3.5 w-3.5"
-                        aria-hidden="true"
-                      />
-                      Виправлено
-                    </Badge>
-                  )}
-                  <Badge variant="secondary" className="font-mono text-xs">
-                    {aiResult.detectedTitle}
-                  </Badge>
-                  {aiResult.isStateVerb && aiResult.detectedMode === "aspects" ? (
-                    <Badge
-                      variant="outline"
-                      className="border-amber-500/40 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-300"
-                    >
-                      State verb · без Continuous
-                    </Badge>
-                  ) : null}
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={() => applyAIResultToGraph(aiResult)}
-                  >
-                    Показати на графіку
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={() => setAiResult(null)}
-                    aria-label="Сховати результат перевірки"
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground",
-                      FOCUS_RING_CLASS,
-                    )}
-                    title="Сховати"
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-
-              {!aiResult.isCorrect ? (
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-1.5 text-xs sm:text-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-muted-foreground line-through">
-                      {aiResult.originalSentence}
-                    </span>
-                    <span className="text-muted-foreground" aria-hidden="true">
-                      →
-                    </span>
-                    <span className="font-semibold text-foreground">
-                      {aiResult.correctedSentence}
-                    </span>
-                  </div>
-                  <BrowserTtsButton
-                    text={aiResult.correctedSentence}
-                    language="english"
-                    label="Слухати"
-                  />
-                </div>
-              ) : null}
-
-              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {aiResult.explanationUk}
-              </p>
-            </motion.div>
           ) : null}
-        </AnimatePresence>
-      </div>
+        </div>
+        <Button
+          type="submit"
+          disabled={isAnalyzing || inputSentence.trim().length < 2}
+          className="h-11 shrink-0 px-5"
+        >
+          {isAnalyzing ? (
+            <>
+              <Loader2
+                className="mr-2 h-4 w-4 animate-spin"
+                aria-hidden="true"
+              />
+              Перевіряю...
+            </>
+          ) : (
+            <>
+              <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
+              Перевірити
+            </>
+          )}
+        </Button>
+      </form>
 
       {/* ── ОСНОВНА РОБОЧА ПАНЕЛЬ ─────────────────────────────────────── */}
       <Card className="overflow-hidden border-border/70 bg-card/70 shadow-sm">
-        <CardHeader className="border-b border-border/50 bg-card/40 pb-4">
-          <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2.5">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <Clock
-                  className="h-5 w-5 shrink-0 text-primary"
-                  aria-hidden="true"
-                />
-                <CardTitle className="text-lg font-bold tracking-tight sm:text-xl">
-                  {mode === "aspects"
-                    ? activeCellMeta.tenseName
-                    : activeCondMeta.nameUk}
-                </CardTitle>
-                {mode === "aspects" && isStateVerb ? (
-                  <Badge
-                    variant="outline"
-                    className="border-amber-500/45 bg-amber-500/12 text-xs text-amber-700 dark:text-amber-300"
-                  >
-                    State verb · без Continuous
-                  </Badge>
-                ) : null}
-              </div>
+        <CardHeader className="flex flex-col gap-3.5 border-b border-border/50 bg-card/40 px-4 py-4 sm:px-6">
+          {/* Рядок 1: Назва часу + структура ліворуч, кнопка скидання праворуч */}
+          <div className="flex min-h-[40px] flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5 text-left">
+              <Clock
+                className="h-5 w-5 shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <CardTitle className="text-lg font-bold tracking-tight sm:text-xl xl:text-2xl">
+                {mode === "aspects"
+                  ? activeCellMeta.tenseName
+                  : mode === "conditionals"
+                    ? activeCondMeta.nameUk
+                    : activeReportedCategoryMeta.headerTitleUk}
+              </CardTitle>
 
-              {/* Виразний рядок структури (виділений блок над графіком) */}
-              <div className="inline-flex max-w-full flex-wrap items-center gap-2.5 rounded-xl border-2 border-primary/45 bg-primary/12 px-3.5 py-2 shadow-xs">
+              {/* Виразний рядок структури (виділений блок прямо біля назви часу) */}
+              <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-xl border-2 border-primary/45 bg-primary/12 px-3 py-1 shadow-xs">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-primary/85">
                   Структура
                 </span>
-                <code className="font-mono text-sm font-bold tracking-wide text-primary sm:text-base">
+                <code className="font-mono text-xs font-bold tracking-wide text-primary sm:text-sm xl:text-base">
                   {activeStructureFormula}
                 </code>
               </div>
-
-              <CardDescription className="text-sm leading-snug text-muted-foreground">
-                {mode === "aspects"
-                  ? activeCellMeta.explanationUk
-                  : activeCondMeta.explanationUk}
-              </CardDescription>
             </div>
 
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleResetCurrent}
+              className="h-8 shrink-0 gap-1.5 px-3 text-xs"
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              Скинути
+            </Button>
+          </div>
+
+          {/* Рядок 2: Симетрична 3-колонкова панель фіксованої висоти (без зсуву графіка) */}
+          <div className="grid grid-cols-1 gap-3 lg:h-[160px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-3.5">
+            {/* Ліва колонка: Типові маркери часу або режим умовних речень */}
             {mode === "aspects" ? (
-              customAspectSentence && activeAspectParsed ? (
-                <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                  <BrowserTtsButton
-                    text={activeAspectParsed.plainText}
-                    language="english"
-                    label="Слухати"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setCustomAspectSentence(null)}
-                    className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
-                    title="Прибрати речення з дошки"
-                  >
-                    <X className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                    Очистити
-                  </Button>
-                </div>
-              ) : null
-            ) : (
-              <div className="flex shrink-0 flex-wrap items-center gap-2.5">
-                {customCondSentence && activeCondPlainText ? (
-                  <div className="flex items-center gap-1.5">
-                    <BrowserTtsButton
-                      text={activeCondPlainText}
-                      language="english"
-                      label="Слухати"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setCustomCondSentence(null)}
-                      className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
-                      title="Прибрати речення з дошки"
-                    >
-                      <X className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                      Очистити
-                    </Button>
-                  </div>
-                ) : null}
-
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium">
-                  {condLinked ? (
-                    <Link2
-                      className="h-3.5 w-3.5 text-primary"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Link2Off
-                      className="h-3.5 w-3.5 text-amber-400"
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span>
-                    {condLinked ? "Чисті (1 · 2 · 3)" : "Міксовані (2 ↔ 3)"}
+              <div
+                aria-label="Типові маркери часу"
+                className="flex h-full min-h-0 flex-col rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5 text-left"
+              >
+                <div className="mb-2 flex min-h-[18px] shrink-0 items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Типові маркери часу
                   </span>
-                  <Switch
-                    checked={condLinked}
-                    onCheckedChange={(checked) => {
-                      setCondLinked(checked);
-                      if (checked) {
-                        if (condIfSlot === 2 || condResultSlot === 2) {
-                          setCondIfSlot(2);
-                          setCondResultSlot(2);
+                  {hasActiveTimeMarker ? (
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-sky-600 dark:text-sky-300">
+                      <span
+                        aria-hidden="true"
+                        className="h-2 w-2 rounded-full bg-sky-400"
+                      />
+                      На графіку
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex min-h-0 flex-1 flex-wrap content-start gap-1.5 overflow-y-auto pr-0.5">
+                  {resolvedTimeMarkers.map((marker) => (
+                    <span
+                      key={marker.label}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors",
+                        marker.isActive
+                          ? cn(
+                              MARKER_STYLES.sky.badge,
+                              "font-semibold shadow-xs ring-1 ring-sky-400/40",
+                            )
+                          : "border-border/60 bg-card/65 font-medium text-muted-foreground",
+                      )}
+                    >
+                      {marker.isActive ? (
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-1.5 rounded-full bg-sky-400"
+                        />
+                      ) : null}
+                      {marker.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : mode === "conditionals" ? (
+              <div
+                aria-label="Режим умовних речень"
+                className="flex h-full min-h-0 flex-col rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5 text-left"
+              >
+                <div className="mb-2 flex min-h-[18px] shrink-0 items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Режим умови
+                  </span>
+                </div>
+                <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 overflow-y-auto">
+                  <label className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium">
+                    {condLinked ? (
+                      <Link2
+                        className="h-3.5 w-3.5 text-primary"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Link2Off
+                        className="h-3.5 w-3.5 text-amber-400"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span>
+                      {condLinked ? "Чисті (1 · 2 · 3)" : "Міксовані (2 ↔ 3)"}
+                    </span>
+                    <Switch
+                      checked={condLinked}
+                      onCheckedChange={(checked) => {
+                        setCondLinked(checked);
+                        if (checked) {
+                          if (condIfSlot === 2 || condResultSlot === 2) {
+                            setCondIfSlot(2);
+                            setCondResultSlot(2);
+                          } else {
+                            setCondResultSlot(condIfSlot);
+                          }
                         } else {
-                          setCondResultSlot(condIfSlot);
+                          setCondIfSlot(0);
+                          setCondResultSlot(1);
                         }
-                      } else {
-                        setCondIfSlot(0);
-                        setCondResultSlot(1);
-                      }
-                    }}
-                  />
-                </label>
+                      }}
+                    />
+                  </label>
 
-                {condIfSlot === 1 && condResultSlot === 1 ? (
-                  <div
-                    role="group"
-                    aria-label="Тип умови для позиції 2"
-                    className="inline-flex rounded-lg border border-border/70 bg-background/50 p-0.5 text-xs"
-                  >
-                    <button
-                      type="button"
-                      aria-pressed={condPresentMode === "unreal"}
-                      onClick={() => setCondPresentMode("unreal")}
+                  {condIfSlot === 1 && condResultSlot === 1 ? (
+                    <div
+                      role="group"
+                      aria-label="Тип умови для позиції 2"
+                      className="inline-flex w-fit rounded-lg border border-border/70 bg-background/50 p-0.5 text-xs"
+                    >
+                      <button
+                        type="button"
+                        aria-pressed={condPresentMode === "unreal"}
+                        onClick={() => setCondPresentMode("unreal")}
+                        className={cn(
+                          "rounded-md px-2.5 py-1 font-medium transition-colors",
+                          FOCUS_RING_CLASS,
+                          condPresentMode === "unreal"
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        Нереальна (2nd)
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={condPresentMode === "zero"}
+                        onClick={() => setCondPresentMode("zero")}
+                        className={cn(
+                          "rounded-md px-2.5 py-1 font-medium transition-colors",
+                          FOCUS_RING_CLASS,
+                          condPresentMode === "zero"
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        Реальний факт (Zero)
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <div
+                aria-label="Перспектива часу й місця"
+                className="flex h-full min-h-0 flex-col rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5 text-left"
+              >
+                <div className="mb-2 flex min-h-[18px] shrink-0 items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Перспектива часу й місця
+                  </span>
+                  {hasActiveReportedExpression ? (
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-sky-600 dark:text-sky-300">
+                      <span
+                        aria-hidden="true"
+                        className="h-2 w-2 rounded-full bg-sky-400"
+                      />
+                      У реченні
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex min-h-0 flex-1 flex-wrap content-start gap-1.5 overflow-y-auto pr-0.5">
+                  {resolvedReportedExpressions.map((expr) => (
+                    <span
+                      key={expr.label}
                       className={cn(
-                        "rounded-md px-2.5 py-1 font-medium transition-colors",
-                        FOCUS_RING_CLASS,
-                        condPresentMode === "unreal"
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground",
+                        "inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-[11px] transition-colors",
+                        expr.isActive
+                          ? cn(
+                              MARKER_STYLES.sky.badge,
+                              "font-semibold shadow-xs ring-1 ring-sky-400/40",
+                            )
+                          : "border-border/60 bg-card/65 font-medium text-muted-foreground",
                       )}
                     >
-                      Нереальна (2nd)
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={condPresentMode === "zero"}
-                      onClick={() => setCondPresentMode("zero")}
-                      className={cn(
-                        "rounded-md px-2.5 py-1 font-medium transition-colors",
-                        FOCUS_RING_CLASS,
-                        condPresentMode === "zero"
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      Реальний факт (Zero)
-                    </button>
-                  </div>
-                ) : null}
+                      {expr.isActive ? (
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-1.5 rounded-full bg-sky-400"
+                        />
+                      ) : null}
+                      {expr.label}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
+
+            {/* Центральна колонка: Функції або Компоненти перетворення */}
+            <div
+              aria-label={
+                mode === "reported"
+                  ? "Компоненти непрямої мови"
+                  : "Функції (коли вживаємо)"
+              }
+              className="flex h-full min-h-0 flex-col items-center rounded-xl border border-border/60 bg-background/45 px-3.5 py-2.5 text-center"
+            >
+              <div className="mb-1.5 flex min-h-[18px] w-full shrink-0 items-center justify-between gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {mode === "reported"
+                    ? "Компоненти перетворення"
+                    : "Функції (коли вживаємо)"}
+                </span>
+                {mode === "aspects" && hasActiveUseCase ? (
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-emerald-600 dark:text-emerald-300">
+                    <span
+                      aria-hidden="true"
+                      className="h-2 w-2 rounded-full bg-emerald-400"
+                    />
+                    У реченні
+                  </span>
+                ) : mode === "reported" ? (
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-emerald-600 dark:text-emerald-300">
+                    <span
+                      aria-hidden="true"
+                      className="h-2 w-2 rounded-full bg-emerald-400"
+                    />
+                    Активні
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex min-h-0 w-full flex-1 overflow-y-auto">
+                {mode === "aspects" ? (
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={`uses-${activeCellKey}`}
+                      initial={reduceMotion ? false : { opacity: 0, y: 3 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={reduceMotion ? undefined : { opacity: 0, y: -3 }}
+                      transition={getCrossfadeTransition(reduceMotion)}
+                      className="my-auto flex w-full flex-wrap items-center justify-center gap-1.5"
+                    >
+                      {resolvedUseCases.map((useCase) => (
+                        <span
+                          key={useCase.label}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                            useCase.isActive
+                              ? "border-emerald-500/60 bg-emerald-500/20 font-semibold text-emerald-800 shadow-xs ring-1 ring-emerald-400/45 dark:text-emerald-200"
+                              : activeAspectParsed
+                                ? "border-border/60 bg-card/55 font-medium text-muted-foreground opacity-75"
+                                : "border-emerald-500/30 bg-emerald-500/10 font-medium text-emerald-700 dark:text-emerald-300",
+                          )}
+                        >
+                          {useCase.isActive ? (
+                            <span
+                              aria-hidden="true"
+                              className="h-1.5 w-1.5 rounded-full bg-emerald-400"
+                            />
+                          ) : null}
+                          {useCase.label}
+                        </span>
+                      ))}
+                    </motion.div>
+                  </AnimatePresence>
+                ) : mode === "conditionals" ? (
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={`cond-uses-${activeCondKey}`}
+                      initial={reduceMotion ? false : { opacity: 0, y: 3 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={reduceMotion ? undefined : { opacity: 0, y: -3 }}
+                      transition={getCrossfadeTransition(reduceMotion)}
+                      className="my-auto flex w-full flex-col items-center justify-center gap-2"
+                    >
+                      <p className="text-xs leading-snug text-foreground/90 sm:text-sm">
+                        {activeCondMeta.explanationUk}
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
+                        <span
+                          className={cn(
+                            "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+                            MARKER_STYLES.amber.badge,
+                          )}
+                        >
+                          IF · {activeCondMeta.ifClauseTense}
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+                            MARKER_STYLES.emerald.badge,
+                          )}
+                        >
+                          RESULT · {activeCondMeta.resultClauseTense}
+                        </span>
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
+                ) : (
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={`rep-components-${reportedCategory}-${activeReportedEntry.hasBackshift}`}
+                      initial={reduceMotion ? false : { opacity: 0, y: 3 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={reduceMotion ? undefined : { opacity: 0, y: -3 }}
+                      transition={getCrossfadeTransition(reduceMotion)}
+                      className="my-auto flex w-full flex-wrap items-center justify-center gap-1.5"
+                    >
+                      {resolvedReportedComponents.map((comp) => {
+                        const dotColorClass =
+                          comp.color === "emerald"
+                            ? "bg-emerald-400"
+                            : comp.color === "amber"
+                              ? "bg-amber-400"
+                              : "bg-sky-400";
+                        return (
+                          <span
+                            key={comp.key}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                              comp.isActive
+                                ? cn(
+                                    MARKER_STYLES[comp.color].badge,
+                                    "font-semibold shadow-xs",
+                                  )
+                                : "border-border/60 bg-card/55 font-medium text-muted-foreground opacity-60",
+                            )}
+                          >
+                            {comp.isActive ? (
+                              <span
+                                aria-hidden="true"
+                                className={cn(
+                                  "h-1.5 w-1.5 rounded-full",
+                                  dotColorClass,
+                                )}
+                              />
+                            ) : null}
+                            {comp.label}
+                          </span>
+                        );
+                      })}
+                    </motion.div>
+                  </AnimatePresence>
+                )}
+              </div>
+            </div>
+
+            {/* Права колонка: Зворотний зв'язок AI (перенесено з-під інпуту) */}
+            <div
+              className={cn(
+                "flex h-full min-h-0 flex-col rounded-xl border px-3.5 py-2.5 text-left transition-colors",
+                aiError
+                  ? "border-destructive/40 bg-destructive/10"
+                  : isAnalyzing
+                    ? "border-primary/35 bg-primary/[0.06]"
+                    : aiResult
+                      ? aiResult.isCorrect
+                        ? "border-emerald-500/35 bg-emerald-500/[0.07]"
+                        : "border-amber-500/40 bg-amber-500/[0.07]"
+                      : "border-dashed border-border/60 bg-background/30",
+              )}
+            >
+              {isAnalyzing ? (
+                <>
+                  <div className="mb-1.5 flex min-h-[18px] shrink-0 items-center gap-1.5">
+                    <Loader2
+                      className="h-3.5 w-3.5 animate-spin text-primary"
+                      aria-hidden="true"
+                    />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                      Перевіряємо речення...
+                    </span>
+                  </div>
+                  <div className="flex min-h-0 flex-1 items-center justify-center text-center text-xs text-muted-foreground">
+                    AI аналізує час, аспект і граматичну будову...
+                  </div>
+                </>
+              ) : aiError ? (
+                <div role="alert" className="flex min-h-0 flex-1 flex-col">
+                  <div className="mb-1.5 flex min-h-[18px] shrink-0 items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-destructive">
+                      Помилка перевірки
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAiError(null)}
+                      aria-label="Закрити повідомлення про помилку"
+                      className={cn(
+                        "flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-destructive transition-colors hover:bg-destructive/15",
+                        FOCUS_RING_CLASS,
+                      )}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div className="flex min-h-0 flex-1 items-center overflow-y-auto text-xs leading-snug text-destructive">
+                    {aiError}
+                  </div>
+                </div>
+              ) : aiResult ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex min-h-0 flex-1 flex-col"
+                >
+                  <div className="mb-1.5 flex shrink-0 items-center justify-between gap-1.5">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1">
+                      {aiResult.isCorrect ? (
+                        <Badge
+                          variant="outline"
+                          className="border-emerald-500/40 bg-emerald-500/15 px-2 py-0 text-[11px] text-emerald-700 dark:text-emerald-300"
+                        >
+                          <CheckCircle2
+                            className="mr-1 h-3 w-3"
+                            aria-hidden="true"
+                          />
+                          Правильно
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/40 bg-amber-500/15 px-2 py-0 text-[11px] text-amber-700 dark:text-amber-300"
+                        >
+                          <AlertTriangle
+                            className="mr-1 h-3 w-3"
+                            aria-hidden="true"
+                          />
+                          Виправлено
+                        </Badge>
+                      )}
+                      <Badge
+                        variant="secondary"
+                        className="px-2 py-0 font-mono text-[11px]"
+                      >
+                        {aiResult.detectedTitle}
+                      </Badge>
+                      {aiResult.isStateVerb &&
+                      aiResult.detectedMode === "aspects" ? (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-700 dark:text-amber-300"
+                        >
+                          State verb
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-[11px]"
+                        onClick={() => applyAIResultToGraph(aiResult)}
+                        aria-label="Показати на графіку"
+                      >
+                        На графік
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => setAiResult(null)}
+                        aria-label="Сховати результат перевірки"
+                        className={cn(
+                          "flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground",
+                          FOCUS_RING_CLASS,
+                        )}
+                        title="Сховати"
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
+                    {!aiResult.isCorrect ? (
+                      <div className="rounded-lg border border-border/60 bg-background/60 px-2.5 py-1 text-xs">
+                        <span className="text-muted-foreground line-through">
+                          {aiResult.originalSentence}
+                        </span>{" "}
+                        <span
+                          className="text-muted-foreground"
+                          aria-hidden="true"
+                        >
+                          →
+                        </span>{" "}
+                        <span className="font-semibold text-foreground">
+                          {aiResult.correctedSentence}
+                        </span>
+                      </div>
+                    ) : null}
+                    <p className="text-xs leading-snug text-muted-foreground">
+                      {aiResult.explanationUk}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-1.5 flex min-h-[18px] shrink-0 items-center gap-1.5">
+                    <Sparkles
+                      className="h-3.5 w-3.5 text-primary/80"
+                      aria-hidden="true"
+                    />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Зворотний зв&apos;язок AI
+                    </span>
+                  </div>
+                  <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-xs leading-relaxed text-muted-foreground/85">
+                    Введіть речення у поле вище та натисніть «Перевірити» — тут
+                    з’явиться граматичний розбір.
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </CardHeader>
 
@@ -910,16 +1377,24 @@ export function TenseDetectorClient() {
                       onClick={() => setActiveAspect(aspect.key)}
                       aria-pressed={isSelected}
                       className={cn(
-                        "flex flex-col items-start justify-between gap-1.5 rounded-xl border px-3.5 py-3 text-left transition-colors",
+                        "relative flex flex-col items-center justify-between gap-1.5 overflow-hidden rounded-xl border px-3.5 py-3 text-center transition-colors",
                         FOCUS_RING_CLASS,
                         isBlockedByStateVerb
                           ? "cursor-not-allowed border-amber-500/25 bg-amber-500/[0.04] opacity-55"
                           : isSelected
-                            ? "border-primary bg-primary/[0.11] shadow-xs ring-1 ring-primary/35"
+                            ? "border-transparent"
                             : "border-border/70 bg-background/55 hover:border-border hover:bg-accent/20",
                       )}
                     >
-                      <div className="flex w-full items-center justify-between gap-2">
+                      {isSelected && !isBlockedByStateVerb ? (
+                        <motion.span
+                          layoutId="aspect-active-ring"
+                          transition={getSpringTransition(false, reduceMotion)}
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0 rounded-xl border-2 border-primary bg-primary/[0.11] shadow-xs"
+                        />
+                      ) : null}
+                      <div className="relative z-10 flex w-full items-center justify-center gap-2">
                         <span
                           className={cn(
                             "text-sm font-bold tracking-tight",
@@ -952,7 +1427,7 @@ export function TenseDetectorClient() {
                           </span>
                         )}
                       </div>
-                      <span className="text-xs leading-snug text-muted-foreground">
+                      <span className="relative z-10 text-xs leading-snug text-muted-foreground">
                         {aspect.explanationUk}
                       </span>
                     </button>
@@ -977,6 +1452,7 @@ export function TenseDetectorClient() {
                         key={opt.key}
                         type="button"
                         aria-pressed={isColActive}
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setAspectTime(opt.key)}
                         className={cn(
                           "flex h-full flex-col items-center pt-3 text-center transition-colors",
@@ -1008,91 +1484,41 @@ export function TenseDetectorClient() {
                   style={{ left: `${nowPct}%` }}
                 />
 
-                {/* Плашка на графіку: лише назва часу (без структури) + введене речення */}
+                {/* Плашка на графіку: відцентрована рівно над своєю колонкою */}
                 <motion.div
-                  animate={{ left: `${colCenterPct}%` }}
+                  initial={false}
+                  animate={{ x: `${colCenterPct - 50}%` }}
                   transition={aspectSpring}
-                  className={cn(
-                    "pointer-events-none absolute top-[54px] z-20 w-max max-w-[240px] rounded-xl border border-emerald-500/35 bg-card/95 px-3.5 py-2.5 text-center shadow-xs backdrop-blur-xs will-change-transform sm:max-w-[340px]",
-                    aspectTime === "past"
-                      ? "-translate-x-[24%]"
-                      : aspectTime === "future"
-                        ? "-translate-x-[76%]"
-                        : "-translate-x-1/2",
-                  )}
+                  className="pointer-events-none absolute inset-x-0 top-[54px] z-20 flex justify-center will-change-transform"
                 >
-                  <div className="text-xs font-bold tracking-tight text-emerald-700 dark:text-emerald-300">
-                    {activeCellMeta.tenseName}
-                  </div>
-                  {activeAspectParsed ? (
-                    <p className="mt-1 text-xs leading-snug font-medium text-foreground sm:text-sm">
-                      <HighlightedSegments
-                        segments={activeAspectParsed.segments}
-                        badgeClassName="py-0"
-                      />
-                    </p>
-                  ) : (
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {activeAspectDef.explanationUk}
-                    </p>
-                  )}
-                </motion.div>
-
-                {/* Межа "ДО" та синхронізована крива стрілка для Perfect / Perfect-Continuous */}
-                {isPerfect ? (
-                  <>
-                    <motion.div
-                      animate={{ left: `${cutoffPct}%` }}
-                      transition={aspectSpring}
-                      className="pointer-events-none absolute top-[172px] z-10 h-[94px] w-0.5 -translate-x-1/2 bg-sky-500 will-change-transform"
-                    />
-
-                    {/* Синхронізований контейнер для кривої стрілки (їде в унісон із ✕) */}
-                    <motion.div
-                      animate={{ left: `${actionPct}%` }}
-                      transition={aspectSpring}
-                      style={{ width: `${cutoffPct - actionPct}%` }}
-                      aria-hidden="true"
-                      className="pointer-events-none absolute top-[160px] z-10 h-[56px] will-change-transform"
-                    >
-                      <svg
-                        viewBox="0 0 200 60"
-                        preserveAspectRatio="none"
-                        className="h-full w-full overflow-visible"
+                  <div className="w-max max-w-[29%] rounded-xl border border-emerald-500/35 bg-card/95 px-3.5 py-2.5 text-center shadow-xs backdrop-blur-xs sm:max-w-[30%]">
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={`bubble-${activeCellKey}-${activeAspectParsed?.plainText ?? "default"}`}
+                        initial={reduceMotion ? false : { opacity: 0, y: 2 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={reduceMotion ? undefined : { opacity: 0, y: -2 }}
+                        transition={getCrossfadeTransition(reduceMotion)}
                       >
-                        <defs>
-                          <marker
-                            id="perfect-cutoff-arrow"
-                            markerWidth="8"
-                            markerHeight="8"
-                            refX="6"
-                            refY="4"
-                            orient="auto"
-                          >
-                            <path d="M0,0 L8,4 L0,8 Z" fill="#38bdf8" />
-                          </marker>
-                        </defs>
-                        <path
-                          d="M 200 40 Q 100 -4 4 40"
-                          fill="none"
-                          stroke="#38bdf8"
-                          strokeWidth="2.5"
-                          strokeDasharray="6 4"
-                          vectorEffect="non-scaling-stroke"
-                          markerEnd="url(#perfect-cutoff-arrow)"
-                        />
-                      </svg>
-                    </motion.div>
-
-                    <motion.div
-                      animate={{ left: `${(cutoffPct + actionPct) / 2}%` }}
-                      transition={aspectSpring}
-                      className="pointer-events-none absolute top-[148px] z-20 -translate-x-1/2 rounded-full border border-sky-500/40 bg-card/95 px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap text-sky-700 shadow-xs will-change-transform dark:text-sky-300"
-                    >
-                      {isContinuous ? 'тривало "ДО"' : 'завершено "ДО"'}
-                    </motion.div>
-                  </>
-                ) : null}
+                        <div className="text-xs font-bold tracking-tight text-emerald-700 dark:text-emerald-300">
+                          {activeCellMeta.tenseName}
+                        </div>
+                        {activeAspectParsed ? (
+                          <p className="mt-1 text-xs leading-snug font-medium text-foreground sm:text-sm">
+                            <HighlightedSegments
+                              segments={activeAspectParsed.segments}
+                              badgeClassName="py-0"
+                            />
+                          </p>
+                        ) : (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {activeAspectDef.explanationUk}
+                          </p>
+                        )}
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
 
                 {/* Основна горизонтальна вісь часу */}
                 <div
@@ -1110,61 +1536,265 @@ export function TenseDetectorClient() {
                   />
                 ))}
 
-                {/* Візуал SIMPLE: ритмічні повторювані крапки обабіч ✕ */}
-                {effectiveAspect === "simple" ? (
-                  <motion.div
-                    animate={{ left: `${actionPct}%` }}
-                    transition={aspectSpring}
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-[224px] z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-5 will-change-transform"
-                  >
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/45" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/75" />
-                    <span className="w-14" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/75" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/45" />
-                  </motion.div>
-                ) : null}
+                {/* Анімовані візуальні індикатори аспектів на GPU transform */}
+                <AnimatePresence initial={false}>
+                  {isPerfect ? (
+                    <motion.div
+                      key="perfect-cutoff"
+                      initial={
+                        reduceMotion
+                          ? false
+                          : { opacity: 0, x: `${cutoffPct - 50}%` }
+                      }
+                      animate={{ opacity: 1, x: `${cutoffPct - 50}%` }}
+                      exit={reduceMotion ? undefined : { opacity: 0 }}
+                      transition={{
+                        ...aspectSpring,
+                        opacity: getCrossfadeTransition(reduceMotion),
+                      }}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-[172px] z-10 flex justify-center will-change-transform"
+                    >
+                      <div className="h-[94px] w-0.5 bg-sky-500" />
+                    </motion.div>
+                  ) : null}
 
-                {/* Візуал CONTINUOUS: чиста хвиля тривалості без тексту під ✕ */}
-                {effectiveAspect === "continuous" ? (
-                  <motion.div
-                    animate={{ left: `${actionPct}%` }}
-                    transition={aspectSpring}
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-[224px] z-10 flex h-11 w-44 -translate-x-1/2 -translate-y-1/2 items-center justify-between rounded-full border border-emerald-500/45 bg-emerald-500/15 px-3.5 will-change-transform"
-                  >
-                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                      〰
-                    </span>
-                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                      〰
-                    </span>
-                  </motion.div>
-                ) : null}
+                  {isPerfect ? (
+                    <motion.div
+                      key="perfect-arrow"
+                      initial={
+                        reduceMotion
+                          ? false
+                          : {
+                              opacity: 0,
+                              x: `${(actionPct + cutoffPct) / 2 - 50}%`,
+                            }
+                      }
+                      animate={{
+                        opacity: 1,
+                        x: `${(actionPct + cutoffPct) / 2 - 50}%`,
+                      }}
+                      exit={reduceMotion ? undefined : { opacity: 0 }}
+                      transition={{
+                        ...aspectSpring,
+                        opacity: getCrossfadeTransition(reduceMotion),
+                      }}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-[160px] z-10 flex justify-center will-change-transform"
+                    >
+                      <div
+                        className="h-[56px]"
+                        style={{ width: `${cutoffPct - actionPct}%` }}
+                      >
+                        <svg
+                          viewBox="0 0 200 60"
+                          preserveAspectRatio="none"
+                          className="h-full w-full overflow-visible"
+                        >
+                          <defs>
+                            <marker
+                              id="perfect-cutoff-arrow"
+                              markerWidth="8"
+                              markerHeight="8"
+                              refX="6"
+                              refY="4"
+                              orient="auto"
+                            >
+                              <path d="M0,0 L8,4 L0,8 Z" fill="#38bdf8" />
+                            </marker>
+                          </defs>
+                          <path
+                            d="M 200 40 Q 100 -4 4 40"
+                            fill="none"
+                            stroke="#38bdf8"
+                            strokeWidth="2.5"
+                            strokeDasharray="6 4"
+                            vectorEffect="non-scaling-stroke"
+                            markerEnd="url(#perfect-cutoff-arrow)"
+                          />
+                        </svg>
+                      </div>
+                    </motion.div>
+                  ) : null}
 
-                {/* Візуал PERFECT-CONTINUOUS: хвиля тривалості аж до межі "ДО" */}
-                {effectiveAspect === "perfect_continuous" ? (
-                  <motion.div
-                    animate={{
-                      left: `${actionPct}%`,
-                      width: `${cutoffPct - actionPct}%`,
-                    }}
-                    transition={aspectSpring}
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-[224px] z-10 flex h-10 -translate-y-1/2 items-center justify-center rounded-l-full border border-r-0 border-emerald-500/45 bg-emerald-500/15 pl-8 pr-2 will-change-transform"
-                  >
-                    <span className="text-xs font-bold tracking-widest text-emerald-600 dark:text-emerald-300">
-                      〰〰
-                    </span>
-                  </motion.div>
-                ) : null}
+                  {isPerfect ? (
+                    <motion.div
+                      key="perfect-badge"
+                      initial={
+                        reduceMotion
+                          ? false
+                          : {
+                              opacity: 0,
+                              scale: 0.94,
+                              x: `${(cutoffPct + actionPct) / 2 - 50}%`,
+                            }
+                      }
+                      animate={{
+                        opacity: 1,
+                        scale: 1,
+                        x: `${(cutoffPct + actionPct) / 2 - 50}%`,
+                      }}
+                      exit={
+                        reduceMotion ? undefined : { opacity: 0, scale: 0.94 }
+                      }
+                      transition={{
+                        ...aspectSpring,
+                        opacity: getCrossfadeTransition(reduceMotion),
+                        scale: getCrossfadeTransition(reduceMotion),
+                      }}
+                      className="pointer-events-none absolute inset-x-0 top-[148px] z-20 flex justify-center will-change-transform"
+                    >
+                      <span className="rounded-full border border-sky-500/40 bg-card/95 px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap text-sky-700 shadow-xs dark:text-sky-300">
+                        {isContinuous ? 'тривало "ДО"' : 'завершено "ДО"'}
+                      </span>
+                    </motion.div>
+                  ) : null}
+
+                  {effectiveAspect === "simple" ? (
+                    <motion.div
+                      key="aspect-simple"
+                      initial={
+                        reduceMotion
+                          ? false
+                          : {
+                              opacity: 0,
+                              scale: 0.94,
+                              x: `${actionPct - 50}%`,
+                            }
+                      }
+                      animate={{
+                        opacity: 1,
+                        scale: 1,
+                        x: `${actionPct - 50}%`,
+                      }}
+                      exit={
+                        reduceMotion ? undefined : { opacity: 0, scale: 0.94 }
+                      }
+                      transition={{
+                        ...aspectSpring,
+                        opacity: getCrossfadeTransition(reduceMotion),
+                        scale: getCrossfadeTransition(reduceMotion),
+                      }}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-[224px] z-10 flex -translate-y-1/2 justify-center will-change-transform"
+                    >
+                      <div className="flex items-center gap-5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/45" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/75" />
+                        <span className="w-14" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/75" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/45" />
+                      </div>
+                    </motion.div>
+                  ) : null}
+
+                  {effectiveAspect === "continuous" ? (
+                    <motion.div
+                      key="aspect-continuous"
+                      initial={
+                        reduceMotion
+                          ? false
+                          : {
+                              opacity: 0,
+                              scale: 0.94,
+                              x: `${actionPct - 50}%`,
+                            }
+                      }
+                      animate={{
+                        opacity: 1,
+                        scale: 1,
+                        x: `${actionPct - 50}%`,
+                      }}
+                      exit={
+                        reduceMotion ? undefined : { opacity: 0, scale: 0.94 }
+                      }
+                      transition={{
+                        ...aspectSpring,
+                        opacity: getCrossfadeTransition(reduceMotion),
+                        scale: getCrossfadeTransition(reduceMotion),
+                      }}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-[224px] z-10 flex -translate-y-1/2 justify-center will-change-transform"
+                    >
+                      <div className="flex h-11 w-44 items-center justify-between rounded-full border border-emerald-500/45 bg-emerald-500/15 px-3.5">
+                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                          〰
+                        </span>
+                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                          〰
+                        </span>
+                      </div>
+                    </motion.div>
+                  ) : null}
+
+                  {effectiveAspect === "perfect_continuous" ? (
+                    <motion.div
+                      key="aspect-perfect-continuous"
+                      initial={
+                        reduceMotion
+                          ? false
+                          : {
+                              opacity: 0,
+                              scale: 0.94,
+                              x: `${(actionPct + cutoffPct) / 2 - 50}%`,
+                            }
+                      }
+                      animate={{
+                        opacity: 1,
+                        scale: 1,
+                        x: `${(actionPct + cutoffPct) / 2 - 50}%`,
+                      }}
+                      exit={
+                        reduceMotion ? undefined : { opacity: 0, scale: 0.94 }
+                      }
+                      transition={{
+                        ...aspectSpring,
+                        opacity: getCrossfadeTransition(reduceMotion),
+                        scale: getCrossfadeTransition(reduceMotion),
+                      }}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-[224px] z-10 flex -translate-y-1/2 justify-center will-change-transform"
+                    >
+                      <div
+                        className="flex h-10 items-center justify-center rounded-l-full border border-r-0 border-emerald-500/45 bg-emerald-500/15 pl-8 pr-2"
+                        style={{ width: `${cutoffPct - actionPct}%` }}
+                      >
+                        <span className="text-xs font-bold tracking-widest text-emerald-600 dark:text-emerald-300">
+                          〰〰
+                        </span>
+                      </div>
+                    </motion.div>
+                  ) : null}
+
+                  {isPerfect && aspectTime !== "present" ? (
+                    <motion.div
+                      key="cutoff-label"
+                      initial={
+                        reduceMotion
+                          ? false
+                          : { opacity: 0, x: `${cutoffPct - 50}%` }
+                      }
+                      animate={{ opacity: 1, x: `${cutoffPct - 50}%` }}
+                      exit={reduceMotion ? undefined : { opacity: 0 }}
+                      transition={{
+                        ...aspectSpring,
+                        opacity: getCrossfadeTransition(reduceMotion),
+                      }}
+                      className="pointer-events-none absolute inset-x-0 top-[276px] z-20 flex justify-center will-change-transform"
+                    >
+                      <span className="rounded-md border border-sky-500/45 bg-sky-500/15 px-2 py-0.5 text-[11px] font-bold whitespace-nowrap text-sky-700 dark:text-sky-300">
+                        Межа &quot;ДО&quot;
+                      </span>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
 
                 {/* Перетягуваний та клавіатурно-доступний маркер ✕ */}
                 <motion.div
-                  animate={{ left: `${actionPct}%` }}
+                  initial={false}
+                  animate={{ x: `${actionPct - 50}%` }}
                   transition={aspectSpring}
-                  className="absolute top-[224px] z-20 -translate-x-1/2 -translate-y-1/2 touch-none select-none will-change-transform"
+                  className="pointer-events-none absolute inset-x-0 top-[224px] z-20 flex -translate-y-1/2 justify-center will-change-transform"
                 >
                   <button
                     type="button"
@@ -1177,7 +1807,7 @@ export function TenseDetectorClient() {
                     onPointerDown={handleAspectPointerDown}
                     onKeyDown={handleAspectMarkerKeyDown}
                     className={cn(
-                      "flex h-10 w-10 items-center justify-center rounded-full border-2 text-base font-black shadow-md ring-4 transition-transform hover:scale-110",
+                      "pointer-events-auto flex h-10 w-10 touch-none select-none items-center justify-center rounded-full border-2 text-base font-black shadow-md ring-4 transition-transform hover:scale-110",
                       FOCUS_RING_CLASS,
                       MARKER_STYLES.emerald.markerBg,
                       MARKER_STYLES.emerald.markerBorder,
@@ -1191,7 +1821,7 @@ export function TenseDetectorClient() {
                   </button>
                 </motion.div>
 
-                {/* Нижні підписи на осі: NOW та Межа "ДО" */}
+                {/* Нижній підпис NOW на осі */}
                 <div
                   className={cn(
                     "pointer-events-none absolute top-[276px] z-20 -translate-x-1/2 rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wider whitespace-nowrap shadow-xs",
@@ -1205,16 +1835,6 @@ export function TenseDetectorClient() {
                     ? 'NOW · межа "ДО"'
                     : "NOW"}
                 </div>
-
-                {isPerfect && aspectTime !== "present" ? (
-                  <motion.div
-                    animate={{ left: `${cutoffPct}%` }}
-                    transition={aspectSpring}
-                    className="pointer-events-none absolute top-[276px] z-20 -translate-x-1/2 rounded-md border border-sky-500/45 bg-sky-500/15 px-2 py-0.5 text-[11px] font-bold whitespace-nowrap text-sky-700 will-change-transform dark:text-sky-300"
-                  >
-                    Межа &quot;ДО&quot;
-                  </motion.div>
-                ) : null}
               </div>
             </div>
           ) : null}
@@ -1333,43 +1953,40 @@ export function TenseDetectorClient() {
                   );
                 })}
 
-                {/* Плашка IF (назва часу + IF частина введеного речення) */}
+                {/* Плашка IF (відцентрована рівно над своєю колонкою) */}
                 <motion.div
-                  animate={{ left: `${condIfPct}%` }}
+                  initial={false}
+                  animate={{ x: `${condIfPct - 50}%` }}
                   transition={condIfSpring}
-                  className={cn(
-                    "pointer-events-none absolute top-[62px] z-10 w-max max-w-[215px] rounded-xl border border-amber-500/35 bg-card/95 px-3 py-2 text-center shadow-xs backdrop-blur-xs will-change-transform sm:max-w-[300px]",
-                    condIfSlot === 0
-                      ? "-translate-x-[26%]"
-                      : condIfSlot === 2
-                        ? "-translate-x-[74%]"
-                        : "-translate-x-1/2",
-                  )}
+                  className="pointer-events-none absolute inset-x-0 top-[62px] z-10 flex justify-center will-change-transform"
                 >
-                  <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-300">
-                    <span>IF · {activeCondMeta.ifClauseTense}</span>
-                    {activeCondMeta.ifBackshifted ? (
-                      <span className="inline-flex items-center gap-0.5 font-semibold opacity-85">
-                        <ArrowLeft className="h-3 w-3" aria-hidden="true" />
-                        backshift
-                      </span>
+                  <div className="w-max max-w-[29%] rounded-xl border border-amber-500/35 bg-card/95 px-3 py-2 text-center shadow-xs backdrop-blur-xs sm:max-w-[30%]">
+                    <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-300">
+                      <span>IF · {activeCondMeta.ifClauseTense}</span>
+                      {activeCondMeta.ifBackshifted ? (
+                        <span className="inline-flex items-center gap-0.5 font-semibold opacity-85">
+                          <ArrowLeft className="h-3 w-3" aria-hidden="true" />
+                          backshift
+                        </span>
+                      ) : null}
+                    </div>
+                    {activeCondParts ? (
+                      <p className="mt-0.5 text-xs leading-snug font-medium text-foreground sm:text-sm">
+                        <HighlightedSegments
+                          segments={activeCondParts.ifPart.segments}
+                          badgeClassName="py-0"
+                        />
+                      </p>
                     ) : null}
                   </div>
-                  {activeCondParts ? (
-                    <p className="mt-0.5 text-xs leading-snug font-medium text-foreground sm:text-sm">
-                      <HighlightedSegments
-                        segments={activeCondParts.ifPart.segments}
-                        badgeClassName="py-0"
-                      />
-                    </p>
-                  ) : null}
                 </motion.div>
 
                 {/* Перетягуваний та клавіатурно-доступний маркер IF ✕ */}
                 <motion.div
-                  animate={{ left: `${condIfPct}%` }}
+                  initial={false}
+                  animate={{ x: `${condIfPct - 50}%` }}
                   transition={condIfSpring}
-                  className="absolute top-[152px] z-20 -translate-x-1/2 -translate-y-1/2 touch-none select-none will-change-transform"
+                  className="pointer-events-none absolute inset-x-0 top-[152px] z-20 flex -translate-y-1/2 justify-center will-change-transform"
                 >
                   <button
                     type="button"
@@ -1384,7 +2001,7 @@ export function TenseDetectorClient() {
                       handleCondMarkerKeyDown("if", condIfSlot, e)
                     }
                     className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-full border-2 text-base font-black shadow-md ring-4 transition-transform hover:scale-110",
+                      "pointer-events-auto flex h-9 w-9 touch-none select-none items-center justify-center rounded-full border-2 text-base font-black shadow-md ring-4 transition-transform hover:scale-110",
                       FOCUS_RING_CLASS,
                       MARKER_STYLES.amber.markerBg,
                       MARKER_STYLES.amber.markerBorder,
@@ -1445,37 +2062,34 @@ export function TenseDetectorClient() {
                   );
                 })}
 
-                {/* Плашка RESULT (назва форми + RESULT частина введеного речення) */}
+                {/* Плашка RESULT (відцентрована рівно над своєю колонкою) */}
                 <motion.div
-                  animate={{ left: `${condResultPct}%` }}
+                  initial={false}
+                  animate={{ x: `${condResultPct - 50}%` }}
                   transition={condResultSpring}
-                  className={cn(
-                    "pointer-events-none absolute top-[212px] z-10 w-max max-w-[215px] rounded-xl border border-emerald-500/35 bg-card/95 px-3 py-2 text-center shadow-xs backdrop-blur-xs will-change-transform sm:max-w-[300px]",
-                    condResultSlot === 0
-                      ? "-translate-x-[26%]"
-                      : condResultSlot === 2
-                        ? "-translate-x-[74%]"
-                        : "-translate-x-1/2",
-                  )}
+                  className="pointer-events-none absolute inset-x-0 top-[212px] z-10 flex justify-center will-change-transform"
                 >
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-300">
-                    RESULT · {activeCondMeta.resultClauseTense}
+                  <div className="w-max max-w-[29%] rounded-xl border border-emerald-500/35 bg-card/95 px-3 py-2 text-center shadow-xs backdrop-blur-xs sm:max-w-[30%]">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-300">
+                      RESULT · {activeCondMeta.resultClauseTense}
+                    </div>
+                    {activeCondParts && activeCondParts.resultPart.plainText ? (
+                      <p className="mt-0.5 text-xs leading-snug font-medium text-foreground sm:text-sm">
+                        <HighlightedSegments
+                          segments={activeCondParts.resultPart.segments}
+                          badgeClassName="py-0"
+                        />
+                      </p>
+                    ) : null}
                   </div>
-                  {activeCondParts && activeCondParts.resultPart.plainText ? (
-                    <p className="mt-0.5 text-xs leading-snug font-medium text-foreground sm:text-sm">
-                      <HighlightedSegments
-                        segments={activeCondParts.resultPart.segments}
-                        badgeClassName="py-0"
-                      />
-                    </p>
-                  ) : null}
                 </motion.div>
 
                 {/* Перетягуваний та клавіатурно-доступний маркер RESULT ✕ */}
                 <motion.div
-                  animate={{ left: `${condResultPct}%` }}
+                  initial={false}
+                  animate={{ x: `${condResultPct - 50}%` }}
                   transition={condResultSpring}
-                  className="absolute top-[300px] z-20 -translate-x-1/2 -translate-y-1/2 touch-none select-none will-change-transform"
+                  className="pointer-events-none absolute inset-x-0 top-[300px] z-20 flex -translate-y-1/2 justify-center will-change-transform"
                 >
                   <button
                     type="button"
@@ -1490,7 +2104,7 @@ export function TenseDetectorClient() {
                       handleCondMarkerKeyDown("result", condResultSlot, e)
                     }
                     className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-full border-2 text-base font-black shadow-md ring-4 transition-transform hover:scale-110",
+                      "pointer-events-auto flex h-9 w-9 touch-none select-none items-center justify-center rounded-full border-2 text-base font-black shadow-md ring-4 transition-transform hover:scale-110",
                       FOCUS_RING_CLASS,
                       MARKER_STYLES.emerald.markerBg,
                       MARKER_STYLES.emerald.markerBorder,
@@ -1503,6 +2117,447 @@ export function TenseDetectorClient() {
                     ✕
                   </button>
                 </motion.div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ════════════════════════════════════════════════════════════ */}
+          {/* РЕЖИМ 3: НЕПРЯМА МОВА (REPORTED SPEECH)                      */}
+          {/* ════════════════════════════════════════════════════════════ */}
+          {mode === "reported" ? (
+            <div className="space-y-4">
+              {/* 4 перемикачі типів непрямої мови */}
+              <div
+                role="group"
+                aria-label="Вибір типу непрямої мови"
+                className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4"
+              >
+                {REPORTED_CATEGORIES.map((cat) => {
+                  const isSelected = reportedCategory === cat.key;
+                  return (
+                    <button
+                      key={cat.key}
+                      type="button"
+                      onClick={() => {
+                        setReportedCategory(cat.key);
+                        setReportedPerspective("reported");
+                      }}
+                      aria-pressed={isSelected}
+                      className={cn(
+                        "relative flex flex-col items-center justify-between gap-1.5 overflow-hidden rounded-xl border px-3.5 py-3 text-center transition-colors",
+                        FOCUS_RING_CLASS,
+                        isSelected
+                          ? "border-transparent"
+                          : "border-border/70 bg-background/55 hover:border-border hover:bg-accent/20",
+                      )}
+                    >
+                      {isSelected ? (
+                        <motion.span
+                          layoutId="reported-active-ring"
+                          transition={getSpringTransition(false, reduceMotion)}
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0 rounded-xl border-2 border-primary bg-primary/[0.11] shadow-xs"
+                        />
+                      ) : null}
+                      <div className="relative z-10 flex w-full items-center justify-center gap-2">
+                        <span
+                          className={cn(
+                            "text-sm font-bold tracking-tight",
+                            isSelected ? "text-primary" : "text-foreground",
+                          )}
+                        >
+                          {cat.title}
+                        </span>
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors",
+                            isSelected
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border/80 bg-background/60",
+                          )}
+                        >
+                          {isSelected ? <Check className="h-2.5 w-2.5" /> : null}
+                        </span>
+                      </div>
+                      <span className="relative z-10 text-xs leading-snug text-muted-foreground">
+                        {cat.explanationUk}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Смуга вибору правила (з таблиць VERB FORMS / QUESTIONS / IMPERATIVES) */}
+              <div className="flex min-h-[38px] flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-background/40 px-3 py-1.5">
+                {customReportedSentence ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <Badge
+                        variant="secondary"
+                        className="border border-primary/30 bg-primary/10 text-primary"
+                      >
+                        {customReportedSentence.labelUk}
+                      </Badge>
+                      <span className="text-muted-foreground">
+                        Ваше речення адаптовано під 4 типи непрямої мови
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCustomReportedSentence(null)}
+                      className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                      Повернути табличні приклади
+                    </Button>
+                  </>
+                ) : (
+                  <div
+                    role="group"
+                    aria-label="Приклади правил перетворення"
+                    className="flex flex-wrap items-center gap-1.5"
+                  >
+                    {reportedCategoryPresets.map((preset) => {
+                      const isPresetActive =
+                        activeReportedPreset.id === preset.id;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          aria-pressed={isPresetActive}
+                          onClick={() => {
+                            setSelectedReportedPresetIds((prev) => ({
+                              ...prev,
+                              [reportedCategory]: preset.id,
+                            }));
+                            setReportedPerspective("reported");
+                          }}
+                          className={cn(
+                            "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                            FOCUS_RING_CLASS,
+                            isPresetActive
+                              ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                              : "border-border/60 bg-card/70 text-muted-foreground hover:border-border hover:text-foreground",
+                          )}
+                        >
+                          {preset.pillLabel}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Інтерактивна дошка: Пряма ↔ Непряма мова + Таймлайн зсуву часу */}
+              <div className="space-y-3 rounded-xl border border-border/70 bg-background/55 p-4">
+                {/* Частина A: Порівняння Direct Speech → Reported Speech */}
+                <div className="grid min-h-[116px] gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-stretch">
+                  <button
+                    type="button"
+                    aria-pressed={reportedPerspective === "direct"}
+                    onClick={() => setReportedPerspective("direct")}
+                    className={cn(
+                      "flex flex-col items-start justify-between gap-2 rounded-xl border p-3.5 text-left transition-all",
+                      FOCUS_RING_CLASS,
+                      reportedPerspective === "direct"
+                        ? "border-sky-500/60 bg-sky-500/[0.08] ring-1 ring-sky-400/40"
+                        : "border-border/70 bg-card/75 hover:border-border",
+                    )}
+                  >
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        1. Пряма мова (Direct)
+                      </span>
+                      <span
+                        className={cn(
+                          "rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-wider",
+                          MARKER_STYLES.sky.badge,
+                        )}
+                      >
+                        {activeReportedEntry.directBadge}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium leading-relaxed text-foreground sm:text-base">
+                      <HighlightedSegments
+                        segments={directParsed.segments}
+                        badgeClassName="py-0"
+                      />
+                    </p>
+                  </button>
+
+                  <div className="flex flex-col items-center justify-center gap-1 px-1 text-center">
+                    <div className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-primary">
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </div>
+                    <span className="max-w-[155px] rounded-full border border-border/60 bg-card/85 px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                      {activeReportedEntry.bridgeLabelUk}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    aria-pressed={reportedPerspective === "reported"}
+                    onClick={() => setReportedPerspective("reported")}
+                    className={cn(
+                      "flex flex-col items-start justify-between gap-2 rounded-xl border p-3.5 text-left transition-all",
+                      FOCUS_RING_CLASS,
+                      reportedPerspective === "reported"
+                        ? "border-emerald-500/60 bg-emerald-500/[0.08] ring-1 ring-emerald-400/40"
+                        : "border-border/70 bg-card/75 hover:border-border",
+                    )}
+                  >
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        2. Непряма мова (Reported)
+                      </span>
+                      <span
+                        className={cn(
+                          "rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-wider",
+                          MARKER_STYLES.emerald.badge,
+                        )}
+                      >
+                        {activeReportedEntry.reportedBadge}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium leading-relaxed text-foreground sm:text-base">
+                      <HighlightedSegments
+                        segments={reportedParsed.segments}
+                        badgeClassName="py-0"
+                      />
+                    </p>
+                  </button>
+                </div>
+
+                {/* Частина B: Вісь зсуву часу (Backshift Timeline) */}
+                <div
+                  ref={reportedTrackRef}
+                  onPointerMove={handleReportedPointerMove}
+                  onPointerUp={() => setDraggingReportedMarker(false)}
+                  onPointerCancel={() => setDraggingReportedMarker(false)}
+                  className="relative h-[138px] w-full select-none overflow-hidden rounded-xl border border-border/70 bg-card/45"
+                >
+                  <div className="absolute inset-0 grid grid-cols-3 divide-x divide-border/40">
+                    {REPORTED_TIME_COLUMNS.map((col) => {
+                      const isDirectHere =
+                        activeReportedEntry.directSlot === col.slot;
+                      const isReportedHere =
+                        activeReportedEntry.reportedSlot === col.slot;
+                      const isInteractive = isDirectHere || isReportedHere;
+                      const isColFocused = reportedActiveSlot === col.slot;
+
+                      return (
+                        <button
+                          key={col.slot}
+                          type="button"
+                          disabled={!isInteractive}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            if (isDirectHere && isReportedHere) {
+                              setReportedPerspective((prev) =>
+                                prev === "direct" ? "reported" : "direct",
+                              );
+                            } else if (isReportedHere) {
+                              setReportedPerspective("reported");
+                            } else if (isDirectHere) {
+                              setReportedPerspective("direct");
+                            }
+                          }}
+                          className={cn(
+                            "flex h-full flex-col items-center pt-2.5 text-center transition-colors",
+                            FOCUS_RING_INSET_CLASS,
+                            isColFocused
+                              ? "bg-primary/[0.05]"
+                              : isInteractive
+                                ? "hover:bg-muted/20"
+                                : "opacity-55",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "px-2 text-[11px] font-bold tracking-tight sm:text-xs",
+                              isColFocused
+                                ? "text-primary"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            {col.labelUk}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Горизонтальна вісь часу */}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-[6%] top-[90px] z-10 h-0.5 -translate-y-1/2 bg-border"
+                  />
+
+                  {REPORTED_TIME_COLUMNS.map((col) => (
+                    <span
+                      key={`rep-tick-${col.slot}`}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute top-[90px] z-10 block h-3 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border"
+                      style={{ left: `${getColumnCenterPercent(col.slot)}%` }}
+                    />
+                  ))}
+
+                  {/* Точка походження прямої мови */}
+                  {activeReportedEntry.directSlot !==
+                  activeReportedEntry.reportedSlot ? (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute top-[90px] z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+                      style={{ left: `${reportedDirectPct}%` }}
+                    >
+                      <span className="h-6 w-6 rounded-full border-2 border-dashed border-sky-400/70 bg-sky-500/10" />
+                    </div>
+                  ) : null}
+
+                  {/* Дуга зсуву часу назад (Backshift) або статична підказка */}
+                  <AnimatePresence initial={false}>
+                    {activeReportedEntry.hasBackshift &&
+                    activeReportedEntry.directSlot !==
+                      activeReportedEntry.reportedSlot ? (
+                      <motion.div
+                        key={`rep-curve-${activeReportedEntry.directSlot}-${activeReportedEntry.reportedSlot}`}
+                        initial={reduceMotion ? false : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={reduceMotion ? undefined : { opacity: 0 }}
+                        transition={getCrossfadeTransition(reduceMotion)}
+                        aria-hidden="true"
+                        className="pointer-events-none absolute top-[40px] z-10 h-[50px]"
+                        style={{
+                          left: `${Math.min(reportedDirectPct, reportedTargetPct)}%`,
+                          width: `${Math.abs(reportedDirectPct - reportedTargetPct)}%`,
+                        }}
+                      >
+                        <svg
+                          viewBox="0 0 200 50"
+                          preserveAspectRatio="none"
+                          className="h-full w-full overflow-visible"
+                        >
+                          <defs>
+                            <marker
+                              id="reported-backshift-arrow"
+                              markerWidth="8"
+                              markerHeight="8"
+                              refX="6"
+                              refY="4"
+                              orient="auto"
+                            >
+                              <path d="M0,0 L8,4 L0,8 Z" fill="#34d399" />
+                            </marker>
+                          </defs>
+                          <path
+                            d="M 196 42 Q 100 -4 6 42"
+                            fill="none"
+                            stroke="#34d399"
+                            strokeWidth="2.5"
+                            strokeDasharray="6 4"
+                            vectorEffect="non-scaling-stroke"
+                            markerEnd="url(#reported-backshift-arrow)"
+                          />
+                        </svg>
+                        <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 rounded-full border border-emerald-500/40 bg-card/95 px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap text-emerald-700 shadow-xs dark:text-emerald-300">
+                          ← Backshift (крок назад)
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="rep-static-note"
+                        initial={reduceMotion ? false : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={reduceMotion ? undefined : { opacity: 0 }}
+                        transition={getCrossfadeTransition(reduceMotion)}
+                        className="pointer-events-none absolute inset-x-0 top-[42px] z-10 flex justify-center"
+                      >
+                        <span className="rounded-full border border-border/70 bg-card/90 px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground shadow-xs">
+                          Час дієслова не зсувається
+                        </span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Перетягуваний та клавіатурний маркер перспективи ✕ */}
+                  <motion.div
+                    initial={false}
+                    animate={{ x: `${reportedMarkerPct - 50}%` }}
+                    transition={reportedSpring}
+                    className="pointer-events-none absolute inset-x-0 top-[90px] z-20 flex -translate-y-1/2 justify-center will-change-transform"
+                  >
+                    <button
+                      type="button"
+                      role="slider"
+                      aria-label="Перспектива: пряма чи непряма мова"
+                      aria-valuemin={0}
+                      aria-valuemax={2}
+                      aria-valuenow={reportedActiveSlot}
+                      aria-valuetext={
+                        reportedPerspective === "direct"
+                          ? "Пряма мова (Direct Speech)"
+                          : "Непряма мова (Reported Speech)"
+                      }
+                      onPointerDown={handleReportedPointerDown}
+                      onKeyDown={handleReportedMarkerKeyDown}
+                      className={cn(
+                        "pointer-events-auto flex h-9 w-9 touch-none select-none items-center justify-center rounded-full border-2 text-base font-black shadow-md ring-4 transition-transform hover:scale-110",
+                        FOCUS_RING_CLASS,
+                        reportedPerspective === "direct"
+                          ? cn(
+                              MARKER_STYLES.sky.markerBg,
+                              MARKER_STYLES.sky.markerBorder,
+                              MARKER_STYLES.sky.ring,
+                            )
+                          : cn(
+                              MARKER_STYLES.emerald.markerBg,
+                              MARKER_STYLES.emerald.markerBorder,
+                              MARKER_STYLES.emerald.ring,
+                            ),
+                        draggingReportedMarker
+                          ? "scale-115 cursor-grabbing shadow-lg"
+                          : "cursor-grab",
+                      )}
+                    >
+                      ✕
+                    </button>
+                  </motion.div>
+
+                  {/* Підписи під віссю */}
+                  <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-around text-[10px] font-semibold text-muted-foreground/85">
+                    <span>Давніший факт (had + V3)</span>
+                    <span>Момент переказу (said / asked)</span>
+                    <span>Озвучення вживу (&quot;Direct&quot;)</span>
+                  </div>
+                </div>
+
+                {/* Частина C: Коротка 3-колірна легенда компонентів */}
+                <div className="flex flex-wrap items-center justify-center gap-4 pt-0.5 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      aria-hidden="true"
+                      className="h-2.5 w-2.5 rounded-full bg-emerald-400"
+                    />
+                    Зсув часу (Backshift) / (not) to + V0
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      aria-hidden="true"
+                      className="h-2.5 w-2.5 rounded-full bg-amber-400"
+                    />
+                    if / whether · прямий порядок S + V (без &quot;?&quot;)
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      aria-hidden="true"
+                      className="h-2.5 w-2.5 rounded-full bg-sky-400"
+                    />
+                    Дистанція: час · місце · особи
+                  </span>
+                </div>
               </div>
             </div>
           ) : null}

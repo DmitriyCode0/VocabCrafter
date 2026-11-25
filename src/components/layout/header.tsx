@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAppI18n } from "@/components/providers/app-language-provider";
 import { NavLinks } from "./nav-links";
+import { HeaderThemeControls } from "./header-theme-controls";
 import { UserMenu } from "./user-menu";
 import { PageHowItWorksButton } from "@/components/shared/page-how-it-works";
 import { SiteAssistantButton } from "@/components/shared/site-assistant-button";
@@ -77,6 +78,7 @@ export function Header({ profile }: HeaderProps) {
         <div className={isStudent ? "hidden md:block" : undefined}>
           <PageHowItWorksButton role={profile.role as Role} />
         </div>
+        <HeaderThemeControls />
         <UserMenu profile={profile} />
       </div>
     </header>

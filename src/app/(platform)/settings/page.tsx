@@ -23,8 +23,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { BrowserTtsButton } from "@/components/quiz/browser-tts-button";
-import { Loader2, Save } from "lucide-react";
+import { useTtsPreference } from "@/components/providers/tts-preference-provider";
+import { cn } from "@/lib/utils";
+import { Loader2, Save, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import {
   APP_LANGUAGES,
   normalizeAppLanguage,
@@ -153,6 +157,7 @@ function SettingsSidebarPanel({
 export default function SettingsPage() {
   const router = useRouter();
   const { messages } = useAppI18n();
+  const { engine, setEngine } = useTtsPreference();
   const { profile, isLoading: profileLoading } = useUser();
   const [draft, setDraft] = useState<SettingsDraft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -451,8 +456,49 @@ export default function SettingsPage() {
     </Select>
   );
 
+  const aiVoiceEngineToggle = (
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/60 bg-background p-4">
+      <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
+            engine === "ai"
+              ? "border-primary/35 bg-primary/10 text-primary"
+              : "border-border/60 bg-muted/40 text-muted-foreground",
+          )}
+        >
+          <Sparkles className="h-4 w-4" aria-hidden="true" />
+        </div>
+        <div className="space-y-0.5">
+          <p className="text-sm font-medium text-foreground">
+            {messages.userMenu.aiVoiceToggle}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {engine === "ai"
+              ? messages.userMenu.aiVoiceEnabled
+              : messages.userMenu.browserVoiceDefault}
+          </p>
+        </div>
+      </div>
+      <Switch
+        checked={engine === "ai"}
+        onCheckedChange={(checked) => {
+          const next = checked ? "ai" : "browser";
+          setEngine(next);
+          if (checked) {
+            toast.success(messages.userMenu.switchedToAiVoice);
+          } else {
+            toast.info(messages.userMenu.switchedToBrowserVoice);
+          }
+        }}
+        aria-label={messages.userMenu.aiVoiceToggle}
+      />
+    </div>
+  );
+
   const tutorAiVoiceControl = (
     <div className="space-y-4">
+      <div className="max-w-lg">{aiVoiceEngineToggle}</div>
       <div className="max-w-lg">{aiVoiceSelectControl}</div>
 
       <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
@@ -518,7 +564,8 @@ export default function SettingsPage() {
   );
 
   const legacyAiVoiceControl = (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {aiVoiceEngineToggle}
       {aiVoiceSelectControl}
       <p className="text-xs text-muted-foreground">
         {messages.settings.aiVoice.description}
