@@ -18,6 +18,7 @@ import {
   BookOpen,
   Users,
   BarChart3,
+  Clock,
   Cpu,
   Zap,
   CreditCard,
@@ -50,11 +51,17 @@ export async function AdminDashboard({
 
   const [
     { count: userCount },
+    { count: pendingUserCount },
     { count: totalQuizCount },
     { count: monthlyQuizCount },
     monthlyUsageEventsResult,
   ] = await Promise.all([
     supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }),
+    supabaseAdmin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("approval_status", "pending")
+      .neq("role", "superadmin"),
     supabaseAdmin.from("quizzes").select("id", { count: "exact", head: true }),
     supabaseAdmin
       .from("quizzes")
@@ -96,6 +103,33 @@ export async function AdminDashboard({
 
   return (
     <div className="space-y-6">
+      {(pendingUserCount ?? 0) > 0 ? (
+        <Card className="border-amber-500/45 bg-amber-500/[0.05]">
+          <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                <Clock className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-sm font-semibold text-foreground">
+                  {messages.dashboard.admin.pendingRequestsBannerTitle(
+                    pendingUserCount ?? 0,
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {messages.dashboard.admin.pendingRequestsBannerDescription}
+                </p>
+              </div>
+            </div>
+            <Button asChild size="sm" className="shrink-0">
+              <Link href="/users" prefetch={false}>
+                {messages.dashboard.admin.reviewRequestsButton}
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <AnimatedDashboard className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <AnimatedCard>
           <Card data-tour-id="admin-quizzes-created">

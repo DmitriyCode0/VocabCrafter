@@ -31,6 +31,14 @@ export const getAuthenticatedUser = cache(async (): Promise<{
   };
 });
 
+export function isProfileApproved(
+  profile: Pick<Profile, "role"> & { approval_status?: string | null },
+): boolean {
+  if (profile.role === "superadmin") return true;
+  if (!profile.approval_status) return true;
+  return profile.approval_status === "approved";
+}
+
 export async function requireRole(...roles: Role[]): Promise<{
   user: { id: string; email: string };
   profile: Profile;
@@ -43,6 +51,10 @@ export async function requireRole(...roles: Role[]): Promise<{
 
   if (!result.profile.onboarding_completed) {
     redirect("/onboarding");
+  }
+
+  if (!isProfileApproved(result.profile)) {
+    redirect("/dashboard");
   }
 
   if (!roles.includes(result.profile.role as Role)) {
@@ -64,6 +76,10 @@ export async function requirePermission(permission: Permission): Promise<{
 
   if (!result.profile.onboarding_completed) {
     redirect("/onboarding");
+  }
+
+  if (!isProfileApproved(result.profile)) {
+    redirect("/dashboard");
   }
 
   if (!hasPermission(result.profile.role as Role, permission)) {

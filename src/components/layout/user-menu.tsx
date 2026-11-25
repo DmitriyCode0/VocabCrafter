@@ -38,9 +38,10 @@ import { Badge } from "@/components/ui/badge";
 
 interface UserMenuProps {
   profile: Profile;
+  isApproved?: boolean;
 }
 
-export function UserMenu({ profile }: UserMenuProps) {
+export function UserMenu({ profile, isApproved = true }: UserMenuProps) {
   const router = useRouter();
   const { messages } = useAppI18n();
   const supabase = createClient();
@@ -109,15 +110,17 @@ export function UserMenu({ profile }: UserMenuProps) {
             <Badge variant="secondary" className="text-[11px]">
               {messages.common.roleNames[profile.role as Role]}
             </Badge>
-            <Badge
-              variant="outline"
-              className={cn("gap-1 text-[11px] font-semibold", planBadgeClass)}
-            >
-              {planKey === "premium" ? (
-                <Crown className="h-2.5 w-2.5 shrink-0" />
-              ) : null}
-              {planName}
-            </Badge>
+            {isApproved ? (
+              <Badge
+                variant="outline"
+                className={cn("gap-1 text-[11px] font-semibold", planBadgeClass)}
+              >
+                {planKey === "premium" ? (
+                  <Crown className="h-2.5 w-2.5 shrink-0" />
+                ) : null}
+                {planName}
+              </Badge>
+            ) : null}
           </div>
         </div>
       </DropdownMenuTrigger>
@@ -132,25 +135,31 @@ export function UserMenu({ profile }: UserMenuProps) {
             <p className="truncate text-sm font-medium">
               {profile.full_name || profile.email}
             </p>
-            <Badge
-              variant="outline"
-              className={cn("shrink-0 gap-1 text-[10px] font-semibold", planBadgeClass)}
-            >
-              {planKey === "premium" ? (
-                <Crown className="h-2.5 w-2.5 shrink-0" />
-              ) : null}
-              {planName}
-            </Badge>
+            {isApproved ? (
+              <Badge
+                variant="outline"
+                className={cn("shrink-0 gap-1 text-[10px] font-semibold", planBadgeClass)}
+              >
+                {planKey === "premium" ? (
+                  <Crown className="h-2.5 w-2.5 shrink-0" />
+                ) : null}
+                {planName}
+              </Badge>
+            ) : null}
           </div>
           <p className="truncate text-xs text-muted-foreground">
             {profile.email}
           </p>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/billing")}>
-          <CreditCard className="mr-2 h-4 w-4" />
-          {messages.userMenu.membershipBilling}
-        </DropdownMenuItem>
+        {isApproved ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/billing")}>
+              <CreditCard className="mr-2 h-4 w-4" />
+              {messages.userMenu.membershipBilling}
+            </DropdownMenuItem>
+          </>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>

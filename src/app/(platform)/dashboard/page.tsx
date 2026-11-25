@@ -22,7 +22,8 @@ import {
   listStudentTutorPlans,
   type StudentTutorPlanCard,
 } from "@/lib/progress/tutor-student-plan";
-import { getAuthenticatedUser } from "@/lib/rbac/require-role";
+import { PendingApprovalCard } from "@/components/dashboard/pending-approval-card";
+import { getAuthenticatedUser, isProfileApproved } from "@/lib/rbac/require-role";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +33,13 @@ export default async function DashboardPage() {
   if (!authenticatedUser) redirect("/login");
 
   const { user, profile } = authenticatedUser;
+  const appLanguage = normalizeAppLanguage(profile.app_language);
+
+  if (!isProfileApproved(profile)) {
+    return <PendingApprovalCard profile={profile} appLanguage={appLanguage} />;
+  }
 
   const role = profile.role as Role;
-  const appLanguage = normalizeAppLanguage(profile.app_language);
   const messages = getAppMessages(appLanguage);
   const displayName = profile.full_name || profile.email;
   let dashboardContent: ReactNode = null;

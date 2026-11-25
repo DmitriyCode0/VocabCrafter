@@ -19,9 +19,10 @@ import type { Role } from "@/types/roles";
 
 interface HeaderProps {
   profile: Profile;
+  isApproved?: boolean;
 }
 
-export function Header({ profile }: HeaderProps) {
+export function Header({ profile, isApproved = true }: HeaderProps) {
   const { messages } = useAppI18n();
   const isStudent = profile.role === "student";
 
@@ -64,7 +65,7 @@ export function Header({ profile }: HeaderProps) {
               </Link>
             </div>
             <div className="px-3 py-4">
-              <NavLinks role={profile.role as Role} />
+              <NavLinks role={profile.role as Role} isApproved={isApproved} />
             </div>
           </SheetContent>
         </Sheet>
@@ -73,9 +74,9 @@ export function Header({ profile }: HeaderProps) {
       <div className="flex-1" />
 
       <div className="flex items-center gap-2">
-        <SiteAssistantButton role={profile.role as Role} />
+        {isApproved ? <SiteAssistantButton role={profile.role as Role} /> : null}
         <HeaderThemeControls />
-        <UserMenu profile={profile} />
+        <UserMenu profile={profile} isApproved={isApproved} />
       </div>
     </header>
   );

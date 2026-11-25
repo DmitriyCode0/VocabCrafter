@@ -40,9 +40,10 @@ function subscribeToSidebarCollapsed(onStoreChange: () => void) {
 
 interface SidebarProps {
   profile: Profile;
+  isApproved?: boolean;
 }
 
-export function Sidebar({ profile }: SidebarProps) {
+export function Sidebar({ profile, isApproved = true }: SidebarProps) {
   const collapsed = useSyncExternalStore(
     subscribeToSidebarCollapsed,
     getSidebarCollapsedSnapshot,
@@ -107,7 +108,11 @@ export function Sidebar({ profile }: SidebarProps) {
           collapsed ? "px-2" : "px-3",
         )}
       >
-        <NavLinks role={profile.role as Role} collapsed={collapsed} />
+        <NavLinks
+          role={profile.role as Role}
+          collapsed={collapsed}
+          isApproved={isApproved}
+        />
       </div>
     </aside>
   );

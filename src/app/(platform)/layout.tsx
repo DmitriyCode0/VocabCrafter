@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { Profile } from "@/types/database";
 import type { Role } from "@/types/roles";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
-import { getAuthenticatedUser } from "@/lib/rbac/require-role";
+import { getAuthenticatedUser, isProfileApproved } from "@/lib/rbac/require-role";
 import { AppLanguageProvider } from "@/components/providers/app-language-provider";
 import { TtsPreferenceProvider } from "@/components/providers/tts-preference-provider";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -27,18 +27,19 @@ export default async function PlatformLayout({
   }
 
   const appLanguage = normalizeAppLanguage(profile.app_language);
+  const isApproved = isProfileApproved(profile);
   const isStudent = profile.role === "student";
 
   return (
     <AppLanguageProvider appLanguage={appLanguage}>
       <TtsPreferenceProvider>
         <div className="flex h-dvh overflow-hidden">
-          <Sidebar profile={profile as Profile} />
+          <Sidebar profile={profile as Profile} isApproved={isApproved} />
           <div className="flex flex-1 flex-col overflow-hidden">
-            <Header profile={profile as Profile} />
+            <Header profile={profile as Profile} isApproved={isApproved} />
             <main
               className={`flex-1 overflow-y-auto p-4 md:p-6 md:pb-6 animate-page-enter ${
-                isStudent
+                isStudent || !isApproved
                   ? "pb-6"
                   : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]"
               }`}
@@ -47,7 +48,7 @@ export default async function PlatformLayout({
             </main>
           </div>
         </div>
-        <MobileBottomNav role={profile.role as Role} />
+        {isApproved ? <MobileBottomNav role={profile.role as Role} /> : null}
       </TtsPreferenceProvider>
     </AppLanguageProvider>
   );

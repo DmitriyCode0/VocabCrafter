@@ -219,9 +219,14 @@ const NAV_ITEMS: NavItem[] = [
 interface NavLinksProps {
   role: Role;
   collapsed?: boolean;
+  isApproved?: boolean;
 }
 
-export function NavLinks({ role, collapsed = false }: NavLinksProps) {
+export function NavLinks({
+  role,
+  collapsed = false,
+  isApproved = true,
+}: NavLinksProps) {
   const pathname = usePathname();
   const { messages } = useAppI18n();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
@@ -243,7 +248,12 @@ export function NavLinks({ role, collapsed = false }: NavLinksProps) {
     clearPendingHrefForPath(pathname);
   }, [pathname]);
 
-  const filteredItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
+  const filteredItems = NAV_ITEMS.filter((item) => {
+    if (!isApproved) {
+      return item.href === "/dashboard";
+    }
+    return item.roles.includes(role);
+  });
 
   return (
     <motion.nav

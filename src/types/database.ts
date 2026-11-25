@@ -1,5 +1,7 @@
 import type { Role } from "./roles";
 
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
 export type Json =
   | string
   | number
@@ -18,6 +20,10 @@ export interface Database {
           full_name: string | null;
           avatar_url: string | null;
           role: Role;
+          approval_status: ApprovalStatus;
+          registration_note: string | null;
+          approved_at: string | null;
+          approved_by: string | null;
           onboarding_completed: boolean;
           cefr_level: string;
           preferred_language: string;
@@ -37,6 +43,10 @@ export interface Database {
           full_name?: string | null;
           avatar_url?: string | null;
           role?: Role;
+          approval_status?: ApprovalStatus;
+          registration_note?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
           onboarding_completed?: boolean;
           cefr_level?: string;
           preferred_language?: string;
@@ -56,6 +66,10 @@ export interface Database {
           full_name?: string | null;
           avatar_url?: string | null;
           role?: Role;
+          approval_status?: ApprovalStatus;
+          registration_note?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
           onboarding_completed?: boolean;
           cefr_level?: string;
           preferred_language?: string;

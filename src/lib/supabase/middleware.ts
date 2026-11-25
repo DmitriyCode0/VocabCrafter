@@ -57,16 +57,76 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // If authenticated, check onboarding status
-  if (user && !isPublicRoute && pathname !== "/onboarding" && !isApiRoute) {
-    const { data: profile, error: profileError } = await supabase
+  // Block unapproved authenticated users from protected API routes
+  if (user && isApiRoute) {
+    const { data: apiProfile, error: apiProfileError } = await supabase
       .from("profiles")
-      .select("onboarding_completed, role")
+      .select("role, approval_status")
       .eq("id", user.id)
       .single();
 
+    if (
+      !apiProfileError &&
+      apiProfile &&
+      apiProfile.role !== "superadmin" &&
+      apiProfile.approval_status &&
+      apiProfile.approval_status !== "approved"
+    ) {
+      return NextResponse.json(
+        {
+          error: "Your account is pending administrator approval.",
+          code: "ACCOUNT_PENDING_APPROVAL",
+        },
+        { status: 403 },
+      );
+    }
+  }
+
+  // If authenticated user visits /onboarding after completing it, redirect to dashboard
+  if (user && pathname === "/onboarding") {
+    const { data: onboardingProfile } = await supabase
+      .from("profiles")
+      .select("onboarding_completed")
+      .eq("id", user.id)
+      .single();
+
+    if (onboardingProfile?.onboarding_completed) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // If authenticated, check onboarding and manual approval status
+  if (user && !isPublicRoute && pathname !== "/onboarding" && !isApiRoute) {
+    let profile: {
+      onboarding_completed: boolean;
+      role: string;
+      approval_status?: string | null;
+    } | null = null;
+
+    const { data: primaryProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("onboarding_completed, role, approval_status")
+      .eq("id", user.id)
+      .single();
+
+    if (
+      profileError &&
+      profileError.message.toLowerCase().includes("approval_status")
+    ) {
+      const { data: fallbackProfile } = await supabase
+        .from("profiles")
+        .select("onboarding_completed, role")
+        .eq("id", user.id)
+        .single();
+      profile = fallbackProfile;
+    } else if (!profileError) {
+      profile = primaryProfile;
+    }
+
     // If profile doesn't exist yet (e.g., trigger hasn't fired), redirect to onboarding
-    if (!profile || profileError) {
+    if (!profile) {
       const url = request.nextUrl.clone();
       url.pathname = "/onboarding";
       return NextResponse.redirect(url);
@@ -76,6 +136,18 @@ export async function updateSession(request: NextRequest) {
     if (!profile.onboarding_completed) {
       const url = request.nextUrl.clone();
       url.pathname = "/onboarding";
+      return NextResponse.redirect(url);
+    }
+
+    // Restrict unapproved accounts solely to /dashboard
+    if (
+      profile.role !== "superadmin" &&
+      profile.approval_status &&
+      profile.approval_status !== "approved" &&
+      pathname !== "/dashboard"
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
       return NextResponse.redirect(url);
     }
 

@@ -6,9 +6,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { Role } from "@/types/roles";
+import type { ApprovalStatus } from "@/types/database";
 import type { CEFRLevel } from "@/types/quiz";
 
 const VALID_ROLES: Role[] = ["student", "tutor", "superadmin"];
+const VALID_APPROVAL_STATUSES: ApprovalStatus[] = [
+  "pending",
+  "approved",
+  "rejected",
+];
 
 async function requireSuperadmin() {
   const supabase = await createClient();
@@ -205,4 +211,55 @@ export async function setDictionaryEditorPermission(
 
   revalidatePath("/users");
   revalidatePath("/library");
+}
+
+export async function setUserApprovalStatus(
+  userId: string,
+  status: ApprovalStatus,
+) {
+  await requireSuperadmin();
+
+  if (!VALID_APPROVAL_STATUSES.includes(status)) {
+    throw new Error("Invalid approval status");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const admin = createAdminClient();
+  const { data: targetProfile, error: targetProfileError } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .single();
+
+  if (targetProfileError || !targetProfile) {
+    throw new Error(targetProfileError?.message ?? "User not found");
+  }
+
+  if (targetProfile.role === "superadmin" && status !== "approved") {
+    throw new Error("Superadmin accounts cannot be unapproved");
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({
+      approval_status: status,
+      approved_at: status === "approved" ? new Date().toISOString() : null,
+      approved_by: status === "approved" ? user.id : null,
+    })
+    .eq("id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/users");
+  revalidatePath("/dashboard");
 }

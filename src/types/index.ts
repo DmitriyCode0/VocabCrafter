@@ -26,6 +26,7 @@ export type {
 } from "./quiz";
 
 export type {
+  ApprovalStatus,
   Database,
   Profile,
   Class,

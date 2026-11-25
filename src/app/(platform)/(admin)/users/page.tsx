@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -10,12 +16,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Users, Shield, GraduationCap, BookOpen } from "lucide-react";
+import { Users, Shield, GraduationCap, BookOpen, Clock } from "lucide-react";
 import { getAllowedCefrLevels } from "@/lib/languages";
 import { CefrLevelSelector } from "./cefr-level-selector";
 import { GrammarArticleEditorPermissionToggle } from "./grammar-article-editor-permission-toggle";
 import { DictionaryEditorPermissionToggle } from "./dictionary-editor-permission-toggle";
 import { RoleSelector } from "./role-selector";
+import { UserApprovalControls } from "./user-approval-controls";
+import type { ApprovalStatus } from "@/types/database";
 import { listGrammarArticleEditorPermissionUserIds } from "@/lib/grammar/article-permissions";
 import { listDictionaryEditorPermissionUserIds } from "@/lib/dictionary/dictionary-permissions";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
@@ -102,6 +110,10 @@ export default async function UsersPage() {
     if (p.role in roleCounts) roleCounts[p.role as keyof typeof roleCounts]++;
   });
 
+  const pendingProfiles = (profiles ?? []).filter(
+    (p) => p.approval_status === "pending" && p.role !== "superadmin",
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -113,8 +125,31 @@ export default async function UsersPage() {
         </p>
       </div>
 
-      {/* Role Summary */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Role & Approval Summary */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card
+          className={
+            pendingProfiles.length > 0
+              ? "border-amber-500/45 bg-amber-500/[0.04]"
+              : undefined
+          }
+        >
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              {messages.adminUsers.summaryTitles.pending}
+            </CardTitle>
+            <Clock
+              className={
+                pendingProfiles.length > 0
+                  ? "h-4 w-4 text-amber-600 dark:text-amber-300"
+                  : "h-4 w-4 text-muted-foreground"
+              }
+            />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{pendingProfiles.length}</div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
@@ -150,6 +185,101 @@ export default async function UsersPage() {
         </Card>
       </div>
 
+      {/* Pending Access Requests Queue */}
+      {pendingProfiles.length > 0 ? (
+        <Card className="border-amber-500/40 bg-amber-500/[0.03]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Clock
+                className="h-5 w-5 text-amber-600 dark:text-amber-300"
+                aria-hidden="true"
+              />
+              {messages.adminUsers.pendingQueueTitle(pendingProfiles.length)}
+            </CardTitle>
+            <CardDescription>
+              {messages.adminUsers.pendingQueueDescription}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{messages.adminUsers.columns.name}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.email}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.changeRole}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.cefr}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.note}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.onboarded}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.joined}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.actions}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingProfiles.map((profile) => (
+                  <TableRow key={`pending-${profile.id}`}>
+                    <TableCell className="font-medium">
+                      {profile.full_name ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {profile.email}
+                    </TableCell>
+                    <TableCell>
+                      <RoleSelector
+                        userId={profile.id}
+                        currentRole={
+                          profile.role as "student" | "tutor" | "superadmin"
+                        }
+                        isSelf={profile.id === currentUserId}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {profile.role === "student" ? (
+                        <CefrLevelSelector
+                          userId={profile.id}
+                          currentCefrLevel={profile.cefr_level}
+                          allowedLevels={getAllowedCefrLevels(
+                            profile.preferred_language,
+                          )}
+                        />
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="max-w-[240px] whitespace-normal text-xs text-muted-foreground">
+                      {profile.registration_note || "—"}
+                    </TableCell>
+                    <TableCell>
+                      {profile.onboarding_completed ? (
+                        <Badge variant="secondary" className="text-xs">
+                          {messages.adminUsers.yes}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          {messages.adminUsers.no}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDateForAppLanguage(appLanguage, profile.created_at)}
+                    </TableCell>
+                    <TableCell>
+                      <UserApprovalControls
+                        userId={profile.id}
+                        currentStatus={
+                          (profile.approval_status ?? "pending") as ApprovalStatus
+                        }
+                        isSuperadminTarget={profile.role === "superadmin"}
+                        variant="queue"
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* Users Table */}
       <Card>
         <CardHeader>
@@ -169,11 +299,13 @@ export default async function UsersPage() {
                 <TableRow>
                   <TableHead>{messages.adminUsers.columns.name}</TableHead>
                   <TableHead>{messages.adminUsers.columns.email}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.status}</TableHead>
                   <TableHead>{messages.adminUsers.columns.role}</TableHead>
                   <TableHead>{messages.adminUsers.columns.changeRole}</TableHead>
                   <TableHead>{messages.adminUsers.columns.articleEditor}</TableHead>
                   <TableHead>Dict. Editor</TableHead>
                   <TableHead>{messages.adminUsers.columns.cefr}</TableHead>
+                  <TableHead>{messages.adminUsers.columns.note}</TableHead>
                   <TableHead>{messages.adminUsers.columns.quizzes}</TableHead>
                   <TableHead>{messages.adminUsers.columns.attempts}</TableHead>
                   <TableHead>{messages.adminUsers.columns.onboarded}</TableHead>
@@ -193,6 +325,17 @@ export default async function UsersPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {profile.email}
+                      </TableCell>
+                      <TableCell>
+                        <UserApprovalControls
+                          userId={profile.id}
+                          currentStatus={
+                            (profile.approval_status ??
+                              "approved") as ApprovalStatus
+                          }
+                          isSuperadminTarget={profile.role === "superadmin"}
+                          variant="table"
+                        />
                       </TableCell>
                       <TableCell>
                         <Badge variant={config.variant}>{config.label}</Badge>
@@ -244,6 +387,9 @@ export default async function UsersPage() {
                             —
                           </span>
                         )}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
+                        {profile.registration_note || "—"}
                       </TableCell>
                       <TableCell>{userQuizMap[profile.id] ?? 0}</TableCell>
                       <TableCell>{userAttemptMap[profile.id] ?? 0}</TableCell>
