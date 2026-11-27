@@ -26,19 +26,19 @@ import {
   formatLessonMonthParam,
   formatLessonTimeRange,
   getLessonMonthRange,
+  getLessonTimingInfo,
+  isLessonUpcomingOrLive,
   normalizeLessonMonthParam,
+  toLocalIsoDate,
   type LessonBalanceSummaryItem,
   type LessonStudentOption,
   type MonthlyLessonItem,
 } from "@/lib/lessons";
+import {
+  useAutoCompleteFinishedLessons,
+  useClientNow,
+} from "@/components/dashboard/tutor-next-up-cards";
 import type { Role } from "@/types/roles";
-
-function toLocalIsoDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
 
 function formatShortDate(isoDate: string) {
   const parsed = new Date(`${isoDate}T00:00:00`);
@@ -55,6 +55,7 @@ interface GoogleCalendarConnectionStatus {
   connectedAt: string;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
+  hasTranscriptScope?: boolean;
 }
 
 interface LessonsScheduleClientProps {
@@ -89,6 +90,22 @@ export function LessonsScheduleClient({
   const [monthParam, setMonthParam] = useState(initialMonthParam);
   const [lessonsState, setLessonsState] =
     useState<MonthlyLessonItem[]>(allLessons);
+  const clientNow = useClientNow();
+
+  useAutoCompleteFinishedLessons(
+    role === "student" ? [] : lessonsState,
+    role === "student" ? null : clientNow,
+    (completedIds) => {
+      const completedSet = new Set(completedIds);
+      setLessonsState((prev) =>
+        prev.map((item) =>
+          completedSet.has(item.id)
+            ? { ...item, status: "completed" as const }
+            : item,
+        ),
+      );
+    },
+  );
 
   useEffect(() => {
     setMonthParam(initialMonthParam);
@@ -112,7 +129,16 @@ export function LessonsScheduleClient({
   }, [lessonsState, monthDate]);
 
   const tutorMetrics = useMemo(() => {
-    const todayIso = toLocalIsoDate(new Date());
+    const refNow = clientNow;
+    const refDate = refNow ?? new Date();
+    const todayIso = toLocalIsoDate(refDate);
+    const tomorrowIso = toLocalIsoDate(
+      new Date(
+        refDate.getFullYear(),
+        refDate.getMonth(),
+        refDate.getDate() + 1,
+      ),
+    );
     const completed = monthLessons.filter((l) => l.status === "completed");
     const planned = monthLessons.filter((l) => l.status === "planned");
     const cancelled = monthLessons.filter((l) => l.status === "cancelled");
@@ -124,9 +150,15 @@ export function LessonsScheduleClient({
       (l) => l.lessonDate === todayIso && l.status === "completed",
     ).length;
 
-    const nextUpcoming = lessonsState.find(
-      (l) => l.lessonDate >= todayIso && l.status === "planned",
+    const nextUpcoming = lessonsState.find((l) =>
+      refNow
+        ? isLessonUpcomingOrLive(l, refNow)
+        : l.lessonDate >= todayIso && l.status === "planned",
     );
+    const nextUpcomingTiming =
+      nextUpcoming && refNow
+        ? getLessonTimingInfo(nextUpcoming, refNow)
+        : null;
 
     const scheduledStudentIds = new Set(
       monthLessons
@@ -136,6 +168,7 @@ export function LessonsScheduleClient({
 
     return {
       todayIso,
+      tomorrowIso,
       activeCount: completed.length + planned.length,
       completedCount: completed.length,
       plannedCount: planned.length,
@@ -144,9 +177,10 @@ export function LessonsScheduleClient({
       plannedCents,
       todayCompletedCount,
       nextUpcoming,
+      nextUpcomingTiming,
       scheduledStudentsCount: scheduledStudentIds.size,
     };
-  }, [lessonsState, monthLessons]);
+  }, [lessonsState, monthLessons, clientNow]);
 
   function handleLessonUpdated(updatedLesson: MonthlyLessonItem) {
     setLessonsState((prev) =>
@@ -288,9 +322,25 @@ export function LessonsScheduleClient({
 
             <Card className="border-border/70 bg-card/70 shadow-xs">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Today &amp; Next Up
-                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Today &amp; Next Up
+                  </CardTitle>
+                  {tutorMetrics.nextUpcomingTiming?.state === "live" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                      <span
+                        aria-hidden="true"
+                        className="h-1.5 w-1.5 rounded-full bg-emerald-500"
+                      />
+                      Now
+                    </span>
+                  ) : tutorMetrics.nextUpcomingTiming?.state === "soon" &&
+                    tutorMetrics.nextUpcomingTiming.minutesUntilStart !== null ? (
+                    <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                      In {tutorMetrics.nextUpcomingTiming.minutesUntilStart}m
+                    </span>
+                  ) : null}
+                </div>
                 <div className="flex h-7 w-7 items-center justify-center rounded-md bg-sky-500/10 text-sky-400">
                   <Clock3 className="h-3.5 w-3.5" />
                 </div>
@@ -324,9 +374,12 @@ export function LessonsScheduleClient({
                       {tutorMetrics.nextUpcoming.lessonDate ===
                       tutorMetrics.todayIso
                         ? "Today"
-                        : formatShortDate(
-                            tutorMetrics.nextUpcoming.lessonDate,
-                          )}{" "}
+                        : tutorMetrics.nextUpcoming.lessonDate ===
+                            tutorMetrics.tomorrowIso
+                          ? "Tomorrow"
+                          : formatShortDate(
+                              tutorMetrics.nextUpcoming.lessonDate,
+                            )}{" "}
                       ·{" "}
                       {formatLessonTimeRange(
                         tutorMetrics.nextUpcoming.startTime,
@@ -409,6 +462,10 @@ export function LessonsScheduleClient({
             previousLabel={previousLabel}
             nextLabel={nextLabel}
             onLessonUpdated={handleLessonUpdated}
+            hasTranscriptScope={
+              googleCalendarConnection?.hasTranscriptScope ?? false
+            }
+            googleConnectHref={connectHref}
           />
         </div>
       )}

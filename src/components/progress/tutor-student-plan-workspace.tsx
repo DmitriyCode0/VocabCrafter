@@ -22,7 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { useAppI18n } from "@/components/providers/app-language-provider";
 import { type ReportLanguage } from "@/lib/progress/monthly-report-language";
 
 interface TutorStudentPlan {
@@ -61,6 +63,13 @@ interface MonthlyReportMetrics {
   averageScore: number | null;
 }
 
+interface SuggestedGrammarTopic {
+  topicKey: string;
+  label: string;
+  attempts: number;
+  averageScore: number | null;
+}
+
 interface TutorStudentPlanWorkspaceProps {
   studentId: string;
   studentName: string;
@@ -69,6 +78,7 @@ interface TutorStudentPlanWorkspaceProps {
   plan: TutorStudentPlan;
   metrics: MonthlyReportMetrics;
   availableGrammarTopics: GrammarTopicOption[];
+  suggestedGrammarTopics?: SuggestedGrammarTopic[];
   targetLanguageLabel: string;
 }
 
@@ -122,6 +132,18 @@ function parseObjectives(text: string) {
     .slice(0, 10);
 }
 
+function parseOptionalTargetNumber(value: string): number | null {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
 export function TutorStudentPlanWorkspace({
   studentId,
   studentName,
@@ -130,9 +152,12 @@ export function TutorStudentPlanWorkspace({
   plan,
   metrics,
   availableGrammarTopics,
+  suggestedGrammarTopics = [],
   targetLanguageLabel,
 }: TutorStudentPlanWorkspaceProps) {
   const router = useRouter();
+  const { messages } = useAppI18n();
+  const hubMessages = messages.progressHub;
   const [planTitle, setPlanTitle] = useState(plan.planTitle ?? "");
   const [goalSummary, setGoalSummary] = useState(plan.goalSummary ?? "");
   const [objectives, setObjectives] = useState(plan.objectives.join("\n"));
@@ -165,6 +190,20 @@ export function TutorStudentPlanWorkspace({
   const grammarTopicMap = new Map(
     availableGrammarTopics.map((topic) => [topic.topicKey, topic]),
   );
+  const suggestedGrammarTopicMap = new Map(
+    suggestedGrammarTopics.map((topic) => [topic.topicKey, topic]),
+  );
+  const unpickedSuggestedTopics = suggestedGrammarTopics.filter(
+    (topic) => !grammarTopicKeys.includes(topic.topicKey),
+  );
+
+  function handleAddGrammarTopicKey(topicKey: string) {
+    if (!topicKey || grammarTopicKeys.includes(topicKey) || grammarTopicKeys.length >= 12) {
+      return;
+    }
+
+    setGrammarTopicKeys((current) => [...current, topicKey]);
+  }
 
   function handleAddGrammarTopic() {
     if (
@@ -325,7 +364,7 @@ export function TutorStudentPlanWorkspace({
               </Button>
             </div>
 
-            <div className="space-y-2">
+              <div className="space-y-2">
               <Label>Selected grammar topics</Label>
               {grammarTopicKeys.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
@@ -335,13 +374,16 @@ export function TutorStudentPlanWorkspace({
                 <div className="flex flex-wrap gap-2">
                   {grammarTopicKeys.map((topicKey) => {
                     const topic = grammarTopicMap.get(topicKey);
+                    const suggestedTopic = suggestedGrammarTopicMap.get(topicKey);
 
                     return (
                       <div
                         key={topicKey}
                         className="inline-flex items-center gap-2 rounded-full border bg-muted/20 px-3 py-1.5 text-sm"
                       >
-                        <span>{topic?.displayName ?? topicKey}</span>
+                        <span>
+                          {topic?.displayName ?? suggestedTopic?.label ?? topicKey}
+                        </span>
                         {topic?.hasUniqueInstructions === false ? (
                           <Badge
                             variant="outline"
@@ -359,7 +401,7 @@ export function TutorStudentPlanWorkspace({
                           type="button"
                           onClick={() => handleRemoveGrammarTopic(topicKey)}
                           className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                          aria-label={`Remove ${topic?.displayName ?? topicKey}`}
+                          aria-label={`Remove ${topic?.displayName ?? suggestedTopic?.label ?? topicKey}`}
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -368,6 +410,41 @@ export function TutorStudentPlanWorkspace({
                   })}
                 </div>
               )}
+              {unpickedSuggestedTopics.length > 0 ? (
+                <div className="space-y-1.5 rounded-xl border border-dashed bg-muted/20 p-3">
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-xs font-semibold text-foreground">
+                      {hubMessages.planContext.suggestedGrammarTitle}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {hubMessages.planContext.suggestedGrammarDescription}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {unpickedSuggestedTopics.map((topic) => (
+                      <button
+                        key={topic.topicKey}
+                        type="button"
+                        disabled={grammarTopicKeys.length >= 12}
+                        onClick={() => handleAddGrammarTopicKey(topic.topicKey)}
+                        className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-background px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/60 hover:bg-primary/5 disabled:opacity-50"
+                      >
+                        <Plus className="h-3 w-3 text-primary" />
+                        <span>{topic.label}</span>
+                        {topic.attempts > 0 ? (
+                          <span className="text-[10px] text-muted-foreground">
+                            ({topic.attempts}x
+                            {topic.averageScore !== null
+                              ? ` · ${topic.averageScore}%`
+                              : ""}
+                            )
+                          </span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 Selected topics are included in the generated monthly report
                 prompt and the saved plan snapshot.
@@ -495,7 +572,7 @@ export function TutorStudentPlanWorkspace({
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <CalendarDays className="h-5 w-5 text-primary" />
-              Current Month Context
+              {hubMessages.planContext.targetProgressTitle}
             </CardTitle>
             <CardDescription>
               Use {currentMonthLabel} progress to set realistic goals. The
@@ -503,91 +580,143 @@ export function TutorStudentPlanWorkspace({
               generated.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">Active days</p>
-                <p className="text-2xl font-semibold">{metrics.activeDays}</p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">New words</p>
-                <p className="text-2xl font-semibold">
-                  {metrics.newMasteryWords}
-                </p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">
-                  Mastered words (levels 4-5)
-                </p>
-                <p className="text-2xl font-semibold">
-                  {metrics.masteredWordsLevel45}
-                </p>
-              </div>
-              {grammarTopicKeys.length > 0 ? (
-                <div className="rounded-lg border px-3 py-3">
-                  <p className="text-xs text-muted-foreground">
-                    Grammar topics
-                  </p>
-                  <p className="text-2xl font-semibold">
-                    {grammarTopicKeys.length}
-                  </p>
+          <CardContent className="space-y-5">
+            {(() => {
+              const targetRows = [
+                {
+                  key: "sentenceTranslations",
+                  label: hubMessages.planContext.metricLabels.sentenceTranslations,
+                  actual: metrics.completedSentenceTranslations,
+                  target: parseOptionalTargetNumber(sentenceTranslationTarget),
+                  isPercent: false,
+                },
+                {
+                  key: "gapFills",
+                  label: hubMessages.planContext.metricLabels.gapFills,
+                  actual: metrics.completedGapFillExercises,
+                  target: parseOptionalTargetNumber(gapFillTarget),
+                  isPercent: false,
+                },
+                {
+                  key: "completedLessons",
+                  label: hubMessages.planContext.metricLabels.completedLessons,
+                  actual: metrics.completedLessons,
+                  target: parseOptionalTargetNumber(lessonTarget),
+                  isPercent: false,
+                },
+                {
+                  key: "wordsAdded",
+                  label: hubMessages.planContext.metricLabels.wordsAdded,
+                  actual: metrics.newMasteryWords,
+                  target: parseOptionalTargetNumber(wordsAddedTarget),
+                  isPercent: false,
+                },
+                {
+                  key: "masteredWords",
+                  label: hubMessages.planContext.metricLabels.masteredWords,
+                  actual: metrics.masteredWordsLevel45,
+                  target: parseOptionalTargetNumber(masteredWordsTarget),
+                  isPercent: false,
+                },
+                {
+                  key: "speakingShare",
+                  label: hubMessages.planContext.metricLabels.speakingShare,
+                  actual: metrics.studentSpeakingShare,
+                  target: parseOptionalTargetNumber(speakingShareTarget),
+                  isPercent: true,
+                },
+                {
+                  key: "averageScore",
+                  label: hubMessages.planContext.metricLabels.averageScore,
+                  actual: metrics.averageScore,
+                  target: parseOptionalTargetNumber(averageScoreTarget),
+                  isPercent: true,
+                },
+              ];
+
+              return (
+                <div className="space-y-3">
+                  {targetRows.map((row) => {
+                    const numericActual =
+                      row.actual != null && Number.isFinite(row.actual)
+                        ? row.actual
+                        : 0;
+                    const ratio =
+                      row.target != null && row.target > 0
+                        ? Math.min(100, Math.round((numericActual / row.target) * 100))
+                        : null;
+                    const formattedActual = row.isPercent
+                      ? formatPercentage(row.actual)
+                      : numericActual.toString();
+                    const formattedTarget =
+                      row.target != null
+                        ? row.isPercent
+                          ? formatPercentage(row.target)
+                          : row.target.toString()
+                        : null;
+
+                    return (
+                      <div
+                        key={row.key}
+                        className="space-y-1.5 rounded-lg border px-3 py-2.5"
+                      >
+                        <div className="flex items-center justify-between gap-2 text-sm">
+                          <span className="font-medium text-foreground">
+                            {row.label}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold tabular-nums">
+                              {formattedTarget
+                                ? `${formattedActual} / ${formattedTarget}`
+                                : formattedActual}
+                            </span>
+                            {ratio !== null ? (
+                              <Badge
+                                variant={ratio >= 100 ? "default" : "secondary"}
+                                className="px-1.5 py-0 text-[11px] tabular-nums"
+                              >
+                                {ratio}%
+                              </Badge>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground">
+                                {hubMessages.planContext.noTargetSet}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {ratio !== null ? (
+                          <Progress value={ratio} className="h-2" />
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
-              ) : null}
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">
-                  Sentence translation exercises
-                </p>
-                <p className="text-2xl font-semibold">
-                  {metrics.completedSentenceTranslations}
-                </p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">
-                  Gap fill exercises
-                </p>
-                <p className="text-2xl font-semibold">
-                  {metrics.completedGapFillExercises}
-                </p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">
-                  Completed lessons
-                </p>
-                <p className="text-2xl font-semibold">
-                  {metrics.completedLessons}
-                </p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">
-                  Words reviewed this month
-                </p>
-                <p className="text-2xl font-semibold">
-                  {metrics.practicedWords}
-                </p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">
-                  Words in vocabulary tracker
-                </p>
-                <p className="text-2xl font-semibold">
-                  {metrics.trackedWordsTotal}
-                </p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">
-                  Average quiz score
-                </p>
-                <p className="text-2xl font-semibold">
-                  {formatPercentage(metrics.averageScore)}
-                </p>
-              </div>
-              <div className="rounded-lg border px-3 py-3">
-                <p className="text-xs text-muted-foreground">
-                  Student speaking share
-                </p>
-                <p className="text-2xl font-semibold">
-                  {formatPercentage(metrics.studentSpeakingShare)}
-                </p>
+              );
+            })()}
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {hubMessages.planContext.otherMetricsTitle}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground">
+                    {hubMessages.planContext.metricLabels.activeDays}
+                  </p>
+                  <p className="text-xl font-semibold">{metrics.activeDays}</p>
+                </div>
+                <div className="rounded-lg border px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground">
+                    {hubMessages.planContext.metricLabels.practicedWords}
+                  </p>
+                  <p className="text-xl font-semibold">{metrics.practicedWords}</p>
+                </div>
+                <div className="rounded-lg border px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground">
+                    {hubMessages.planContext.metricLabels.trackedWords}
+                  </p>
+                  <p className="text-xl font-semibold">{metrics.trackedWordsTotal}</p>
+                </div>
               </div>
             </div>
           </CardContent>

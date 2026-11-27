@@ -12,6 +12,15 @@ export interface LessonStudentOption {
   lessonPriceCents?: number;
 }
 
+export interface LessonTranscriptSummary {
+  analysisStatus: "pending" | "analyzed" | "learning_approved" | "failed";
+  activeAppliedCount: number;
+  passiveAppliedCount: number;
+  learningApprovedCount: number;
+  pendingLearningCount: number;
+  analyzedAt: string | null;
+}
+
 export interface MonthlyLessonItem {
   id: string;
   title: string | null;
@@ -25,6 +34,7 @@ export interface MonthlyLessonItem {
   participantName: string;
   participantLabel: string;
   meetUrl?: string | null;
+  transcriptSummary?: LessonTranscriptSummary | null;
 }
 
 export function isOneTimeLessonStudentValue(value?: string | null) {
@@ -94,6 +104,127 @@ export function isLessonJoinable(lesson: {
   }
 
   return true;
+}
+
+export type LessonTimingState = "live" | "soon" | "upcoming" | "ended";
+
+function parseTimeParts(timeStr?: string | null): [number, number] | null {
+  if (!timeStr) return null;
+  const parts = timeStr.trim().split(":");
+  if (parts.length < 2) return null;
+  const hour = Number(parts[0]);
+  const minute = Number(parts[1]);
+  if (
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return null;
+  }
+  return [hour, minute];
+}
+
+export function toLocalIsoDate(date: Date): string {
+  return toIsoDate(date);
+}
+
+/**
+ * Computes local start and end Date boundaries for a scheduled lesson.
+ * Defaults end time to start + 60m when only startTime is specified.
+ */
+export function getLessonStartEndDates(
+  lessonDate: string,
+  startTime: string | null,
+  endTime: string | null,
+): { start: Date | null; end: Date | null } {
+  const dateParts = lessonDate.split("-").map(Number);
+  if (dateParts.length !== 3 || dateParts.some((n) => !Number.isInteger(n))) {
+    return { start: null, end: null };
+  }
+  const [year, month, day] = dateParts;
+  const startParts = parseTimeParts(startTime);
+  const endParts = parseTimeParts(endTime);
+
+  if (startParts) {
+    const start = new Date(year, month - 1, day, startParts[0], startParts[1], 0, 0);
+    let end: Date;
+    if (endParts) {
+      end = new Date(year, month - 1, day, endParts[0], endParts[1], 0, 0);
+      if (end.getTime() <= start.getTime()) {
+        end.setDate(end.getDate() + 1);
+      }
+    } else {
+      end = new Date(start.getTime() + 60 * 60 * 1000);
+    }
+    return { start, end };
+  }
+
+  const end = endParts
+    ? new Date(year, month - 1, day, endParts[0], endParts[1], 0, 0)
+    : new Date(year, month - 1, day, 23, 59, 59, 999);
+
+  return { start: null, end };
+}
+
+/**
+ * Returns true if a planned lesson has not finished yet relative to `now`
+ * in the viewer's local timezone.
+ */
+export function isLessonUpcomingOrLive(
+  lesson: {
+    lessonDate: string;
+    startTime: string | null;
+    endTime: string | null;
+    status: LessonStatus;
+  },
+  now: Date = new Date(),
+): boolean {
+  if (lesson.status !== "planned") return false;
+  const { end } = getLessonStartEndDates(
+    lesson.lessonDate,
+    lesson.startTime,
+    lesson.endTime,
+  );
+  if (!end) {
+    return lesson.lessonDate >= toIsoDate(now);
+  }
+  return now.getTime() < end.getTime();
+}
+
+export function getLessonTimingInfo(
+  lesson: {
+    lessonDate: string;
+    startTime: string | null;
+    endTime: string | null;
+    status: LessonStatus;
+  },
+  now: Date = new Date(),
+): { state: LessonTimingState; minutesUntilStart: number | null } {
+  if (lesson.status !== "planned") {
+    return { state: "ended", minutesUntilStart: null };
+  }
+  const { start, end } = getLessonStartEndDates(
+    lesson.lessonDate,
+    lesson.startTime,
+    lesson.endTime,
+  );
+  if (!end || now.getTime() >= end.getTime()) {
+    return { state: "ended", minutesUntilStart: null };
+  }
+  if (start && now.getTime() >= start.getTime() && now.getTime() < end.getTime()) {
+    return { state: "live", minutesUntilStart: 0 };
+  }
+  if (start) {
+    const mins = Math.max(1, Math.ceil((start.getTime() - now.getTime()) / 60_000));
+    return {
+      state: mins <= 60 ? "soon" : "upcoming",
+      minutesUntilStart: mins,
+    };
+  }
+  return { state: "upcoming", minutesUntilStart: null };
 }
 
 function toIsoDate(date: Date) {

@@ -14,44 +14,41 @@ import Link from "next/link";
 import {
   Activity,
   AlertTriangle,
-  ArrowRight,
   BookMarked,
   BookOpen,
-  CalendarClock,
   CheckCircle2,
   ClipboardList,
-  Clock3,
   GraduationCap,
   MessageSquare,
   PlusCircle,
-  Video,
   Wallet,
 } from "lucide-react";
 import { fmtLimit } from "@/lib/plans";
 import { getPlan } from "@/lib/plans-server";
 import {
   formatLessonCurrency,
-  formatLessonTimeRange,
   getLessonDisplayTitle,
+  toLocalIsoDate,
 } from "@/lib/lessons";
-import { getTutorLessonBalanceSummaries } from "@/lib/lessons-server";
+import {
+  autoCompleteOverduePlannedLessons,
+  getTutorLessonBalanceSummaries,
+} from "@/lib/lessons-server";
 import {
   TutorHomeworkActivityCard,
   type StudentHomeworkSnapshotItem,
 } from "@/components/dashboard/tutor-homework-activity-card";
+import {
+  TutorNextUpCard,
+  TutorUpcomingScheduleCard,
+  type TutorDashboardLessonItem,
+} from "@/components/dashboard/tutor-next-up-cards";
 import { cn } from "@/lib/utils";
 import type { AppMessages } from "@/lib/i18n/messages";
 
 function pct(used: number, total: number) {
   if (!isFinite(total) || total === 0) return 0;
   return Math.min(100, Math.round((used / total) * 100));
-}
-
-function toLocalIsoDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function formatShortLessonDate(isoDate: string) {
@@ -107,11 +104,16 @@ export async function TutorDashboard({
   const plan = await getPlan(planKey);
 
   const now = new Date();
-  const todayIso = toLocalIsoDate(now);
+  const yesterdayDate = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() - 1,
+  );
+  const yesterdayIso = toLocalIsoDate(yesterdayDate);
   const nextWeekDate = new Date(
     now.getFullYear(),
     now.getMonth(),
-    now.getDate() + 7,
+    now.getDate() + 8,
   );
   const nextWeekIso = toLocalIsoDate(nextWeekDate);
 
@@ -121,6 +123,13 @@ export async function TutorDashboard({
 
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  await autoCompleteOverduePlannedLessons({
+    tutorId: userId,
+    supabaseAdmin,
+  }).catch((error) => {
+    console.error("Failed to auto-complete overdue planned lessons:", error);
+  });
 
   const [
     { count: monthlyQuizCount },
@@ -150,12 +159,12 @@ export async function TutorDashboard({
         "id, student_id, title, lesson_date, start_time, end_time, status, price_cents, meet_url, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
       )
       .eq("tutor_id", userId)
-      .neq("status", "cancelled")
-      .gte("lesson_date", todayIso)
+      .eq("status", "planned")
+      .gte("lesson_date", yesterdayIso)
       .lte("lesson_date", nextWeekIso)
       .order("lesson_date", { ascending: true })
       .order("start_time", { ascending: true })
-      .limit(12),
+      .limit(40),
     supabaseAdmin
       .from("tutor_student_lessons")
       .select("student_id, lesson_date, end_time, updated_at")
@@ -197,15 +206,36 @@ export async function TutorDashboard({
       (summary.lessonPriceCents > 0 && (summary.lessonsLeft ?? 0) <= 0),
   );
 
-  const allUpcomingLessons = (upcomingLessonsData ?? []) as UpcomingLessonRow[];
-  const upcomingLessons = allUpcomingLessons.slice(0, 6);
-  const todayLessonsCount = allUpcomingLessons.filter(
-    (lesson) => lesson.lesson_date === todayIso,
-  ).length;
-  const nextUpcomingLesson =
-    allUpcomingLessons.find((lesson) => lesson.status === "planned") ??
-    allUpcomingLessons[0] ??
-    null;
+  const serializedUpcomingLessons: TutorDashboardLessonItem[] = (
+    (upcomingLessonsData ?? []) as UpcomingLessonRow[]
+  ).map((lesson) => {
+    const studentName =
+      lesson.student_profile?.full_name ||
+      lesson.student_profile?.email ||
+      getLessonDisplayTitle(lesson.title);
+    const balanceSummary = lesson.student_id
+      ? balanceByStudentId.get(lesson.student_id)
+      : undefined;
+    const lessonsLeft = balanceSummary?.lessonsLeft ?? null;
+    const isLowBalance = Boolean(
+      balanceSummary &&
+        (balanceSummary.balanceCents < 0 ||
+          (balanceSummary.lessonPriceCents > 0 && (lessonsLeft ?? 0) <= 0)),
+    );
+
+    return {
+      id: lesson.id,
+      studentId: lesson.student_id,
+      studentName,
+      lessonDate: lesson.lesson_date,
+      startTime: lesson.start_time,
+      endTime: lesson.end_time,
+      status: lesson.status,
+      meetUrl: lesson.meet_url ?? null,
+      lessonsLeft,
+      isLowBalance,
+    };
+  });
 
   const lastLessonByStudentId = new Map<
     string,
@@ -339,78 +369,17 @@ export async function TutorDashboard({
 
   const tutorI18n = messages.dashboard.tutor;
   const kpi = tutorI18n.kpi;
-
-  const nextLessonName = nextUpcomingLesson
-    ? nextUpcomingLesson.student_profile?.full_name ||
-      nextUpcomingLesson.student_profile?.email ||
-      getLessonDisplayTitle(nextUpcomingLesson.title)
-    : null;
+  const initialNowMs = now.getTime();
 
   return (
     <div className="space-y-5">
       {/* Row 1: 4-Card Bento KPI Strip */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {/* KPI 1: Today & Next Up */}
-        <Card className="border-border/70 bg-card/70 shadow-xs">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              {kpi.nextLessonTitle}
-            </CardTitle>
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <Clock3 className="h-3.5 w-3.5" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {nextUpcomingLesson && nextLessonName ? (
-              <>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-base font-semibold">
-                    {nextLessonName}
-                  </span>
-                  {nextUpcomingLesson.meet_url ? (
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="h-6 shrink-0 border-emerald-500/30 bg-emerald-500/10 px-2 text-[11px] text-emerald-500 hover:bg-emerald-500/20 hover:text-emerald-400"
-                    >
-                      <a
-                        href={nextUpcomingLesson.meet_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Video className="mr-1 h-3 w-3" />
-                        Meet
-                      </a>
-                    </Button>
-                  ) : null}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                  {nextUpcomingLesson.lesson_date === todayIso
-                    ? cc.todayBadge
-                    : formatShortLessonDate(nextUpcomingLesson.lesson_date)}{" "}
-                  ·{" "}
-                  {formatLessonTimeRange(
-                    nextUpcomingLesson.start_time,
-                    nextUpcomingLesson.end_time,
-                  )}
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="text-base font-semibold">
-                  {kpi.noUpcomingTitle}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {kpi.todayAndWeek(
-                    todayLessonsCount,
-                    allUpcomingLessons.length,
-                  )}
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <TutorNextUpCard
+          lessons={serializedUpcomingLessons}
+          initialNowMs={initialNowMs}
+        />
 
         {/* KPI 2: Active Students */}
         <Card
@@ -602,129 +571,10 @@ export async function TutorDashboard({
       {/* Row 3: 2-Column Main Workspace */}
       <div className="grid gap-4 lg:grid-cols-12">
         {/* Left (5 cols): Today & Upcoming Lessons */}
-        <Card className="flex flex-col border-border/70 bg-card/70 shadow-xs lg:col-span-5">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-                  <CalendarClock className="h-4 w-4" />
-                </div>
-                <CardTitle className="text-base">
-                  {cc.todayScheduleTitle}
-                </CardTitle>
-              </div>
-              <Badge variant="secondary" className="text-xs font-medium">
-                {upcomingLessons.length}
-              </Badge>
-            </div>
-            <CardDescription>{cc.todayScheduleDescription}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 space-y-2">
-            {upcomingLessons.length === 0 ? (
-              <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                {cc.noUpcomingLessons}
-              </div>
-            ) : (
-              upcomingLessons.map((lesson) => {
-                const isToday = lesson.lesson_date === todayIso;
-                const studentName =
-                  lesson.student_profile?.full_name ||
-                  lesson.student_profile?.email ||
-                  getLessonDisplayTitle(lesson.title);
-                const balanceSummary = lesson.student_id
-                  ? balanceByStudentId.get(lesson.student_id)
-                  : undefined;
-                const lessonsLeft = balanceSummary?.lessonsLeft ?? null;
-                const isLowBalance =
-                  balanceSummary &&
-                  (balanceSummary.balanceCents < 0 ||
-                    (balanceSummary.lessonPriceCents > 0 &&
-                      (lessonsLeft ?? 0) <= 0));
-
-                return (
-                  <div
-                    key={lesson.id}
-                    className={cn(
-                      "flex items-center justify-between gap-2 rounded-lg border border-border/70 border-l-[3px] px-3 py-2.5 text-sm transition-colors",
-                      isToday
-                        ? "border-l-primary bg-primary/[0.06] hover:bg-primary/[0.1]"
-                        : "border-l-sky-500 bg-background/40 hover:bg-accent/20",
-                    )}
-                  >
-                    <div className="min-w-0 space-y-0.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="truncate font-medium">
-                          {studentName}
-                        </span>
-                        {isToday ? (
-                          <Badge
-                            variant="default"
-                            className="h-5 px-1.5 text-[10px]"
-                          >
-                            {cc.todayBadge}
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="secondary"
-                            className="h-5 px-1.5 text-[10px]"
-                          >
-                            {formatShortLessonDate(lesson.lesson_date)}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground tabular-nums">
-                        {formatLessonTimeRange(
-                          lesson.start_time,
-                          lesson.end_time,
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      {lesson.meet_url ? (
-                        <Button
-                          asChild
-                          variant="outline"
-                          size="sm"
-                          className="h-7 border-emerald-500/30 bg-emerald-500/10 px-2 text-xs text-emerald-500 hover:bg-emerald-500/20 hover:text-emerald-400"
-                        >
-                          <a
-                            href={lesson.meet_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Video className="mr-1 h-3.5 w-3.5" />
-                            Meet
-                          </a>
-                        </Button>
-                      ) : null}
-                      {lessonsLeft !== null ? (
-                        <Badge
-                          variant={isLowBalance ? "destructive" : "outline"}
-                          className="text-[11px] tabular-nums"
-                        >
-                          {cc.lessonsLeftBadge(lessonsLeft)}
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </CardContent>
-          <CardFooter className="border-t border-border/40 pt-3">
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-              className="ml-auto text-xs"
-            >
-              <Link href="/lessons" prefetch={false}>
-                {cc.openScheduleButton}
-                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
+        <TutorUpcomingScheduleCard
+          lessons={serializedUpcomingLessons}
+          initialNowMs={initialNowMs}
+        />
 
         {/* Right (7 cols): Activity Since Last Lesson with Filter Tabs */}
         <div className="lg:col-span-7">
@@ -842,7 +692,7 @@ export async function TutorDashboard({
           </CardHeader>
           <CardFooter className="pt-2">
             <Button asChild variant="outline" size="sm" className="w-full">
-              <Link href="/plans-and-reports" prefetch={false}>
+              <Link href="/results?tab=plan" prefetch={false}>
                 {tutorI18n.plansReportsButton}
               </Link>
             </Button>

@@ -16,10 +16,25 @@ const GOOGLE_CALENDAR_USERINFO_URL =
   "https://www.googleapis.com/oauth2/v2/userinfo";
 const GOOGLE_CALENDAR_API_BASE_URL = "https://www.googleapis.com/calendar/v3";
 
+export const GOOGLE_DRIVE_READONLY_SCOPE =
+  "https://www.googleapis.com/auth/drive.readonly";
+
 export const GOOGLE_CALENDAR_SCOPE = [
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/userinfo.email",
+  GOOGLE_DRIVE_READONLY_SCOPE,
 ].join(" ");
+
+export function hasGoogleDriveScope(scopeString: string | null | undefined): boolean {
+  if (!scopeString) {
+    return false;
+  }
+  const scopes = scopeString.split(/\s+/).filter(Boolean);
+  return (
+    scopes.includes(GOOGLE_DRIVE_READONLY_SCOPE) ||
+    scopes.includes("https://www.googleapis.com/auth/drive")
+  );
+}
 
 type SupabaseAdminClient = ReturnType<typeof createAdminClient>;
 type GoogleCalendarConnectionRow =
@@ -75,6 +90,7 @@ export interface GoogleCalendarConnectionSummary {
   connectedAt: string;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
+  hasTranscriptScope: boolean;
 }
 
 export interface CalendarSyncResult {
@@ -174,11 +190,11 @@ export async function getGoogleCalendarConnection(
 export async function getGoogleCalendarConnectionSummary(
   userId: string,
   supabaseAdmin = createAdminClient(),
-) {
+): Promise<GoogleCalendarConnectionSummary | null> {
   const { data, error } = await supabaseAdmin
     .from("google_calendar_connections")
     .select(
-      "google_email, calendar_id, connected_at, last_synced_at, last_sync_error",
+      "google_email, calendar_id, connected_at, last_synced_at, last_sync_error, scope",
     )
     .eq("user_id", userId)
     .maybeSingle();
@@ -197,6 +213,7 @@ export async function getGoogleCalendarConnectionSummary(
     connectedAt: data.connected_at,
     lastSyncedAt: data.last_synced_at,
     lastSyncError: data.last_sync_error,
+    hasTranscriptScope: hasGoogleDriveScope(data.scope),
   } satisfies GoogleCalendarConnectionSummary;
 }
 
@@ -602,7 +619,7 @@ async function refreshGoogleCalendarAccessToken(
   } satisfies GoogleCalendarConnectionRow;
 }
 
-async function getValidGoogleCalendarAccessToken(
+export async function getValidGoogleCalendarAccessToken(
   connection: GoogleCalendarConnectionRow,
   supabaseAdmin: SupabaseAdminClient,
 ) {
@@ -643,7 +660,7 @@ async function loadLessonForGoogleCalendarSync(
   return (data ?? null) as LessonGoogleCalendarSyncRow | null;
 }
 
-async function getLessonGoogleCalendarEvent(
+export async function getLessonGoogleCalendarEvent(
   lessonId: string,
   tutorId: string,
   supabaseAdmin: SupabaseAdminClient,

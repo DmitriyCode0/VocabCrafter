@@ -464,9 +464,16 @@ ${useCasesGuide}
    - If detectedMode === "aspects": fill ALL 12 keys of "aspectForms" (${ASPECT_CELL_KEYS.join(", ")}).
      * Adapt the verb and add natural short time cues matching each cell.
      * IMPORTANT: If "isStateVerb" is true, NEVER use unnatural "-ing" state forms like "was being busy" or "have been being busy"; keep Simple forms in *_continuous keys and Perfect forms in *_perfect_continuous keys.
-     * Wrap ONLY the main verb/auxiliary phrase in [[...]] (double square brackets) and optional time/cutoff cue in {{...}} (double curly braces).
-     * Example: "past_perfect": "{{Before we arrived home}}, the alarm [[had been activated]]."
-     * For the cell matching the user's detected tense, keep their correctedSentence wording as close as possible with [[...]] and optional {{...}} tags!
+     * Tag semantically so the timeline graph color-codes each part clearly:
+       - [[...]] (emerald / green): main or primary long verb phrase (e.g. "[[was doing]]", "[[had done]]", "[[was cooking]]").
+       - {{...}} (sky / blue):
+         * In Perfect / Perfect Continuous: the aligned cutoff action or boundary cue (e.g. "{{before dinner}}", "{{when we arrived}}", "{{by 7 pm tomorrow}}", "{{already}}"). Put any "for ..." duration inside <<...>> (amber) instead so {{...}} stays the boundary!
+         * In Continuous with a shorter interrupting action: the shorter interrupting clause/time (e.g. "{{when dinner started}}", "{{at 7 pm yesterday}}").
+         * In Continuous with 2 parallel long actions: the SECOND long continuous verb phrase (e.g. "While I [[was cooking]] dinner, she {{was doing}} her homework.").
+         * In Simple sequence of actions: the 2nd verb in {{...}} and optional 3rd verb in <<...>>.
+     * Example: "past_perfect": "I [[had done]] my classes {{before dinner}}."
+     * Example: "past_continuous": "I [[was doing]] my classes {{when dinner started}}."
+     * For the cell matching the user's detected tense, keep their correctedSentence wording as close as possible with [[...]], {{...}}, and optional <<...>> tags!
    - If detectedMode === "conditionals": fill ALL 6 keys of "conditionalForms" (${CONDITIONAL_KEYS.join(", ")}).
      * EVERY form MUST be written cleanly as two comma-separated parts ("If ..., ..."), with the IF-clause verb in [[...]] and the RESULT-clause verb in {{...}}.
      * Example: "second": "If I [[won]] the lottery now, I {{would buy}} a house."

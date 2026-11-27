@@ -215,13 +215,13 @@ export function TutorsClient({ connections }: TutorsClientProps) {
 
                     <div className="flex flex-wrap gap-2">
                       <Button asChild variant="outline" size="sm">
-                        <Link href={`/plan?tutor=${tutor?.id ?? ""}`}>
+                        <Link href={`/progress?tab=plan&tutor=${tutor?.id ?? ""}`}>
                           <Target className="mr-2 h-4 w-4" />
                           Plan
                         </Link>
                       </Button>
                       <Button asChild variant="outline" size="sm">
-                        <Link href="/progress/monthly">
+                        <Link href="/progress?tab=monthly">
                           <BookOpen className="mr-2 h-4 w-4" />
                           Progress
                         </Link>

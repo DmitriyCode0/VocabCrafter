@@ -14,6 +14,7 @@ export type AIUsageFeature =
   | "monthly_report"
   | "passive_vocabulary_enrichment"
   | "lesson_transcript"
+  | "lesson_transcript_vocab"
   | "classroom_transcript"
   | "tense_detector"
   | "tts";

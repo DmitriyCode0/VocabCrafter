@@ -33,6 +33,7 @@ import {
   type PassiveVocabularyPartOfSpeech,
 } from "./passive-vocabulary";
 import { syncPassiveVocabularyLibraryUkrainianForms } from "./passive-vocabulary-library-ukrainian-forms";
+import { lookupReferenceDictionaryEntries } from "./reference-dictionary";
 export { syncConfirmedActiveVocabularyToPassiveEvidence } from "./active-vocabulary-evidence";
 
 type AdminClient = SupabaseClient<Database>;
@@ -846,6 +847,11 @@ export async function createPassiveVocabularyLibraryEntries(
     return;
   }
 
+  const refDictEntries = await lookupReferenceDictionaryEntries(
+    adminClient,
+    englishInputs.map((input) => input.normalizedTerm),
+  );
+
   const libraryGroups = new Map<
     string,
     {
@@ -863,9 +869,43 @@ export async function createPassiveVocabularyLibraryEntries(
   >();
 
   for (const input of englishInputs) {
-    const fallback = getFallbackCanonicalTerm(input);
-    const isPhrase = input.itemType === "phrase";
-    const partOfSpeech = isPhrase ? "phrase" : (input.partOfSpeech ?? null);
+    const refEntry = refDictEntries.get(input.normalizedTerm);
+    const enrichedInput: PassiveVocabularyLibraryInput = refEntry
+      ? {
+          ...input,
+          ukrainianTranslation:
+            input.ukrainianTranslation ?? refEntry.shortUkTranslation ?? null,
+          partOfSpeech:
+            input.partOfSpeech ??
+            normalizePassiveVocabularyPartOfSpeech(refEntry.partOfSpeech) ??
+            undefined,
+          attributes: {
+            ...input.attributes,
+            ...(refEntry.ipaUs || refEntry.ipaUk
+              ? {
+                  transcription:
+                    input.attributes?.transcription ??
+                    refEntry.ipaUs ??
+                    refEntry.ipaUk ??
+                    null,
+                  americanTranscription:
+                    input.attributes?.americanTranscription ??
+                    refEntry.ipaUs ??
+                    null,
+                  britishTranscription:
+                    input.attributes?.britishTranscription ??
+                    refEntry.ipaUk ??
+                    null,
+                }
+              : {}),
+          },
+        }
+      : input;
+    const fallback = getFallbackCanonicalTerm(enrichedInput);
+    const isPhrase = enrichedInput.itemType === "phrase";
+    const partOfSpeech = isPhrase
+      ? "phrase"
+      : (enrichedInput.partOfSpeech ?? null);
     const canonicalHeadword = getPassiveVocabularyCanonicalHeadword(
       fallback.canonicalTerm,
       partOfSpeech,
@@ -879,7 +919,7 @@ export async function createPassiveVocabularyLibraryEntries(
     const isDisambiguatedCanonical =
       normalizePassiveVocabularyText(canonicalHeadword) !==
       canonicalNormalizedTerm;
-    const groupKey = getLookupKey(canonicalNormalizedTerm, input.itemType);
+    const groupKey = getLookupKey(canonicalNormalizedTerm, enrichedInput.itemType);
     const existingGroup = libraryGroups.get(groupKey);
     const candidateForms = new Map<string, string>(
       existingGroup?.candidateForms ?? [],
@@ -888,7 +928,7 @@ export async function createPassiveVocabularyLibraryEntries(
     candidateForms.set(canonicalNormalizedTerm, canonicalTerm);
 
     if (!isDisambiguatedCanonical) {
-      candidateForms.set(input.normalizedTerm, input.term);
+      candidateForms.set(enrichedInput.normalizedTerm, enrichedInput.term);
     }
 
     if (!isDisambiguatedCanonical) {
@@ -903,16 +943,16 @@ export async function createPassiveVocabularyLibraryEntries(
     libraryGroups.set(groupKey, {
       canonicalTerm,
       canonicalNormalizedTerm,
-      itemType: input.itemType,
+      itemType: enrichedInput.itemType,
       cefrLevel: null,
       partOfSpeech,
       attributes: mergeSeededPassiveVocabularyLibraryAttributes(
         existingGroup?.attributes ?? {},
-        input,
+        enrichedInput,
       ),
       enrichmentStatus: "pending",
       enrichmentError: null,
-      inputItems: [...(existingGroup?.inputItems ?? []), input],
+      inputItems: [...(existingGroup?.inputItems ?? []), enrichedInput],
       candidateForms,
     });
   }

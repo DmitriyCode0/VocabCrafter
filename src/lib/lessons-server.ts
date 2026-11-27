@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getLessonDisplayTitle,
@@ -39,11 +40,132 @@ interface CompletedLessonChargeRow {
   price_cents: number;
 }
 
-function toIsoDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+export const USER_TIMEZONE_COOKIE = "vc_tz";
+
+interface PlannedLessonFinishCandidate {
+  id: string;
+  lesson_date: string;
+  start_time: string | null;
+  end_time: string | null;
+}
+
+function resolveValidTimeZone(candidate?: string | null): string | undefined {
+  if (!candidate) return undefined;
+  const trimmed = candidate.trim();
+  if (!trimmed) return undefined;
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone: trimmed });
+    return trimmed;
+  } catch {
+    return undefined;
+  }
+}
+
+async function getRequestTimeZone(): Promise<string | undefined> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(USER_TIMEZONE_COOKIE)?.value;
+    const decoded = raw ? decodeURIComponent(raw) : undefined;
+    const fromCookie = resolveValidTimeZone(decoded);
+    if (fromCookie) return fromCookie;
+  } catch {
+    // Ignore when called outside a request context
+  }
+
+  return resolveValidTimeZone(process.env.GOOGLE_CALENDAR_TIME_ZONE);
+}
+
+function parseMinutesOfDay(timeStr?: string | null): number | null {
+  if (!timeStr) return null;
+  const parts = timeStr.trim().split(":");
+  if (parts.length < 2) return null;
+  const hour = Number(parts[0]);
+  const minute = Number(parts[1]);
+  if (
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return null;
+  }
+  return hour * 60 + minute;
+}
+
+function getLocalClockInTimeZone(
+  now: Date,
+  timeZone?: string,
+): { todayIso: string; yesterdayIso: string; currentMinutes: number } {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    ...(timeZone ? { timeZone } : {}),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+
+  const parts = formatter.formatToParts(now);
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+
+  const year = getPart("year");
+  const month = getPart("month");
+  const day = getPart("day");
+  const rawHour = getPart("hour");
+  const hour = rawHour === 24 ? 0 : rawHour;
+  const minute = getPart("minute");
+
+  const todayIso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const yesterdayUtc = new Date(Date.UTC(year, month - 1, day - 1));
+  const yesterdayIso = `${yesterdayUtc.getUTCFullYear()}-${String(yesterdayUtc.getUTCMonth() + 1).padStart(2, "0")}-${String(yesterdayUtc.getUTCDate()).padStart(2, "0")}`;
+
+  return {
+    todayIso,
+    yesterdayIso,
+    currentMinutes: hour * 60 + minute,
+  };
+}
+
+function isPlannedLessonFinished(
+  lesson: PlannedLessonFinishCandidate,
+  clock: { todayIso: string; yesterdayIso: string; currentMinutes: number },
+): boolean {
+  if (lesson.lesson_date > clock.todayIso) {
+    return false;
+  }
+
+  const startMins = parseMinutesOfDay(lesson.start_time);
+  const endMins = parseMinutesOfDay(lesson.end_time);
+
+  let effectiveEndMins: number;
+  let crossesMidnight = false;
+
+  if (endMins !== null) {
+    crossesMidnight = startMins !== null && endMins <= startMins;
+    effectiveEndMins = endMins;
+  } else if (startMins !== null) {
+    crossesMidnight = startMins + 60 >= 1440;
+    effectiveEndMins = (startMins + 60) % 1440;
+  } else {
+    return lesson.lesson_date < clock.todayIso;
+  }
+
+  if (lesson.lesson_date < clock.todayIso) {
+    if (lesson.lesson_date === clock.yesterdayIso && crossesMidnight) {
+      return clock.currentMinutes >= effectiveEndMins;
+    }
+    return true;
+  }
+
+  if (crossesMidnight) {
+    return false;
+  }
+
+  return clock.currentMinutes >= effectiveEndMins;
 }
 
 function buildTotalsByKey<T extends object>(
@@ -159,41 +281,64 @@ function buildLessonBalanceSummaries(
 export async function autoCompleteOverduePlannedLessons({
   tutorId,
   studentId,
+  timeZone,
   supabaseAdmin = createAdminClient(),
 }: {
   tutorId?: string;
   studentId?: string;
+  timeZone?: string | null;
   supabaseAdmin?: SupabaseAdminClient;
-}) {
+}): Promise<string[]> {
   if (!tutorId && !studentId) {
-    return;
+    return [];
   }
 
-  const todayIsoDate = toIsoDate(new Date());
-  const nowIso = new Date().toISOString();
+  const effectiveTimeZone =
+    resolveValidTimeZone(timeZone) ?? (await getRequestTimeZone());
+  const clock = getLocalClockInTimeZone(new Date(), effectiveTimeZone);
 
-  let query = supabaseAdmin
+  let selectQuery = supabaseAdmin
     .from("tutor_student_lessons")
-    .update({
-      status: "completed",
-      updated_at: nowIso,
-    })
+    .select("id, lesson_date, start_time, end_time")
     .eq("status", "planned")
-    .lt("lesson_date", todayIsoDate);
+    .lte("lesson_date", clock.todayIso);
 
   if (tutorId) {
-    query = query.eq("tutor_id", tutorId);
+    selectQuery = selectQuery.eq("tutor_id", tutorId);
   }
 
   if (studentId) {
-    query = query.eq("student_id", studentId);
+    selectQuery = selectQuery.eq("student_id", studentId);
   }
 
-  const { error } = await query;
+  const { data: candidates, error: selectError } = await selectQuery;
 
-  if (error) {
-    throw error;
+  if (selectError) {
+    throw selectError;
   }
+
+  const overdueIds = ((candidates ?? []) as PlannedLessonFinishCandidate[])
+    .filter((row) => isPlannedLessonFinished(row, clock))
+    .map((row) => row.id);
+
+  if (overdueIds.length === 0) {
+    return [];
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from("tutor_student_lessons")
+    .update({
+      status: "completed",
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", overdueIds)
+    .eq("status", "planned");
+
+  if (updateError) {
+    throw updateError;
+  }
+
+  return overdueIds;
 }
 
 export async function getTutorLessonBalanceSummaries(

@@ -1,7 +1,29 @@
 import { Suspense } from "react";
 import dynamicImport from "next/dynamic";
-import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { BookOpen, PlusCircle, TrendingUp } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { normalizeAppLanguage, type AppLanguage } from "@/lib/i18n/app-language";
+import { getAppMessages } from "@/lib/i18n/messages";
+import { parseProgressInsightsValue } from "@/lib/progress/contracts";
+import {
+  applyTutorTimeAdjustmentToSnapshot,
+  getStudentMonthlyComparisonSnapshot,
+  getStudentProgressSnapshot,
+} from "@/lib/progress/profile-metrics";
+import { getPublishedTutorTimeAdjustment } from "@/lib/progress/published-tutor-time-adjustment";
+import { getStudentMonthlyActivity } from "@/lib/progress/tutor-progress-monthly";
+import { normalizeTutorStudentPlanMonth } from "@/lib/progress/tutor-student-plan";
+import { ProgressHubHeader } from "@/components/progress/progress-hub-header";
+import type { ProgressHubTabItem } from "@/components/progress/progress-hub-tabs";
+import { ReportMonthFilter } from "@/components/progress/report-month-filter";
+import { StudentMonthlyReportsTabContent } from "@/components/progress/student-monthly-reports-tab-content";
+import { StudentOverallProgressSections } from "@/components/progress/student-overall-progress-sections";
+import { StudentPlansTabContent } from "@/components/progress/student-plans-tab-content";
+import { StudentProgressInsights } from "@/components/progress/student-progress-insights";
+import { StudentResultsSummary } from "@/components/progress/student-results-summary";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardDescription,
@@ -9,24 +31,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { StudentOverallProgressSections } from "@/components/progress/student-overall-progress-sections";
-import { StudentProgressInsights } from "@/components/progress/student-progress-insights";
-import { StudentResultsSummary } from "@/components/progress/student-results-summary";
-import { StudentProgressOverviewCards } from "@/components/progress/student-progress-overview-cards";
-import { TutorProgressPageHeader } from "@/components/progress/tutor-progress-page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, BookOpen, PlusCircle } from "lucide-react";
-import { normalizeAppLanguage } from "@/lib/i18n/app-language";
-import { getAppMessages } from "@/lib/i18n/messages";
-import {
-  applyTutorTimeAdjustmentToSnapshot,
-  getStudentMonthlyComparisonSnapshot,
-  getStudentProgressSnapshot,
-} from "@/lib/progress/profile-metrics";
-import { parseProgressInsightsValue } from "@/lib/progress/contracts";
-import { getPublishedTutorTimeAdjustment } from "@/lib/progress/published-tutor-time-adjustment";
 
 export const dynamic = "force-dynamic";
 
@@ -40,12 +45,44 @@ const StudentSkillRadar = dynamicImport(
   },
 );
 
+const StudentMonthlyProgressPanel = dynamicImport(
+  () =>
+    import("@/components/progress/tutor-student-monthly-performance").then(
+      (module) => module.StudentMonthlyProgressPanel,
+    ),
+  {
+    loading: () => <Skeleton className="h-[24rem] w-full rounded-xl" />,
+  },
+);
+
 const APP_LANGUAGE_LOCALES = {
   en: "en-GB",
   uk: "uk-UA",
 } as const;
 
-function formatMonthLabel(reportMonth: string, appLanguage: "en" | "uk") {
+type StudentProgressTab = "overview" | "monthly" | "plan" | "reports";
+
+function resolveStudentTab(
+  requestedTab?: string,
+  legacyView?: string,
+): StudentProgressTab {
+  if (
+    requestedTab === "overview" ||
+    requestedTab === "monthly" ||
+    requestedTab === "plan" ||
+    requestedTab === "reports"
+  ) {
+    return requestedTab;
+  }
+
+  if (legacyView === "monthly") {
+    return "monthly";
+  }
+
+  return "overview";
+}
+
+function formatMonthLabel(reportMonth: string, appLanguage: AppLanguage) {
   return new Intl.DateTimeFormat(APP_LANGUAGE_LOCALES[appLanguage], {
     month: "long",
     year: "numeric",
@@ -79,9 +116,9 @@ function ProgressBodySkeleton() {
         <Card>
           <CardHeader>
             <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-4 w-48 mt-1" />
+            <Skeleton className="mt-1 h-4 w-48" />
           </CardHeader>
-          <div className="px-6 pb-6 space-y-3">
+          <div className="space-y-3 px-6 pb-6">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-5/6" />
             <Skeleton className="h-4 w-4/6" />
@@ -92,43 +129,50 @@ function ProgressBodySkeleton() {
   );
 }
 
-async function ProgressBody({
+async function StudentProgressMetricsBody({
   userId,
-  chartView,
+  activeTab,
   appLanguage,
 }: {
   userId: string;
-  chartView: "overall" | "monthly";
-  appLanguage: "en" | "uk";
+  activeTab: "overview" | "monthly";
+  appLanguage: AppLanguage;
 }) {
   const supabase = await createClient();
   const messages = getAppMessages(appLanguage);
 
-  const [snapshot, savedInsightsResult, publishedTutorTimeAdjustment] =
-    await Promise.all([
-      getStudentProgressSnapshot(userId),
-      supabase
-        .from("student_progress_insights")
-        .select("insights")
-        .eq("user_id", userId)
-        .maybeSingle(),
-      getPublishedTutorTimeAdjustment(userId),
-    ]);
-
-  const monthlyComparison =
-    chartView === "monthly"
-      ? await getStudentMonthlyComparisonSnapshot(userId)
-      : null;
+  const [
+    snapshot,
+    savedInsightsResult,
+    publishedTutorTimeAdjustment,
+    monthlyComparison,
+    monthlyTrend,
+  ] = await Promise.all([
+    getStudentProgressSnapshot(userId),
+    supabase
+      .from("student_progress_insights")
+      .select("insights")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    getPublishedTutorTimeAdjustment(userId),
+    activeTab === "monthly"
+      ? getStudentMonthlyComparisonSnapshot(userId)
+      : Promise.resolve(null),
+    activeTab === "monthly"
+      ? getStudentMonthlyActivity(userId, appLanguage)
+      : Promise.resolve(null),
+  ]);
 
   const savedInsights = parseProgressInsightsValue(
     savedInsightsResult.data?.insights,
   );
-  const effectiveSnapshot = publishedTutorTimeAdjustment != null
-    ? applyTutorTimeAdjustmentToSnapshot(
-        snapshot,
-        publishedTutorTimeAdjustment,
-      )
-    : snapshot;
+  const effectiveSnapshot =
+    publishedTutorTimeAdjustment != null
+      ? applyTutorTimeAdjustmentToSnapshot(
+          snapshot,
+          publishedTutorTimeAdjustment,
+        )
+      : snapshot;
   const hasAnyData =
     effectiveSnapshot.overview.totalAttempts > 0 ||
     effectiveSnapshot.timeMetrics.completedLessons > 0 ||
@@ -136,15 +180,11 @@ async function ProgressBody({
     effectiveSnapshot.passiveSignals.uniqueItems > 0 ||
     effectiveSnapshot.timeMetrics.timeAdjustmentHours !== 0;
 
-  if (chartView === "monthly" && !monthlyComparison) {
-    return null;
-  }
-
   if (!hasAnyData) {
     return (
       <Card>
-        <CardHeader className="items-center text-center py-12">
-          <TrendingUp className="h-12 w-12 text-muted-foreground/50 mb-2" />
+        <CardHeader className="items-center py-12 text-center">
+          <TrendingUp className="mb-2 h-12 w-12 text-muted-foreground/50" />
           <CardTitle className="text-lg">
             {messages.progress.noProgressTitle}
           </CardTitle>
@@ -170,77 +210,84 @@ async function ProgressBody({
     );
   }
 
-  return (
-    <>
-      {chartView === "overall" ? (
-        <StudentOverallProgressSections
-          snapshot={effectiveSnapshot}
-          radarAside={
-            <StudentProgressInsights
-              hasData={hasAnyData}
-              initialInsights={savedInsights}
-            />
-          }
-          showCefrGuidedHoursCard={false}
-          overviewCardsVariant="streak-only"
-          showActivityStrengths={false}
-        />
-      ) : (
-        <>
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-            <StudentSkillRadar
-              axes={monthlyComparison!.currentMonth.axes}
-              chartData={monthlyComparison!.currentMonth.chartData}
-              cefrLevel={effectiveSnapshot.profile.cefrLevel}
-              grammarNotice={effectiveSnapshot.grammar.betaNotice}
-              grammarTopics={effectiveSnapshot.grammarTopicMastery}
-              title={
-                appLanguage === "uk"
-                  ? "Профіль прогресу за місяць"
-                  : "Monthly Progress Profile"
-              }
-              description={
-                appLanguage === "uk"
-                  ? "Порівняння поточного місяця з попереднім за тими самими п'ятьма осями."
-                  : "Compare the current month with the previous month across the same five axes."
-              }
-              comparison={{
-                currentLabel: formatMonthLabel(
-                  monthlyComparison!.currentMonth.window.reportMonth,
-                  appLanguage,
-                ),
-                previousLabel: formatMonthLabel(
-                  monthlyComparison!.previousMonth.window.reportMonth,
-                  appLanguage,
-                ),
-                previousAxes: monthlyComparison!.previousMonth.axes,
-                previousChartData: monthlyComparison!.previousMonth.chartData,
-              }}
-            />
-            <StudentProgressInsights
-              hasData={hasAnyData}
-              initialInsights={savedInsights}
-            />
-          </div>
-
-          <StudentResultsSummary snapshot={effectiveSnapshot} />
-
-          <StudentProgressOverviewCards
-            snapshot={effectiveSnapshot}
-            variant="streak-only"
+  if (activeTab === "overview") {
+    return (
+      <StudentOverallProgressSections
+        snapshot={effectiveSnapshot}
+        radarAside={
+          <StudentProgressInsights
+            hasData={hasAnyData}
+            initialInsights={savedInsights}
           />
-        </>
-      )}
-    </>
+        }
+        showCefrGuidedHoursCard={false}
+        overviewCardsVariant="streak-only"
+        showActivityStrengths={false}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {monthlyComparison ? (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+          <StudentSkillRadar
+            axes={monthlyComparison.currentMonth.axes}
+            chartData={monthlyComparison.currentMonth.chartData}
+            cefrLevel={effectiveSnapshot.profile.cefrLevel}
+            grammarNotice={effectiveSnapshot.grammar.betaNotice}
+            grammarTopics={effectiveSnapshot.grammarTopicMastery}
+            title={
+              appLanguage === "uk"
+                ? "Профіль прогресу за місяць"
+                : "Monthly Progress Profile"
+            }
+            description={
+              appLanguage === "uk"
+                ? "Порівняння поточного місяця з попереднім за тими самими п'ятьма осями."
+                : "Compare the current month with the previous month across the same five axes."
+            }
+            comparison={{
+              currentLabel: formatMonthLabel(
+                monthlyComparison.currentMonth.window.reportMonth,
+                appLanguage,
+              ),
+              previousLabel: formatMonthLabel(
+                monthlyComparison.previousMonth.window.reportMonth,
+                appLanguage,
+              ),
+              previousAxes: monthlyComparison.previousMonth.axes,
+              previousChartData: monthlyComparison.previousMonth.chartData,
+            }}
+          />
+          <StudentProgressInsights
+            hasData={hasAnyData}
+            initialInsights={savedInsights}
+          />
+        </div>
+      ) : null}
+
+      {monthlyTrend ? <StudentMonthlyProgressPanel trend={monthlyTrend} /> : null}
+
+      <StudentResultsSummary
+        snapshot={effectiveSnapshot}
+        showCefrGuidedHoursCard={false}
+      />
+    </div>
   );
 }
 
 export default async function ProgressPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    view?: string;
+    month?: string;
+    tutor?: string;
+  }>;
 }) {
-  const { view } = await searchParams;
+  const { tab, view, month, tutor } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -257,44 +304,56 @@ export default async function ProgressPage({
 
   const appLanguage = normalizeAppLanguage(profileResult.data?.app_language);
   const messages = getAppMessages(appLanguage);
-  const chartView = view === "monthly" ? "monthly" : "overall";
+  const hub = messages.progressHub;
+  const locale = APP_LANGUAGE_LOCALES[appLanguage];
+  const activeTab = resolveStudentTab(tab, view);
+  const selectedMonth = normalizeTutorStudentPlanMonth(month);
+
+  const tabs: ProgressHubTabItem[] = [
+    { value: "overview", label: hub.studentTabs.overview, icon: "overview" },
+    { value: "monthly", label: hub.studentTabs.monthly, icon: "monthly" },
+    { value: "plan", label: hub.studentTabs.plan, icon: "plan" },
+    { value: "reports", label: hub.studentTabs.reports, icon: "reports" },
+  ];
+
+  const headerActions =
+    activeTab === "plan" || activeTab === "reports" ? (
+      <ReportMonthFilter activeMonth={selectedMonth} locale={locale} />
+    ) : null;
 
   return (
     <div className="space-y-6">
-      <TutorProgressPageHeader
-        currentSection="overall"
+      <ProgressHubHeader
+        title={hub.title}
+        description={hub.studentDescriptions[activeTab]}
+        actions={headerActions}
+        activeTab={activeTab}
         basePath="/progress"
-        title={messages.progress.title}
-        description={messages.progress.description}
+        tabs={tabs}
+        preserveParams={["month", "tutor"]}
       />
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          asChild
-          size="sm"
-          variant={chartView === "overall" ? "default" : "outline"}
-        >
-          <Link href="/progress">
-            {appLanguage === "uk" ? "Загалом" : "Overall"}
-          </Link>
-        </Button>
-        <Button
-          asChild
-          size="sm"
-          variant={chartView === "monthly" ? "default" : "outline"}
-        >
-          <Link href="/progress?view=monthly">
-            {appLanguage === "uk" ? "Порівняння місяців" : "Monthly Comparison"}
-          </Link>
-        </Button>
-      </div>
-
       <Suspense fallback={<ProgressBodySkeleton />}>
-        <ProgressBody
-          userId={user.id}
-          chartView={chartView}
-          appLanguage={appLanguage}
-        />
+        {activeTab === "plan" ? (
+          <StudentPlansTabContent
+            userId={user.id}
+            selectedMonth={selectedMonth}
+            selectedTutorId={tutor ?? null}
+            appLanguage={appLanguage}
+          />
+        ) : activeTab === "reports" ? (
+          <StudentMonthlyReportsTabContent
+            userId={user.id}
+            selectedMonth={selectedMonth}
+            appLanguage={appLanguage}
+          />
+        ) : (
+          <StudentProgressMetricsBody
+            userId={user.id}
+            activeTab={activeTab}
+            appLanguage={appLanguage}
+          />
+        )}
       </Suspense>
     </div>
   );

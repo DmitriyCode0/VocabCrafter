@@ -480,7 +480,7 @@ export function StudentsClient({
                     </Button>
                     <Button variant="outline" size="sm" asChild>
                       <Link
-                        href={`/plans-and-reports?student=${conn.student_id as string}`}
+                        href={`/results?tab=plan&student=${conn.student_id as string}`}
                       >
                         <Target className="mr-2 h-4 w-4" />
                         Plan
@@ -488,7 +488,7 @@ export function StudentsClient({
                     </Button>
                     <Button variant="outline" size="sm" asChild>
                       <Link
-                        href={`/plans-and-reports/reports?student=${conn.student_id as string}`}
+                        href={`/results?tab=reports&student=${conn.student_id as string}`}
                       >
                         <FileText className="mr-2 h-4 w-4" />
                         Reports
@@ -603,7 +603,7 @@ export function StudentsClient({
                         </Button>
                         <Button variant="outline" size="sm" asChild>
                           <Link
-                            href={`/plans-and-reports/reports?student=${conn.student_id as string}`}
+                            href={`/results?tab=reports&student=${conn.student_id as string}`}
                           >
                             <FileText className="mr-1.5 h-3.5 w-3.5" />
                             Reports

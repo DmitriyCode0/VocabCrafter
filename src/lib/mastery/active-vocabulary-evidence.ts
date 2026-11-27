@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import {
+  inferPassiveVocabularyItemType,
   normalizePassiveVocabularyLibraryAttributes,
   normalizePassiveVocabularyText,
   type PassiveVocabularyLibraryAttributes,
@@ -272,7 +273,7 @@ export async function upsertActiveVocabularyEvidence({
     items: normalizedUniqueTerms.map((term) => ({
       term,
       normalizedTerm: term,
-      itemType: "word" as const,
+      itemType: inferPassiveVocabularyItemType(term),
     })),
   });
 
@@ -369,7 +370,7 @@ export async function upsertActiveVocabularyEvidence({
     items: rows.map((row) => ({
       term: row.term,
       normalizedTerm: row.normalized_term,
-      itemType: "word",
+      itemType: inferPassiveVocabularyItemType(row.term),
       libraryItemId: row.library_item_id,
     })),
   });

@@ -8,5 +8,9 @@ export default async function CoachingResultsPage({
   searchParams: Promise<{ student?: string }>;
 }) {
   const { student } = await searchParams;
-  redirect(student ? `/plans-and-reports?student=${student}` : "/plans-and-reports");
+  const params = new URLSearchParams({ tab: "plan" });
+  if (student) {
+    params.set("student", student);
+  }
+  redirect(`/results?${params.toString()}`);
 }

@@ -897,6 +897,11 @@ const EN_MESSAGES = {
         todayScheduleDescription:
           "Your upcoming sessions, lesson times, and student balance status.",
         todayBadge: "Today",
+        tomorrowBadge: "Tomorrow",
+        liveNowBadge: "Now",
+        nextUpBadge: "Next up",
+        startsInMinutes: (mins: number) => `In ${mins}m`,
+        moreTodayLabel: (count: number) => `+${count} more today`,
         noUpcomingLessons:
           "No upcoming lessons scheduled for the next 7 days.",
         openScheduleButton: "Open Schedule",
@@ -1392,6 +1397,75 @@ const EN_MESSAGES = {
     noReportsTitle: "No monthly reports yet",
     noReportsDescription:
       "Monthly reports will appear here after your tutor publishes them.",
+  },
+  progressHub: {
+    title: "Progress",
+    tutorTabs: {
+      overview: "Overview",
+      students: "All Students",
+      vocabulary: "Vocabulary",
+      plan: "Plan & Curriculum",
+      reports: "Reports",
+    },
+    studentTabs: {
+      overview: "Overview",
+      monthly: "Monthly",
+      plan: "My Plan",
+      reports: "Reports",
+    },
+    tutorDescriptions: {
+      overview:
+        "Review holistic progress, CEFR readiness, radar profile, recommendations, and 30-day activity.",
+      students:
+        "Compare all active students across Learning, Passive, and Active vocabulary tiers.",
+      vocabulary:
+        "Inspect the three-state vocabulary funnel, CEFR distribution, and SRS mastery breakdown.",
+      plan:
+        "Set monthly goals, focus grammar topics, and track covered curriculum lessons.",
+      reports:
+        "Generate, review, publish, and export monthly progress reports.",
+    },
+    studentDescriptions: {
+      overview:
+        "Track your overall CEFR progress, guided hours, skills profile, and learning insights.",
+      monthly:
+        "Compare this month against last month and inspect your 30-day quiz and lesson activity.",
+      plan:
+        "View the monthly goals, grammar focus, and performance targets set by your tutors.",
+      reports:
+        "Read and download the monthly progress reports published by your tutors.",
+    },
+    dayStreakBadge: (days: number) => `${days}-day streak`,
+    studentOverviewEmptyDescription:
+      "This student has not built enough saved activity or lesson history to populate the progress overview yet.",
+    planContext: {
+      targetProgressTitle: "Target vs. Actual",
+      otherMetricsTitle: "Additional Activity",
+      noTargetSet: "No target set",
+      suggestedGrammarTitle: "Suggested from unmastered topics",
+      suggestedGrammarDescription:
+        "One-click add weak or unmastered grammar topics from this student's profile.",
+      viewVocabularyButton: "Vocabulary",
+      metricLabels: {
+        sentenceTranslations: "Sentence translations",
+        gapFills: "Gap fill exercises",
+        completedLessons: "Completed lessons",
+        wordsAdded: "New words added",
+        masteredWords: "Mastered words (levels 4-5)",
+        speakingShare: "Student speaking share",
+        averageScore: "Average quiz score",
+        activeDays: "Active days",
+        practicedWords: "Words reviewed this month",
+        trackedWords: "Words in vocabulary tracker",
+      },
+    },
+    studentPlan: {
+      untitledPlan: "Monthly Learning Plan",
+      planGoalsHeading: "Focus & Goals",
+      objectivesHeading: "Key Objectives",
+      grammarFocusHeading: "Grammar Focus",
+      monthlyTargetsHeading: "Monthly Targets",
+    },
   },
   adminUsers: {
     title: "Users",
@@ -2696,6 +2770,11 @@ const UK_MESSAGES: AppMessages = {
         todayScheduleDescription:
           "Ваші найближчі заняття, час проведення та стан балансу учнів.",
         todayBadge: "Сьогодні",
+        tomorrowBadge: "Завтра",
+        liveNowBadge: "Зараз",
+        nextUpBadge: "Далі",
+        startsInMinutes: (mins: number) => `Через ${mins} хв`,
+        moreTodayLabel: (count: number) => `ще ${count} сьогодні`,
         noUpcomingLessons:
           "На найближчі 7 днів запланованих уроків немає.",
         openScheduleButton: "Відкрити розклад",
@@ -3197,6 +3276,75 @@ const UK_MESSAGES: AppMessages = {
     noReportsTitle: "Поки немає щомісячних звітів",
     noReportsDescription:
       "Щомісячні звіти з’являться тут після того, як викладач опублікує їх для вас.",
+  },
+  progressHub: {
+    title: "Прогрес",
+    tutorTabs: {
+      overview: "Огляд",
+      students: "Усі учні",
+      vocabulary: "Словник",
+      plan: "План і програма",
+      reports: "Звіти",
+    },
+    studentTabs: {
+      overview: "Огляд",
+      monthly: "За місяць",
+      plan: "Мій план",
+      reports: "Звіти",
+    },
+    tutorDescriptions: {
+      overview:
+        "Комплексний огляд успішності, готовності за CEFR, профілю навичок, рекомендацій та 30-денної активності.",
+      students:
+        "Порівнюйте всіх активних учнів за етапами навчального, пасивного й активного словника.",
+      vocabulary:
+        "Аналізуйте триступеневу воронку словника, розподіл за CEFR і деталі SRS-засвоєння.",
+      plan:
+        "Визначайте місячні цілі, фокусну граматику та відстежуйте пройдені уроки програми.",
+      reports:
+        "Створюйте, редагуйте, публікуйте та експортуйте щомісячні звіти про прогрес.",
+    },
+    studentDescriptions: {
+      overview:
+        "Відстежуйте загальний прогрес за CEFR, навчальні години, профіль навичок і персональні інсайти.",
+      monthly:
+        "Порівнюйте поточний місяць із попереднім та переглядайте активність вікторин і уроків за 30 днів.",
+      plan:
+        "Переглядайте місячні цілі, граматичний фокус та орієнтири, які встановив викладач.",
+      reports:
+        "Читайте й завантажуйте щомісячні звіти про прогрес, опубліковані викладачем.",
+    },
+    dayStreakBadge: (days: number) => `Серія: ${days} дн.`,
+    studentOverviewEmptyDescription:
+      "У цього учня ще недостатньо збереженої активності або історії уроків для заповнення огляду прогресу.",
+    planContext: {
+      targetProgressTitle: "Ціль і факт",
+      otherMetricsTitle: "Додаткова активність",
+      noTargetSet: "Ціль не задана",
+      suggestedGrammarTitle: "Рекомендовано з неопанованих тем",
+      suggestedGrammarDescription:
+        "Додайте одним кліком граматичні теми, які учень ще не опанував.",
+      viewVocabularyButton: "Словник",
+      metricLabels: {
+        sentenceTranslations: "Переклад речень",
+        gapFills: "Заповнення пропусків",
+        completedLessons: "Завершені уроки",
+        wordsAdded: "Додано нових слів",
+        masteredWords: "Опановані слова (рівні 4-5)",
+        speakingShare: "Частка мовлення учня",
+        averageScore: "Середній бал вікторин",
+        activeDays: "Активні дні",
+        practicedWords: "Повторено слів за місяць",
+        trackedWords: "Слів у трекері",
+      },
+    },
+    studentPlan: {
+      untitledPlan: "Місячний навчальний план",
+      planGoalsHeading: "Фокус і цілі",
+      objectivesHeading: "Ключові завдання",
+      grammarFocusHeading: "Граматичний фокус",
+      monthlyTargetsHeading: "Цілі на місяць",
+    },
   },
   adminUsers: {
     title: "Користувачі",

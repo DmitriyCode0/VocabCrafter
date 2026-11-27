@@ -13,5 +13,5 @@ export default async function StudentMonthlyFeedbackPage() {
     redirect("/login");
   }
 
-  redirect("/plans-and-reports/reports");
+  redirect("/progress?tab=reports");
 }

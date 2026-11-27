@@ -122,7 +122,7 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["tutor"],
   },
   {
-    labelKey: "classes",
+    labelKey: "myClasses",
     href: "/classes",
     icon: SHARED_PAGE_ICONS.classes,
     roles: ["tutor"],
@@ -131,12 +131,6 @@ const NAV_ITEMS: NavItem[] = [
     labelKey: "assignments",
     href: "/assignments",
     icon: SHARED_PAGE_ICONS.assignments,
-    roles: ["tutor"],
-  },
-  {
-    labelKey: "vocabMastery",
-    href: "/mastery",
-    icon: SHARED_PAGE_ICONS.mastery,
     roles: ["tutor"],
   },
   {
@@ -150,12 +144,6 @@ const NAV_ITEMS: NavItem[] = [
     href: "/results",
     icon: SHARED_PAGE_ICONS.progress,
     roles: ["tutor"],
-  },
-  {
-    labelKey: "plansAndReports",
-    href: "/plans-and-reports",
-    icon: FileText,
-    roles: ["student", "tutor"],
   },
   // Shared items
   {

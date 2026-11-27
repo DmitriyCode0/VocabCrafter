@@ -8,7 +8,5 @@ export default async function TutorStudentReportsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id: studentId } = await params;
-  redirect(
-    `/plans-and-reports/reports?student=${encodeURIComponent(studentId)}`,
-  );
+  redirect(`/results?tab=reports&student=${encodeURIComponent(studentId)}`);
 }

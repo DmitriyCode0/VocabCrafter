@@ -2465,6 +2465,162 @@ export interface Database {
           },
         ];
       };
+      reference_dictionary_entries: {
+        Row: {
+          id: string;
+          language_pair: string;
+          headword: string;
+          normalized_headword: string;
+          item_type: "word" | "phrase";
+          part_of_speech: string | null;
+          ipa_us: string | null;
+          ipa_uk: string | null;
+          short_uk_translation: string | null;
+          senses: Json;
+          source_dict: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          language_pair?: string;
+          headword: string;
+          normalized_headword: string;
+          item_type?: "word" | "phrase";
+          part_of_speech?: string | null;
+          ipa_us?: string | null;
+          ipa_uk?: string | null;
+          short_uk_translation?: string | null;
+          senses?: Json;
+          source_dict?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          language_pair?: string;
+          headword?: string;
+          normalized_headword?: string;
+          item_type?: "word" | "phrase";
+          part_of_speech?: string | null;
+          ipa_us?: string | null;
+          ipa_uk?: string | null;
+          short_uk_translation?: string | null;
+          senses?: Json;
+          source_dict?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      lesson_meet_transcripts: {
+        Row: {
+          id: string;
+          lesson_id: string;
+          tutor_id: string;
+          student_id: string | null;
+          source_type: "google_drive" | "manual_paste" | "file_upload";
+          google_drive_file_id: string | null;
+          google_drive_file_name: string | null;
+          google_drive_web_view_link: string | null;
+          raw_text: string;
+          parsed_segments: Json;
+          analysis_status:
+            | "pending"
+            | "analyzed"
+            | "learning_approved"
+            | "failed";
+          analysis_error: string | null;
+          lesson_summary_uk: string | null;
+          auto_applied_active: Json;
+          auto_applied_passive: Json;
+          learning_candidates: Json;
+          active_applied_count: number;
+          passive_applied_count: number;
+          learning_approved_count: number;
+          analyzed_at: string | null;
+          learning_reviewed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          lesson_id: string;
+          tutor_id: string;
+          student_id?: string | null;
+          source_type?: "google_drive" | "manual_paste" | "file_upload";
+          google_drive_file_id?: string | null;
+          google_drive_file_name?: string | null;
+          google_drive_web_view_link?: string | null;
+          raw_text: string;
+          parsed_segments?: Json;
+          analysis_status?:
+            | "pending"
+            | "analyzed"
+            | "learning_approved"
+            | "failed";
+          analysis_error?: string | null;
+          lesson_summary_uk?: string | null;
+          auto_applied_active?: Json;
+          auto_applied_passive?: Json;
+          learning_candidates?: Json;
+          active_applied_count?: number;
+          passive_applied_count?: number;
+          learning_approved_count?: number;
+          analyzed_at?: string | null;
+          learning_reviewed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          lesson_id?: string;
+          tutor_id?: string;
+          student_id?: string | null;
+          source_type?: "google_drive" | "manual_paste" | "file_upload";
+          google_drive_file_id?: string | null;
+          google_drive_file_name?: string | null;
+          google_drive_web_view_link?: string | null;
+          raw_text?: string;
+          parsed_segments?: Json;
+          analysis_status?:
+            | "pending"
+            | "analyzed"
+            | "learning_approved"
+            | "failed";
+          analysis_error?: string | null;
+          lesson_summary_uk?: string | null;
+          auto_applied_active?: Json;
+          auto_applied_passive?: Json;
+          learning_candidates?: Json;
+          active_applied_count?: number;
+          passive_applied_count?: number;
+          learning_approved_count?: number;
+          analyzed_at?: string | null;
+          learning_reviewed_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lesson_meet_transcripts_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: true;
+            referencedRelation: "tutor_student_lessons";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lesson_meet_transcripts_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lesson_meet_transcripts_tutor_id_fkey";
+            columns: ["tutor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -2548,3 +2704,7 @@ export type PassiveVocabularyEvidence =
 export type StudentVocabularyItem =
   Database["public"]["Tables"]["student_vocabulary_items"]["Row"];
 export type WordMastery = Database["public"]["Tables"]["word_mastery"]["Row"];
+export type ReferenceDictionaryEntryRow =
+  Database["public"]["Tables"]["reference_dictionary_entries"]["Row"];
+export type LessonMeetTranscriptRow =
+  Database["public"]["Tables"]["lesson_meet_transcripts"]["Row"];

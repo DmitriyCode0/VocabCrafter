@@ -200,9 +200,45 @@ export interface ResolvedTimeMarker {
   isActive: boolean;
 }
 
+export type AspectGraphVariant =
+  | "single_fact"
+  | "general_truth"
+  | "habit_regular"
+  | "sequence"
+  | "timetable_future"
+  | "future_time_clause"
+  | "point_in_progress"
+  | "duration_span"
+  | "parallel_long"
+  | "interrupted"
+  | "future_arrangement"
+  | "developing_trend"
+  | "before_cutoff"
+  | "life_experience"
+  | "duration_up_to_cutoff";
+
+export interface AspectUseCaseSpec {
+  labelUk: string;
+  graphVariant: AspectGraphVariant;
+  exampleTagged: string;
+  defaultPrimaryLabel?: string;
+  defaultSecondaryLabel?: string;
+  defaultCutoffLabel?: string;
+}
+
 export interface ResolvedUseCase {
+  index: number;
   label: string;
+  graphVariant: AspectGraphVariant;
   isActive: boolean;
+}
+
+export interface AspectTimelineLabels {
+  primaryLabel: string | null;
+  secondaryLabel: string | null;
+  tertiaryLabel: string | null;
+  durationOrStartLabel: string | null;
+  cutoffLabel: string;
 }
 
 export interface AspectMatrixCellMeta {
@@ -211,6 +247,7 @@ export interface AspectMatrixCellMeta {
   formula: string;
   explanationUk: string;
   useCasesUk: readonly string[];
+  useCaseSpecs: readonly AspectUseCaseSpec[];
   timeCueExample: string;
   timeMarkers: readonly TimeMarkerSpec[];
 }
@@ -225,6 +262,29 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
       "Факти в минулому",
       "Регулярні дії раніше (used to)",
       "Послідовні дії одна за одною",
+    ],
+    useCaseSpecs: [
+      {
+        labelUk: "Факти в минулому",
+        graphVariant: "single_fact",
+        exampleTagged: "I [[finished]] the project {{yesterday}}.",
+        defaultPrimaryLabel: "finished",
+        defaultSecondaryLabel: "yesterday",
+      },
+      {
+        labelUk: "Регулярні дії раніше (used to)",
+        graphVariant: "habit_regular",
+        exampleTagged: "I [[used to walk]] to school {{every day}}.",
+        defaultPrimaryLabel: "used to walk",
+        defaultSecondaryLabel: "every day",
+      },
+      {
+        labelUk: "Послідовні дії одна за одною",
+        graphVariant: "sequence",
+        exampleTagged: "I [[woke up]], {{made}} coffee, and <<left>> home.",
+        defaultPrimaryLabel: "woke up",
+        defaultSecondaryLabel: "made",
+      },
     ],
     timeCueExample: "yesterday / last week",
     timeMarkers: [
@@ -249,6 +309,37 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
       "Тривалість (from ... to / all morning)",
       "2 паралельні тривалі дії (while / as)",
       "Тривала дія, перервана коротшою (when + V2)",
+    ],
+    useCaseSpecs: [
+      {
+        labelUk: "У конкретний час (at 7 yesterday)",
+        graphVariant: "point_in_progress",
+        exampleTagged: "I [[was doing]] my classes {{at 7 pm yesterday}}.",
+        defaultPrimaryLabel: "was doing",
+        defaultSecondaryLabel: "at 7 pm yesterday",
+      },
+      {
+        labelUk: "Тривалість (from ... to / all morning)",
+        graphVariant: "duration_span",
+        exampleTagged: "I [[was studying]] English {{all morning}}.",
+        defaultPrimaryLabel: "was studying",
+        defaultSecondaryLabel: "all morning",
+      },
+      {
+        labelUk: "2 паралельні тривалі дії (while / as)",
+        graphVariant: "parallel_long",
+        exampleTagged:
+          "While I [[was cooking]] dinner, she {{was doing}} her homework.",
+        defaultPrimaryLabel: "was cooking",
+        defaultSecondaryLabel: "was doing",
+      },
+      {
+        labelUk: "Тривала дія, перервана коротшою (when + V2)",
+        graphVariant: "interrupted",
+        exampleTagged: "I [[was doing]] my classes {{when dinner started}}.",
+        defaultPrimaryLabel: "was doing",
+        defaultSecondaryLabel: "when dinner started",
+      },
     ],
     timeCueExample: "at 5 pm yesterday",
     timeMarkers: [
@@ -279,6 +370,16 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
     useCasesUk: [
       "Дія відбулася ДО певного моменту чи дії в минулому (before / after)",
     ],
+    useCaseSpecs: [
+      {
+        labelUk:
+          "Дія відбулася ДО певного моменту чи дії в минулому (before / after)",
+        graphVariant: "before_cutoff",
+        exampleTagged: "I [[had done]] my classes {{before dinner}}.",
+        defaultPrimaryLabel: "had done",
+        defaultCutoffLabel: "before dinner",
+      },
+    ],
     timeCueExample: "before we arrived",
     timeMarkers: [
       { id: "before", label: "before ...", pattern: /\bbefore\b/i },
@@ -304,6 +405,16 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
     explanationUk: 'Дія тривала впродовж часу "ДО" моменту в минулому.',
     useCasesUk: [
       "Тривала або повторювана дія ДО іншої дії в минулому",
+    ],
+    useCaseSpecs: [
+      {
+        labelUk: "Тривала або повторювана дія ДО іншої дії в минулому",
+        graphVariant: "duration_up_to_cutoff",
+        exampleTagged:
+          "I [[had been studying]] <<for two hours>> {{before dinner}}.",
+        defaultPrimaryLabel: "had been studying",
+        defaultCutoffLabel: "before dinner",
+      },
     ],
     timeCueExample: "for an hour before...",
     timeMarkers: [
@@ -333,6 +444,49 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
       "Майбутнє після if / when",
       "Дія зараз зі state verbs",
       "Живі історії та жарти (storytelling)",
+    ],
+    useCaseSpecs: [
+      {
+        labelUk: "Факти та істини",
+        graphVariant: "general_truth",
+        exampleTagged: "Water [[boils]] at 100°C.",
+        defaultPrimaryLabel: "boils",
+      },
+      {
+        labelUk: "Регулярні дії (every / often / never)",
+        graphVariant: "habit_regular",
+        exampleTagged: "I [[do]] my classes {{every day}}.",
+        defaultPrimaryLabel: "do",
+        defaultSecondaryLabel: "every day",
+      },
+      {
+        labelUk: "Розклади й графіки (майбутнє)",
+        graphVariant: "timetable_future",
+        exampleTagged: "The train [[leaves]] {{at 8 pm tomorrow}}.",
+        defaultPrimaryLabel: "leaves",
+        defaultSecondaryLabel: "at 8 pm tomorrow",
+      },
+      {
+        labelUk: "Майбутнє після if / when",
+        graphVariant: "future_time_clause",
+        exampleTagged: "I'll call you when I [[arrive]] {{tonight}}.",
+        defaultPrimaryLabel: "arrive",
+        defaultSecondaryLabel: "tonight",
+      },
+      {
+        labelUk: "Дія зараз зі state verbs",
+        graphVariant: "single_fact",
+        exampleTagged: "I [[know]] the answer.",
+        defaultPrimaryLabel: "know",
+      },
+      {
+        labelUk: "Живі історії та жарти (storytelling)",
+        graphVariant: "sequence",
+        exampleTagged:
+          "He [[opens]] the door, {{looks}} around, and <<smiles>>.",
+        defaultPrimaryLabel: "opens",
+        defaultSecondaryLabel: "looks",
+      },
     ],
     timeCueExample: "every day / usually",
     timeMarkers: [
@@ -370,6 +524,36 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
       "Запланована домовленість у майбутньому",
       "Розвиток і зміна (more and more)",
     ],
+    useCaseSpecs: [
+      {
+        labelUk: "Прямо зараз (now)",
+        graphVariant: "point_in_progress",
+        exampleTagged: "I [[am doing]] my classes {{right now}}.",
+        defaultPrimaryLabel: "am doing",
+        defaultSecondaryLabel: "right now",
+      },
+      {
+        labelUk: "Тимчасова дія (today / this week)",
+        graphVariant: "duration_span",
+        exampleTagged: "I [[am taking]] an intensive course {{this week}}.",
+        defaultPrimaryLabel: "am taking",
+        defaultSecondaryLabel: "this week",
+      },
+      {
+        labelUk: "Запланована домовленість у майбутньому",
+        graphVariant: "future_arrangement",
+        exampleTagged: "I [[am meeting]] my tutor {{tonight at 7}}.",
+        defaultPrimaryLabel: "am meeting",
+        defaultSecondaryLabel: "tonight at 7",
+      },
+      {
+        labelUk: "Розвиток і зміна (more and more)",
+        graphVariant: "developing_trend",
+        exampleTagged: "My English [[is getting]] {{better and better}}.",
+        defaultPrimaryLabel: "is getting",
+        defaultSecondaryLabel: "better and better",
+      },
+    ],
     timeCueExample: "right now / at the moment",
     timeMarkers: [
       { id: "right-now", label: "right now", pattern: /\bright\s+now\b/i },
@@ -406,6 +590,30 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
       "Життєвий досвід (ever / never / before)",
       "Незавершений стан досі (для state verbs)",
     ],
+    useCaseSpecs: [
+      {
+        labelUk: "Новини та свіжий результат",
+        graphVariant: "before_cutoff",
+        exampleTagged: "I [[have done]] my classes {{already}}.",
+        defaultPrimaryLabel: "have done",
+        defaultCutoffLabel: "already",
+      },
+      {
+        labelUk: "Життєвий досвід (ever / never / before)",
+        graphVariant: "life_experience",
+        exampleTagged: "I [[have visited]] London {{twice}}.",
+        defaultPrimaryLabel: "have visited",
+        defaultSecondaryLabel: "twice",
+        defaultCutoffLabel: "NOW",
+      },
+      {
+        labelUk: "Незавершений стан досі (для state verbs)",
+        graphVariant: "duration_up_to_cutoff",
+        exampleTagged: "I [[have known]] her <<since 2021>>.",
+        defaultPrimaryLabel: "have known",
+        defaultCutoffLabel: "NOW",
+      },
+    ],
     timeCueExample: "already / just / by now",
     timeMarkers: [
       {
@@ -440,6 +648,15 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
     useCasesUk: [
       "Незавершена тривала дія, що триває досі (for / since)",
     ],
+    useCaseSpecs: [
+      {
+        labelUk: "Незавершена тривала дія, що триває досі (for / since)",
+        graphVariant: "duration_up_to_cutoff",
+        exampleTagged: "I [[have been studying]] <<for two hours>> {{today}}.",
+        defaultPrimaryLabel: "have been studying",
+        defaultCutoffLabel: "today",
+      },
+    ],
     timeCueExample: "for 2 hours / since morning",
     timeMarkers: [
       {
@@ -468,6 +685,22 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
     useCasesUk: [
       "Факти й прогнози в майбутньому",
       "Спонтанні рішення та обіцянки",
+    ],
+    useCaseSpecs: [
+      {
+        labelUk: "Факти й прогнози в майбутньому",
+        graphVariant: "single_fact",
+        exampleTagged: "I [[will finish]] my classes {{tomorrow}}.",
+        defaultPrimaryLabel: "will finish",
+        defaultSecondaryLabel: "tomorrow",
+      },
+      {
+        labelUk: "Спонтанні рішення та обіцянки",
+        graphVariant: "single_fact",
+        exampleTagged: "Don't worry, I [[will help]] you {{right away}}.",
+        defaultPrimaryLabel: "will help",
+        defaultSecondaryLabel: "right away",
+      },
     ],
     timeCueExample: "tomorrow / next week",
     timeMarkers: [
@@ -498,6 +731,23 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
       "У конкретний час у майбутньому (at 11 tomorrow)",
       "Тривалість процесу (from ... to)",
     ],
+    useCaseSpecs: [
+      {
+        labelUk: "У конкретний час у майбутньому (at 11 tomorrow)",
+        graphVariant: "point_in_progress",
+        exampleTagged: "I [[will be doing]] my classes {{at 11 tomorrow}}.",
+        defaultPrimaryLabel: "will be doing",
+        defaultSecondaryLabel: "at 11 tomorrow",
+      },
+      {
+        labelUk: "Тривалість процесу (from ... to)",
+        graphVariant: "duration_span",
+        exampleTagged:
+          "I [[will be working]] on this {{from 2 to 5 tomorrow}}.",
+        defaultPrimaryLabel: "will be working",
+        defaultSecondaryLabel: "from 2 to 5 tomorrow",
+      },
+    ],
     timeCueExample: "at this time tomorrow",
     timeMarkers: [
       {
@@ -527,6 +777,15 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
     useCasesUk: [
       "Дія завершиться ДО моменту в майбутньому (by)",
     ],
+    useCaseSpecs: [
+      {
+        labelUk: "Дія завершиться ДО моменту в майбутньому (by)",
+        graphVariant: "before_cutoff",
+        exampleTagged: "I [[will have done]] my classes {{by 7 pm tomorrow}}.",
+        defaultPrimaryLabel: "will have done",
+        defaultCutoffLabel: "by 7 pm tomorrow",
+      },
+    ],
     timeCueExample: "by 7 pm tomorrow",
     timeMarkers: [
       {
@@ -551,6 +810,16 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
     useCasesUk: [
       "Тривала дія ДО певного моменту в майбутньому",
     ],
+    useCaseSpecs: [
+      {
+        labelUk: "Тривала дія ДО певного моменту в майбутньому",
+        graphVariant: "duration_up_to_cutoff",
+        exampleTagged:
+          "I [[will have been working]] <<for 5 years>> {{by next month}}.",
+        defaultPrimaryLabel: "will have been working",
+        defaultCutoffLabel: "by next month",
+      },
+    ],
     timeCueExample: "for 5 years by next month",
     timeMarkers: [
       {
@@ -573,12 +842,95 @@ export const ASPECT_MATRIX_META: Record<AspectCellKey, AspectMatrixCellMeta> = {
   },
 };
 
+function cleanTimelineCueLabel(text: string): string {
+  return text.replace(/\s+/g, " ").replace(/[,.!?;:]+$/g, "").trim();
+}
+
+/**
+ * Extracts crisp primary/secondary labels and an aligned Perfect boundary cue for the timeline.
+ */
+export function extractAspectTimelineLabels(
+  cellKey: AspectCellKey,
+  aspectTime: AspectTime,
+  parsedSentence: { plainText: string; segments: SentenceSegment[] } | null,
+  activeUseCaseSpec: AspectUseCaseSpec,
+): AspectTimelineLabels {
+  const emeraldSegments = (parsedSentence?.segments ?? [])
+    .filter((segment) => segment.color === "emerald")
+    .map((segment) => cleanTimelineCueLabel(segment.text))
+    .filter(Boolean);
+  const skySegments = (parsedSentence?.segments ?? [])
+    .filter((segment) => segment.color === "sky")
+    .map((segment) => cleanTimelineCueLabel(segment.text))
+    .filter(Boolean);
+  const amberSegments = (parsedSentence?.segments ?? [])
+    .filter((segment) => segment.color === "amber")
+    .map((segment) => cleanTimelineCueLabel(segment.text))
+    .filter(Boolean);
+
+  const primaryLabel =
+    emeraldSegments[0] ?? activeUseCaseSpec.defaultPrimaryLabel ?? null;
+  const secondaryLabel =
+    skySegments[0] ?? activeUseCaseSpec.defaultSecondaryLabel ?? null;
+  const tertiaryLabel = amberSegments[0] ?? null;
+
+  const isDurationOrStart = (cue: string) => /^(for|since)\s+/i.test(cue);
+  const isExperienceCount = (cue: string) =>
+    /^(ever|never|once|twice|\d+\s+times)$/i.test(cue);
+
+  const durationOrStartLabel =
+    tertiaryLabel ??
+    skySegments.find((cue) => isDurationOrStart(cue)) ??
+    null;
+
+  const boundaryCueFromSky =
+    skySegments.find(
+      (cue) =>
+        !isDurationOrStart(cue) &&
+        !isExperienceCount(cue) &&
+        /\b(before|by|when|until|till|already|just|yet|now|today|this|so\s+far)\b/i.test(
+          cue,
+        ),
+    ) ??
+    skySegments.find(
+      (cue) => !isDurationOrStart(cue) && !isExperienceCount(cue),
+    ) ??
+    null;
+
+  let cutoffLabel =
+    boundaryCueFromSky ??
+    activeUseCaseSpec.defaultCutoffLabel ??
+    ASPECT_MATRIX_META[cellKey].timeCueExample;
+
+  if (aspectTime === "present") {
+    const cleaned = cleanTimelineCueLabel(cutoffLabel);
+    if (!cleaned || /^now$/i.test(cleaned) || /^right\s+now$/i.test(cleaned)) {
+      cutoffLabel = "NOW";
+    } else if (/^now\b/i.test(cleaned)) {
+      cutoffLabel = cleaned;
+    } else {
+      cutoffLabel = `NOW · ${cleaned}`;
+    }
+  }
+
+  return {
+    primaryLabel,
+    secondaryLabel,
+    tertiaryLabel,
+    durationOrStartLabel,
+    cutoffLabel,
+  };
+}
+
 /**
  * Matches typical tense markers against the sentence displayed on the timeline.
  */
 export function resolveActiveTimeMarkers(
   cellKey: AspectCellKey,
   parsedSentence: { plainText: string; segments: SentenceSegment[] } | null,
+  options?: {
+    graphVariant?: AspectGraphVariant;
+  },
 ): ResolvedTimeMarker[] {
   const specs = ASPECT_MATRIX_META[cellKey].timeMarkers;
 
@@ -606,7 +958,16 @@ export function resolveActiveTimeMarkers(
     };
   });
 
-  if (skyCues.length > 0 && !resolved.some((marker) => marker.isActive)) {
+  const skipFallbackSyntheticChip =
+    options?.graphVariant === "general_truth" ||
+    options?.graphVariant === "parallel_long" ||
+    options?.graphVariant === "sequence";
+
+  if (
+    !skipFallbackSyntheticChip &&
+    skyCues.length > 0 &&
+    !resolved.some((marker) => marker.isActive)
+  ) {
     const fallbackLabel = skyCues
       .join(" · ")
       .replace(/[,.!?;:]+$/g, "")
@@ -629,26 +990,54 @@ export function resolveActiveUseCases(
     isStateVerb?: boolean;
     detectedCellKey?: AspectCellKey;
     detectedUseCaseIndex?: number | null;
+    selectedUseCaseIndex?: number | null;
   },
 ): ResolvedUseCase[] {
-  const useCases = ASPECT_MATRIX_META[cellKey].useCasesUk;
+  const specs = ASPECT_MATRIX_META[cellKey].useCaseSpecs;
 
-  if (!parsedSentence) {
-    return useCases.map((label) => ({ label, isActive: false }));
+  if (specs.length === 1) {
+    return [
+      {
+        index: 0,
+        label: specs[0].labelUk,
+        graphVariant: specs[0].graphVariant,
+        isActive: true,
+      },
+    ];
   }
 
-  if (useCases.length === 1) {
-    return [{ label: useCases[0], isActive: true }];
+  if (
+    typeof options?.selectedUseCaseIndex === "number" &&
+    options.selectedUseCaseIndex >= 0 &&
+    options.selectedUseCaseIndex < specs.length
+  ) {
+    return specs.map((spec, idx) => ({
+      index: idx,
+      label: spec.labelUk,
+      graphVariant: spec.graphVariant,
+      isActive: idx === options.selectedUseCaseIndex,
+    }));
+  }
+
+  if (!parsedSentence) {
+    return specs.map((spec, idx) => ({
+      index: idx,
+      label: spec.labelUk,
+      graphVariant: spec.graphVariant,
+      isActive: idx === 0,
+    }));
   }
 
   if (
     options?.detectedCellKey === cellKey &&
     typeof options.detectedUseCaseIndex === "number" &&
     options.detectedUseCaseIndex >= 0 &&
-    options.detectedUseCaseIndex < useCases.length
+    options.detectedUseCaseIndex < specs.length
   ) {
-    return useCases.map((label, idx) => ({
-      label,
+    return specs.map((spec, idx) => ({
+      index: idx,
+      label: spec.labelUk,
+      graphVariant: spec.graphVariant,
       isActive: idx === options.detectedUseCaseIndex,
     }));
   }
@@ -675,7 +1064,10 @@ export function resolveActiveUseCases(
       break;
 
     case "past_continuous":
-      if (/\b(while|as)\b/i.test(text)) {
+      if (
+        /\b(while|as)\b/i.test(text) ||
+        (text.match(/\b(was|were)\s+\w+ing\b/gi)?.length ?? 0) >= 2
+      ) {
         matchedIndex = 2;
       } else if (/\bwhen\b/i.test(text)) {
         matchedIndex = 3;
@@ -792,8 +1184,10 @@ export function resolveActiveUseCases(
       break;
   }
 
-  return useCases.map((label, idx) => ({
-    label,
+  return specs.map((spec, idx) => ({
+    index: idx,
+    label: spec.labelUk,
+    graphVariant: spec.graphVariant,
     isActive: idx === matchedIndex,
   }));
 }

@@ -18,8 +18,9 @@ export default async function StudentPlanPage({
     redirect("/login");
   }
 
-  const tutorQuery = resolvedSearchParams.tutor
-    ? `?tutor=${encodeURIComponent(resolvedSearchParams.tutor)}`
-    : "";
-  redirect(`/plans-and-reports${tutorQuery}`);
+  const params = new URLSearchParams({ tab: "plan" });
+  if (resolvedSearchParams.tutor) {
+    params.set("tutor", resolvedSearchParams.tutor);
+  }
+  redirect(`/progress?${params.toString()}`);
 }

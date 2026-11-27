@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { CreateLessonDialog } from "@/components/lessons/create-lesson-dialog";
 import { DeleteLessonButton } from "@/components/lessons/delete-lesson-button";
 import { EditLessonDialog } from "@/components/lessons/edit-lesson-dialog";
+import { LessonMeetTranscriptDialog } from "@/components/lessons/lesson-meet-transcript-dialog";
 import { RescheduleLessonDialog } from "@/components/lessons/reschedule-lesson-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ import {
   ONE_TIME_LESSON_OPTION_VALUE,
   type LessonStatus,
   type LessonStudentOption,
+  type LessonTranscriptSummary,
   type MonthlyLessonItem,
 } from "@/lib/lessons";
 import {
@@ -65,6 +67,8 @@ interface MonthlyLessonsCalendarProps {
   previousLabel?: string;
   nextLabel?: string;
   onLessonUpdated?: (lesson: MonthlyLessonItem) => void;
+  hasTranscriptScope?: boolean;
+  googleConnectHref?: string;
 }
 
 function getCompactChipClasses(status: LessonStatus) {
@@ -90,6 +94,8 @@ export function MonthlyLessonsCalendar({
   previousLabel = "Previous",
   nextLabel = "Next",
   onLessonUpdated,
+  hasTranscriptScope = false,
+  googleConnectHref,
 }: MonthlyLessonsCalendarProps) {
   const [isMonthlyListExpanded, setIsMonthlyListExpanded] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -358,6 +364,37 @@ export function MonthlyLessonsCalendar({
             ) : null}
             {showManageActions ? (
               <div className="flex items-center gap-1">
+                <LessonMeetTranscriptDialog
+                  lessonId={lesson.id}
+                  lessonTitle={getLessonDisplayTitle(lesson.title)}
+                  lessonDate={lesson.lessonDate}
+                  studentId={lesson.studentId}
+                  studentName={lesson.participantName}
+                  hasTranscriptScope={hasTranscriptScope}
+                  connectHref={googleConnectHref}
+                  summary={lesson.transcriptSummary}
+                  onSummaryUpdated={(
+                    targetLessonId: string,
+                    nextSummary: LessonTranscriptSummary,
+                  ) => {
+                    setLocalLessons((prev) =>
+                      prev.map((item) =>
+                        item.id === targetLessonId
+                          ? { ...item, transcriptSummary: nextSummary }
+                          : item,
+                      ),
+                    );
+                    const matched = localLessons.find(
+                      (item) => item.id === targetLessonId,
+                    );
+                    if (matched) {
+                      onLessonUpdated?.({
+                        ...matched,
+                        transcriptSummary: nextSummary,
+                      });
+                    }
+                  }}
+                />
                 <EditLessonDialog
                   lesson={{
                     id: lesson.id,

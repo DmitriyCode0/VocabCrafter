@@ -244,13 +244,13 @@ export const APP_FEATURE_REGISTRY: AppFeatureEntry[] = [
     title: "Monthly Study Plans & Progress Reports",
     category: "progress",
     roles: ["tutor", "student"],
-    href: "/plans-and-reports",
+    href: "/progress",
     summary:
-      "Tutors can generate structured monthly syllabi and comprehensive student evaluation reports with 1-click AI assistance.",
+      "Inside the unified Progress hub (/results for tutors, /progress for students), tutors set monthly goals, track covered curriculum, and generate AI-assisted evaluation reports.",
     howTo: [
-      "Open Plans & Reports (/plans-and-reports).",
-      "Select a connected student and click 'Create Monthly Plan' to outline target topics and vocabulary goals.",
-      "At month-end, click 'Generate Report' to summarize attendance, quiz performance, and recommendations.",
+      "Open Progress (/results?tab=plan for tutors, or /progress?tab=plan for students).",
+      "Select a connected student and configure their monthly plan, target goals, and unmastered grammar focus topics.",
+      "Switch to the Reports tab (/results?tab=reports or /progress?tab=reports) to generate, publish, or download monthly PDF reports.",
     ],
     keywords: [
       "plan",

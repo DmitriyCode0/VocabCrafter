@@ -7,6 +7,7 @@ import {
   normalizeLessonMonthParam,
   type LessonBalanceHistoryEntry,
   type LessonBalanceSummaryItem,
+  type LessonTranscriptSummary,
   type MonthlyLessonItem,
 } from "@/lib/lessons";
 import { getAppMessages } from "@/lib/i18n/messages";
@@ -96,9 +97,13 @@ interface GoogleCalendarConnectionStatusRow {
   connectedAt: string;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
+  hasTranscriptScope: boolean;
 }
 
-function mapTutorLessons(rows: TutorLessonRow[]): MonthlyLessonItem[] {
+function mapTutorLessons(
+  rows: TutorLessonRow[],
+  transcriptSummaryMap?: Map<string, LessonTranscriptSummary>,
+): MonthlyLessonItem[] {
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
@@ -115,6 +120,7 @@ function mapTutorLessons(rows: TutorLessonRow[]): MonthlyLessonItem[] {
       "One-time",
     participantLabel: row.student_id ? "Student" : "Type",
     meetUrl: row.meet_url ?? null,
+    transcriptSummary: transcriptSummaryMap?.get(row.id) ?? null,
   }));
 }
 
@@ -342,6 +348,7 @@ export default async function LessonsPage({
   const [
     { data: connectionsResult },
     { data: lessonsResult },
+    { data: transcriptSummariesResult, error: transcriptSummariesError },
     googleCalendarConnectionResult,
   ] = await Promise.all([
     supabaseAdmin
@@ -360,8 +367,37 @@ export default async function LessonsPage({
       .eq("tutor_id", userId)
       .order("lesson_date", { ascending: true })
       .order("start_time", { ascending: true }),
+    supabaseAdmin
+      .from("lesson_meet_transcripts")
+      .select(
+        "lesson_id, analysis_status, active_applied_count, passive_applied_count, learning_approved_count, learning_candidates, analyzed_at",
+      )
+      .eq("tutor_id", userId),
     getGoogleCalendarConnectionSummary(userId, supabaseAdmin),
   ]);
+
+  const transcriptSummaryMap = new Map<string, LessonTranscriptSummary>();
+  if (!transcriptSummariesError && Array.isArray(transcriptSummariesResult)) {
+    for (const row of transcriptSummariesResult) {
+      const pendingLearningCount = Array.isArray(row.learning_candidates)
+        ? row.learning_candidates.filter(
+            (item) =>
+              typeof item === "object" &&
+              item !== null &&
+              "status" in item &&
+              item.status === "pending",
+          ).length
+        : 0;
+      transcriptSummaryMap.set(row.lesson_id, {
+        analysisStatus: row.analysis_status,
+        activeAppliedCount: row.active_applied_count,
+        passiveAppliedCount: row.passive_applied_count,
+        learningApprovedCount: row.learning_approved_count,
+        pendingLearningCount,
+        analyzedAt: row.analyzed_at,
+      });
+    }
+  }
 
   const connectedStudents = (
     (connectionsResult ?? []) as StudentConnectionRow[]
@@ -378,7 +414,10 @@ export default async function LessonsPage({
       left.name.localeCompare(right.name, undefined, { sensitivity: "base" }),
     );
 
-  const allLessons = mapTutorLessons((lessonsResult ?? []) as TutorLessonRow[]);
+  const allLessons = mapTutorLessons(
+    (lessonsResult ?? []) as TutorLessonRow[],
+    transcriptSummaryMap,
+  );
   const googleCalendarConnection = (googleCalendarConnectionResult ??
     null) as GoogleCalendarConnectionStatusRow | null;
   const isGoogleCalendarAvailable = isGoogleCalendarSyncConfigured();

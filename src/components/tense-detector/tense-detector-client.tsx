@@ -47,6 +47,7 @@ import {
   ASPECT_MATRIX_META,
   CONDITIONAL_META,
   CONDITIONAL_POSITIONS,
+  extractAspectTimelineLabels,
   getAspectCellKey,
   MARKER_STYLES,
   parseTaggedSentence,
@@ -209,6 +210,9 @@ export function TenseDetectorClient() {
   // ── Aspects State (4 Aspect Selectors + Time on Graph) ───────────
   const [aspectTime, setAspectTime] = useState<AspectTime>("present");
   const [activeAspect, setActiveAspect] = useState<AspectType>("continuous");
+  const [manualUseCaseIndex, setManualUseCaseIndex] = useState<number | null>(
+    null,
+  );
   const [customAspectSentence, setCustomAspectSentence] =
     useState<AspectSentenceTemplate | null>(null);
   const [draggingAspectMarker, setDraggingAspectMarker] = useState(false);
@@ -291,17 +295,38 @@ export function TenseDetectorClient() {
   const activeTimeMeta =
     TIME_AXIS_OPTIONS.find((item) => item.key === aspectTime) ??
     TIME_AXIS_OPTIONS[1];
-  const activeAspectTagged = customAspectSentence?.forms[activeCellKey] ?? null;
+  const clampedManualUseCaseIndex =
+    manualUseCaseIndex !== null &&
+    manualUseCaseIndex >= 0 &&
+    manualUseCaseIndex < activeCellMeta.useCaseSpecs.length
+      ? manualUseCaseIndex
+      : null;
+  const activeAspectTagged = (() => {
+    if (customAspectSentence) {
+      if (
+        clampedManualUseCaseIndex !== null &&
+        !(
+          activeCellKey === customAspectSentence.detectedCellKey &&
+          clampedManualUseCaseIndex ===
+            customAspectSentence.detectedUseCaseIndex
+        )
+      ) {
+        return (
+          activeCellMeta.useCaseSpecs[clampedManualUseCaseIndex]
+            ?.exampleTagged ?? customAspectSentence.forms[activeCellKey]
+        );
+      }
+      return customAspectSentence.forms[activeCellKey] ?? null;
+    }
+
+    return (
+      activeCellMeta.useCaseSpecs[clampedManualUseCaseIndex ?? 0]
+        ?.exampleTagged ?? null
+    );
+  })();
   const activeAspectParsed = activeAspectTagged
-    ? parseTaggedSentence(activeAspectTagged, "emerald", "sky")
+    ? parseTaggedSentence(activeAspectTagged, "emerald", "sky", "amber")
     : null;
-  const resolvedTimeMarkers = resolveActiveTimeMarkers(
-    activeCellKey,
-    activeAspectParsed,
-  );
-  const hasActiveTimeMarker = resolvedTimeMarkers.some(
-    (marker) => marker.isActive,
-  );
   const resolvedUseCases = resolveActiveUseCases(
     activeCellKey,
     activeAspectParsed,
@@ -309,9 +334,32 @@ export function TenseDetectorClient() {
       isStateVerb,
       detectedCellKey: customAspectSentence?.detectedCellKey,
       detectedUseCaseIndex: customAspectSentence?.detectedUseCaseIndex,
+      selectedUseCaseIndex:
+        clampedManualUseCaseIndex ?? (customAspectSentence ? null : 0),
     },
   );
   const hasActiveUseCase = resolvedUseCases.some((item) => item.isActive);
+  const activeResolvedUseCase =
+    resolvedUseCases.find((item) => item.isActive) ?? resolvedUseCases[0];
+  const activeUseCaseSpec =
+    activeCellMeta.useCaseSpecs[activeResolvedUseCase?.index ?? 0] ??
+    activeCellMeta.useCaseSpecs[0];
+  const activeGraphVariant =
+    activeResolvedUseCase?.graphVariant ?? activeUseCaseSpec.graphVariant;
+  const resolvedTimeMarkers = resolveActiveTimeMarkers(
+    activeCellKey,
+    activeAspectParsed,
+    { graphVariant: activeGraphVariant },
+  );
+  const hasActiveTimeMarker = resolvedTimeMarkers.some(
+    (marker) => marker.isActive,
+  );
+  const timelineLabels = extractAspectTimelineLabels(
+    activeCellKey,
+    aspectTime,
+    activeAspectParsed,
+    activeUseCaseSpec,
+  );
 
   // ── Derived Conditionals State ───────────────────────────────────
   const activeCondKey = resolveConditionalVariantKey(
@@ -470,6 +518,13 @@ export function TenseDetectorClient() {
   const reportedMarkerPct = getColumnCenterPercent(reportedActiveSlot);
 
   // ── Drag & Keyboard Handlers ─────────────────────────────────────
+  function selectAspectTime(nextTime: AspectTime) {
+    if (nextTime !== aspectTime) {
+      setManualUseCaseIndex(null);
+    }
+    setAspectTime(nextTime);
+  }
+
   function handleAspectPointerDown(event: PointerEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -481,7 +536,7 @@ export function TenseDetectorClient() {
     const rect = aspectTrackRef.current.getBoundingClientRect();
     const slot = clientXToColumnSlot(event.clientX, rect);
     const nextTime = TIME_AXIS_OPTIONS[slot]?.key ?? "present";
-    setAspectTime(nextTime);
+    selectAspectTime(nextTime);
   }
 
   function handleAspectMarkerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
@@ -498,7 +553,7 @@ export function TenseDetectorClient() {
     }
     if (nextSlot !== null) {
       event.preventDefault();
-      setAspectTime(TIME_AXIS_OPTIONS[nextSlot]?.key ?? "present");
+      selectAspectTime(TIME_AXIS_OPTIONS[nextSlot]?.key ?? "present");
     }
   }
 
@@ -651,10 +706,12 @@ export function TenseDetectorClient() {
   }
 
   function handleResetCurrent() {
+    setInputSentence("");
     setAiResult(null);
     setAiError(null);
     if (mode === "aspects") {
       setCustomAspectSentence(null);
+      setManualUseCaseIndex(null);
       setAspectTime("present");
       setActiveAspect("continuous");
     } else if (mode === "conditionals") {
@@ -690,6 +747,7 @@ export function TenseDetectorClient() {
   function applyAIResultToGraph(result: AIAnalysisResult) {
     setMode(result.detectedMode);
     if (result.detectedMode === "aspects") {
+      setManualUseCaseIndex(null);
       setAspectTime(result.time);
       setActiveAspect(
         resolveAspectType(
@@ -809,8 +867,6 @@ export function TenseDetectorClient() {
           forms: result.passiveForms,
         });
       }
-
-      setInputSentence("");
     } catch {
       setAiError("Помилка мережі при зверненні до AI-помічника.");
     } finally {
@@ -956,73 +1012,151 @@ export function TenseDetectorClient() {
       </div>
 
       {/* ── Чистий рядок введення + AI-перевірка граматики ── */}
-      <form
-        onSubmit={(e) => handleSubmitAISentence(e)}
-        className="flex flex-col gap-2 sm:flex-row"
-      >
-        <div className="relative flex-1">
-          <label
-            htmlFor="tense-detector-sentence-input"
-            className="sr-only"
+      {(() => {
+        const showLeftReset = inputSentence.length > 0 || aiResult !== null;
+        const isRecheckSameSentence =
+          !isAnalyzing &&
+          aiResult !== null &&
+          inputSentence.trim() === aiResult.originalSentence.trim();
+        return (
+          <form
+            onSubmit={(e) => handleSubmitAISentence(e)}
+            className="flex flex-col gap-2 sm:flex-row"
           >
-            Речення англійською для граматичної перевірки
-          </label>
-          <Wand2
-            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary"
-            aria-hidden="true"
-          />
-          <Input
-            id="tense-detector-sentence-input"
-            value={inputSentence}
-            onChange={(e) => setInputSentence(e.target.value)}
-            placeholder={
-              mode === "conditionals"
-                ? "Введіть умовне речення англійською для перевірки (напр. If I won the lottery...)"
-                : mode === "reported"
-                  ? "Введіть пряму чи непряму мову для перевірки (напр. When did they arrive? або He asked me where was Tom)"
-                  : mode === "passive"
-                    ? "Введіть пасив чи актив для розбору (напр. I want to be told..., I hate being spoken to... або The cat knocked over the vase)"
-                    : "Введіть англійське речення для перевірки (навіть з помилкою)..."
-            }
-            className="h-11 bg-card pl-10 pr-10 text-sm shadow-xs sm:text-base"
-            maxLength={400}
-            disabled={isAnalyzing}
-          />
-          {inputSentence.length > 0 && !isAnalyzing ? (
-            <button
-              type="button"
-              onClick={() => setInputSentence("")}
-              aria-label="Очистити поле введення"
-              className={cn(
-                "absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground",
-                FOCUS_RING_CLASS,
-              )}
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
-          ) : null}
-        </div>
-        <Button
-          type="submit"
-          disabled={isAnalyzing || inputSentence.trim().length < 2}
-          className="h-11 shrink-0 px-5"
-        >
-          {isAnalyzing ? (
-            <>
-              <Loader2
-                className="mr-2 h-4 w-4 animate-spin"
-                aria-hidden="true"
+            <div className="relative flex-1">
+              <label
+                htmlFor="tense-detector-sentence-input"
+                className="sr-only"
+              >
+                Речення англійською для граматичної перевірки
+              </label>
+
+              <div className="absolute left-1.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center">
+                <AnimatePresence mode="wait" initial={false}>
+                  {showLeftReset ? (
+                    <motion.button
+                      key="input-reset-btn"
+                      type="button"
+                      disabled={isAnalyzing}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={handleResetCurrent}
+                      aria-label="Скинути речення та дошку"
+                      title="Скинути речення та дошку"
+                      initial={
+                        reduceMotion
+                          ? false
+                          : { opacity: 0, scale: 0.65, rotate: -90 }
+                      }
+                      animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                      exit={
+                        reduceMotion
+                          ? undefined
+                          : { opacity: 0, scale: 0.65, rotate: 90 }
+                      }
+                      transition={
+                        reduceMotion
+                          ? { duration: 0 }
+                          : {
+                              type: "spring",
+                              stiffness: 460,
+                              damping: 26,
+                              mass: 0.6,
+                            }
+                      }
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-lg border border-primary/35 bg-primary/12 text-primary transition-colors hover:bg-primary/20 active:scale-95 disabled:pointer-events-none disabled:opacity-50",
+                        FOCUS_RING_CLASS,
+                      )}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                    </motion.button>
+                  ) : (
+                    <motion.span
+                      key="input-wand-icon"
+                      aria-hidden="true"
+                      initial={
+                        reduceMotion
+                          ? false
+                          : { opacity: 0, scale: 0.65, rotate: 20 }
+                      }
+                      animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                      exit={
+                        reduceMotion
+                          ? undefined
+                          : { opacity: 0, scale: 0.65, rotate: -20 }
+                      }
+                      transition={
+                        reduceMotion
+                          ? { duration: 0 }
+                          : { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
+                      }
+                      className="pointer-events-none flex h-8 w-8 items-center justify-center text-primary"
+                    >
+                      <Wand2 className="h-4 w-4" aria-hidden="true" />
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <Input
+                id="tense-detector-sentence-input"
+                value={inputSentence}
+                onChange={(e) => setInputSentence(e.target.value)}
+                placeholder={
+                  mode === "conditionals"
+                    ? "Введіть умовне речення англійською для перевірки (напр. If I won the lottery...)"
+                    : mode === "reported"
+                      ? "Введіть пряму чи непряму мову для перевірки (напр. When did they arrive? або He asked me where was Tom)"
+                      : mode === "passive"
+                        ? "Введіть пасив чи актив для розбору (напр. I want to be told..., I hate being spoken to... або The cat knocked over the vase)"
+                        : "Введіть англійське речення для перевірки (навіть з помилкою)..."
+                }
+                className="h-11 bg-card pl-11 pr-10 text-sm shadow-xs sm:text-base"
+                maxLength={400}
+                disabled={isAnalyzing}
               />
-              Перевіряю...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
-              Перевірити
-            </>
-          )}
-        </Button>
-      </form>
+              {inputSentence.length > 0 && !isAnalyzing ? (
+                <button
+                  type="button"
+                  onClick={() => setInputSentence("")}
+                  aria-label="Очистити поле введення"
+                  className={cn(
+                    "absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground",
+                    FOCUS_RING_CLASS,
+                  )}
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
+            <Button
+              type="submit"
+              disabled={isAnalyzing || inputSentence.trim().length < 2}
+              className="h-11 shrink-0 px-5"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2
+                    className="mr-2 h-4 w-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                  Перевіряю...
+                </>
+              ) : isRecheckSameSentence ? (
+                <>
+                  <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Перевірити ще раз
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Перевірити
+                </>
+              )}
+            </Button>
+          </form>
+        );
+      })()}
 
       {/* ── ОСНОВНА РОБОЧА ПАНЕЛЬ ─────────────────────────────────────── */}
       <Card className="overflow-hidden border-border/70 bg-card/70 shadow-sm">
@@ -1358,15 +1492,19 @@ export function TenseDetectorClient() {
                           className="my-auto flex w-full flex-wrap items-center justify-center gap-1.5"
                         >
                           {resolvedUseCases.map((useCase) => (
-                            <span
+                            <button
                               key={useCase.label}
+                              type="button"
+                              aria-pressed={useCase.isActive}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() =>
+                                setManualUseCaseIndex(useCase.index)
+                              }
                               className={cn(
-                                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
                                 useCase.isActive
                                   ? "border-emerald-500/60 bg-emerald-500/20 font-semibold text-emerald-800 shadow-xs ring-1 ring-emerald-400/45 dark:text-emerald-200"
-                                  : activeAspectParsed
-                                    ? "border-border/60 bg-card/55 font-medium text-muted-foreground opacity-75"
-                                    : "border-emerald-500/30 bg-emerald-500/10 font-medium text-emerald-700 dark:text-emerald-300",
+                                  : "border-border/60 bg-card/55 font-medium text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground",
                               )}
                             >
                               {useCase.isActive ? (
@@ -1376,7 +1514,7 @@ export function TenseDetectorClient() {
                                 />
                               ) : null}
                               {useCase.label}
-                            </span>
+                            </button>
                           ))}
                         </motion.div>
                       </AnimatePresence>
@@ -1645,7 +1783,10 @@ export function TenseDetectorClient() {
                       key={aspect.key}
                       type="button"
                       disabled={isBlockedByStateVerb}
-                      onClick={() => setActiveAspect(aspect.key)}
+                      onClick={() => {
+                        setActiveAspect(aspect.key);
+                        setManualUseCaseIndex(null);
+                      }}
                       aria-pressed={isSelected}
                       className={cn(
                         "relative flex flex-col items-center justify-between gap-1.5 overflow-hidden rounded-xl border px-3.5 py-3 text-center transition-colors",
@@ -1712,7 +1853,7 @@ export function TenseDetectorClient() {
                 onPointerMove={handleAspectPointerMove}
                 onPointerUp={() => setDraggingAspectMarker(false)}
                 onPointerCancel={() => setDraggingAspectMarker(false)}
-                className="relative h-[328px] w-full select-none overflow-hidden rounded-xl border border-border/70 bg-background/55"
+                className="relative h-[352px] w-full select-none overflow-hidden rounded-xl border border-border/70 bg-background/55"
               >
                 {/* 3 колонки часу прямо на графіку */}
                 <div className="absolute inset-0 grid grid-cols-3 divide-x divide-border/40">
@@ -1724,7 +1865,7 @@ export function TenseDetectorClient() {
                         type="button"
                         aria-pressed={isColActive}
                         onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => setAspectTime(opt.key)}
+                        onClick={() => selectAspectTime(opt.key)}
                         className={cn(
                           "flex h-full flex-col items-center pt-3 text-center transition-colors",
                           FOCUS_RING_INSET_CLASS,
@@ -1760,12 +1901,12 @@ export function TenseDetectorClient() {
                   initial={false}
                   animate={{ x: `${colCenterPct - 50}%` }}
                   transition={aspectSpring}
-                  className="pointer-events-none absolute inset-x-0 top-[54px] z-20 flex justify-center will-change-transform"
+                  className="pointer-events-none absolute inset-x-0 top-[50px] z-20 flex justify-center will-change-transform"
                 >
                   <div className="w-max max-w-[29%] rounded-xl border border-emerald-500/35 bg-card/95 px-3.5 py-2.5 text-center shadow-xs backdrop-blur-xs sm:max-w-[30%]">
                     <AnimatePresence mode="wait" initial={false}>
                       <motion.div
-                        key={`bubble-${activeCellKey}-${activeAspectParsed?.plainText ?? "default"}`}
+                        key={`bubble-${activeCellKey}-${activeGraphVariant}-${activeAspectParsed?.plainText ?? "default"}`}
                         initial={reduceMotion ? false : { opacity: 0, y: 2 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={reduceMotion ? undefined : { opacity: 0, y: -2 }}
@@ -1794,318 +1935,1075 @@ export function TenseDetectorClient() {
                 {/* Основна горизонтальна вісь часу */}
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-[5%] top-[224px] z-10 h-0.5 -translate-y-1/2 bg-border"
+                  className="pointer-events-none absolute inset-x-[5%] top-[230px] z-10 h-0.5 -translate-y-1/2 bg-border"
                 />
 
-                {/* Декоративні засічки на осі (вибір відбувається через колонки або слайдер ✕) */}
+                {/* Декоративні засічки на осі */}
                 {TIME_AXIS_OPTIONS.map((opt) => (
                   <span
                     key={`axis-tick-${opt.key}`}
                     aria-hidden="true"
-                    className="pointer-events-none absolute top-[224px] z-10 block h-3 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border"
+                    className="pointer-events-none absolute top-[230px] z-10 block h-3 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border"
                     style={{ left: `${getColumnCenterPercent(opt.slot)}%` }}
                   />
                 ))}
 
-                {/* Анімовані візуальні індикатори аспектів на GPU transform */}
-                <AnimatePresence initial={false}>
-                  {isPerfect ? (
-                    <motion.div
-                      key="perfect-cutoff"
-                      initial={
-                        reduceMotion
-                          ? false
-                          : { opacity: 0, x: `${cutoffPct - 50}%` }
-                      }
-                      animate={{ opacity: 1, x: `${cutoffPct - 50}%` }}
-                      exit={reduceMotion ? undefined : { opacity: 0 }}
-                      transition={{
-                        ...aspectSpring,
-                        opacity: getCrossfadeTransition(reduceMotion),
-                      }}
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-[172px] z-10 flex justify-center will-change-transform"
-                    >
-                      <div className="h-[94px] w-0.5 bg-sky-500" />
-                    </motion.div>
-                  ) : null}
+                {/* Анімовані візуальні індикатори за функцією речення */}
+                {(() => {
+                  const isInterrupted = activeGraphVariant === "interrupted";
+                  const isPointInProgress =
+                    activeGraphVariant === "point_in_progress";
+                  const isParallelLong = activeGraphVariant === "parallel_long";
+                  const isDurationSpan = activeGraphVariant === "duration_span";
+                  const isSequence = activeGraphVariant === "sequence";
+                  const isGeneralTruth = activeGraphVariant === "general_truth";
+                  const isHabitRegular = activeGraphVariant === "habit_regular";
+                  const isTimetableFuture =
+                    activeGraphVariant === "timetable_future";
+                  const isFutureTimeClause =
+                    activeGraphVariant === "future_time_clause";
+                  const isFutureArrangement =
+                    activeGraphVariant === "future_arrangement";
+                  const isFutureLinked =
+                    isTimetableFuture ||
+                    isFutureTimeClause ||
+                    isFutureArrangement;
+                  const isDevelopingTrend =
+                    activeGraphVariant === "developing_trend";
+                  const isLifeExperience =
+                    activeGraphVariant === "life_experience";
+                  const isDurationUpToCutoff =
+                    activeGraphVariant === "duration_up_to_cutoff";
 
-                  {isPerfect ? (
-                    <motion.div
-                      key="perfect-arrow"
-                      initial={
-                        reduceMotion
-                          ? false
-                          : {
-                              opacity: 0,
-                              x: `${(actionPct + cutoffPct) / 2 - 50}%`,
+                  const handlePct = isInterrupted
+                    ? Math.min(92, actionPct + 4)
+                    : actionPct;
+                  const futureTargetPct = Math.min(89, actionPct + 28);
+                  const experienceStartPct = 14;
+
+                  return (
+                    <>
+                      <AnimatePresence initial={false}>
+                        {/* ── Perfect / Perfect-Continuous: межа та стрілка ДО ── */}
+                        {isPerfect ? (
+                          <motion.div
+                            key="perfect-cutoff"
+                            initial={
+                              reduceMotion
+                                ? false
+                                : { opacity: 0, x: `${cutoffPct - 50}%` }
                             }
-                      }
-                      animate={{
-                        opacity: 1,
-                        x: `${(actionPct + cutoffPct) / 2 - 50}%`,
-                      }}
-                      exit={reduceMotion ? undefined : { opacity: 0 }}
-                      transition={{
-                        ...aspectSpring,
-                        opacity: getCrossfadeTransition(reduceMotion),
-                      }}
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-[160px] z-10 flex justify-center will-change-transform"
-                    >
-                      <div
-                        className="h-[56px]"
-                        style={{ width: `${cutoffPct - actionPct}%` }}
-                      >
-                        <svg
-                          viewBox="0 0 200 60"
-                          preserveAspectRatio="none"
-                          className="h-full w-full overflow-visible"
-                        >
-                          <defs>
-                            <marker
-                              id="perfect-cutoff-arrow"
-                              markerWidth="8"
-                              markerHeight="8"
-                              refX="6"
-                              refY="4"
-                              orient="auto"
+                            animate={{ opacity: 1, x: `${cutoffPct - 50}%` }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={{
+                              ...aspectSpring,
+                              opacity: getCrossfadeTransition(reduceMotion),
+                            }}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-x-0 top-[174px] z-10 flex justify-center will-change-transform"
+                          >
+                            <div className="h-[96px] w-0.5 bg-sky-500" />
+                          </motion.div>
+                        ) : null}
+
+                        {isPerfect ? (
+                          <motion.div
+                            key="perfect-arrow"
+                            initial={
+                              reduceMotion
+                                ? false
+                                : {
+                                    opacity: 0,
+                                    x: `${(actionPct + cutoffPct) / 2 - 50}%`,
+                                  }
+                            }
+                            animate={{
+                              opacity: 1,
+                              x: `${(actionPct + cutoffPct) / 2 - 50}%`,
+                            }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={{
+                              ...aspectSpring,
+                              opacity: getCrossfadeTransition(reduceMotion),
+                            }}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-x-0 top-[160px] z-10 flex justify-center will-change-transform"
+                          >
+                            <div
+                              className="h-[56px]"
+                              style={{ width: `${cutoffPct - actionPct}%` }}
                             >
-                              <path d="M0,0 L8,4 L0,8 Z" fill="#38bdf8" />
-                            </marker>
-                          </defs>
-                          <path
-                            d="M 200 40 Q 100 -4 4 40"
-                            fill="none"
-                            stroke="#38bdf8"
-                            strokeWidth="2.5"
-                            strokeDasharray="6 4"
-                            vectorEffect="non-scaling-stroke"
-                            markerEnd="url(#perfect-cutoff-arrow)"
-                          />
-                        </svg>
-                      </div>
-                    </motion.div>
-                  ) : null}
+                              <svg
+                                viewBox="0 0 200 60"
+                                preserveAspectRatio="none"
+                                className="h-full w-full overflow-visible"
+                              >
+                                <defs>
+                                  <marker
+                                    id="perfect-cutoff-arrow"
+                                    markerWidth="8"
+                                    markerHeight="8"
+                                    refX="6"
+                                    refY="4"
+                                    orient="auto"
+                                  >
+                                    <path
+                                      d="M0,0 L8,4 L0,8 Z"
+                                      fill="#38bdf8"
+                                    />
+                                  </marker>
+                                </defs>
+                                <path
+                                  d="M 200 40 Q 100 -4 4 40"
+                                  fill="none"
+                                  stroke="#38bdf8"
+                                  strokeWidth="2.5"
+                                  strokeDasharray="6 4"
+                                  vectorEffect="non-scaling-stroke"
+                                  markerEnd="url(#perfect-cutoff-arrow)"
+                                />
+                              </svg>
+                            </div>
+                          </motion.div>
+                        ) : null}
 
-                  {isPerfect ? (
-                    <motion.div
-                      key="perfect-badge"
-                      initial={
-                        reduceMotion
-                          ? false
-                          : {
-                              opacity: 0,
-                              scale: 0.94,
+                        {isPerfect ? (
+                          <motion.div
+                            key="perfect-badge"
+                            initial={
+                              reduceMotion
+                                ? false
+                                : {
+                                    opacity: 0,
+                                    scale: 0.94,
+                                    x: `${(cutoffPct + actionPct) / 2 - 50}%`,
+                                  }
+                            }
+                            animate={{
+                              opacity: 1,
+                              scale: 1,
                               x: `${(cutoffPct + actionPct) / 2 - 50}%`,
+                            }}
+                            exit={
+                              reduceMotion
+                                ? undefined
+                                : { opacity: 0, scale: 0.94 }
                             }
-                      }
-                      animate={{
-                        opacity: 1,
-                        scale: 1,
-                        x: `${(cutoffPct + actionPct) / 2 - 50}%`,
-                      }}
-                      exit={
-                        reduceMotion ? undefined : { opacity: 0, scale: 0.94 }
-                      }
-                      transition={{
-                        ...aspectSpring,
-                        opacity: getCrossfadeTransition(reduceMotion),
-                        scale: getCrossfadeTransition(reduceMotion),
-                      }}
-                      className="pointer-events-none absolute inset-x-0 top-[148px] z-20 flex justify-center will-change-transform"
-                    >
-                      <span className="rounded-full border border-sky-500/40 bg-card/95 px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap text-sky-700 shadow-xs dark:text-sky-300">
-                        {isContinuous ? 'тривало "ДО"' : 'завершено "ДО"'}
-                      </span>
-                    </motion.div>
-                  ) : null}
+                            transition={{
+                              ...aspectSpring,
+                              opacity: getCrossfadeTransition(reduceMotion),
+                              scale: getCrossfadeTransition(reduceMotion),
+                            }}
+                            className="pointer-events-none absolute inset-x-0 top-[146px] z-20 flex justify-center will-change-transform"
+                          >
+                            <span className="rounded-full border border-sky-500/40 bg-card/95 px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap text-sky-700 shadow-xs dark:text-sky-300">
+                              {isContinuous
+                                ? 'тривало "ДО"'
+                                : isLifeExperience
+                                  ? timelineLabels.secondaryLabel
+                                    ? `досвід ДО зараз · ${timelineLabels.secondaryLabel}`
+                                    : "досвід ДО зараз"
+                                  : isDurationUpToCutoff
+                                    ? "триває ДО NOW"
+                                    : 'завершено "ДО"'}
+                            </span>
+                          </motion.div>
+                        ) : null}
 
-                  {effectiveAspect === "simple" ? (
-                    <motion.div
-                      key="aspect-simple"
-                      initial={
-                        reduceMotion
-                          ? false
-                          : {
-                              opacity: 0,
-                              scale: 0.94,
-                              x: `${actionPct - 50}%`,
+                        {isLifeExperience ? (
+                          <motion.div
+                            key="aspect-life-experience"
+                            initial={
+                              reduceMotion
+                                ? false
+                                : {
+                                    opacity: 0,
+                                    x: `${(experienceStartPct + cutoffPct) / 2 - 50}%`,
+                                  }
                             }
-                      }
-                      animate={{
-                        opacity: 1,
-                        scale: 1,
-                        x: `${actionPct - 50}%`,
-                      }}
-                      exit={
-                        reduceMotion ? undefined : { opacity: 0, scale: 0.94 }
-                      }
-                      transition={{
-                        ...aspectSpring,
-                        opacity: getCrossfadeTransition(reduceMotion),
-                        scale: getCrossfadeTransition(reduceMotion),
-                      }}
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-[224px] z-10 flex -translate-y-1/2 justify-center will-change-transform"
-                    >
-                      <div className="flex items-center gap-5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/45" />
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/75" />
-                        <span className="w-14" />
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/75" />
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/45" />
-                      </div>
-                    </motion.div>
-                  ) : null}
+                            animate={{
+                              opacity: 1,
+                              x: `${(experienceStartPct + cutoffPct) / 2 - 50}%`,
+                            }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={aspectSpring}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-x-0 top-[230px] z-10 flex -translate-y-1/2 justify-center will-change-transform"
+                          >
+                            <div
+                              className="flex h-8 items-center justify-around rounded-l-full border border-r-0 border-emerald-500/35 bg-emerald-500/12 px-5"
+                              style={{
+                                width: `${cutoffPct - experienceStartPct}%`,
+                              }}
+                            >
+                              <span className="flex h-4 w-4 items-center justify-center rounded-full border border-emerald-500/50 bg-emerald-500/20 text-[10px] font-bold text-emerald-600 dark:text-emerald-300">
+                                ?
+                              </span>
+                              <span className="w-8" />
+                              <span className="flex h-4 w-4 items-center justify-center rounded-full border border-emerald-500/50 bg-emerald-500/20 text-[10px] font-bold text-emerald-600 dark:text-emerald-300">
+                                ?
+                              </span>
+                            </div>
+                          </motion.div>
+                        ) : null}
 
-                  {effectiveAspect === "continuous" ? (
-                    <motion.div
-                      key="aspect-continuous"
-                      initial={
-                        reduceMotion
-                          ? false
-                          : {
-                              opacity: 0,
-                              scale: 0.94,
-                              x: `${actionPct - 50}%`,
+                        {isDurationUpToCutoff ? (
+                          <motion.div
+                            key="aspect-perfect-continuous"
+                            initial={
+                              reduceMotion
+                                ? false
+                                : {
+                                    opacity: 0,
+                                    scale: 0.94,
+                                    x: `${(actionPct + cutoffPct) / 2 - 50}%`,
+                                  }
                             }
-                      }
-                      animate={{
-                        opacity: 1,
-                        scale: 1,
-                        x: `${actionPct - 50}%`,
-                      }}
-                      exit={
-                        reduceMotion ? undefined : { opacity: 0, scale: 0.94 }
-                      }
-                      transition={{
-                        ...aspectSpring,
-                        opacity: getCrossfadeTransition(reduceMotion),
-                        scale: getCrossfadeTransition(reduceMotion),
-                      }}
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-[224px] z-10 flex -translate-y-1/2 justify-center will-change-transform"
-                    >
-                      <div className="flex h-11 w-44 items-center justify-between rounded-full border border-emerald-500/45 bg-emerald-500/15 px-3.5">
-                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                          〰
-                        </span>
-                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                          〰
-                        </span>
-                      </div>
-                    </motion.div>
-                  ) : null}
-
-                  {effectiveAspect === "perfect_continuous" ? (
-                    <motion.div
-                      key="aspect-perfect-continuous"
-                      initial={
-                        reduceMotion
-                          ? false
-                          : {
-                              opacity: 0,
-                              scale: 0.94,
+                            animate={{
+                              opacity: 1,
+                              scale: 1,
                               x: `${(actionPct + cutoffPct) / 2 - 50}%`,
+                            }}
+                            exit={
+                              reduceMotion
+                                ? undefined
+                                : { opacity: 0, scale: 0.94 }
                             }
-                      }
-                      animate={{
-                        opacity: 1,
-                        scale: 1,
-                        x: `${(actionPct + cutoffPct) / 2 - 50}%`,
-                      }}
-                      exit={
-                        reduceMotion ? undefined : { opacity: 0, scale: 0.94 }
-                      }
-                      transition={{
-                        ...aspectSpring,
-                        opacity: getCrossfadeTransition(reduceMotion),
-                        scale: getCrossfadeTransition(reduceMotion),
-                      }}
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-[224px] z-10 flex -translate-y-1/2 justify-center will-change-transform"
-                    >
-                      <div
-                        className="flex h-10 items-center justify-center rounded-l-full border border-r-0 border-emerald-500/45 bg-emerald-500/15 pl-8 pr-2"
-                        style={{ width: `${cutoffPct - actionPct}%` }}
+                            transition={{
+                              ...aspectSpring,
+                              opacity: getCrossfadeTransition(reduceMotion),
+                              scale: getCrossfadeTransition(reduceMotion),
+                            }}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-x-0 top-[230px] z-10 flex -translate-y-1/2 justify-center will-change-transform"
+                          >
+                            <div
+                              className="flex h-10 items-center justify-center rounded-l-full border border-r-0 border-emerald-500/45 bg-emerald-500/15 pl-8 pr-2"
+                              style={{ width: `${cutoffPct - actionPct}%` }}
+                            >
+                              {isContinuous ? (
+                                <span className="text-xs font-bold tracking-widest text-emerald-600 dark:text-emerald-300">
+                                  〰〰
+                                </span>
+                              ) : (
+                                <span className="h-1 w-full rounded-full bg-emerald-500/55" />
+                              )}
+                            </div>
+                          </motion.div>
+                        ) : null}
+
+                        {/* Вирівняний підпис межі (дія або часовий орієнтир замість «Межа "ДО"») */}
+                        {isPerfect && aspectTime !== "present" ? (
+                          <motion.div
+                            key={`cutoff-label-${timelineLabels.cutoffLabel}`}
+                            initial={
+                              reduceMotion
+                                ? false
+                                : { opacity: 0, x: `${cutoffPct - 50}%` }
+                            }
+                            animate={{ opacity: 1, x: `${cutoffPct - 50}%` }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={{
+                              ...aspectSpring,
+                              opacity: getCrossfadeTransition(reduceMotion),
+                            }}
+                            className="pointer-events-none absolute inset-x-0 top-[292px] z-20 flex justify-center will-change-transform"
+                          >
+                            <span
+                              title={timelineLabels.cutoffLabel}
+                              className="max-w-[180px] truncate rounded-md border border-sky-500/45 bg-sky-500/15 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-sky-700 shadow-xs dark:text-sky-300"
+                            >
+                              {timelineLabels.cutoffLabel}
+                            </span>
+                          </motion.div>
+                        ) : null}
+
+                        {/* Підпис під початковою точкою ✕ для тривалості/стану ДО межі та життєвого досвіду */}
+                        {isPerfect &&
+                        (isDurationUpToCutoff
+                          ? timelineLabels.durationOrStartLabel
+                          : isLifeExperience
+                            ? timelineLabels.primaryLabel
+                            : false) ? (
+                          <motion.div
+                            key="perfect-action-label"
+                            initial={
+                              reduceMotion
+                                ? false
+                                : { opacity: 0, x: `${actionPct - 50}%` }
+                            }
+                            animate={{ opacity: 1, x: `${actionPct - 50}%` }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={aspectSpring}
+                            className="pointer-events-none absolute inset-x-0 top-[292px] z-20 flex justify-center will-change-transform"
+                          >
+                            <span
+                              className={cn(
+                                "max-w-[160px] truncate rounded-md border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap",
+                                isDurationUpToCutoff &&
+                                  timelineLabels.durationOrStartLabel
+                                  ? MARKER_STYLES.amber.badge
+                                  : MARKER_STYLES.emerald.badge,
+                              )}
+                            >
+                              {isDurationUpToCutoff
+                                ? timelineLabels.durationOrStartLabel
+                                : timelineLabels.primaryLabel}
+                            </span>
+                          </motion.div>
+                        ) : null}
+
+                        {/* ── General Truth (Present Simple) ── */}
+                        {isGeneralTruth ? (
+                          <motion.div
+                            key="aspect-general-truth"
+                            initial={reduceMotion ? false : { opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-x-[10%] top-[230px] z-10 flex -translate-y-1/2 items-center justify-between"
+                          >
+                            <span className="text-xs font-bold text-emerald-500">
+                              ◀
+                            </span>
+                            <div className="mx-1 h-2 flex-1 rounded-full bg-emerald-500/30" />
+                            <span className="text-xs font-bold text-emerald-500">
+                              ▶
+                            </span>
+                          </motion.div>
+                        ) : null}
+
+                        {/* ── Habit / Regular Events ── */}
+                        {isHabitRegular ? (
+                          <motion.div
+                            key="aspect-habit-regular"
+                            initial={
+                              reduceMotion
+                                ? false
+                                : {
+                                    opacity: 0,
+                                    scale: 0.94,
+                                    x: `${actionPct - 50}%`,
+                                  }
+                            }
+                            animate={{
+                              opacity: 1,
+                              scale: 1,
+                              x: `${actionPct - 50}%`,
+                            }}
+                            exit={
+                              reduceMotion
+                                ? undefined
+                                : { opacity: 0, scale: 0.94 }
+                            }
+                            transition={{
+                              ...aspectSpring,
+                              opacity: getCrossfadeTransition(reduceMotion),
+                              scale: getCrossfadeTransition(reduceMotion),
+                            }}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-x-0 top-[230px] z-10 flex -translate-y-1/2 justify-center will-change-transform"
+                          >
+                            <div className="flex items-center gap-5">
+                              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/45" />
+                              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/75" />
+                              <span className="w-14" />
+                              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/75" />
+                              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/45" />
+                            </div>
+                          </motion.div>
+                        ) : null}
+
+                        {/* ── Sequence of Actions (1 → 2 → 3) ── */}
+                        {isSequence ? (
+                          <>
+                            <motion.div
+                              key="aspect-sequence-labels"
+                              initial={
+                                reduceMotion
+                                  ? false
+                                  : { opacity: 0, x: `${actionPct - 50}%` }
+                              }
+                              animate={{
+                                opacity: 1,
+                                x: `${actionPct - 50}%`,
+                              }}
+                              exit={reduceMotion ? undefined : { opacity: 0 }}
+                              transition={aspectSpring}
+                              className="pointer-events-none absolute inset-x-0 top-[168px] z-20 flex justify-center will-change-transform"
+                            >
+                              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                                <span
+                                  className={cn(
+                                    "rounded-md border px-2 py-0.5 text-[11px] font-semibold",
+                                    MARKER_STYLES.emerald.badge,
+                                  )}
+                                >
+                                  1 · {timelineLabels.primaryLabel ?? "дія 1"}
+                                </span>
+                                <ArrowRight
+                                  className="h-3 w-3 text-muted-foreground"
+                                  aria-hidden="true"
+                                />
+                                <span
+                                  className={cn(
+                                    "rounded-md border px-2 py-0.5 text-[11px] font-semibold",
+                                    MARKER_STYLES.sky.badge,
+                                  )}
+                                >
+                                  2 ·{" "}
+                                  {timelineLabels.secondaryLabel ?? "дія 2"}
+                                </span>
+                                {timelineLabels.tertiaryLabel ? (
+                                  <>
+                                    <ArrowRight
+                                      className="h-3 w-3 text-muted-foreground"
+                                      aria-hidden="true"
+                                    />
+                                    <span
+                                      className={cn(
+                                        "rounded-md border px-2 py-0.5 text-[11px] font-semibold",
+                                        MARKER_STYLES.amber.badge,
+                                      )}
+                                    >
+                                      3 · {timelineLabels.tertiaryLabel}
+                                    </span>
+                                  </>
+                                ) : null}
+                              </div>
+                            </motion.div>
+
+                            <motion.div
+                              key="aspect-sequence-nodes"
+                              initial={
+                                reduceMotion
+                                  ? false
+                                  : { opacity: 0, x: `${actionPct - 50}%` }
+                              }
+                              animate={{
+                                opacity: 1,
+                                x: `${actionPct - 50}%`,
+                              }}
+                              exit={reduceMotion ? undefined : { opacity: 0 }}
+                              transition={aspectSpring}
+                              aria-hidden="true"
+                              className="pointer-events-none absolute inset-x-0 top-[230px] z-10 flex -translate-y-1/2 items-center justify-center will-change-transform"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-400 bg-emerald-500 text-[11px] font-bold text-emerald-950 shadow-xs">
+                                  1
+                                </span>
+                                <span className="h-0.5 w-6 bg-sky-400/75" />
+                                <span className="w-10" />
+                                <span className="h-0.5 w-6 bg-amber-400/75" />
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full border border-amber-400 bg-amber-500 text-[11px] font-bold text-amber-950 shadow-xs">
+                                  3
+                                </span>
+                              </div>
+                            </motion.div>
+                          </>
+                        ) : null}
+
+                        {/* ── Future Timetable / Future Time Clause / Future Arrangement (Present → Future) ── */}
+                        {isTimetableFuture ? (
+                          <motion.div
+                            key="aspect-timetable-cadence"
+                            initial={reduceMotion ? false : { opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={getCrossfadeTransition(reduceMotion)}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-x-0 top-[230px] z-10 -translate-y-1/2"
+                          >
+                            {[24, 34, 42, 62, 70, 86, 93].map((dotPct) => (
+                              <span
+                                key={dotPct}
+                                className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-400/50 bg-emerald-500/45"
+                                style={{ left: `${dotPct}%` }}
+                              />
+                            ))}
+                          </motion.div>
+                        ) : null}
+
+                        {isFutureLinked ? (
+                          <motion.div
+                            key="aspect-future-link"
+                            initial={
+                              reduceMotion
+                                ? false
+                                : {
+                                    opacity: 0,
+                                    x: `${(actionPct + futureTargetPct) / 2 - 50}%`,
+                                  }
+                            }
+                            animate={{
+                              opacity: 1,
+                              x: `${(actionPct + futureTargetPct) / 2 - 50}%`,
+                            }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={aspectSpring}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-x-0 top-[172px] z-10 flex justify-center will-change-transform"
+                          >
+                            <div
+                              className="h-[58px]"
+                              style={{
+                                width: `${Math.max(8, futureTargetPct - actionPct)}%`,
+                              }}
+                            >
+                              <svg
+                                viewBox="0 0 200 60"
+                                preserveAspectRatio="none"
+                                className="h-full w-full overflow-visible"
+                              >
+                                <defs>
+                                  <marker
+                                    id="future-link-arrow"
+                                    markerWidth="8"
+                                    markerHeight="8"
+                                    refX="6"
+                                    refY="4"
+                                    orient="auto"
+                                  >
+                                    <path
+                                      d="M0,0 L8,4 L0,8 Z"
+                                      fill="#38bdf8"
+                                    />
+                                  </marker>
+                                </defs>
+                                <path
+                                  d="M 4 50 Q 100 0 196 50"
+                                  fill="none"
+                                  stroke="#38bdf8"
+                                  strokeWidth="2.5"
+                                  strokeDasharray="6 4"
+                                  vectorEffect="non-scaling-stroke"
+                                  markerEnd="url(#future-link-arrow)"
+                                />
+                              </svg>
+                            </div>
+                          </motion.div>
+                        ) : null}
+
+                        {isFutureLinked ? (
+                          <motion.div
+                            key="aspect-future-nuance-badge"
+                            initial={
+                              reduceMotion
+                                ? false
+                                : {
+                                    opacity: 0,
+                                    x: `${(actionPct + futureTargetPct) / 2 - 50}%`,
+                                  }
+                            }
+                            animate={{
+                              opacity: 1,
+                              x: `${(actionPct + futureTargetPct) / 2 - 50}%`,
+                            }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={aspectSpring}
+                            className="pointer-events-none absolute inset-x-0 top-[148px] z-20 flex justify-center will-change-transform"
+                          >
+                            <span className="rounded-full border border-sky-500/40 bg-card/95 px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap text-sky-700 shadow-xs dark:text-sky-300">
+                              {isTimetableFuture
+                                ? "фіксований розклад · повторюється"
+                                : isFutureArrangement
+                                  ? "разова домовленість · 1 подія"
+                                  : "умова if / when → майбутнє"}
+                            </span>
+                          </motion.div>
+                        ) : null}
+
+                        {isFutureLinked ? (
+                          <motion.div
+                            key="aspect-future-target-dot"
+                            initial={reduceMotion ? false : { opacity: 0 }}
+                            animate={{
+                              opacity: 1,
+                              x: `${futureTargetPct - 50}%`,
+                            }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={aspectSpring}
+                            className="pointer-events-none absolute inset-x-0 top-[230px] z-20 flex -translate-y-1/2 justify-center will-change-transform"
+                          >
+                            {isFutureArrangement ? (
+                              <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-sky-400 bg-sky-500 text-[11px] font-black text-sky-950 shadow-sm ring-4 ring-sky-400/35">
+                                1
+                              </span>
+                            ) : (
+                              <span className="h-4 w-4 rounded-full border-2 border-sky-300 bg-sky-500 shadow-sm ring-4 ring-sky-400/25" />
+                            )}
+                          </motion.div>
+                        ) : null}
+
+                        {isFutureLinked && timelineLabels.secondaryLabel ? (
+                          <motion.div
+                            key="aspect-future-target-label"
+                            initial={reduceMotion ? false : { opacity: 0 }}
+                            animate={{
+                              opacity: 1,
+                              x: `${futureTargetPct - 50}%`,
+                            }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={aspectSpring}
+                            className="pointer-events-none absolute inset-x-0 top-[292px] z-20 flex justify-center will-change-transform"
+                          >
+                            <span className="max-w-[165px] truncate rounded-md border border-sky-500/45 bg-sky-500/15 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-sky-700 dark:text-sky-300">
+                              {timelineLabels.secondaryLabel}
+                            </span>
+                          </motion.div>
+                        ) : null}
+
+                        {/* ── Developing Trend (Present Continuous) ── */}
+                        {isDevelopingTrend ? (
+                          <motion.div
+                            key="aspect-developing-trend"
+                            initial={
+                              reduceMotion
+                                ? false
+                                : { opacity: 0, x: `${actionPct - 50}%` }
+                            }
+                            animate={{ opacity: 1, x: `${actionPct - 50}%` }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={aspectSpring}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-x-0 top-[188px] z-10 flex justify-center will-change-transform"
+                          >
+                            <div className="h-[58px] w-44">
+                              <svg
+                                viewBox="0 0 180 60"
+                                className="h-full w-full overflow-visible"
+                              >
+                                <defs>
+                                  <marker
+                                    id="trend-up-arrow"
+                                    markerWidth="8"
+                                    markerHeight="8"
+                                    refX="6"
+                                    refY="4"
+                                    orient="auto"
+                                  >
+                                    <path
+                                      d="M0,0 L8,4 L0,8 Z"
+                                      fill="#34d399"
+                                    />
+                                  </marker>
+                                </defs>
+                                <path
+                                  d="M 10 48 Q 88 42 170 10"
+                                  fill="none"
+                                  stroke="#34d399"
+                                  strokeWidth="3"
+                                  markerEnd="url(#trend-up-arrow)"
+                                />
+                              </svg>
+                            </div>
+                          </motion.div>
+                        ) : null}
+
+                        {/* ── Continuous: 1) Point in Progress або Interrupted (довга зелена + коротка синя) ── */}
+                        {isInterrupted || isPointInProgress ? (
+                          <>
+                            <motion.div
+                              key="continuous-long-green"
+                              initial={
+                                reduceMotion
+                                  ? false
+                                  : {
+                                      opacity: 0,
+                                      scale: 0.94,
+                                      x: `${actionPct - 50}%`,
+                                    }
+                              }
+                              animate={{
+                                opacity: 1,
+                                scale: 1,
+                                x: `${actionPct - 50}%`,
+                              }}
+                              exit={
+                                reduceMotion
+                                  ? undefined
+                                  : { opacity: 0, scale: 0.94 }
+                              }
+                              transition={{
+                                ...aspectSpring,
+                                opacity: getCrossfadeTransition(reduceMotion),
+                                scale: getCrossfadeTransition(reduceMotion),
+                              }}
+                              aria-hidden="true"
+                              className="pointer-events-none absolute inset-x-0 top-[230px] z-10 flex -translate-y-1/2 justify-center will-change-transform"
+                            >
+                              <div className="flex h-11 w-52 items-center justify-between rounded-full border border-emerald-500/50 bg-emerald-500/15 px-3.5 sm:w-56">
+                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                  〰
+                                </span>
+                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                  〰
+                                </span>
+                              </div>
+                            </motion.div>
+
+                            {/* Зелений підпис довгої тривалої дії */}
+                            {timelineLabels.primaryLabel ? (
+                              <motion.div
+                                key="continuous-long-label"
+                                initial={
+                                  reduceMotion
+                                    ? false
+                                    : { opacity: 0, x: `${actionPct - 50}%` }
+                                }
+                                animate={{
+                                  opacity: 1,
+                                  x: `${actionPct - 50}%`,
+                                }}
+                                exit={reduceMotion ? undefined : { opacity: 0 }}
+                                transition={aspectSpring}
+                                className="pointer-events-none absolute inset-x-0 top-[170px] z-20 flex justify-center will-change-transform"
+                              >
+                                <span className="max-w-[180px] truncate rounded-md border border-emerald-500/45 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-emerald-700 shadow-xs dark:text-emerald-300">
+                                  {timelineLabels.primaryLabel}
+                                </span>
+                              </motion.div>
+                            ) : null}
+
+                            {/* Синя вертикальна лінія короткої дії / моменту */}
+                            <motion.div
+                              key="continuous-short-blue-line"
+                              initial={
+                                reduceMotion
+                                  ? false
+                                  : { opacity: 0, x: `${handlePct - 50}%` }
+                              }
+                              animate={{
+                                opacity: 1,
+                                x: `${handlePct - 50}%`,
+                              }}
+                              exit={reduceMotion ? undefined : { opacity: 0 }}
+                              transition={aspectSpring}
+                              aria-hidden="true"
+                              className="pointer-events-none absolute inset-x-0 top-[194px] z-10 flex justify-center will-change-transform"
+                            >
+                              <div className="h-[72px] w-0.5 bg-sky-400" />
+                            </motion.div>
+
+                            {/* Синій підпис короткої дії / моменту (коли не перекриває NOW) */}
+                            {timelineLabels.secondaryLabel &&
+                            aspectTime !== "present" ? (
+                              <motion.div
+                                key="continuous-short-label"
+                                initial={
+                                  reduceMotion
+                                    ? false
+                                    : { opacity: 0, x: `${handlePct - 50}%` }
+                                }
+                                animate={{
+                                  opacity: 1,
+                                  x: `${handlePct - 50}%`,
+                                }}
+                                exit={reduceMotion ? undefined : { opacity: 0 }}
+                                transition={aspectSpring}
+                                className="pointer-events-none absolute inset-x-0 top-[292px] z-20 flex justify-center will-change-transform"
+                              >
+                                <span
+                                  title={timelineLabels.secondaryLabel}
+                                  className="max-w-[190px] truncate rounded-md border border-sky-500/45 bg-sky-500/15 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-sky-700 shadow-xs dark:text-sky-300"
+                                >
+                                  {timelineLabels.secondaryLabel}
+                                </span>
+                              </motion.div>
+                            ) : null}
+                          </>
+                        ) : null}
+
+                        {/* ── Continuous: 2) Дві паралельні тривалі дії ── */}
+                        {isParallelLong ? (
+                          <>
+                            <motion.div
+                              key="aspect-parallel-long-top"
+                              initial={
+                                reduceMotion
+                                  ? false
+                                  : {
+                                      opacity: 0,
+                                      scale: 0.96,
+                                      x: `${actionPct - 50}%`,
+                                    }
+                              }
+                              animate={{
+                                opacity: 1,
+                                scale: 1,
+                                x: `${actionPct - 50}%`,
+                              }}
+                              exit={
+                                reduceMotion
+                                  ? undefined
+                                  : { opacity: 0, scale: 0.96 }
+                              }
+                              transition={aspectSpring}
+                              className="pointer-events-none absolute inset-x-0 top-[176px] z-10 flex justify-center will-change-transform"
+                            >
+                              <div className="flex h-8 w-52 items-center justify-between gap-2 rounded-full border border-emerald-500/50 bg-emerald-500/15 px-3 sm:w-60">
+                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                  〰
+                                </span>
+                                <span className="truncate text-[11px] font-bold text-emerald-700 dark:text-emerald-200">
+                                  {timelineLabels.primaryLabel ??
+                                    "дія 1 (тривала)"}
+                                </span>
+                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                  〰
+                                </span>
+                              </div>
+                            </motion.div>
+
+                            <motion.div
+                              key="aspect-parallel-long-bottom"
+                              initial={
+                                reduceMotion
+                                  ? false
+                                  : {
+                                      opacity: 0,
+                                      scale: 0.96,
+                                      x: `${actionPct - 50}%`,
+                                    }
+                              }
+                              animate={{
+                                opacity: 1,
+                                scale: 1,
+                                x: `${actionPct - 50}%`,
+                              }}
+                              exit={
+                                reduceMotion
+                                  ? undefined
+                                  : { opacity: 0, scale: 0.96 }
+                              }
+                              transition={aspectSpring}
+                              className="pointer-events-none absolute inset-x-0 top-[252px] z-10 flex justify-center will-change-transform"
+                            >
+                              <div className="flex h-8 w-52 items-center justify-between gap-2 rounded-full border border-sky-500/50 bg-sky-500/15 px-3 sm:w-60">
+                                <span className="text-xs font-bold text-sky-600 dark:text-sky-400">
+                                  〰
+                                </span>
+                                <span className="truncate text-[11px] font-bold text-sky-700 dark:text-sky-200">
+                                  {timelineLabels.secondaryLabel ??
+                                    "дія 2 (паралельно)"}
+                                </span>
+                                <span className="text-xs font-bold text-sky-600 dark:text-sky-400">
+                                  〰
+                                </span>
+                              </div>
+                            </motion.div>
+                          </>
+                        ) : null}
+
+                        {/* ── Continuous: 3) Тривалість у межах періоду ── */}
+                        {isDurationSpan ? (
+                          <>
+                            <motion.div
+                              key="aspect-duration-span"
+                              initial={
+                                reduceMotion
+                                  ? false
+                                  : {
+                                      opacity: 0,
+                                      scale: 0.94,
+                                      x: `${actionPct - 50}%`,
+                                    }
+                              }
+                              animate={{
+                                opacity: 1,
+                                scale: 1,
+                                x: `${actionPct - 50}%`,
+                              }}
+                              exit={
+                                reduceMotion
+                                  ? undefined
+                                  : { opacity: 0, scale: 0.94 }
+                              }
+                              transition={aspectSpring}
+                              aria-hidden="true"
+                              className="pointer-events-none absolute inset-x-0 top-[230px] z-10 flex -translate-y-1/2 justify-center will-change-transform"
+                            >
+                              <div className="flex h-11 w-48 items-center justify-between rounded-md border-x-2 border-y border-emerald-500/60 bg-emerald-500/15 px-3 sm:w-52">
+                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                  〰
+                                </span>
+                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                  〰
+                                </span>
+                              </div>
+                            </motion.div>
+                            {timelineLabels.primaryLabel ? (
+                              <motion.div
+                                key="aspect-duration-primary"
+                                initial={
+                                  reduceMotion
+                                    ? false
+                                    : { opacity: 0, x: `${actionPct - 50}%` }
+                                }
+                                animate={{
+                                  opacity: 1,
+                                  x: `${actionPct - 50}%`,
+                                }}
+                                exit={reduceMotion ? undefined : { opacity: 0 }}
+                                transition={aspectSpring}
+                                className="pointer-events-none absolute inset-x-0 top-[170px] z-20 flex justify-center will-change-transform"
+                              >
+                                <span className="max-w-[180px] truncate rounded-md border border-emerald-500/45 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-emerald-700 dark:text-emerald-300">
+                                  {timelineLabels.primaryLabel}
+                                </span>
+                              </motion.div>
+                            ) : null}
+                            {timelineLabels.secondaryLabel &&
+                            aspectTime !== "present" ? (
+                              <motion.div
+                                key="aspect-duration-cue"
+                                initial={
+                                  reduceMotion
+                                    ? false
+                                    : { opacity: 0, x: `${actionPct - 50}%` }
+                                }
+                                animate={{
+                                  opacity: 1,
+                                  x: `${actionPct - 50}%`,
+                                }}
+                                exit={reduceMotion ? undefined : { opacity: 0 }}
+                                transition={aspectSpring}
+                                className="pointer-events-none absolute inset-x-0 top-[292px] z-20 flex justify-center will-change-transform"
+                              >
+                                <span className="max-w-[180px] truncate rounded-md border border-sky-500/45 bg-sky-500/15 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-sky-700 dark:text-sky-300">
+                                  {timelineLabels.secondaryLabel}
+                                </span>
+                              </motion.div>
+                            ) : null}
+                          </>
+                        ) : null}
+
+                        {/* ── Підпис для Simple / Single Fact / Developing Trend ── */}
+                        {!isPerfect &&
+                        !isInterrupted &&
+                        !isPointInProgress &&
+                        !isParallelLong &&
+                        !isDurationSpan &&
+                        !isSequence ? (
+                          <>
+                            {timelineLabels.primaryLabel ? (
+                              <motion.div
+                                key="simple-primary-label"
+                                initial={
+                                  reduceMotion
+                                    ? false
+                                    : { opacity: 0, x: `${actionPct - 50}%` }
+                                }
+                                animate={{
+                                  opacity: 1,
+                                  x: `${actionPct - 50}%`,
+                                }}
+                                exit={reduceMotion ? undefined : { opacity: 0 }}
+                                transition={aspectSpring}
+                                className="pointer-events-none absolute inset-x-0 top-[170px] z-20 flex justify-center will-change-transform"
+                              >
+                                <span className="max-w-[180px] truncate rounded-md border border-emerald-500/45 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-emerald-700 dark:text-emerald-300">
+                                  {timelineLabels.primaryLabel}
+                                </span>
+                              </motion.div>
+                            ) : null}
+
+                            {!isFutureLinked &&
+                            timelineLabels.secondaryLabel &&
+                            aspectTime !== "present" ? (
+                              <motion.div
+                                key="simple-secondary-cue"
+                                initial={
+                                  reduceMotion
+                                    ? false
+                                    : { opacity: 0, x: `${actionPct - 50}%` }
+                                }
+                                animate={{
+                                  opacity: 1,
+                                  x: `${actionPct - 50}%`,
+                                }}
+                                exit={reduceMotion ? undefined : { opacity: 0 }}
+                                transition={aspectSpring}
+                                className="pointer-events-none absolute inset-x-0 top-[292px] z-20 flex justify-center will-change-transform"
+                              >
+                                <span className="max-w-[180px] truncate rounded-md border border-sky-500/45 bg-sky-500/15 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-sky-700 dark:text-sky-300">
+                                  {timelineLabels.secondaryLabel}
+                                </span>
+                              </motion.div>
+                            ) : null}
+                          </>
+                        ) : null}
+                      </AnimatePresence>
+
+                      {/* Перетягуваний та клавіатурно-доступний маркер (зелений або синій для короткої дії) */}
+                      <motion.div
+                        initial={false}
+                        animate={{ x: `${handlePct - 50}%` }}
+                        transition={aspectSpring}
+                        className="pointer-events-none absolute inset-x-0 top-[230px] z-20 flex -translate-y-1/2 justify-center will-change-transform"
                       >
-                        <span className="text-xs font-bold tracking-widest text-emerald-600 dark:text-emerald-300">
-                          〰〰
-                        </span>
+                        {(() => {
+                          const markerTone =
+                            isInterrupted || isPointInProgress
+                              ? MARKER_STYLES.sky
+                              : MARKER_STYLES.emerald;
+                          return (
+                            <button
+                              type="button"
+                              role="slider"
+                              aria-label="Позиція дії на лінії часу"
+                              aria-valuemin={0}
+                              aria-valuemax={2}
+                              aria-valuenow={activeTimeMeta.slot}
+                              aria-valuetext={`${activeTimeMeta.labelEn} (${activeTimeMeta.labelUk}) — ${activeCellMeta.tenseName}`}
+                              onPointerDown={handleAspectPointerDown}
+                              onKeyDown={handleAspectMarkerKeyDown}
+                              className={cn(
+                                "pointer-events-auto flex touch-none select-none items-center justify-center rounded-full border-2 font-black shadow-md ring-4 transition-transform hover:scale-110",
+                                FOCUS_RING_CLASS,
+                                isParallelLong
+                                  ? "h-7 w-7 text-xs"
+                                  : "h-10 w-10 text-base",
+                                markerTone.markerBg,
+                                markerTone.markerBorder,
+                                markerTone.ring,
+                                draggingAspectMarker
+                                  ? "scale-115 cursor-grabbing shadow-lg"
+                                  : "cursor-grab",
+                              )}
+                            >
+                              {isParallelLong ? "⇄" : isSequence ? "2" : "✕"}
+                            </button>
+                          );
+                        })()}
+                      </motion.div>
+
+                      {/* Нижній підпис NOW на осі */}
+                      <div
+                        className={cn(
+                          "pointer-events-none absolute top-[292px] z-20 -translate-x-1/2 rounded-md px-2.5 py-0.5 text-[11px] font-bold tracking-wider whitespace-nowrap shadow-xs",
+                          aspectTime === "present" &&
+                            (isPerfect ||
+                              isInterrupted ||
+                              isPointInProgress ||
+                              isDurationSpan)
+                            ? "border border-sky-500/50 bg-sky-500/15 text-sky-700 dark:text-sky-300"
+                            : "bg-foreground text-background",
+                        )}
+                        style={{ left: `${nowPct}%` }}
+                      >
+                        {aspectTime === "present" &&
+                        (isPerfect ||
+                          isInterrupted ||
+                          isPointInProgress ||
+                          isDurationSpan)
+                          ? timelineLabels.cutoffLabel
+                          : "NOW"}
                       </div>
-                    </motion.div>
-                  ) : null}
-
-                  {isPerfect && aspectTime !== "present" ? (
-                    <motion.div
-                      key="cutoff-label"
-                      initial={
-                        reduceMotion
-                          ? false
-                          : { opacity: 0, x: `${cutoffPct - 50}%` }
-                      }
-                      animate={{ opacity: 1, x: `${cutoffPct - 50}%` }}
-                      exit={reduceMotion ? undefined : { opacity: 0 }}
-                      transition={{
-                        ...aspectSpring,
-                        opacity: getCrossfadeTransition(reduceMotion),
-                      }}
-                      className="pointer-events-none absolute inset-x-0 top-[276px] z-20 flex justify-center will-change-transform"
-                    >
-                      <span className="rounded-md border border-sky-500/45 bg-sky-500/15 px-2 py-0.5 text-[11px] font-bold whitespace-nowrap text-sky-700 dark:text-sky-300">
-                        Межа &quot;ДО&quot;
-                      </span>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-
-                {/* Перетягуваний та клавіатурно-доступний маркер ✕ */}
-                <motion.div
-                  initial={false}
-                  animate={{ x: `${actionPct - 50}%` }}
-                  transition={aspectSpring}
-                  className="pointer-events-none absolute inset-x-0 top-[224px] z-20 flex -translate-y-1/2 justify-center will-change-transform"
-                >
-                  <button
-                    type="button"
-                    role="slider"
-                    aria-label="Позиція дії на лінії часу"
-                    aria-valuemin={0}
-                    aria-valuemax={2}
-                    aria-valuenow={activeTimeMeta.slot}
-                    aria-valuetext={`${activeTimeMeta.labelEn} (${activeTimeMeta.labelUk}) — ${activeCellMeta.tenseName}`}
-                    onPointerDown={handleAspectPointerDown}
-                    onKeyDown={handleAspectMarkerKeyDown}
-                    className={cn(
-                      "pointer-events-auto flex h-10 w-10 touch-none select-none items-center justify-center rounded-full border-2 text-base font-black shadow-md ring-4 transition-transform hover:scale-110",
-                      FOCUS_RING_CLASS,
-                      MARKER_STYLES.emerald.markerBg,
-                      MARKER_STYLES.emerald.markerBorder,
-                      MARKER_STYLES.emerald.ring,
-                      draggingAspectMarker
-                        ? "scale-115 cursor-grabbing shadow-lg"
-                        : "cursor-grab",
-                    )}
-                  >
-                    ✕
-                  </button>
-                </motion.div>
-
-                {/* Нижній підпис NOW на осі */}
-                <div
-                  className={cn(
-                    "pointer-events-none absolute top-[276px] z-20 -translate-x-1/2 rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wider whitespace-nowrap shadow-xs",
-                    isPerfect && aspectTime === "present"
-                      ? "border border-sky-500/50 bg-sky-500/15 text-sky-700 dark:text-sky-300"
-                      : "bg-foreground text-background",
-                  )}
-                  style={{ left: `${nowPct}%` }}
-                >
-                  {isPerfect && aspectTime === "present"
-                    ? 'NOW · межа "ДО"'
-                    : "NOW"}
-                </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           ) : null}
