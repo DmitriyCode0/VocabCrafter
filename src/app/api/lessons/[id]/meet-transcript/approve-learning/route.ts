@@ -2,19 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { approveLessonLearningCandidates } from "@/lib/lesson-transcript-vocab-analyzer";
+import { applyLessonTranscriptVocabulary } from "@/lib/lesson-transcript-vocab-analyzer";
 
-const approveLearningSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        term: z.string().trim().min(1).max(120),
-        ukrainianTranslation: z.string().trim().max(240).nullable().optional(),
-        englishDefinition: z.string().trim().max(320).nullable().optional(),
-        partOfSpeech: z.string().trim().max(40).nullable().optional(),
-      }),
-    )
-    .max(50),
+const reviewItemSchema = z.object({
+  term: z.string().trim().min(1).max(120),
+  ukrainianTranslation: z.string().trim().max(240).nullable().optional(),
+  englishDefinition: z.string().trim().max(320).nullable().optional(),
+  partOfSpeech: z.string().trim().max(40).nullable().optional(),
+  cefrLevel: z.string().trim().max(10).nullable().optional(),
+  quote: z.string().trim().max(320).nullable().optional(),
+  source: z.string().trim().max(40).nullable().optional(),
+  graduatedFromLearning: z.boolean().optional(),
+});
+
+const approveTranscriptVocabSchema = z.object({
+  activeItems: z.array(reviewItemSchema).max(600).optional(),
+  passiveItems: z.array(reviewItemSchema).max(600).optional(),
+  learningItems: z.array(reviewItemSchema).max(60).optional(),
+  // Legacy fallback field name
+  items: z.array(reviewItemSchema).max(60).optional(),
 });
 
 export async function POST(
@@ -41,13 +47,13 @@ export async function POST(
 
     if (!profile || profile.role !== "tutor") {
       return NextResponse.json(
-        { error: "Only tutors can approve learning words" },
+        { error: "Only tutors can apply lesson vocabulary" },
         { status: 403 },
       );
     }
 
     const body = await request.json().catch(() => null);
-    const parsed = approveLearningSchema.safeParse(body);
+    const parsed = approveTranscriptVocabSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid request payload", details: parsed.error.flatten() },
@@ -55,20 +61,22 @@ export async function POST(
       );
     }
 
-    const result = await approveLessonLearningCandidates({
+    const result = await applyLessonTranscriptVocabulary({
       lessonId,
       tutorId: user.id,
-      approvedItems: parsed.data.items,
+      activeItems: parsed.data.activeItems ?? [],
+      passiveItems: parsed.data.passiveItems ?? [],
+      learningItems: parsed.data.learningItems ?? parsed.data.items ?? [],
       adminClient: supabaseAdmin,
     });
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Approve lesson learning candidates error:", error);
+    console.error("Apply lesson transcript vocabulary error:", error);
     const message =
       error instanceof Error
         ? error.message
-        : "Failed to approve learning words";
+        : "Failed to apply lesson vocabulary";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

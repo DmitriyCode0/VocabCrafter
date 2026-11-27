@@ -18,6 +18,7 @@ export interface LessonTranscriptSummary {
   passiveAppliedCount: number;
   learningApprovedCount: number;
   pendingLearningCount: number;
+  pendingReviewCount?: number;
   analyzedAt: string | null;
 }
 

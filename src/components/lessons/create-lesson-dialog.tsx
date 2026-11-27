@@ -87,6 +87,13 @@ function getTodayIsoDate() {
   return toIsoDate(new Date());
 }
 
+function getDefaultStatusForLessonDate(isoDate: string): LessonStatus {
+  if (isoDate && isoDate < getTodayIsoDate()) {
+    return "completed";
+  }
+  return "planned";
+}
+
 function parseLocalIsoDate(isoDate: string) {
   const parsed = new Date(`${isoDate}T00:00:00`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
@@ -228,7 +235,10 @@ export function CreateLessonDialog({
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [notes, setNotes] = useState("");
-  const [status, setStatus] = useState<LessonStatus>("completed");
+  const [status, setStatus] = useState<LessonStatus>(() =>
+    getDefaultStatusForLessonDate(resolvedDefaultLessonDate),
+  );
+  const [hasManualStatusOverride, setHasManualStatusOverride] = useState(false);
   const [priceInput, setPriceInput] = useState(resolvedDefaultPriceInput);
   const [autoAdjustEndTime, setAutoAdjustEndTime] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -290,7 +300,8 @@ export function CreateLessonDialog({
     setStartTime("");
     setEndTime("");
     setNotes("");
-    setStatus("completed");
+    setStatus(getDefaultStatusForLessonDate(resolvedDefaultLessonDate));
+    setHasManualStatusOverride(false);
     setPriceInput(resolvedDefaultPriceInput);
     setAutoAdjustEndTime(true);
     setIsRecurring(false);
@@ -304,6 +315,7 @@ export function CreateLessonDialog({
 
   function handleRecurringModeChange(nextIsRecurring: boolean) {
     setIsRecurring(nextIsRecurring);
+    setHasManualStatusOverride(false);
     if (nextIsRecurring) {
       // Default recurring lessons to "planned" since overdue planned lessons auto-complete
       setStatus("planned");
@@ -311,13 +323,16 @@ export function CreateLessonDialog({
         setSelectedWeekdays([getMondayFirstWeekday(lessonDate)]);
       }
     } else {
-      setStatus("completed");
+      setStatus(getDefaultStatusForLessonDate(lessonDate));
     }
   }
 
   function handleLessonDateChange(nextDate: string) {
     setLessonDate(nextDate);
     setExcludedDates([]);
+    if (!isRecurring && !hasManualStatusOverride && nextDate) {
+      setStatus(getDefaultStatusForLessonDate(nextDate));
+    }
     if (!hasCustomWeekdays && nextDate) {
       setSelectedWeekdays([getMondayFirstWeekday(nextDate)]);
     }
@@ -567,7 +582,10 @@ export function CreateLessonDialog({
               <Label>Status</Label>
               <Select
                 value={status}
-                onValueChange={(value) => setStatus(value as LessonStatus)}
+                onValueChange={(value) => {
+                  setStatus(value as LessonStatus);
+                  setHasManualStatusOverride(true);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />

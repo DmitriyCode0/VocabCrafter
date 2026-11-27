@@ -15,15 +15,21 @@ import { upsertActiveVocabularyEvidence } from "@/lib/mastery/active-vocabulary-
 import {
   PASSIVE_VOCABULARY_CEFR_LEVELS,
   PASSIVE_VOCABULARY_PARTS_OF_SPEECH,
+  extractPassiveVocabularyTermsFromText,
   getPassiveVocabularyCompositeKey,
   getPassiveVocabularyEnglishDefinitions,
+  getPassiveVocabularyTranscription,
   getPassiveVocabularyUkrainianTranslation,
   inferPassiveVocabularyItemType,
   normalizePassiveVocabularyText,
   type PassiveVocabularyLibraryCefrLevel,
   type PassiveVocabularyPartOfSpeech,
 } from "@/lib/mastery/passive-vocabulary";
-import { resolvePassiveVocabularyLibraryItems } from "@/lib/mastery/passive-vocabulary-library";
+import {
+  lookupPassiveVocabularyLibraryItems,
+  resolvePassiveVocabularyLibraryItems,
+  type PassiveVocabularyLibraryResolution,
+} from "@/lib/mastery/passive-vocabulary-library";
 import {
   lookupReferenceDictionaryEntries,
   type ReferenceDictionaryEntry,
@@ -32,14 +38,62 @@ import {
   markStudentVocabularyStateAsLearning,
   syncStudentVocabularyStateFromPassiveEvidence,
 } from "@/lib/mastery/student-vocabulary-state";
+import { isEnglishWord } from "@/lib/text/language-detection";
 import type { Database, Json } from "@/types/database";
 
 type SupabaseAdminClient = SupabaseClient<Database>;
 
-const MAX_TRANSCRIPT_CHARS_FOR_AI = 24000;
+const MAX_TRANSCRIPT_CHARS_FOR_AI = 120000;
 
 const VALID_PARTS_OF_SPEECH = new Set<string>(PASSIVE_VOCABULARY_PARTS_OF_SPEECH);
 const VALID_CEFR_LEVELS = new Set<string>(PASSIVE_VOCABULARY_CEFR_LEVELS);
+
+const CEFR_PRIORITY_RANK: Record<string, number> = {
+  C2: 6,
+  C1: 5,
+  B2: 4,
+  B1: 3,
+  A2: 1,
+  A1: 0,
+};
+
+// Closed-class function words and speech-to-text fillers excluded from transcript diffs
+const ENGLISH_STOPWORDS = new Set<string>([
+  "the", "and", "but", "for", "nor", "yet", "are", "was", "were", "been", "being",
+  "have", "has", "had", "having", "did", "does", "doing", "done", "will", "would",
+  "shall", "should", "can", "could", "may", "might", "must", "not", "yes", "yeah",
+  "yep", "nope", "nah", "okay", "ok", "hey", "hello", "bye", "hi", "hmm", "mhm",
+  "uh", "um", "ah", "oh", "eh", "huh", "you", "your", "yours", "yourself", "she",
+  "her", "hers", "herself", "him", "his", "himself", "they", "them", "their",
+  "theirs", "themselves", "our", "ours", "ourselves", "its", "itself", "who",
+  "whom", "whose", "which", "that", "this", "these", "those", "what", "where",
+  "when", "why", "how", "all", "any", "both", "each", "few", "more", "most",
+  "other", "others", "some", "such", "than", "too", "very", "just", "now", "then",
+  "here", "there", "out", "off", "over", "under", "again", "once", "from", "into",
+  "with", "without", "about", "against", "between", "through", "during", "before",
+  "after", "above", "below", "down", "own", "same", "only", "also", "even", "still",
+  "already", "always", "never", "well", "really", "actually", "basically", "maybe",
+  "probably", "quite", "pretty", "much", "many", "lot", "lots", "bit", "little",
+  "good", "bad", "nice", "fine", "great", "right", "sure", "true", "false", "one",
+  "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+  "something", "anything", "nothing", "everything", "someone", "anyone", "everyone",
+  "nobody", "somebody", "everybody", "somewhere", "anywhere", "nowhere", "everywhere",
+  "because", "since", "while", "although", "though", "unless", "until", "whether",
+  "like", "think", "know", "mean", "say", "said", "says", "see", "saw", "seen",
+  "look", "want", "need", "use", "used", "using", "make", "made", "take", "took",
+  "get", "got", "give", "gave", "put", "let", "try", "ask", "tell", "told", "work",
+  "seem", "feel", "come", "came", "going", "goes", "went", "gone", "gonna", "wanna",
+  "gotta", "kinda", "sorta", "don", "didn", "doesn", "won", "wouldn", "couldn",
+  "shouldn", "isn", "aren", "wasn", "weren", "hasn", "haven", "hadn", "can't",
+  "don't", "didn't", "doesn't", "won't", "wouldn't", "couldn't", "shouldn't",
+  "isn't", "aren't", "wasn't", "weren't", "hasn't", "haven't", "hadn't", "i'm",
+  "you're", "he's", "she's", "it's", "we're", "they're", "i've", "you've", "we've",
+  "they've", "i'll", "you'll", "he'll", "she'll", "we'll", "they'll", "i'd",
+  "you'd", "he'd", "she'd", "we'd", "they'd", "that's", "there's", "here's",
+  "what's", "who's", "let's", "sorry", "please", "thank", "thanks", "today",
+  "yesterday", "tomorrow", "lesson", "time", "day", "way", "thing", "things",
+  "people", "person", "man", "woman", "part", "example",
+]);
 
 function toValidPartOfSpeech(
   value: string | null | undefined,
@@ -63,6 +117,8 @@ function toValidCefrLevel(
   return null;
 }
 
+export type TranscriptCandidateStatus = "pending" | "approved" | "dismissed";
+
 export interface TranscriptAutoAppliedActiveItem {
   term: string;
   normalizedTerm: string;
@@ -70,8 +126,12 @@ export interface TranscriptAutoAppliedActiveItem {
   evidenceQuote: string | null;
   ukrainianTranslation: string | null;
   transcription: string | null;
+  cefrLevel?: string | null;
+  partOfSpeech?: string | null;
   dictionaryMatched: boolean;
   graduatedFromLearning: boolean;
+  source?: "ai_phrase" | "transcript_scan" | "manual";
+  status?: TranscriptCandidateStatus;
 }
 
 export interface TranscriptAutoAppliedPassiveItem {
@@ -81,7 +141,11 @@ export interface TranscriptAutoAppliedPassiveItem {
   contextQuote: string | null;
   ukrainianTranslation: string | null;
   transcription: string | null;
+  cefrLevel?: string | null;
+  partOfSpeech?: string | null;
   dictionaryMatched: boolean;
+  source?: "ai_phrase" | "reading_aloud" | "transcript_scan" | "manual";
+  status?: TranscriptCandidateStatus;
 }
 
 export interface TranscriptLearningCandidateItem {
@@ -98,7 +162,7 @@ export interface TranscriptLearningCandidateItem {
   confidence: "high" | "medium";
   dictionaryMatched: boolean;
   alreadyInLearning: boolean;
-  status: "pending" | "approved" | "dismissed";
+  status: TranscriptCandidateStatus;
 }
 
 export interface LessonMeetTranscriptView {
@@ -129,28 +193,8 @@ export interface LessonMeetTranscriptView {
   rawTextPreview: string;
 }
 
-const aiAnalysisResponseSchema = z.object({
+const aiHybridAnalysisResponseSchema = z.object({
   lessonSummaryUk: z.string().trim().max(1500).default(""),
-  activeUsed: z
-    .array(
-      z.object({
-        term: z.string().trim().min(1).max(120),
-        evidenceQuote: z.string().trim().max(260).optional().nullable(),
-        ukrainianTranslation: z.string().trim().max(240).optional().nullable(),
-      }),
-    )
-    .max(40)
-    .default([]),
-  passiveEncountered: z
-    .array(
-      z.object({
-        term: z.string().trim().min(1).max(120),
-        contextQuote: z.string().trim().max(260).optional().nullable(),
-        ukrainianTranslation: z.string().trim().max(240).optional().nullable(),
-      }),
-    )
-    .max(45)
-    .default([]),
   learningCandidates: z
     .array(
       z.object({
@@ -166,6 +210,29 @@ const aiAnalysisResponseSchema = z.object({
     )
     .max(20)
     .default([]),
+  activePhrases: z
+    .array(
+      z.object({
+        term: z.string().trim().min(1).max(120),
+        evidenceQuote: z.string().trim().max(260).optional().nullable(),
+        ukrainianTranslation: z.string().trim().max(240).optional().nullable(),
+        cefrLevel: z.string().trim().max(10).optional().nullable(),
+      }),
+    )
+    .max(80)
+    .default([]),
+  passivePhrases: z
+    .array(
+      z.object({
+        term: z.string().trim().min(1).max(120),
+        contextQuote: z.string().trim().max(260).optional().nullable(),
+        ukrainianTranslation: z.string().trim().max(240).optional().nullable(),
+        cefrLevel: z.string().trim().max(10).optional().nullable(),
+      }),
+    )
+    .max(80)
+    .default([]),
+  readingAloudTerms: z.array(z.string().trim().min(1).max(120)).max(120).default([]),
 });
 
 function truncateTranscriptForAI(text: string): string {
@@ -222,6 +289,28 @@ function summarizeTranscriptSpeakers(turns: MeetTranscriptTurn[]) {
   return Array.from(map.values());
 }
 
+function normalizeActiveItems(raw: unknown): TranscriptAutoAppliedActiveItem[] {
+  if (!Array.isArray(raw)) return [];
+  return (raw as TranscriptAutoAppliedActiveItem[]).map((item) => ({
+    ...item,
+    cefrLevel: item.cefrLevel ?? null,
+    partOfSpeech: item.partOfSpeech ?? null,
+    source: item.source ?? "ai_phrase",
+    status: item.status ?? "approved",
+  }));
+}
+
+function normalizePassiveItems(raw: unknown): TranscriptAutoAppliedPassiveItem[] {
+  if (!Array.isArray(raw)) return [];
+  return (raw as TranscriptAutoAppliedPassiveItem[]).map((item) => ({
+    ...item,
+    cefrLevel: item.cefrLevel ?? null,
+    partOfSpeech: item.partOfSpeech ?? null,
+    source: item.source ?? "ai_phrase",
+    status: item.status ?? "approved",
+  }));
+}
+
 export function mapLessonMeetTranscriptRowToView(
   row: Database["public"]["Tables"]["lesson_meet_transcripts"]["Row"],
 ): LessonMeetTranscriptView {
@@ -242,12 +331,8 @@ export function mapLessonMeetTranscriptRowToView(
     lessonSummaryUk: row.lesson_summary_uk,
     speakers: summarizeTranscriptSpeakers(turns),
     turnCount: turns.length,
-    autoAppliedActive: Array.isArray(row.auto_applied_active)
-      ? (row.auto_applied_active as unknown as TranscriptAutoAppliedActiveItem[])
-      : [],
-    autoAppliedPassive: Array.isArray(row.auto_applied_passive)
-      ? (row.auto_applied_passive as unknown as TranscriptAutoAppliedPassiveItem[])
-      : [],
+    autoAppliedActive: normalizeActiveItems(row.auto_applied_active),
+    autoAppliedPassive: normalizePassiveItems(row.auto_applied_passive),
     learningCandidates: Array.isArray(row.learning_candidates)
       ? (row.learning_candidates as unknown as TranscriptLearningCandidateItem[])
       : [],
@@ -269,6 +354,65 @@ function getLookupEntryForTerm(
 ): ReferenceDictionaryEntry | undefined {
   const normalized = normalizePassiveVocabularyText(term);
   return dictMap.get(normalized);
+}
+
+function buildNameTokenExclusionSet(
+  tutorName: string | null,
+  studentName: string | null,
+  speakers: Array<{ name: string }>,
+): Set<string> {
+  const excluded = new Set<string>();
+  const sources = [
+    tutorName,
+    studentName,
+    ...speakers.map((s) => s.name),
+  ];
+
+  for (const source of sources) {
+    if (!source) continue;
+    for (const token of extractPassiveVocabularyTermsFromText(source)) {
+      if (token.length >= 2) {
+        excluded.add(token);
+      }
+    }
+  }
+  return excluded;
+}
+
+function truncateQuote(text: string, maxLen = 180): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= maxLen) return clean;
+  return `${clean.slice(0, maxLen - 1)}…`;
+}
+
+function extractDeterministicWordsWithQuotes(
+  turns: MeetTranscriptTurn[],
+  excludeNameTokens: Set<string>,
+): Map<string, { rawTerm: string; quote: string }> {
+  const result = new Map<string, { rawTerm: string; quote: string }>();
+
+  for (const turn of turns) {
+    const terms = extractPassiveVocabularyTermsFromText(turn.text);
+    const quote = truncateQuote(turn.text);
+    for (const term of terms) {
+      if (term.length < 3) continue;
+      if (!isEnglishWord(term)) continue;
+      if (/^\d+$/.test(term)) continue;
+      if (ENGLISH_STOPWORDS.has(term)) continue;
+      if (excludeNameTokens.has(term)) continue;
+
+      if (!result.has(term)) {
+        result.set(term, { rawTerm: term, quote });
+      }
+    }
+  }
+
+  return result;
+}
+
+function getCefrSortScore(cefrLevel: string | null | undefined): number {
+  if (!cefrLevel) return 2; // unscored words above A1/A2 basic
+  return CEFR_PRIORITY_RANK[cefrLevel] ?? 2;
 }
 
 export async function analyzeLessonTranscriptAndAutoApply({
@@ -322,8 +466,14 @@ export async function analyzeLessonTranscriptAndAutoApply({
     );
   }
 
-  // Load student context + existing vocabulary states
-  const [studentProfileRes, studentVocabRes] = await Promise.all([
+  // Load student context + existing vocabulary across all 3 state tables
+  const [
+    studentProfileRes,
+    studentVocabRes,
+    activeEvidenceRes,
+    passiveEvidenceRes,
+    wordMasteryRes,
+  ] = await Promise.all([
     adminClient
       .from("profiles")
       .select("full_name, cefr_level, preferred_language")
@@ -333,12 +483,22 @@ export async function analyzeLessonTranscriptAndAutoApply({
       .from("student_vocabulary_items")
       .select("normalized_term, item_type, current_state")
       .eq("student_id", studentId),
+    adminClient
+      .from("active_vocabulary_evidence")
+      .select("normalized_term")
+      .eq("student_id", studentId),
+    adminClient
+      .from("passive_vocabulary_evidence")
+      .select("normalized_term")
+      .eq("student_id", studentId),
+    adminClient
+      .from("word_mastery")
+      .select("term")
+      .eq("student_id", studentId),
   ]);
 
   const studentCefr = toValidCefrLevel(studentProfileRes.data?.cefr_level) ?? "B1";
-  const targetLanguage = normalizeLearningLanguage(
-    studentProfileRes.data?.preferred_language,
-  );
+  normalizeLearningLanguage(studentProfileRes.data?.preferred_language);
 
   const existingLearningSet = new Set<string>();
   const existingActiveSet = new Set<string>();
@@ -354,20 +514,52 @@ export async function analyzeLessonTranscriptAndAutoApply({
     }
   }
 
+  for (const row of activeEvidenceRes.data ?? []) {
+    existingActiveSet.add(row.normalized_term);
+  }
+  for (const row of passiveEvidenceRes.data ?? []) {
+    existingPassiveSet.add(row.normalized_term);
+  }
+  for (const row of wordMasteryRes.data ?? []) {
+    const norm = normalizePassiveVocabularyText(row.term);
+    if (norm) existingLearningSet.add(norm);
+  }
+
+  // Step 1: Deterministic extraction from Student turns vs Tutor/Unknown turns
+  const excludeNameTokens = buildNameTokenExclusionSet(
+    tutorName,
+    studentName ?? studentProfileRes.data?.full_name ?? null,
+    parsed.speakers,
+  );
+  const studentTurns = parsed.turns.filter((t) => t.speakerRole === "student");
+  const otherTurns = parsed.turns.filter((t) => t.speakerRole !== "student");
+
+  const studentDetRaw = extractDeterministicWordsWithQuotes(
+    studentTurns,
+    excludeNameTokens,
+  );
+  const otherDetRaw = extractDeterministicWordsWithQuotes(
+    otherTurns,
+    excludeNameTokens,
+  );
+
+  // Step 2: Gemini AI pass (full transcript up to 120k chars)
   const promptTranscript = formatTranscriptForPrompt(
     parsed.turns,
     parsed.normalizedText,
   );
-  const learningSample = Array.from(existingLearningSet).slice(0, 60);
+  const learningSample = Array.from(existingLearningSet).slice(0, 200);
+  const knownActiveSample = Array.from(existingActiveSet).slice(0, 200);
 
   const systemInstruction = [
     "You are an expert ESL/EFL linguistics analyst for an English learning platform for Ukrainian-speaking students.",
-    "Analyze a Google Meet lesson transcript between a Tutor and a Student.",
-    "Classify vocabulary cleanly into 3 categories:",
-    "1) activeUsed: meaningful non-trivial English words, collocations, or phrasal verbs that the STUDENT genuinely produced naturally and meaningfully in speech (excluding basic grammar/stopwords like 'the', 'yes', 'okay', 'good', 'hello', 'think'). Normalize verbs/nouns to base dictionary lemma (infinitive/singular).",
-    "2) passiveEncountered: meaningful target vocabulary discussed by the tutor, read aloud, or appearing in lesson context that the student understood/encountered passively (not already in activeUsed).",
-    "3) learningCandidates: ONLY the most valuable words/phrases the student explicitly asked about, stumbled over, couldn't recall, misused, needed a Ukrainian explanation for, or that the tutor highlighted as new target vocabulary to drill with spaced repetition.",
-    "Exclude all Ukrainian words as target terms; translate meanings concisely into natural Ukrainian.",
+    "Analyze the ENTIRE Google Meet lesson transcript between a Tutor and a Student.",
+    "Notice that single-word vocabulary extraction is also handled deterministically, so your job focuses on HIGH-VALUE pedagogical judgment across 4 outputs:",
+    "1) learningCandidates (UP TO 20 max — never pad; return 3-10 if only 3-10 are genuinely new/needed): target English words, collocations, or phrasal verbs the student explicitly asked about, stumbled over, translated into Ukrainian, couldn't recall, mispronounced/misused, or that the tutor specifically explained/assigned to practice with spaced repetition. Exclude words already in the student's Learning deck.",
+    "2) activePhrases: multi-word expressions, phrasal verbs, idioms, collocations (and any words from the student's existing Learning deck listed below) that the STUDENT genuinely produced spontaneously in their own speech. NEVER include phrases that were merely read aloud from a text/article/exercise.",
+    "3) passivePhrases: multi-word expressions, phrasal verbs, collocations, or key lesson vocabulary introduced/explained by the tutor or read from lesson materials.",
+    "4) readingAloudTerms: single words or phrases from [STUDENT] turns that the student was ONLY reading aloud from an article, story, exercise, or screen (not spontaneous speech) — so we classify them as Passive instead of Active.",
+    "Normalize verbs/nouns to base dictionary lemma (e.g., 'surround', not 'surrounded'), keep fixed phrases natural (e.g., 'stay in touch'), exclude all Ukrainian terms as English targets, and provide concise natural Ukrainian translations.",
     "Return strictly valid JSON matching the requested schema.",
   ].join(" ");
 
@@ -378,27 +570,16 @@ export async function analyzeLessonTranscriptAndAutoApply({
     `Student: ${studentName || studentProfileRes.data?.full_name || "Student"}`,
     `Student CEFR Level: ${studentCefr}`,
     learningSample.length > 0
-      ? `Words already in Student's Learning deck (if the student uses any of these naturally in speech, include them in activeUsed): ${learningSample.join(", ")}`
+      ? `Student's existing Learning deck (exclude from learningCandidates; include in activePhrases if used naturally in spontaneous speech): ${learningSample.join(", ")}`
+      : "",
+    knownActiveSample.length > 0
+      ? `Already tracked in student's Active vocabulary (skip these unless graduated from Learning): ${knownActiveSample.join(", ")}`
       : "",
     "",
     "Respond in this exact JSON format:",
     JSON.stringify(
       {
         lessonSummaryUk: "Короткий підсумок уроку українською (2-3 речення).",
-        activeUsed: [
-          {
-            term: "cope with",
-            evidenceQuote: "Student sentence excerpt showing usage",
-            ukrainianTranslation: "впоратися з",
-          },
-        ],
-        passiveEncountered: [
-          {
-            term: "resilient",
-            contextQuote: "Excerpt where tutor or material introduced it",
-            ukrainianTranslation: "стійкий, витривалий",
-          },
-        ],
         learningCandidates: [
           {
             term: "reluctant",
@@ -406,11 +587,28 @@ export async function analyzeLessonTranscriptAndAutoApply({
             cefrLevel: "B2",
             ukrainianTranslation: "неохочий",
             englishDefinition: "unwilling and hesitant",
-            exampleSentence: "Natural short example sentence from or matching the lesson",
-            reasonUk: "Учень вагався з перекладом / спитав значення слова",
+            exampleSentence: "Short natural example sentence matching the lesson",
+            reasonUk: "Учень спитав значення / вагався з перекладом",
             confidence: "high",
           },
         ],
+        activePhrases: [
+          {
+            term: "stay in touch",
+            evidenceQuote: "Short spontaneous student quote",
+            ukrainianTranslation: "залишатися на зв'язку",
+            cefrLevel: "B1",
+          },
+        ],
+        passivePhrases: [
+          {
+            term: "break the ice",
+            contextQuote: "Short tutor/material quote",
+            ukrainianTranslation: "розтопити лід",
+            cefrLevel: "B2",
+          },
+        ],
+        readingAloudTerms: ["perceive", "surrounded"],
       },
       null,
       2,
@@ -429,7 +627,7 @@ export async function analyzeLessonTranscriptAndAutoApply({
       systemInstruction,
       temperature: 0.2,
     },
-    aiAnalysisResponseSchema,
+    aiHybridAnalysisResponseSchema,
   );
 
   await Promise.all([
@@ -444,312 +642,290 @@ export async function analyzeLessonTranscriptAndAutoApply({
     }),
   ]);
 
-  // Deduplicate and enforce category disjointness (Active > Learning > Passive)
-  const activeDeduped = new Map<
-    string,
-    {
-      term: string;
-      normalizedTerm: string;
-      itemType: "word" | "phrase";
-      evidenceQuote: string | null;
-      ukrainianTranslation: string | null;
-    }
-  >();
+  // Step 3: Batch lookup Layer 2 library (lemmatization + CEFR + approval) & Layer 1 reference dictionary
+  const allCandidateTermsForLookup = Array.from(
+    new Set([
+      ...studentDetRaw.keys(),
+      ...otherDetRaw.keys(),
+      ...aiResult.data.learningCandidates
+        .map((c) => normalizePassiveVocabularyText(c.term))
+        .filter(Boolean),
+      ...aiResult.data.activePhrases
+        .map((c) => normalizePassiveVocabularyText(c.term))
+        .filter(Boolean),
+      ...aiResult.data.passivePhrases
+        .map((c) => normalizePassiveVocabularyText(c.term))
+        .filter(Boolean),
+      ...aiResult.data.readingAloudTerms
+        .map((t) => normalizePassiveVocabularyText(t))
+        .filter(Boolean),
+    ]),
+  ).filter((t) => t.length >= 2 && isEnglishWord(t));
 
-  for (const rawItem of aiResult.data.activeUsed) {
-    const normalized = normalizePassiveVocabularyText(rawItem.term);
-    if (!normalized || normalized.length < 2) continue;
-    if (!activeDeduped.has(normalized)) {
-      activeDeduped.set(normalized, {
-        term: normalized,
-        normalizedTerm: normalized,
-        itemType: inferPassiveVocabularyItemType(normalized),
-        evidenceQuote: rawItem.evidenceQuote ?? null,
-        ukrainianTranslation: rawItem.ukrainianTranslation ?? null,
+  const libraryLookupInputs = allCandidateTermsForLookup.map((term) => ({
+    term,
+    normalizedTerm: term,
+    itemType: inferPassiveVocabularyItemType(term),
+  }));
+
+  const [libraryMatchesRaw, dictMap] = await Promise.all([
+    lookupPassiveVocabularyLibraryItems({
+      items: libraryLookupInputs,
+      adminClient,
+    }),
+    lookupReferenceDictionaryEntries(adminClient, allCandidateTermsForLookup),
+  ]);
+
+  const libraryByRequestedTerm = new Map<string, PassiveVocabularyLibraryResolution>();
+  for (const match of libraryMatchesRaw.values()) {
+    libraryByRequestedTerm.set(match.requestedNormalizedTerm, match);
+  }
+
+  // Canonicalize helper (uses Layer 2 lemma if available, else normalized term)
+  const resolveCanonicalMeta = (rawTerm: string) => {
+    const normalized = normalizePassiveVocabularyText(rawTerm);
+    const lib = libraryByRequestedTerm.get(normalized);
+    const canonicalTerm = lib ? lib.canonicalTerm : normalized;
+    const canonicalNormalized = lib ? lib.canonicalNormalizedTerm : normalized;
+    const dict =
+      getLookupEntryForTerm(dictMap, canonicalNormalized) ??
+      getLookupEntryForTerm(dictMap, normalized);
+
+    return {
+      requestedNormalized: normalized,
+      canonicalTerm,
+      canonicalNormalized,
+      itemType: lib?.itemType ?? inferPassiveVocabularyItemType(canonicalNormalized),
+      isRejected: lib?.approvalStatus === "rejected",
+      cefrLevel: lib?.cefrLevel ?? null,
+      partOfSpeech: lib?.partOfSpeech ?? dict?.partOfSpeech ?? null,
+      ukrainianTranslation:
+        (lib ? getPassiveVocabularyUkrainianTranslation(lib.attributes) : null) ??
+        dict?.shortUkTranslation ??
+        null,
+      transcription:
+        (lib ? getPassiveVocabularyTranscription(lib.attributes) : null) ??
+        dict?.ipaUs ??
+        dict?.ipaUk ??
+        null,
+      dictionaryMatched: Boolean(dict),
+    };
+  };
+
+  // Reading aloud terms canonicalized
+  const readingAloudMap = new Map<string, { rawTerm: string; quote: string | null }>();
+  for (const term of aiResult.data.readingAloudTerms) {
+    const norm = normalizePassiveVocabularyText(term);
+    if (!norm || norm.length < 2) continue;
+    const meta = resolveCanonicalMeta(norm);
+    if (meta.isRejected) continue;
+    const detQuote =
+      studentDetRaw.get(norm)?.quote ??
+      otherDetRaw.get(norm)?.quote ??
+      null;
+    if (!readingAloudMap.has(meta.canonicalNormalized)) {
+      readingAloudMap.set(meta.canonicalNormalized, {
+        rawTerm: meta.canonicalNormalized,
+        quote: detQuote,
       });
     }
   }
 
-  const learningDeduped = new Map<
-    string,
-    {
-      term: string;
-      normalizedTerm: string;
-      itemType: "word" | "phrase";
-      partOfSpeech: string | null;
-      cefrLevel: string | null;
-      ukrainianTranslation: string | null;
-      englishDefinition: string | null;
-      exampleSentence: string | null;
-      reasonUk: string;
-      confidence: "high" | "medium";
-    }
-  >();
-
+  // 1) Learning candidates (capped at 20, status: "pending")
+  const learningDeduped = new Map<string, TranscriptLearningCandidateItem>();
   for (const rawItem of aiResult.data.learningCandidates) {
-    const normalized = normalizePassiveVocabularyText(rawItem.term);
-    if (!normalized || normalized.length < 2) continue;
-    if (activeDeduped.has(normalized) || existingLearningSet.has(normalized)) {
-      continue;
-    }
-    if (!learningDeduped.has(normalized)) {
-      learningDeduped.set(normalized, {
-        term: normalized,
-        normalizedTerm: normalized,
-        itemType: inferPassiveVocabularyItemType(normalized),
-        partOfSpeech: toValidPartOfSpeech(rawItem.partOfSpeech) ?? null,
-        cefrLevel: toValidCefrLevel(rawItem.cefrLevel),
-        ukrainianTranslation: rawItem.ukrainianTranslation ?? null,
-        englishDefinition: rawItem.englishDefinition ?? null,
-        exampleSentence: rawItem.exampleSentence ?? null,
+    if (learningDeduped.size >= 20) break;
+    const norm = normalizePassiveVocabularyText(rawItem.term);
+    if (!norm || norm.length < 2 || !isEnglishWord(norm)) continue;
+    const meta = resolveCanonicalMeta(norm);
+    if (meta.isRejected) continue;
+    if (existingLearningSet.has(meta.canonicalNormalized)) continue;
+
+    if (!learningDeduped.has(meta.canonicalNormalized)) {
+      learningDeduped.set(meta.canonicalNormalized, {
+        term: meta.canonicalTerm,
+        normalizedTerm: meta.canonicalNormalized,
+        itemType: meta.itemType,
+        partOfSpeech: toValidPartOfSpeech(rawItem.partOfSpeech) ?? meta.partOfSpeech ?? null,
+        cefrLevel: toValidCefrLevel(rawItem.cefrLevel) ?? meta.cefrLevel ?? null,
+        ukrainianTranslation:
+          rawItem.ukrainianTranslation?.trim() ||
+          meta.ukrainianTranslation ||
+          null,
+        englishDefinition: rawItem.englishDefinition?.trim() || null,
+        transcription: meta.transcription,
+        exampleSentence: rawItem.exampleSentence?.trim() || null,
         reasonUk:
           rawItem.reasonUk?.trim() || "Рекомендовано для повторення з уроку",
         confidence: rawItem.confidence,
+        dictionaryMatched: meta.dictionaryMatched,
+        alreadyInLearning: false,
+        status: "pending",
       });
     }
   }
 
-  const passiveDeduped = new Map<
-    string,
-    {
-      term: string;
-      normalizedTerm: string;
-      itemType: "word" | "phrase";
-      contextQuote: string | null;
-      ukrainianTranslation: string | null;
-    }
-  >();
+  // 2) Active candidates (AI phrases + deterministic student words; unlimited, only NEW or Graduated from Learning)
+  const activeDeduped = new Map<string, TranscriptAutoAppliedActiveItem>();
 
-  for (const rawItem of aiResult.data.passiveEncountered) {
-    const normalized = normalizePassiveVocabularyText(rawItem.term);
-    if (!normalized || normalized.length < 2) continue;
-    if (activeDeduped.has(normalized) || learningDeduped.has(normalized)) {
-      continue;
-    }
-    if (!passiveDeduped.has(normalized)) {
-      passiveDeduped.set(normalized, {
-        term: normalized,
-        normalizedTerm: normalized,
-        itemType: inferPassiveVocabularyItemType(normalized),
-        contextQuote: rawItem.contextQuote ?? null,
-        ukrainianTranslation: rawItem.ukrainianTranslation ?? null,
-      });
-    }
-  }
+  for (const aiActive of aiResult.data.activePhrases) {
+    const norm = normalizePassiveVocabularyText(aiActive.term);
+    if (!norm || norm.length < 2 || !isEnglishWord(norm)) continue;
+    const meta = resolveCanonicalMeta(norm);
+    if (meta.isRejected) continue;
+    if (learningDeduped.has(meta.canonicalNormalized)) continue;
+    if (readingAloudMap.has(meta.canonicalNormalized)) continue;
 
-  // Layer 1 reference dictionary lookup across all extracted terms
-  const allTerms = Array.from(
-    new Set([
-      ...activeDeduped.keys(),
-      ...passiveDeduped.keys(),
-      ...learningDeduped.keys(),
-    ]),
-  );
-  const dictMap = await lookupReferenceDictionaryEntries(adminClient, allTerms);
+    const graduated = existingLearningSet.has(meta.canonicalNormalized);
+    if (existingActiveSet.has(meta.canonicalNormalized) && !graduated) continue;
 
-  const sourceLabel = `Meet Lesson · ${lessonDate}${lessonTitle ? ` · ${lessonTitle}` : ""}`;
-
-  // 1) Silently auto-apply Active Vocabulary evidence
-  const activeItemsList = Array.from(activeDeduped.values());
-  if (activeItemsList.length > 0) {
-    await upsertActiveVocabularyEvidence({
-      adminClient,
-      studentId,
-      actorUserId: tutorId,
-      targetLanguage,
-      terms: activeItemsList.map((item) => item.term),
-      sourceType: "lesson_recording",
-      sourceLabel,
-      usedAt: new Date(`${lessonDate}T12:00:00Z`).toISOString(),
-    });
-  }
-
-  // 2) Silently auto-apply Passive Vocabulary evidence + sync state
-  const passiveItemsList = Array.from(passiveDeduped.values());
-  if (passiveItemsList.length > 0) {
-    const libraryResolutions = await resolvePassiveVocabularyLibraryItems({
-      adminClient,
-      actorUserId: tutorId,
-      targetLanguage,
-      items: passiveItemsList.map((item) => {
-        const dictEntry = getLookupEntryForTerm(dictMap, item.term);
-        return {
-          term: item.term,
-          normalizedTerm: item.normalizedTerm,
-          itemType: item.itemType,
-          ukrainianTranslation:
-            item.ukrainianTranslation ?? dictEntry?.shortUkTranslation ?? null,
-          partOfSpeech: toValidPartOfSpeech(dictEntry?.partOfSpeech),
-        };
-      }),
-    });
-
-    const acceptedPassive = libraryResolutions.filter(
-      (res) => res.approvalStatus !== "rejected",
-    );
-
-    if (acceptedPassive.length > 0) {
-      const canonicalMap = new Map<
-        string,
-        {
-          term: string;
-          normalizedTerm: string;
-          itemType: "word" | "phrase";
-          libraryItemId: string | null;
-          definition: string | null;
-        }
-      >();
-
-      for (const resolution of acceptedPassive) {
-        const key = getPassiveVocabularyCompositeKey(
-          resolution.canonicalNormalizedTerm,
-          resolution.itemType,
-        );
-        if (canonicalMap.has(key)) continue;
-
-        const sourceInput = passiveDeduped.get(resolution.requestedNormalizedTerm);
-        const dictEntry = getLookupEntryForTerm(
-          dictMap,
-          resolution.canonicalNormalizedTerm,
-        );
-        const translation =
-          getPassiveVocabularyUkrainianTranslation(resolution.attributes) ||
-          sourceInput?.ukrainianTranslation ||
-          dictEntry?.shortUkTranslation ||
-          getPassiveVocabularyEnglishDefinitions(resolution.attributes)[0] ||
-          null;
-
-        canonicalMap.set(key, {
-          term: resolution.canonicalTerm,
-          normalizedTerm: resolution.canonicalNormalizedTerm,
-          itemType: resolution.itemType,
-          libraryItemId: resolution.libraryItemId,
-          definition: translation,
-        });
-      }
-
-      const canonicalList = Array.from(canonicalMap.values());
-      const { data: existingPassiveRows } = await adminClient
-        .from("passive_vocabulary_evidence")
-        .select(
-          "normalized_term, item_type, definition, source_label, import_count, library_item_id",
-        )
-        .eq("student_id", studentId)
-        .in(
-          "normalized_term",
-          canonicalList.map((item) => item.normalizedTerm),
-        );
-
-      const existingPassiveMap = new Map(
-        (existingPassiveRows ?? []).map((row) => [
-          getPassiveVocabularyCompositeKey(row.normalized_term, row.item_type),
-          row,
-        ]),
-      );
-      const nowIso = new Date().toISOString();
-
-      const upsertPassiveRows = canonicalList.map((item) => {
-        const existing = existingPassiveMap.get(
-          getPassiveVocabularyCompositeKey(item.normalizedTerm, item.itemType),
-        );
-        return {
-          student_id: studentId,
-          imported_by: tutorId,
-          term: item.term,
-          normalized_term: item.normalizedTerm,
-          library_item_id: item.libraryItemId ?? existing?.library_item_id ?? null,
-          definition: item.definition ?? existing?.definition ?? null,
-          item_type: item.itemType,
-          source_type: "full_text" as const,
-          source_label: sourceLabel,
-          import_count: (existing?.import_count ?? 0) + 1,
-          last_imported_at: nowIso,
-          updated_at: nowIso,
-        };
-      });
-
-      const { error: passiveUpsertError } = await adminClient
-        .from("passive_vocabulary_evidence")
-        .upsert(upsertPassiveRows, {
-          onConflict: "student_id,normalized_term,item_type",
-        });
-
-      if (passiveUpsertError) {
-        console.error(
-          "Lesson transcript passive vocabulary upsert error:",
-          passiveUpsertError,
-        );
-      } else {
-        await syncStudentVocabularyStateFromPassiveEvidence({
-          adminClient,
-          studentId,
-          items: canonicalList.map((item) => ({
-            term: item.term,
-            normalizedTerm: item.normalizedTerm,
-            itemType: item.itemType,
-            libraryItemId: item.libraryItemId,
-          })),
-        });
-      }
-    }
-  }
-
-  // Build structured UI snapshots enriched with Layer 1 dictionary metadata
-  const autoAppliedActive: TranscriptAutoAppliedActiveItem[] = activeItemsList.map(
-    (item) => {
-      const dictEntry = getLookupEntryForTerm(dictMap, item.term);
-      return {
-        term: item.term,
-        normalizedTerm: item.normalizedTerm,
-        itemType: item.itemType,
-        evidenceQuote: item.evidenceQuote,
+    if (!activeDeduped.has(meta.canonicalNormalized)) {
+      activeDeduped.set(meta.canonicalNormalized, {
+        term: meta.canonicalTerm,
+        normalizedTerm: meta.canonicalNormalized,
+        itemType: meta.itemType,
+        evidenceQuote: aiActive.evidenceQuote?.trim() || null,
         ukrainianTranslation:
-          dictEntry?.shortUkTranslation ?? item.ukrainianTranslation ?? null,
-        transcription: dictEntry?.ipaUs ?? dictEntry?.ipaUk ?? null,
-        dictionaryMatched: Boolean(dictEntry),
-        graduatedFromLearning: existingLearningSet.has(item.normalizedTerm),
-      };
-    },
-  );
+          aiActive.ukrainianTranslation?.trim() ||
+          meta.ukrainianTranslation ||
+          null,
+        transcription: meta.transcription,
+        cefrLevel: toValidCefrLevel(aiActive.cefrLevel) ?? meta.cefrLevel ?? null,
+        partOfSpeech: meta.partOfSpeech,
+        dictionaryMatched: meta.dictionaryMatched,
+        graduatedFromLearning: graduated,
+        source: "ai_phrase",
+        status: "pending",
+      });
+    }
+  }
 
-  const autoAppliedPassive: TranscriptAutoAppliedPassiveItem[] =
-    passiveItemsList.map((item) => {
-      const dictEntry = getLookupEntryForTerm(dictMap, item.term);
-      return {
-        term: item.term,
-        normalizedTerm: item.normalizedTerm,
-        itemType: item.itemType,
-        contextQuote: item.contextQuote,
-        ukrainianTranslation:
-          dictEntry?.shortUkTranslation ?? item.ukrainianTranslation ?? null,
-        transcription: dictEntry?.ipaUs ?? dictEntry?.ipaUk ?? null,
-        dictionaryMatched: Boolean(dictEntry),
-      };
-    });
+  for (const [rawWord, info] of studentDetRaw.entries()) {
+    const meta = resolveCanonicalMeta(rawWord);
+    if (meta.isRejected) continue;
+    if (learningDeduped.has(meta.canonicalNormalized)) continue;
+    if (readingAloudMap.has(meta.canonicalNormalized)) continue;
 
-  const learningCandidates: TranscriptLearningCandidateItem[] = Array.from(
-    learningDeduped.values(),
-  ).map((item) => {
-    const dictEntry = getLookupEntryForTerm(dictMap, item.term);
-    return {
-      term: item.term,
-      normalizedTerm: item.normalizedTerm,
-      itemType: item.itemType,
-      partOfSpeech: item.partOfSpeech ?? dictEntry?.partOfSpeech ?? null,
-      cefrLevel: item.cefrLevel,
-      ukrainianTranslation:
-        item.ukrainianTranslation ?? dictEntry?.shortUkTranslation ?? null,
-      englishDefinition: item.englishDefinition ?? null,
-      transcription: dictEntry?.ipaUs ?? dictEntry?.ipaUk ?? null,
-      exampleSentence: item.exampleSentence ?? null,
-      reasonUk: item.reasonUk,
-      confidence: item.confidence,
-      dictionaryMatched: Boolean(dictEntry),
-      alreadyInLearning: existingLearningSet.has(item.normalizedTerm),
+    const graduated = existingLearningSet.has(meta.canonicalNormalized);
+    if (existingActiveSet.has(meta.canonicalNormalized) && !graduated) continue;
+    if (activeDeduped.has(meta.canonicalNormalized)) continue;
+
+    activeDeduped.set(meta.canonicalNormalized, {
+      term: meta.canonicalTerm,
+      normalizedTerm: meta.canonicalNormalized,
+      itemType: meta.itemType,
+      evidenceQuote: info.quote,
+      ukrainianTranslation: meta.ukrainianTranslation,
+      transcription: meta.transcription,
+      cefrLevel: meta.cefrLevel,
+      partOfSpeech: meta.partOfSpeech,
+      dictionaryMatched: meta.dictionaryMatched,
+      graduatedFromLearning: graduated,
+      source: "transcript_scan",
       status: "pending",
-    };
+    });
+  }
+
+  // 3) Passive candidates (AI passive phrases + reading aloud + deterministic tutor/other words; unlimited, only NEW)
+  const passiveDeduped = new Map<string, TranscriptAutoAppliedPassiveItem>();
+
+  const shouldSkipForPassive = (canonicalNormalized: string) =>
+    learningDeduped.has(canonicalNormalized) ||
+    activeDeduped.has(canonicalNormalized) ||
+    existingActiveSet.has(canonicalNormalized) ||
+    existingPassiveSet.has(canonicalNormalized) ||
+    existingLearningSet.has(canonicalNormalized);
+
+  for (const aiPassive of aiResult.data.passivePhrases) {
+    const norm = normalizePassiveVocabularyText(aiPassive.term);
+    if (!norm || norm.length < 2 || !isEnglishWord(norm)) continue;
+    const meta = resolveCanonicalMeta(norm);
+    if (meta.isRejected || shouldSkipForPassive(meta.canonicalNormalized)) continue;
+
+    if (!passiveDeduped.has(meta.canonicalNormalized)) {
+      passiveDeduped.set(meta.canonicalNormalized, {
+        term: meta.canonicalTerm,
+        normalizedTerm: meta.canonicalNormalized,
+        itemType: meta.itemType,
+        contextQuote: aiPassive.contextQuote?.trim() || null,
+        ukrainianTranslation:
+          aiPassive.ukrainianTranslation?.trim() ||
+          meta.ukrainianTranslation ||
+          null,
+        transcription: meta.transcription,
+        cefrLevel: toValidCefrLevel(aiPassive.cefrLevel) ?? meta.cefrLevel ?? null,
+        partOfSpeech: meta.partOfSpeech,
+        dictionaryMatched: meta.dictionaryMatched,
+        source: "ai_phrase",
+        status: "pending",
+      });
+    }
+  }
+
+  for (const [canonicalNormalized, info] of readingAloudMap.entries()) {
+    const meta = resolveCanonicalMeta(canonicalNormalized);
+    if (meta.isRejected || shouldSkipForPassive(meta.canonicalNormalized)) continue;
+    if (passiveDeduped.has(meta.canonicalNormalized)) continue;
+
+    passiveDeduped.set(meta.canonicalNormalized, {
+      term: meta.canonicalTerm,
+      normalizedTerm: meta.canonicalNormalized,
+      itemType: meta.itemType,
+      contextQuote: info.quote,
+      ukrainianTranslation: meta.ukrainianTranslation,
+      transcription: meta.transcription,
+      cefrLevel: meta.cefrLevel,
+      partOfSpeech: meta.partOfSpeech,
+      dictionaryMatched: meta.dictionaryMatched,
+      source: "reading_aloud",
+      status: "pending",
+    });
+  }
+
+  for (const [rawWord, info] of otherDetRaw.entries()) {
+    const meta = resolveCanonicalMeta(rawWord);
+    if (meta.isRejected || shouldSkipForPassive(meta.canonicalNormalized)) continue;
+    if (passiveDeduped.has(meta.canonicalNormalized)) continue;
+
+    passiveDeduped.set(meta.canonicalNormalized, {
+      term: meta.canonicalTerm,
+      normalizedTerm: meta.canonicalNormalized,
+      itemType: meta.itemType,
+      contextQuote: info.quote,
+      ukrainianTranslation: meta.ukrainianTranslation,
+      transcription: meta.transcription,
+      cefrLevel: meta.cefrLevel,
+      partOfSpeech: meta.partOfSpeech,
+      dictionaryMatched: meta.dictionaryMatched,
+      source: "transcript_scan",
+      status: "pending",
+    });
+  }
+
+  const autoAppliedActive = Array.from(activeDeduped.values()).sort((a, b) => {
+    if (a.graduatedFromLearning !== b.graduatedFromLearning) {
+      return a.graduatedFromLearning ? -1 : 1;
+    }
+    if ((a.source === "ai_phrase") !== (b.source === "ai_phrase")) {
+      return a.source === "ai_phrase" ? -1 : 1;
+    }
+    const cefrDiff = getCefrSortScore(b.cefrLevel) - getCefrSortScore(a.cefrLevel);
+    if (cefrDiff !== 0) return cefrDiff;
+    return a.term.localeCompare(b.term);
   });
 
+  const autoAppliedPassive = Array.from(passiveDeduped.values()).sort((a, b) => {
+    const aSpecial = a.source === "ai_phrase" || a.source === "reading_aloud";
+    const bSpecial = b.source === "ai_phrase" || b.source === "reading_aloud";
+    if (aSpecial !== bSpecial) return aSpecial ? -1 : 1;
+    const cefrDiff = getCefrSortScore(b.cefrLevel) - getCefrSortScore(a.cefrLevel);
+    if (cefrDiff !== 0) return cefrDiff;
+    return a.term.localeCompare(b.term);
+  });
+
+  const learningCandidates = Array.from(learningDeduped.values());
+
+  // Save ALL 3 categories as "pending" review — tutor controls what actually enters DB
   const nowIso = new Date().toISOString();
   const { data: savedRow, error: saveError } = await adminClient
     .from("lesson_meet_transcripts")
@@ -770,10 +946,11 @@ export async function analyzeLessonTranscriptAndAutoApply({
         auto_applied_active: autoAppliedActive as unknown as Json,
         auto_applied_passive: autoAppliedPassive as unknown as Json,
         learning_candidates: learningCandidates as unknown as Json,
-        active_applied_count: autoAppliedActive.length,
-        passive_applied_count: autoAppliedPassive.length,
+        active_applied_count: 0,
+        passive_applied_count: 0,
         learning_approved_count: 0,
         analyzed_at: nowIso,
+        learning_reviewed_at: null,
         updated_at: nowIso,
       },
       { onConflict: "lesson_id" },
@@ -789,31 +966,51 @@ export async function analyzeLessonTranscriptAndAutoApply({
   return mapLessonMeetTranscriptRowToView(savedRow);
 }
 
-export async function approveLessonLearningCandidates({
+export interface TranscriptReviewApplyItemInput {
+  term: string;
+  ukrainianTranslation?: string | null;
+  englishDefinition?: string | null;
+  partOfSpeech?: string | null;
+  cefrLevel?: string | null;
+  quote?: string | null;
+  source?: string | null;
+  graduatedFromLearning?: boolean;
+}
+
+export async function applyLessonTranscriptVocabulary({
   lessonId,
   tutorId,
-  approvedItems,
+  activeItems = [],
+  passiveItems = [],
+  learningItems = [],
   adminClient,
 }: {
   lessonId: string;
   tutorId: string;
-  approvedItems: Array<{
-    term: string;
-    ukrainianTranslation?: string | null;
-    englishDefinition?: string | null;
-    partOfSpeech?: string | null;
-  }>;
+  activeItems?: TranscriptReviewApplyItemInput[];
+  passiveItems?: TranscriptReviewApplyItemInput[];
+  learningItems?: TranscriptReviewApplyItemInput[];
   adminClient: SupabaseAdminClient;
 }): Promise<{
   transcript: LessonMeetTranscriptView;
+  activeAppliedCount: number;
+  passiveAppliedCount: number;
   addedCount: number;
   skippedExistingCount: number;
 }> {
-  const { data: transcriptRow, error: fetchError } = await adminClient
-    .from("lesson_meet_transcripts")
-    .select("*")
-    .eq("lesson_id", lessonId)
-    .maybeSingle();
+  const [{ data: transcriptRow, error: fetchError }, { data: lessonRow }] =
+    await Promise.all([
+      adminClient
+        .from("lesson_meet_transcripts")
+        .select("*")
+        .eq("lesson_id", lessonId)
+        .maybeSingle(),
+      adminClient
+        .from("tutor_student_lessons")
+        .select("id, title, lesson_date")
+        .eq("id", lessonId)
+        .maybeSingle(),
+    ]);
 
   if (fetchError) {
     throw new Error("Failed to load lesson transcript.");
@@ -841,47 +1038,195 @@ export async function approveLessonLearningCandidates({
   const targetLanguage = normalizeLearningLanguage(
     studentProfile?.preferred_language,
   );
+  const nowIso = new Date().toISOString();
+  const lessonDate = lessonRow?.lesson_date ?? nowIso.slice(0, 10);
+  const sourceLabel = `Meet Lesson · ${lessonDate}${lessonRow?.title ? ` · ${lessonRow.title}` : ""}`;
 
-  const normalizedApprovedMap = new Map<
-    string,
-    {
-      term: string;
-      normalizedTerm: string;
-      itemType: "word" | "phrase";
-      ukrainianTranslation: string | null;
-      englishDefinition: string | null;
-      partOfSpeech: PassiveVocabularyPartOfSpeech | undefined;
+  // Deduplicate inputs cleanly across the 3 final buckets (Learning > Active > Passive)
+  const dedupeInputs = (list: TranscriptReviewApplyItemInput[]) => {
+    const map = new Map<
+      string,
+      TranscriptReviewApplyItemInput & {
+        normalizedTerm: string;
+        itemType: "word" | "phrase";
+      }
+    >();
+    for (const item of list) {
+      const normalized = normalizePassiveVocabularyText(item.term);
+      if (!normalized || normalized.length < 2) continue;
+      map.set(normalized, {
+        ...item,
+        term: normalized,
+        normalizedTerm: normalized,
+        itemType: inferPassiveVocabularyItemType(normalized),
+        ukrainianTranslation: item.ukrainianTranslation?.trim() || null,
+        englishDefinition: item.englishDefinition?.trim() || null,
+      });
     }
-  >();
+    return map;
+  };
 
-  for (const item of approvedItems) {
-    const normalized = normalizePassiveVocabularyText(item.term);
-    if (!normalized) continue;
-    normalizedApprovedMap.set(normalized, {
-      term: normalized,
-      normalizedTerm: normalized,
-      itemType: inferPassiveVocabularyItemType(normalized),
-      ukrainianTranslation: item.ukrainianTranslation?.trim() || null,
-      englishDefinition: item.englishDefinition?.trim() || null,
-      partOfSpeech: toValidPartOfSpeech(item.partOfSpeech),
+  const finalLearningMap = dedupeInputs(learningItems);
+  const finalActiveMap = dedupeInputs(activeItems);
+  for (const key of finalLearningMap.keys()) {
+    finalActiveMap.delete(key);
+  }
+  const finalPassiveMap = dedupeInputs(passiveItems);
+  for (const key of finalLearningMap.keys()) {
+    finalPassiveMap.delete(key);
+  }
+  for (const key of finalActiveMap.keys()) {
+    finalPassiveMap.delete(key);
+  }
+
+  const finalActiveList = Array.from(finalActiveMap.values());
+  const finalPassiveList = Array.from(finalPassiveMap.values());
+  const finalLearningList = Array.from(finalLearningMap.values());
+
+  // 1) Apply approved Active vocabulary
+  if (finalActiveList.length > 0) {
+    await upsertActiveVocabularyEvidence({
+      adminClient,
+      studentId,
+      actorUserId: tutorId,
+      targetLanguage,
+      terms: finalActiveList.map((item) => item.term),
+      sourceType: "lesson_recording",
+      sourceLabel,
+      usedAt: new Date(`${lessonDate}T12:00:00Z`).toISOString(),
     });
   }
 
-  const nowIso = new Date().toISOString();
-  const approvedList = Array.from(normalizedApprovedMap.values());
+  // 2) Apply approved Passive vocabulary
+  if (finalPassiveList.length > 0) {
+    const passiveResolutions = await resolvePassiveVocabularyLibraryItems({
+      adminClient,
+      actorUserId: tutorId,
+      targetLanguage,
+      items: finalPassiveList.map((item) => ({
+        term: item.term,
+        normalizedTerm: item.normalizedTerm,
+        itemType: item.itemType,
+        partOfSpeech: toValidPartOfSpeech(item.partOfSpeech),
+        ukrainianTranslation: item.ukrainianTranslation,
+      })),
+    });
+
+    const acceptedPassive = passiveResolutions.filter(
+      (res) => res.approvalStatus !== "rejected",
+    );
+
+    if (acceptedPassive.length > 0) {
+      const canonicalPassiveMap = new Map<
+        string,
+        {
+          term: string;
+          normalizedTerm: string;
+          itemType: "word" | "phrase";
+          libraryItemId: string | null;
+          definition: string | null;
+        }
+      >();
+
+      for (const resolution of acceptedPassive) {
+        const key = getPassiveVocabularyCompositeKey(
+          resolution.canonicalNormalizedTerm,
+          resolution.itemType,
+        );
+        if (canonicalPassiveMap.has(key)) continue;
+
+        const input = finalPassiveMap.get(resolution.requestedNormalizedTerm);
+        const definition =
+          input?.ukrainianTranslation ||
+          getPassiveVocabularyUkrainianTranslation(resolution.attributes) ||
+          getPassiveVocabularyEnglishDefinitions(resolution.attributes)[0] ||
+          null;
+
+        canonicalPassiveMap.set(key, {
+          term: resolution.canonicalTerm,
+          normalizedTerm: resolution.canonicalNormalizedTerm,
+          itemType: resolution.itemType,
+          libraryItemId: resolution.libraryItemId,
+          definition,
+        });
+      }
+
+      const canonicalPassiveList = Array.from(canonicalPassiveMap.values());
+      const { data: existingPassiveRows } = await adminClient
+        .from("passive_vocabulary_evidence")
+        .select(
+          "normalized_term, item_type, definition, source_label, import_count, library_item_id",
+        )
+        .eq("student_id", studentId)
+        .in(
+          "normalized_term",
+          canonicalPassiveList.map((item) => item.normalizedTerm),
+        );
+
+      const existingPassiveMap = new Map(
+        (existingPassiveRows ?? []).map((row) => [
+          getPassiveVocabularyCompositeKey(row.normalized_term, row.item_type),
+          row,
+        ]),
+      );
+
+      const upsertPassiveRows = canonicalPassiveList.map((item) => {
+        const existing = existingPassiveMap.get(
+          getPassiveVocabularyCompositeKey(item.normalizedTerm, item.itemType),
+        );
+        return {
+          student_id: studentId,
+          imported_by: tutorId,
+          term: item.term,
+          normalized_term: item.normalizedTerm,
+          library_item_id: item.libraryItemId ?? existing?.library_item_id ?? null,
+          definition: item.definition ?? existing?.definition ?? null,
+          item_type: item.itemType,
+          source_type: "full_text" as const,
+          source_label: sourceLabel,
+          import_count: (existing?.import_count ?? 0) + 1,
+          last_imported_at: nowIso,
+          updated_at: nowIso,
+        };
+      });
+
+      const { error: passiveUpsertError } = await adminClient
+        .from("passive_vocabulary_evidence")
+        .upsert(upsertPassiveRows, {
+          onConflict: "student_id,normalized_term,item_type",
+        });
+
+      if (passiveUpsertError) {
+        throw new Error("Failed to save approved Passive vocabulary.");
+      }
+
+      await syncStudentVocabularyStateFromPassiveEvidence({
+        adminClient,
+        studentId,
+        items: canonicalPassiveList.map((item) => ({
+          term: item.term,
+          normalizedTerm: item.normalizedTerm,
+          itemType: item.itemType,
+          libraryItemId: item.libraryItemId,
+        })),
+      });
+    }
+  }
+
+  // 3) Apply approved Learning vocabulary into word_mastery (SRS) + student_vocabulary_items
   let addedCount = 0;
   let skippedExistingCount = 0;
 
-  if (approvedList.length > 0) {
+  if (finalLearningList.length > 0) {
     const resolutions = await resolvePassiveVocabularyLibraryItems({
       adminClient,
       actorUserId: tutorId,
       targetLanguage,
-      items: approvedList.map((item) => ({
+      items: finalLearningList.map((item) => ({
         term: item.term,
         normalizedTerm: item.normalizedTerm,
         itemType: item.itemType,
-        partOfSpeech: item.partOfSpeech,
+        partOfSpeech: toValidPartOfSpeech(item.partOfSpeech),
         ukrainianTranslation: item.ukrainianTranslation,
         englishDefinitions: item.englishDefinition
           ? [item.englishDefinition]
@@ -893,7 +1238,7 @@ export async function approveLessonLearningCandidates({
     const { data: existingMasteryRows, error: existingMasteryError } =
       await adminClient
         .from("word_mastery")
-        .select("id, term, definition")
+        .select("id, term, definition, source_lesson_id")
         .eq("student_id", studentId)
         .in("term", canonicalTerms);
 
@@ -902,10 +1247,7 @@ export async function approveLessonLearningCandidates({
     }
 
     const existingMasteryMap = new Map(
-      (existingMasteryRows ?? []).map((row) => [
-        row.term.toLowerCase(),
-        row,
-      ]),
+      (existingMasteryRows ?? []).map((row) => [row.term.toLowerCase(), row]),
     );
 
     const rowsToInsert: Array<{
@@ -914,12 +1256,11 @@ export async function approveLessonLearningCandidates({
       definition: string;
       mastery_level: number;
       next_review: string;
+      source_lesson_id: string;
     }> = [];
 
     for (const resolution of resolutions) {
-      const input = normalizedApprovedMap.get(
-        resolution.requestedNormalizedTerm,
-      );
+      const input = finalLearningMap.get(resolution.requestedNormalizedTerm);
       const definition =
         input?.ukrainianTranslation ||
         getPassiveVocabularyUkrainianTranslation(resolution.attributes) ||
@@ -932,10 +1273,17 @@ export async function approveLessonLearningCandidates({
       );
       if (existing) {
         skippedExistingCount += 1;
+        const updates: { definition?: string; source_lesson_id?: string } = {};
         if (!(existing.definition ?? "").trim() && definition.trim()) {
+          updates.definition = definition;
+        }
+        if (!existing.source_lesson_id) {
+          updates.source_lesson_id = lessonId;
+        }
+        if (Object.keys(updates).length > 0) {
           await adminClient
             .from("word_mastery")
-            .update({ definition })
+            .update(updates)
             .eq("id", existing.id);
         }
         continue;
@@ -952,6 +1300,7 @@ export async function approveLessonLearningCandidates({
           definition,
           mastery_level: 0,
           next_review: nowIso,
+          source_lesson_id: lessonId,
         });
       }
     }
@@ -980,39 +1329,174 @@ export async function approveLessonLearningCandidates({
     });
   }
 
-  const existingCandidates = Array.isArray(transcriptRow.learning_candidates)
+  // Reconcile stored JSONB audit snapshots with the tutor's exact reviewed choices (including moves & manual additions)
+  const prevActive = normalizeActiveItems(transcriptRow.auto_applied_active);
+  const prevPassive = normalizePassiveItems(transcriptRow.auto_applied_passive);
+  const prevLearning = Array.isArray(transcriptRow.learning_candidates)
     ? (transcriptRow.learning_candidates as unknown as TranscriptLearningCandidateItem[])
     : [];
 
-  const updatedCandidates: TranscriptLearningCandidateItem[] =
-    existingCandidates.map((candidate) => {
-      const approved = normalizedApprovedMap.get(candidate.normalizedTerm);
-      if (approved) {
-        return {
-          ...candidate,
-          ukrainianTranslation:
-            approved.ukrainianTranslation ?? candidate.ukrainianTranslation,
-          status: "approved",
-        };
-      }
-      if (candidate.status === "pending") {
-        return {
-          ...candidate,
-          status: "dismissed",
-        };
-      }
-      return candidate;
-    });
+  const prevActiveByTerm = new Map(prevActive.map((i) => [i.normalizedTerm, i]));
+  const prevPassiveByTerm = new Map(prevPassive.map((i) => [i.normalizedTerm, i]));
+  const prevLearningByTerm = new Map(prevLearning.map((i) => [i.normalizedTerm, i]));
 
-  const approvedTotal = updatedCandidates.filter(
+  const nextActiveList: TranscriptAutoAppliedActiveItem[] = [];
+  for (const input of finalActiveList) {
+    const oldA = prevActiveByTerm.get(input.normalizedTerm);
+    const oldP = prevPassiveByTerm.get(input.normalizedTerm);
+    const oldL = prevLearningByTerm.get(input.normalizedTerm);
+    nextActiveList.push({
+      term: input.term,
+      normalizedTerm: input.normalizedTerm,
+      itemType: input.itemType,
+      evidenceQuote:
+        input.quote ??
+        oldA?.evidenceQuote ??
+        oldP?.contextQuote ??
+        oldL?.exampleSentence ??
+        null,
+      ukrainianTranslation:
+        input.ukrainianTranslation ??
+        oldA?.ukrainianTranslation ??
+        oldP?.ukrainianTranslation ??
+        oldL?.ukrainianTranslation ??
+        null,
+      transcription:
+        oldA?.transcription ?? oldP?.transcription ?? oldL?.transcription ?? null,
+      cefrLevel: input.cefrLevel ?? oldA?.cefrLevel ?? oldP?.cefrLevel ?? oldL?.cefrLevel ?? null,
+      partOfSpeech:
+        input.partOfSpeech ?? oldA?.partOfSpeech ?? oldP?.partOfSpeech ?? oldL?.partOfSpeech ?? null,
+      dictionaryMatched:
+        oldA?.dictionaryMatched ?? oldP?.dictionaryMatched ?? oldL?.dictionaryMatched ?? false,
+      graduatedFromLearning:
+        input.graduatedFromLearning ?? oldA?.graduatedFromLearning ?? false,
+      source:
+        oldA?.source ?? (input.source === "manual" ? "manual" : "ai_phrase"),
+      status: "approved",
+    });
+  }
+  for (const oldItem of prevActive) {
+    if (
+      !finalActiveMap.has(oldItem.normalizedTerm) &&
+      !finalPassiveMap.has(oldItem.normalizedTerm) &&
+      !finalLearningMap.has(oldItem.normalizedTerm)
+    ) {
+      nextActiveList.push({ ...oldItem, status: "dismissed" });
+    }
+  }
+
+  const nextPassiveList: TranscriptAutoAppliedPassiveItem[] = [];
+  for (const input of finalPassiveList) {
+    const oldP = prevPassiveByTerm.get(input.normalizedTerm);
+    const oldA = prevActiveByTerm.get(input.normalizedTerm);
+    const oldL = prevLearningByTerm.get(input.normalizedTerm);
+    nextPassiveList.push({
+      term: input.term,
+      normalizedTerm: input.normalizedTerm,
+      itemType: input.itemType,
+      contextQuote:
+        input.quote ??
+        oldP?.contextQuote ??
+        oldA?.evidenceQuote ??
+        oldL?.exampleSentence ??
+        null,
+      ukrainianTranslation:
+        input.ukrainianTranslation ??
+        oldP?.ukrainianTranslation ??
+        oldA?.ukrainianTranslation ??
+        oldL?.ukrainianTranslation ??
+        null,
+      transcription:
+        oldP?.transcription ?? oldA?.transcription ?? oldL?.transcription ?? null,
+      cefrLevel: input.cefrLevel ?? oldP?.cefrLevel ?? oldA?.cefrLevel ?? oldL?.cefrLevel ?? null,
+      partOfSpeech:
+        input.partOfSpeech ?? oldP?.partOfSpeech ?? oldA?.partOfSpeech ?? oldL?.partOfSpeech ?? null,
+      dictionaryMatched:
+        oldP?.dictionaryMatched ?? oldA?.dictionaryMatched ?? oldL?.dictionaryMatched ?? false,
+      source:
+        oldP?.source ?? (input.source === "manual" ? "manual" : "ai_phrase"),
+      status: "approved",
+    });
+  }
+  for (const oldItem of prevPassive) {
+    if (
+      !finalActiveMap.has(oldItem.normalizedTerm) &&
+      !finalPassiveMap.has(oldItem.normalizedTerm) &&
+      !finalLearningMap.has(oldItem.normalizedTerm)
+    ) {
+      nextPassiveList.push({ ...oldItem, status: "dismissed" });
+    }
+  }
+
+  const nextLearningList: TranscriptLearningCandidateItem[] = [];
+  for (const input of finalLearningList) {
+    const oldL = prevLearningByTerm.get(input.normalizedTerm);
+    const oldA = prevActiveByTerm.get(input.normalizedTerm);
+    const oldP = prevPassiveByTerm.get(input.normalizedTerm);
+    nextLearningList.push({
+      term: input.term,
+      normalizedTerm: input.normalizedTerm,
+      itemType: input.itemType,
+      partOfSpeech:
+        input.partOfSpeech ?? oldL?.partOfSpeech ?? oldA?.partOfSpeech ?? oldP?.partOfSpeech ?? null,
+      cefrLevel:
+        input.cefrLevel ?? oldL?.cefrLevel ?? oldA?.cefrLevel ?? oldP?.cefrLevel ?? null,
+      ukrainianTranslation:
+        input.ukrainianTranslation ??
+        oldL?.ukrainianTranslation ??
+        oldA?.ukrainianTranslation ??
+        oldP?.ukrainianTranslation ??
+        null,
+      englishDefinition:
+        input.englishDefinition ?? oldL?.englishDefinition ?? null,
+      transcription:
+        oldL?.transcription ?? oldA?.transcription ?? oldP?.transcription ?? null,
+      exampleSentence:
+        oldL?.exampleSentence ?? input.quote ?? oldA?.evidenceQuote ?? oldP?.contextQuote ?? null,
+      reasonUk:
+        oldL?.reasonUk ??
+        (input.source === "manual"
+          ? "Додано викладачем вручну"
+          : "Перенесено викладачем у Learning"),
+      confidence: oldL?.confidence ?? "high",
+      dictionaryMatched:
+        oldL?.dictionaryMatched ?? oldA?.dictionaryMatched ?? oldP?.dictionaryMatched ?? false,
+      alreadyInLearning: false,
+      status: "approved",
+    });
+  }
+  for (const oldItem of prevLearning) {
+    if (
+      !finalActiveMap.has(oldItem.normalizedTerm) &&
+      !finalPassiveMap.has(oldItem.normalizedTerm) &&
+      !finalLearningMap.has(oldItem.normalizedTerm)
+    ) {
+      nextLearningList.push({
+        ...oldItem,
+        status: oldItem.status === "approved" ? "approved" : "dismissed",
+      });
+    }
+  }
+
+  const activeApprovedTotal = nextActiveList.filter(
+    (c) => c.status === "approved",
+  ).length;
+  const passiveApprovedTotal = nextPassiveList.filter(
+    (c) => c.status === "approved",
+  ).length;
+  const learningApprovedTotal = nextLearningList.filter(
     (c) => c.status === "approved",
   ).length;
 
   const { data: updatedRow, error: updateError } = await adminClient
     .from("lesson_meet_transcripts")
     .update({
-      learning_candidates: updatedCandidates as unknown as Json,
-      learning_approved_count: approvedTotal,
+      auto_applied_active: nextActiveList as unknown as Json,
+      auto_applied_passive: nextPassiveList as unknown as Json,
+      learning_candidates: nextLearningList as unknown as Json,
+      active_applied_count: activeApprovedTotal,
+      passive_applied_count: passiveApprovedTotal,
+      learning_approved_count: learningApprovedTotal,
       analysis_status: "learning_approved",
       learning_reviewed_at: nowIso,
       updated_at: nowIso,
@@ -1027,7 +1511,33 @@ export async function approveLessonLearningCandidates({
 
   return {
     transcript: mapLessonMeetTranscriptRowToView(updatedRow),
+    activeAppliedCount: activeApprovedTotal,
+    passiveAppliedCount: passiveApprovedTotal,
     addedCount,
     skippedExistingCount,
   };
+}
+
+export async function approveLessonLearningCandidates({
+  lessonId,
+  tutorId,
+  approvedItems,
+  adminClient,
+}: {
+  lessonId: string;
+  tutorId: string;
+  approvedItems: Array<{
+    term: string;
+    ukrainianTranslation?: string | null;
+    englishDefinition?: string | null;
+    partOfSpeech?: string | null;
+  }>;
+  adminClient: SupabaseAdminClient;
+}) {
+  return applyLessonTranscriptVocabulary({
+    lessonId,
+    tutorId,
+    learningItems: approvedItems,
+    adminClient,
+  });
 }

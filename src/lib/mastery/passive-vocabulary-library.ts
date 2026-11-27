@@ -648,40 +648,57 @@ async function findExistingPassiveVocabularyLibraryMatches(
     return new Map<string, PassiveVocabularyLibraryResolution>();
   }
 
-  const { data: formRows, error: formError } = await adminClient
-    .from("passive_vocabulary_library_forms")
-    .select(
-      "id, library_item_id, form_term, normalized_form, item_type, is_canonical, created_at, updated_at",
-    )
-    .in("normalized_form", Array.from(allCandidates));
+  const candidateList = Array.from(allCandidates);
+  const chunkSize = 200;
+  const formRows: LibraryFormRow[] = [];
 
-  if (formError) {
-    throw new Error("Failed to inspect passive vocabulary library forms");
+  for (let offset = 0; offset < candidateList.length; offset += chunkSize) {
+    const chunk = candidateList.slice(offset, offset + chunkSize);
+    const { data: chunkFormRows, error: formError } = await adminClient
+      .from("passive_vocabulary_library_forms")
+      .select(
+        "id, library_item_id, form_term, normalized_form, item_type, is_canonical, created_at, updated_at",
+      )
+      .in("normalized_form", chunk);
+
+    if (formError) {
+      throw new Error("Failed to inspect passive vocabulary library forms");
+    }
+
+    if (chunkFormRows) {
+      formRows.push(...(chunkFormRows as LibraryFormRow[]));
+    }
   }
 
   const libraryIds = Array.from(
-    new Set((formRows ?? []).map((row) => row.library_item_id)),
+    new Set(formRows.map((row) => row.library_item_id)),
   );
+  const libraryRows: LibraryRow[] = [];
 
-  const { data: libraryRows, error: libraryError } = libraryIds.length
-    ? await adminClient
-        .from("passive_vocabulary_library")
-        .select(
-          "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, created_by, reviewed_by, reviewed_at, updated_by, created_at, updated_at",
-        )
-        .in("id", libraryIds)
-    : { data: [] as LibraryRow[], error: null };
+  for (let offset = 0; offset < libraryIds.length; offset += chunkSize) {
+    const chunk = libraryIds.slice(offset, offset + chunkSize);
+    const { data: chunkLibraryRows, error: libraryError } = await adminClient
+      .from("passive_vocabulary_library")
+      .select(
+        "id, canonical_term, normalized_term, item_type, cefr_level, part_of_speech, attributes, approval_status, rejection_reason, enrichment_status, enrichment_error, created_by, reviewed_by, reviewed_at, updated_by, created_at, updated_at",
+      )
+      .in("id", chunk);
 
-  if (libraryError) {
-    throw new Error("Failed to inspect passive vocabulary library");
+    if (libraryError) {
+      throw new Error("Failed to inspect passive vocabulary library");
+    }
+
+    if (chunkLibraryRows) {
+      libraryRows.push(...(chunkLibraryRows as LibraryRow[]));
+    }
   }
 
   const libraryRowById = new Map(
-    (libraryRows ?? []).map((row) => [row.id, row]),
+    libraryRows.map((row) => [row.id, row]),
   );
   const formLibraryIdByLookupKey = new Map<string, string>();
 
-  for (const row of (formRows ?? []) as LibraryFormRow[]) {
+  for (const row of formRows) {
     formLibraryIdByLookupKey.set(
       getLookupKey(row.normalized_form, row.item_type),
       row.library_item_id,

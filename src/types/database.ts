@@ -2363,6 +2363,7 @@ export interface Database {
           streak: number;
           last_practiced: string;
           next_review: string;
+          source_lesson_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -2377,6 +2378,7 @@ export interface Database {
           streak?: number;
           last_practiced?: string;
           next_review?: string;
+          source_lesson_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -2390,6 +2392,7 @@ export interface Database {
           streak?: number;
           last_practiced?: string;
           next_review?: string;
+          source_lesson_id?: string | null;
         };
         Relationships: [
           {
