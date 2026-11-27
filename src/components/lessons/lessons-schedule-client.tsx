@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   Clock3,
+  Globe,
   TrendingUp,
   UserCheck,
   Users,
@@ -14,6 +15,11 @@ import { GoogleCalendarSyncCard } from "@/components/lessons/google-calendar-syn
 import { LessonBalanceManager } from "@/components/lessons/lesson-balance-manager";
 import { LessonsPageHeader } from "@/components/lessons/lessons-page-header";
 import { MonthlyLessonsCalendar } from "@/components/lessons/monthly-lessons-calendar";
+import { useClientTimeZone } from "@/components/providers/timezone-cookie-sync";
+import {
+  getShortTimeZoneLabel,
+  projectLessonToTimeZone,
+} from "@/lib/lesson-timezone";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -91,9 +97,27 @@ export function LessonsScheduleClient({
   const [lessonsState, setLessonsState] =
     useState<MonthlyLessonItem[]>(allLessons);
   const clientNow = useClientNow();
+  const clientTimeZone = useClientTimeZone();
+
+  const localizedLessons = useMemo(() => {
+    if (!clientTimeZone) {
+      return lessonsState;
+    }
+
+    return lessonsState.map((lesson) => {
+      if (!lesson.startAt) return lesson;
+      const projected = projectLessonToTimeZone(lesson, clientTimeZone);
+      return {
+        ...lesson,
+        lessonDate: projected.lessonDate,
+        startTime: projected.startTime,
+        endTime: projected.endTime,
+      };
+    });
+  }, [lessonsState, clientTimeZone]);
 
   useAutoCompleteFinishedLessons(
-    role === "student" ? [] : lessonsState,
+    role === "student" ? [] : localizedLessons,
     role === "student" ? null : clientNow,
     (completedIds) => {
       const completedSet = new Set(completedIds);
@@ -122,11 +146,11 @@ export function LessonsScheduleClient({
 
   const monthLessons = useMemo(() => {
     const { startIsoDate, endIsoDate } = getLessonMonthRange(monthDate);
-    return lessonsState.filter(
+    return localizedLessons.filter(
       (lesson) =>
         lesson.lessonDate >= startIsoDate && lesson.lessonDate <= endIsoDate,
     );
-  }, [lessonsState, monthDate]);
+  }, [localizedLessons, monthDate]);
 
   const tutorMetrics = useMemo(() => {
     const refNow = clientNow;
@@ -146,11 +170,11 @@ export function LessonsScheduleClient({
     const earnedCents = completed.reduce((sum, l) => sum + l.priceCents, 0);
     const plannedCents = planned.reduce((sum, l) => sum + l.priceCents, 0);
 
-    const todayCompletedCount = lessonsState.filter(
+    const todayCompletedCount = localizedLessons.filter(
       (l) => l.lessonDate === todayIso && l.status === "completed",
     ).length;
 
-    const nextUpcoming = lessonsState.find((l) =>
+    const nextUpcoming = localizedLessons.find((l) =>
       refNow
         ? isLessonUpcomingOrLive(l, refNow)
         : l.lessonDate >= todayIso && l.status === "planned",
@@ -180,7 +204,11 @@ export function LessonsScheduleClient({
       nextUpcomingTiming,
       scheduledStudentsCount: scheduledStudentIds.size,
     };
-  }, [lessonsState, monthLessons, clientNow]);
+  }, [localizedLessons, monthLessons, clientNow]);
+
+  const timeZoneShortLabel = clientTimeZone
+    ? getShortTimeZoneLabel(clientNow ?? new Date(), clientTimeZone)
+    : null;
 
   function handleLessonUpdated(updatedLesson: MonthlyLessonItem) {
     setLessonsState((prev) =>
@@ -228,6 +256,16 @@ export function LessonsScheduleClient({
           ) : undefined
         }
       />
+
+      {clientTimeZone ? (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Globe className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            Times shown in your local timezone: {clientTimeZone}
+            {timeZoneShortLabel ? ` (${timeZoneShortLabel})` : ""}
+          </span>
+        </div>
+      ) : null}
 
       {role === "student" ? (
         <div className="space-y-5">

@@ -72,6 +72,7 @@ interface LessonGoogleCalendarSyncRow {
   lesson_date: string;
   start_time: string | null;
   end_time: string | null;
+  time_zone?: string | null;
   notes: string | null;
   status: LessonStatus;
   tutor_profile: {
@@ -647,7 +648,7 @@ async function loadLessonForGoogleCalendarSync(
   const { data, error } = await supabaseAdmin
     .from("tutor_student_lessons")
     .select(
-      "id, tutor_id, student_id, title, lesson_date, start_time, end_time, notes, status, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email), student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
+      "id, tutor_id, student_id, title, lesson_date, start_time, end_time, time_zone, notes, status, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email), student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
     )
     .eq("id", lessonId)
     .eq("tutor_id", tutorId)
@@ -779,6 +780,9 @@ function buildGoogleCalendarEventPayload(lesson: LessonGoogleCalendarSyncRow) {
 }
 
 function buildGoogleCalendarEventTiming(lesson: LessonGoogleCalendarSyncRow) {
+  const timeZone =
+    lesson.time_zone || process.env.GOOGLE_CALENDAR_TIME_ZONE || "Europe/Kyiv";
+
   if (lesson.start_time) {
     const endTime =
       lesson.end_time || getSuggestedLessonEndTime(lesson.start_time);
@@ -787,11 +791,11 @@ function buildGoogleCalendarEventTiming(lesson: LessonGoogleCalendarSyncRow) {
       return {
         start: {
           dateTime: `${lesson.lesson_date}T${lesson.start_time}:00`,
-          timeZone: process.env.GOOGLE_CALENDAR_TIME_ZONE ?? "UTC",
+          timeZone,
         },
         end: {
           dateTime: `${lesson.lesson_date}T${endTime}:00`,
-          timeZone: process.env.GOOGLE_CALENDAR_TIME_ZONE ?? "UTC",
+          timeZone,
         },
       };
     }

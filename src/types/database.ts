@@ -319,6 +319,9 @@ export interface Database {
           lesson_date: string;
           start_time: string | null;
           end_time: string | null;
+          time_zone: string | null;
+          start_at: string | null;
+          end_at: string | null;
           notes: string | null;
           status: "planned" | "completed" | "cancelled";
           price_cents: number;
@@ -334,6 +337,9 @@ export interface Database {
           lesson_date: string;
           start_time?: string | null;
           end_time?: string | null;
+          time_zone?: string | null;
+          start_at?: string | null;
+          end_at?: string | null;
           notes?: string | null;
           status?: "planned" | "completed" | "cancelled";
           price_cents?: number;
@@ -348,6 +354,9 @@ export interface Database {
           lesson_date?: string;
           start_time?: string | null;
           end_time?: string | null;
+          time_zone?: string | null;
+          start_at?: string | null;
+          end_at?: string | null;
           notes?: string | null;
           status?: "planned" | "completed" | "cancelled";
           price_cents?: number;

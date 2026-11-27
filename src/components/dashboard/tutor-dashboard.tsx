@@ -67,6 +67,9 @@ interface UpcomingLessonRow {
   lesson_date: string;
   start_time: string | null;
   end_time: string | null;
+  time_zone?: string | null;
+  start_at?: string | null;
+  end_at?: string | null;
   status: "planned" | "completed" | "cancelled";
   price_cents: number;
   meet_url?: string | null;
@@ -156,7 +159,7 @@ export async function TutorDashboard({
     supabaseAdmin
       .from("tutor_student_lessons")
       .select(
-        "id, student_id, title, lesson_date, start_time, end_time, status, price_cents, meet_url, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
+        "id, student_id, title, lesson_date, start_time, end_time, time_zone, start_at, end_at, status, price_cents, meet_url, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
       )
       .eq("tutor_id", userId)
       .eq("status", "planned")
@@ -230,6 +233,9 @@ export async function TutorDashboard({
       lessonDate: lesson.lesson_date,
       startTime: lesson.start_time,
       endTime: lesson.end_time,
+      timeZone: lesson.time_zone ?? null,
+      startAt: lesson.start_at ?? null,
+      endAt: lesson.end_at ?? null,
       status: lesson.status,
       meetUrl: lesson.meet_url ?? null,
       lessonsLeft,

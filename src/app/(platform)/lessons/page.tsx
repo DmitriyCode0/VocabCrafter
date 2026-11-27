@@ -1,5 +1,11 @@
+import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LessonsScheduleClient } from "@/components/lessons/lessons-schedule-client";
+import {
+  isValidIanaTimeZone,
+  projectLessonToTimeZone,
+  USER_TIMEZONE_COOKIE_NAME,
+} from "@/lib/lesson-timezone";
 import {
   formatLessonMonthParam,
   getLessonDisplayTitle,
@@ -65,6 +71,9 @@ interface TutorLessonRow {
   lesson_date: string;
   start_time: string | null;
   end_time: string | null;
+  time_zone?: string | null;
+  start_at?: string | null;
+  end_at?: string | null;
   notes: string | null;
   status: "planned" | "completed" | "cancelled";
   price_cents: number;
@@ -81,6 +90,9 @@ interface StudentLessonRow {
   lesson_date: string;
   start_time: string | null;
   end_time: string | null;
+  time_zone?: string | null;
+  start_at?: string | null;
+  end_at?: string | null;
   notes: string | null;
   status: "planned" | "completed" | "cancelled";
   price_cents: number;
@@ -103,42 +115,84 @@ interface GoogleCalendarConnectionStatusRow {
 function mapTutorLessons(
   rows: TutorLessonRow[],
   transcriptSummaryMap?: Map<string, LessonTranscriptSummary>,
+  viewerTimeZone?: string,
 ): MonthlyLessonItem[] {
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    lessonDate: row.lesson_date,
-    startTime: row.start_time,
-    endTime: row.end_time,
-    notes: row.notes,
-    status: row.status,
-    priceCents: row.price_cents,
-    studentId: row.student_id,
-    participantName:
-      row.student_profile?.full_name ||
-      row.student_profile?.email ||
-      "One-time",
-    participantLabel: row.student_id ? "Student" : "Type",
-    meetUrl: row.meet_url ?? null,
-    transcriptSummary: transcriptSummaryMap?.get(row.id) ?? null,
-  }));
+  return rows.map((row) => {
+    const projected = viewerTimeZone
+      ? projectLessonToTimeZone(
+          {
+            lessonDate: row.lesson_date,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            startAt: row.start_at ?? null,
+            endAt: row.end_at ?? null,
+            timeZone: row.time_zone ?? null,
+          },
+          viewerTimeZone,
+        )
+      : null;
+
+    return {
+      id: row.id,
+      title: row.title,
+      lessonDate: projected?.lessonDate ?? row.lesson_date,
+      startTime: projected?.startTime ?? row.start_time,
+      endTime: projected?.endTime ?? row.end_time,
+      startAt: row.start_at ?? null,
+      endAt: row.end_at ?? null,
+      timeZone: row.time_zone ?? null,
+      notes: row.notes,
+      status: row.status,
+      priceCents: row.price_cents,
+      studentId: row.student_id,
+      participantName:
+        row.student_profile?.full_name ||
+        row.student_profile?.email ||
+        "One-time",
+      participantLabel: row.student_id ? "Student" : "Type",
+      meetUrl: row.meet_url ?? null,
+      transcriptSummary: transcriptSummaryMap?.get(row.id) ?? null,
+    };
+  });
 }
 
-function mapStudentLessons(rows: StudentLessonRow[]): MonthlyLessonItem[] {
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    lessonDate: row.lesson_date,
-    startTime: row.start_time,
-    endTime: row.end_time,
-    notes: row.notes,
-    status: row.status,
-    priceCents: row.price_cents,
-    participantName:
-      row.tutor_profile?.full_name || row.tutor_profile?.email || "Tutor",
-    participantLabel: "Tutor",
-    meetUrl: row.meet_url ?? null,
-  }));
+function mapStudentLessons(
+  rows: StudentLessonRow[],
+  viewerTimeZone?: string,
+): MonthlyLessonItem[] {
+  return rows.map((row) => {
+    const projected = viewerTimeZone
+      ? projectLessonToTimeZone(
+          {
+            lessonDate: row.lesson_date,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            startAt: row.start_at ?? null,
+            endAt: row.end_at ?? null,
+            timeZone: row.time_zone ?? null,
+          },
+          viewerTimeZone,
+        )
+      : null;
+
+    return {
+      id: row.id,
+      title: row.title,
+      lessonDate: projected?.lessonDate ?? row.lesson_date,
+      startTime: projected?.startTime ?? row.start_time,
+      endTime: projected?.endTime ?? row.end_time,
+      startAt: row.start_at ?? null,
+      endAt: row.end_at ?? null,
+      timeZone: row.time_zone ?? null,
+      notes: row.notes,
+      status: row.status,
+      priceCents: row.price_cents,
+      participantName:
+        row.tutor_profile?.full_name || row.tutor_profile?.email || "Tutor",
+      participantLabel: "Tutor",
+      meetUrl: row.meet_url ?? null,
+    };
+  });
 }
 
 function buildTotalsByKey<T extends object>(
@@ -258,11 +312,17 @@ export default async function LessonsPage({
   const { userId, role, appLanguage } = await getLessonsViewerAccess();
   const messages = getAppMessages(appLanguage);
   const supabaseAdmin = createAdminClient();
+  const cookieStore = await cookies();
+  const rawCookieTz = cookieStore.get(USER_TIMEZONE_COOKIE_NAME)?.value;
+  const decodedCookieTz = rawCookieTz ? decodeURIComponent(rawCookieTz) : null;
+  const viewerTimeZone = isValidIanaTimeZone(decodedCookieTz)
+    ? (decodedCookieTz as string)
+    : undefined;
 
   await autoCompleteOverduePlannedLessons(
     role === "student"
-      ? { studentId: userId, supabaseAdmin }
-      : { tutorId: userId, supabaseAdmin },
+      ? { studentId: userId, timeZone: viewerTimeZone, supabaseAdmin }
+      : { tutorId: userId, timeZone: viewerTimeZone, supabaseAdmin },
   );
 
   if (role === "student") {
@@ -275,7 +335,7 @@ export default async function LessonsPage({
       supabaseAdmin
         .from("tutor_student_lessons")
         .select(
-          "id, title, lesson_date, start_time, end_time, notes, status, price_cents, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
+          "id, title, lesson_date, start_time, end_time, time_zone, start_at, end_at, notes, status, price_cents, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
         )
         .eq("student_id", userId)
         .order("lesson_date", { ascending: true })
@@ -300,6 +360,7 @@ export default async function LessonsPage({
 
     const allLessons = mapStudentLessons(
       (lessonsResult ?? []) as StudentLessonRow[],
+      viewerTimeZone,
     );
     const tutorConnections = (connectionsResult ??
       []) as StudentTutorConnectionRow[];
@@ -362,7 +423,7 @@ export default async function LessonsPage({
     supabaseAdmin
       .from("tutor_student_lessons")
       .select(
-        "id, student_id, title, lesson_date, start_time, end_time, notes, status, price_cents, meet_url, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
+        "id, student_id, title, lesson_date, start_time, end_time, time_zone, start_at, end_at, notes, status, price_cents, meet_url, student_profile:profiles!tutor_student_lessons_student_id_fkey(full_name, email)",
       )
       .eq("tutor_id", userId)
       .order("lesson_date", { ascending: true })
@@ -425,6 +486,7 @@ export default async function LessonsPage({
   const allLessons = mapTutorLessons(
     (lessonsResult ?? []) as TutorLessonRow[],
     transcriptSummaryMap,
+    viewerTimeZone,
   );
   const googleCalendarConnection = (googleCalendarConnectionResult ??
     null) as GoogleCalendarConnectionStatusRow | null;

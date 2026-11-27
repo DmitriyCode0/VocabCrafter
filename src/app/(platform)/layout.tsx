@@ -4,6 +4,7 @@ import type { Role } from "@/types/roles";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAuthenticatedUser, isProfileApproved } from "@/lib/rbac/require-role";
 import { AppLanguageProvider } from "@/components/providers/app-language-provider";
+import { TimezoneCookieSync } from "@/components/providers/timezone-cookie-sync";
 import { TtsPreferenceProvider } from "@/components/providers/tts-preference-provider";
 import { PendingApprovalCard } from "@/components/dashboard/pending-approval-card";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -34,6 +35,7 @@ export default async function PlatformLayout({
   return (
     <AppLanguageProvider appLanguage={appLanguage}>
       <TtsPreferenceProvider>
+        <TimezoneCookieSync />
         <div className="flex h-dvh overflow-hidden">
           <Sidebar profile={profile as Profile} isApproved={isApproved} />
           <div className="flex flex-1 flex-col overflow-hidden">

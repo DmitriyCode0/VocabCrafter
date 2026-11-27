@@ -31,6 +31,10 @@ import {
   type LessonStatus,
   type MonthlyLessonItem,
 } from "@/lib/lessons";
+import {
+  computeLessonUtcInstants,
+  getBrowserTimeZone,
+} from "@/lib/lesson-timezone";
 
 interface RescheduleLessonDialogProps {
   lesson: MonthlyLessonItem | null;
@@ -192,6 +196,7 @@ export function RescheduleLessonDialog({
     setIsSaving(true);
 
     try {
+      const browserTimeZone = getBrowserTimeZone();
       const response = await fetch(`/api/lessons/${lesson.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -201,6 +206,7 @@ export function RescheduleLessonDialog({
           lessonDate: nextDate,
           startTime: startTime || null,
           endTime: endTime || null,
+          timeZone: browserTimeZone ?? lesson.timeZone ?? undefined,
           notes: lesson.notes,
           status,
           priceCents: lesson.priceCents,
@@ -215,11 +221,21 @@ export function RescheduleLessonDialog({
         throw new Error(data?.error || "Failed to reschedule lesson");
       }
 
+      const nextInstants = computeLessonUtcInstants({
+        lessonDate: nextDate,
+        startTime: startTime || null,
+        endTime: endTime || null,
+        timeZone: browserTimeZone ?? lesson.timeZone,
+      });
+
       onRescheduled({
         ...lesson,
         lessonDate: nextDate,
         startTime: startTime || null,
         endTime: endTime || null,
+        timeZone: nextInstants.timeZone,
+        startAt: nextInstants.startAt,
+        endAt: nextInstants.endAt,
         status,
       });
 

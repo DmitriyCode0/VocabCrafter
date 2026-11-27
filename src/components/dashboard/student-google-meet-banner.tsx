@@ -1,7 +1,21 @@
+"use client";
+
 import { Video, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatLessonTimeRange } from "@/lib/lessons";
+import {
+  formatLessonTimeRange,
+  getLessonTimingInfo,
+  isLessonUpcomingOrLive,
+  toLocalIsoDate,
+  type LessonStatus,
+} from "@/lib/lessons";
+import { projectLessonToTimeZone } from "@/lib/lesson-timezone";
+import { useClientTimeZone } from "@/components/providers/timezone-cookie-sync";
+import {
+  useAutoCompleteFinishedLessons,
+  useClientNow,
+} from "@/components/dashboard/tutor-next-up-cards";
 import { cn } from "@/lib/utils";
 
 export interface StudentNextLesson {
@@ -10,12 +24,17 @@ export interface StudentNextLesson {
   lessonDate: string;
   startTime: string | null;
   endTime: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  timeZone?: string | null;
+  status?: LessonStatus;
   meetUrl: string | null;
   tutorName: string;
 }
 
 interface StudentGoogleMeetBannerProps {
   nextLesson: StudentNextLesson | null;
+  upcomingLessons?: StudentNextLesson[];
   todayIso: string;
   className?: string;
 }
@@ -30,15 +49,93 @@ function formatDayMonthLabel(isoDate: string) {
 
 export function StudentGoogleMeetBanner({
   nextLesson,
-  todayIso,
+  upcomingLessons,
+  todayIso: fallbackTodayIso,
   className,
 }: StudentGoogleMeetBannerProps) {
-  const isLessonToday = nextLesson?.lessonDate === todayIso;
-  const hasMeetUrl = Boolean(nextLesson?.meetUrl);
+  const clientNow = useClientNow();
+  const clientTimeZone = useClientTimeZone();
+
+  const candidateList =
+    upcomingLessons && upcomingLessons.length > 0
+      ? upcomingLessons
+      : nextLesson
+        ? [nextLesson]
+        : [];
+
+  useAutoCompleteFinishedLessons(
+    candidateList.map((lesson) => ({
+      id: lesson.id,
+      lessonDate: lesson.lessonDate,
+      startTime: lesson.startTime,
+      endTime: lesson.endTime,
+      startAt: lesson.startAt,
+      endAt: lesson.endAt,
+      status: lesson.status ?? "planned",
+    })),
+    clientNow,
+  );
+
+  const activeLesson = clientNow
+    ? (candidateList.find((lesson) =>
+        isLessonUpcomingOrLive(
+          {
+            lessonDate: lesson.lessonDate,
+            startTime: lesson.startTime,
+            endTime: lesson.endTime,
+            startAt: lesson.startAt,
+            endAt: lesson.endAt,
+            status: lesson.status ?? "planned",
+          },
+          clientNow,
+        ),
+      ) ?? null)
+    : (candidateList[0] ?? null);
+
+  const effectiveTodayIso = clientNow
+    ? toLocalIsoDate(clientNow)
+    : fallbackTodayIso;
+
+  const localized = activeLesson
+    ? projectLessonToTimeZone(
+        {
+          lessonDate: activeLesson.lessonDate,
+          startTime: activeLesson.startTime,
+          endTime: activeLesson.endTime,
+          startAt: activeLesson.startAt,
+          endAt: activeLesson.endAt,
+          timeZone: activeLesson.timeZone,
+        },
+        clientTimeZone ?? undefined,
+      )
+    : null;
+
+  const displayDate = localized?.lessonDate ?? activeLesson?.lessonDate ?? "";
+  const displayStartTime = localized?.startTime ?? activeLesson?.startTime ?? null;
+  const displayEndTime = localized?.endTime ?? activeLesson?.endTime ?? null;
+  const timeZoneLabel = clientTimeZone ? localized?.timeZoneLabel : null;
+
+  const timing =
+    activeLesson && clientNow
+      ? getLessonTimingInfo(
+          {
+            lessonDate: displayDate,
+            startTime: displayStartTime,
+            endTime: displayEndTime,
+            startAt: activeLesson.startAt,
+            endAt: activeLesson.endAt,
+            status: activeLesson.status ?? "planned",
+          },
+          clientNow,
+        )
+      : null;
+
+  const isLessonToday = Boolean(activeLesson) && displayDate === effectiveTodayIso;
+  const hasMeetUrl = Boolean(activeLesson?.meetUrl);
   const isButtonActive = isLessonToday && hasMeetUrl;
 
-  const timeLabel = nextLesson
-    ? formatLessonTimeRange(nextLesson.startTime, nextLesson.endTime)
+  const timeLabel = activeLesson
+    ? formatLessonTimeRange(displayStartTime, displayEndTime)
     : "";
 
   return (
@@ -65,15 +162,23 @@ export function StudentGoogleMeetBanner({
           </div>
 
           <div className="min-w-0 space-y-0.5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold">
                 {isLessonToday
                   ? "Lesson Today!"
-                  : nextLesson
-                    ? `Next lesson on ${formatDayMonthLabel(nextLesson.lessonDate)}`
+                  : activeLesson
+                    ? `Next lesson on ${formatDayMonthLabel(displayDate)}`
                     : "No upcoming lessons scheduled"}
               </span>
-              {isLessonToday ? (
+              {timing?.state === "live" ? (
+                <span className="inline-flex items-center rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                  Live Now
+                </span>
+              ) : timing?.state === "soon" && timing.minutesUntilStart !== null ? (
+                <span className="inline-flex items-center rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
+                  In {timing.minutesUntilStart}m
+                </span>
+              ) : isLessonToday ? (
                 <span className="inline-flex items-center rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
                   Live Today
                 </span>
@@ -81,22 +186,26 @@ export function StudentGoogleMeetBanner({
             </div>
 
             <p className="text-xs text-muted-foreground">
-              {nextLesson
-                ? `${nextLesson.tutorName ? `With ${nextLesson.tutorName} · ` : ""}${timeLabel !== "Time not set" ? timeLabel : "Time TBA"}`
+              {activeLesson
+                ? `${activeLesson.tutorName ? `With ${activeLesson.tutorName} · ` : ""}${
+                    timeLabel !== "Time not set"
+                      ? `${timeLabel}${timeZoneLabel ? ` (${timeZoneLabel})` : ""}`
+                      : "Time TBA"
+                  }`
                 : "Your tutor will schedule your next session soon."}
             </p>
           </div>
         </div>
 
         <div>
-          {isButtonActive ? (
+          {isButtonActive && activeLesson?.meetUrl ? (
             <Button
               asChild
               size="lg"
               className="h-11 w-full bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-500 sm:w-auto"
             >
               <a
-                href={nextLesson.meetUrl!}
+                href={activeLesson.meetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -112,8 +221,8 @@ export function StudentGoogleMeetBanner({
               className="h-11 w-full text-muted-foreground sm:w-auto opacity-70"
             >
               <CalendarClock className="mr-2 h-4 w-4" />
-              {nextLesson
-                ? `Next lesson on ${formatDayMonthLabel(nextLesson.lessonDate)}`
+              {activeLesson
+                ? `Next lesson on ${formatDayMonthLabel(displayDate)}`
                 : "No lesson today"}
             </Button>
           )}
@@ -122,4 +231,3 @@ export function StudentGoogleMeetBanner({
     </Card>
   );
 }
-

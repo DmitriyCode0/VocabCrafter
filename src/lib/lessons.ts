@@ -28,6 +28,9 @@ export interface MonthlyLessonItem {
   lessonDate: string;
   startTime: string | null;
   endTime: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  timeZone?: string | null;
   notes: string | null;
   status: LessonStatus;
   priceCents: number;
@@ -80,11 +83,27 @@ export function isLessonJoinable(lesson: {
   lessonDate: string;
   startTime: string | null;
   endTime: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
   status: LessonStatus;
 }): boolean {
   if (lesson.status !== "planned") return false;
 
   const now = new Date();
+  if (lesson.startAt) {
+    const { start, end } = getLessonStartEndDates(
+      lesson.lessonDate,
+      lesson.startTime,
+      lesson.endTime,
+      lesson.startAt,
+      lesson.endAt,
+    );
+    if (start && end) {
+      const windowOpenMs = 30 * 60 * 1000;
+      return now.getTime() >= start.getTime() - windowOpenMs && now.getTime() <= end.getTime();
+    }
+  }
+
   const todayIso = toIsoDate(now);
 
   if (lesson.lessonDate !== todayIso) return false;
@@ -140,7 +159,21 @@ export function getLessonStartEndDates(
   lessonDate: string,
   startTime: string | null,
   endTime: string | null,
+  startAt?: string | null,
+  endAt?: string | null,
 ): { start: Date | null; end: Date | null } {
+  if (startAt) {
+    const parsedStart = new Date(startAt);
+    if (!Number.isNaN(parsedStart.getTime())) {
+      const parsedEnd = endAt ? new Date(endAt) : null;
+      const validEnd =
+        parsedEnd && !Number.isNaN(parsedEnd.getTime())
+          ? parsedEnd
+          : new Date(parsedStart.getTime() + 60 * 60 * 1000);
+      return { start: parsedStart, end: validEnd };
+    }
+  }
+
   const dateParts = lessonDate.split("-").map(Number);
   if (dateParts.length !== 3 || dateParts.some((n) => !Number.isInteger(n))) {
     return { start: null, end: null };
@@ -179,6 +212,8 @@ export function isLessonUpcomingOrLive(
     lessonDate: string;
     startTime: string | null;
     endTime: string | null;
+    startAt?: string | null;
+    endAt?: string | null;
     status: LessonStatus;
   },
   now: Date = new Date(),
@@ -188,6 +223,8 @@ export function isLessonUpcomingOrLive(
     lesson.lessonDate,
     lesson.startTime,
     lesson.endTime,
+    lesson.startAt,
+    lesson.endAt,
   );
   if (!end) {
     return lesson.lessonDate >= toIsoDate(now);
@@ -200,6 +237,8 @@ export function getLessonTimingInfo(
     lessonDate: string;
     startTime: string | null;
     endTime: string | null;
+    startAt?: string | null;
+    endAt?: string | null;
     status: LessonStatus;
   },
   now: Date = new Date(),
@@ -211,6 +250,8 @@ export function getLessonTimingInfo(
     lesson.lessonDate,
     lesson.startTime,
     lesson.endTime,
+    lesson.startAt,
+    lesson.endAt,
   );
   if (!end || now.getTime() >= end.getTime()) {
     return { state: "ended", minutesUntilStart: null };

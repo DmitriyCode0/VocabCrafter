@@ -6,6 +6,11 @@ import {
   syncLessonToGoogleCalendar,
   type CalendarSyncResult,
 } from "@/lib/google-calendar";
+import {
+  computeLessonUtcInstants,
+  resolveLessonTimeZone,
+  USER_TIMEZONE_COOKIE_NAME,
+} from "@/lib/lesson-timezone";
 import { LESSON_STATUSES } from "@/lib/lessons";
 
 const lessonTitleSchema = z
@@ -35,6 +40,7 @@ const createLessonSchema = z
     lessonDates: z.array(isoDateSchema).min(1).max(60).optional(),
     startTime: timeSchema,
     endTime: timeSchema,
+    timeZone: z.string().trim().max(100).nullable().optional(),
     notes: z.string().trim().max(2000).nullable().optional(),
     status: z.enum(LESSON_STATUSES).optional(),
     priceCents: z.number().int().nonnegative().optional(),
@@ -138,19 +144,39 @@ export async function POST(request: NextRequest) {
   const resolvedPriceCents =
     parsed.data.priceCents ?? connection?.lesson_price_cents ?? 0;
 
+  const rawCookieTz = request.cookies.get(USER_TIMEZONE_COOKIE_NAME)?.value;
+  const decodedCookieTz = rawCookieTz
+    ? decodeURIComponent(rawCookieTz)
+    : null;
+  const effectiveTimeZone = resolveLessonTimeZone(
+    parsed.data.timeZone,
+    decodedCookieTz ?? process.env.GOOGLE_CALENDAR_TIME_ZONE,
+  );
+
   const nowIso = new Date().toISOString();
-  const rowsToInsert = resolvedDates.map((dateIso) => ({
-    tutor_id: user.id,
-    student_id: parsed.data.studentId ?? null,
-    title: parsed.data.title,
-    lesson_date: dateIso,
-    start_time: parsed.data.startTime ?? null,
-    end_time: parsed.data.endTime ?? null,
-    notes: parsed.data.notes ?? null,
-    status: resolvedStatus,
-    price_cents: resolvedPriceCents,
-    updated_at: nowIso,
-  }));
+  const rowsToInsert = resolvedDates.map((dateIso) => {
+    const { timeZone, startAt, endAt } = computeLessonUtcInstants({
+      lessonDate: dateIso,
+      startTime: parsed.data.startTime ?? null,
+      endTime: parsed.data.endTime ?? null,
+      timeZone: effectiveTimeZone,
+    });
+    return {
+      tutor_id: user.id,
+      student_id: parsed.data.studentId ?? null,
+      title: parsed.data.title,
+      lesson_date: dateIso,
+      start_time: parsed.data.startTime ?? null,
+      end_time: parsed.data.endTime ?? null,
+      time_zone: timeZone,
+      start_at: startAt,
+      end_at: endAt,
+      notes: parsed.data.notes ?? null,
+      status: resolvedStatus,
+      price_cents: resolvedPriceCents,
+      updated_at: nowIso,
+    };
+  });
 
   const { data: insertedLessons, error } = await supabaseAdmin
     .from("tutor_student_lessons")

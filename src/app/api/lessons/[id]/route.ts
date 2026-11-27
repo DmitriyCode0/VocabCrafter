@@ -6,6 +6,11 @@ import {
   removeLessonFromGoogleCalendar,
   syncLessonToGoogleCalendar,
 } from "@/lib/google-calendar";
+import {
+  computeLessonUtcInstants,
+  resolveLessonTimeZone,
+  USER_TIMEZONE_COOKIE_NAME,
+} from "@/lib/lesson-timezone";
 import { LESSON_STATUSES } from "@/lib/lessons";
 
 const lessonTitleSchema = z
@@ -32,6 +37,7 @@ const updateLessonSchema = z
     lessonDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     startTime: timeSchema,
     endTime: timeSchema,
+    timeZone: z.string().trim().max(100).nullable().optional(),
     notes: z.string().trim().max(2000).nullable().optional(),
     status: z.enum(LESSON_STATUSES),
     priceCents: z.number().int().nonnegative().optional(),
@@ -171,6 +177,21 @@ export async function PATCH(
       }
     }
 
+    const rawCookieTz = request.cookies.get(USER_TIMEZONE_COOKIE_NAME)?.value;
+    const decodedCookieTz = rawCookieTz
+      ? decodeURIComponent(rawCookieTz)
+      : null;
+    const effectiveTimeZone = resolveLessonTimeZone(
+      parsed.data.timeZone,
+      decodedCookieTz ?? process.env.GOOGLE_CALENDAR_TIME_ZONE,
+    );
+    const { timeZone, startAt, endAt } = computeLessonUtcInstants({
+      lessonDate: parsed.data.lessonDate,
+      startTime: parsed.data.startTime ?? null,
+      endTime: parsed.data.endTime ?? null,
+      timeZone: effectiveTimeZone,
+    });
+
     const { data, error } = await access.supabaseAdmin
       .from("tutor_student_lessons")
       .update({
@@ -179,6 +200,9 @@ export async function PATCH(
         lesson_date: parsed.data.lessonDate,
         start_time: parsed.data.startTime ?? null,
         end_time: parsed.data.endTime ?? null,
+        time_zone: timeZone,
+        start_at: startAt,
+        end_at: endAt,
         notes: parsed.data.notes ?? null,
         status: parsed.data.status,
         price_cents:

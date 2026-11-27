@@ -22,6 +22,8 @@ import {
   toLocalIsoDate,
   type LessonStatus,
 } from "@/lib/lessons";
+import { projectLessonToTimeZone } from "@/lib/lesson-timezone";
+import { useClientTimeZone } from "@/components/providers/timezone-cookie-sync";
 import { cn } from "@/lib/utils";
 
 export interface TutorDashboardLessonItem {
@@ -31,6 +33,9 @@ export interface TutorDashboardLessonItem {
   lessonDate: string;
   startTime: string | null;
   endTime: string | null;
+  timeZone?: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
   status: LessonStatus;
   meetUrl: string | null;
   lessonsLeft: number | null;
@@ -101,6 +106,8 @@ export function useAutoCompleteFinishedLessons(
     lessonDate: string;
     startTime: string | null;
     endTime: string | null;
+    startAt?: string | null;
+    endAt?: string | null;
     status: LessonStatus;
   }>,
   now: Date | null,
@@ -207,6 +214,7 @@ export function TutorNextUpCard({
 }) {
   const { messages } = useAppI18n();
   const now = useLiveClock(initialNowMs);
+  const clientTimeZone = useClientTimeZone();
   useAutoCompleteFinishedLessons(lessons, now);
 
   const todayIso = toLocalIsoDate(now);
@@ -214,7 +222,18 @@ export function TutorNextUpCard({
     new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
   );
 
-  const activeUpcoming = lessons.filter((lesson) =>
+  const localizedLessons = lessons.map((lesson) => {
+    if (!clientTimeZone || !lesson.startAt) return lesson;
+    const projected = projectLessonToTimeZone(lesson, clientTimeZone);
+    return {
+      ...lesson,
+      lessonDate: projected.lessonDate,
+      startTime: projected.startTime,
+      endTime: projected.endTime,
+    };
+  });
+
+  const activeUpcoming = localizedLessons.filter((lesson) =>
     isLessonUpcomingOrLive(lesson, now),
   );
   const nextLesson = activeUpcoming[0] ?? null;
@@ -341,6 +360,7 @@ export function TutorUpcomingScheduleCard({
 }) {
   const { messages } = useAppI18n();
   const now = useLiveClock(initialNowMs);
+  const clientTimeZone = useClientTimeZone();
 
   const todayIso = toLocalIsoDate(now);
   const tomorrowIso = toLocalIsoDate(
@@ -348,7 +368,18 @@ export function TutorUpcomingScheduleCard({
   );
   const cc = messages.dashboard.tutor.commandCenter;
 
-  const upcomingLessons = lessons
+  const localizedLessons = lessons.map((lesson) => {
+    if (!clientTimeZone || !lesson.startAt) return lesson;
+    const projected = projectLessonToTimeZone(lesson, clientTimeZone);
+    return {
+      ...lesson,
+      lessonDate: projected.lessonDate,
+      startTime: projected.startTime,
+      endTime: projected.endTime,
+    };
+  });
+
+  const upcomingLessons = localizedLessons
     .filter((lesson) => isLessonUpcomingOrLive(lesson, now))
     .slice(0, 6);
 

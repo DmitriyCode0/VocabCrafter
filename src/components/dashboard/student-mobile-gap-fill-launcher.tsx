@@ -113,6 +113,7 @@ interface StudentMobileGapFillLauncherProps {
   preferredLanguage?: string | null;
   sourceLanguage?: string | null;
   nextLesson?: StudentNextLesson | null;
+  upcomingLessons?: StudentNextLesson[];
   todayIso?: string;
   grammarTopicCatalog?: {
     english: GrammarTopicLevelGroup[];
@@ -128,6 +129,7 @@ export function StudentMobileGapFillLauncher({
   preferredLanguage,
   sourceLanguage: rawSourceLanguage,
   nextLesson = null,
+  upcomingLessons,
   todayIso = "",
   grammarTopicCatalog,
   planGrammarTopicKeys,
@@ -462,6 +464,7 @@ export function StudentMobileGapFillLauncher({
         <div className="space-y-4">
           <StudentGoogleMeetBanner
             nextLesson={nextLesson}
+            upcomingLessons={upcomingLessons}
             todayIso={todayIso}
           />
 

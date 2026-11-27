@@ -37,6 +37,8 @@ import {
   type LessonStatus,
   type LessonStudentOption,
 } from "@/lib/lessons";
+import { getBrowserTimeZone } from "@/lib/lesson-timezone";
+import { useClientTimeZone } from "@/components/providers/timezone-cookie-sync";
 
 interface EditLessonDialogProps {
   lesson: {
@@ -91,6 +93,7 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
     Boolean(initialSuggestedEndTime) &&
       lesson.endTime === initialSuggestedEndTime,
   );
+  const clientTimeZone = useClientTimeZone();
 
   const selectedStudentName = useMemo(
     () =>
@@ -178,6 +181,7 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
           lessonDate,
           startTime: startTime || null,
           endTime: endTime || null,
+          timeZone: getBrowserTimeZone() ?? undefined,
           notes: notes.trim() || null,
           status,
           priceCents,
@@ -300,26 +304,33 @@ export function EditLessonDialog({ lesson, students }: EditLessonDialogProps) {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor={`lesson-start-${lesson.id}`}>Start time</Label>
-              <Input
-                id={`lesson-start-${lesson.id}`}
-                type="time"
-                value={startTime}
-                onChange={(event) => handleStartTimeChange(event.target.value)}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor={`lesson-start-${lesson.id}`}>Start time</Label>
+                <Input
+                  id={`lesson-start-${lesson.id}`}
+                  type="time"
+                  value={startTime}
+                  onChange={(event) => handleStartTimeChange(event.target.value)}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor={`lesson-end-${lesson.id}`}>End time</Label>
-              <Input
-                id={`lesson-end-${lesson.id}`}
-                type="time"
-                value={endTime}
-                onChange={(event) => handleEndTimeChange(event.target.value)}
-              />
+              <div className="space-y-2">
+                <Label htmlFor={`lesson-end-${lesson.id}`}>End time</Label>
+                <Input
+                  id={`lesson-end-${lesson.id}`}
+                  type="time"
+                  value={endTime}
+                  onChange={(event) => handleEndTimeChange(event.target.value)}
+                />
+              </div>
             </div>
+            {clientTimeZone ? (
+              <p className="text-[11px] text-muted-foreground">
+                Saved in your local timezone ({clientTimeZone}) — students see it in their device timezone.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2">

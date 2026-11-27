@@ -53,6 +53,12 @@ export default async function DashboardPage() {
 
     const now = new Date();
     const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const yesterday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 1,
+    );
+    const yesterdayIso = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
 
     const [
       { data: upcomingLessonRows },
@@ -63,14 +69,14 @@ export default async function DashboardPage() {
       supabaseAdmin
         .from("tutor_student_lessons")
         .select(
-          "id, title, lesson_date, start_time, end_time, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
+          "id, title, lesson_date, start_time, end_time, time_zone, start_at, end_at, status, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
         )
         .eq("student_id", user.id)
-        .neq("status", "cancelled")
-        .gte("lesson_date", todayIso)
+        .eq("status", "planned")
+        .gte("lesson_date", yesterdayIso)
         .order("lesson_date", { ascending: true })
         .order("start_time", { ascending: true })
-        .limit(1),
+        .limit(8),
       getGrammarTopicPromptCatalog("english"),
       listStudentTutorPlans(user.id).catch((): StudentTutorPlanCard[] => []),
       supabaseAdmin
@@ -105,32 +111,34 @@ export default async function DashboardPage() {
       })),
     };
 
-    const rawNextLesson = upcomingLessonRows?.[0] as
-      | {
-          id: string;
-          title: string | null;
-          lesson_date: string;
-          start_time: string | null;
-          end_time: string | null;
-          meet_url: string | null;
-          tutor_profile: { full_name: string | null; email: string } | null;
-        }
-      | undefined;
+    const upcomingLessons = ((upcomingLessonRows ?? []) as Array<{
+      id: string;
+      title: string | null;
+      lesson_date: string;
+      start_time: string | null;
+      end_time: string | null;
+      time_zone?: string | null;
+      start_at?: string | null;
+      end_at?: string | null;
+      status: "planned" | "completed" | "cancelled";
+      meet_url: string | null;
+      tutor_profile: { full_name: string | null; email: string } | null;
+    }>).map((row) => ({
+      id: row.id,
+      title: row.title,
+      lessonDate: row.lesson_date,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      timeZone: row.time_zone ?? null,
+      startAt: row.start_at ?? null,
+      endAt: row.end_at ?? null,
+      status: row.status,
+      meetUrl: row.meet_url,
+      tutorName:
+        row.tutor_profile?.full_name || row.tutor_profile?.email || "Tutor",
+    }));
 
-    const nextLesson = rawNextLesson
-      ? {
-          id: rawNextLesson.id,
-          title: rawNextLesson.title,
-          lessonDate: rawNextLesson.lesson_date,
-          startTime: rawNextLesson.start_time,
-          endTime: rawNextLesson.end_time,
-          meetUrl: rawNextLesson.meet_url,
-          tutorName:
-            rawNextLesson.tutor_profile?.full_name ||
-            rawNextLesson.tutor_profile?.email ||
-            "Tutor",
-        }
-      : null;
+    const nextLesson = upcomingLessons[0] ?? null;
 
     return (
       <>
@@ -142,6 +150,7 @@ export default async function DashboardPage() {
           preferredLanguage={profile.preferred_language}
           sourceLanguage={profile.source_language}
           nextLesson={nextLesson}
+          upcomingLessons={upcomingLessons}
           todayIso={todayIso}
           grammarTopicCatalog={grammarTopicCatalog}
           planGrammarTopicKeys={planGrammarTopicKeys}

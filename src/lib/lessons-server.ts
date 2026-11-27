@@ -47,6 +47,7 @@ interface PlannedLessonFinishCandidate {
   lesson_date: string;
   start_time: string | null;
   end_time: string | null;
+  end_at?: string | null;
 }
 
 function resolveValidTimeZone(candidate?: string | null): string | undefined {
@@ -133,7 +134,15 @@ function getLocalClockInTimeZone(
 function isPlannedLessonFinished(
   lesson: PlannedLessonFinishCandidate,
   clock: { todayIso: string; yesterdayIso: string; currentMinutes: number },
+  nowMs: number,
 ): boolean {
+  if (lesson.end_at) {
+    const parsedEndAt = new Date(lesson.end_at);
+    if (!Number.isNaN(parsedEndAt.getTime())) {
+      return nowMs >= parsedEndAt.getTime();
+    }
+  }
+
   if (lesson.lesson_date > clock.todayIso) {
     return false;
   }
@@ -293,15 +302,19 @@ export async function autoCompleteOverduePlannedLessons({
     return [];
   }
 
+  const now = new Date();
   const effectiveTimeZone =
     resolveValidTimeZone(timeZone) ?? (await getRequestTimeZone());
-  const clock = getLocalClockInTimeZone(new Date(), effectiveTimeZone);
+  const clock = getLocalClockInTimeZone(now, effectiveTimeZone);
+  const tomorrowUtc = new Date(`${clock.todayIso}T00:00:00Z`);
+  tomorrowUtc.setUTCDate(tomorrowUtc.getUTCDate() + 1);
+  const tomorrowIso = tomorrowUtc.toISOString().slice(0, 10);
 
   let selectQuery = supabaseAdmin
     .from("tutor_student_lessons")
-    .select("id, lesson_date, start_time, end_time")
+    .select("id, lesson_date, start_time, end_time, end_at")
     .eq("status", "planned")
-    .lte("lesson_date", clock.todayIso);
+    .lte("lesson_date", tomorrowIso);
 
   if (tutorId) {
     selectQuery = selectQuery.eq("tutor_id", tutorId);
@@ -317,8 +330,9 @@ export async function autoCompleteOverduePlannedLessons({
     throw selectError;
   }
 
+  const nowMs = now.getTime();
   const overdueIds = ((candidates ?? []) as PlannedLessonFinishCandidate[])
-    .filter((row) => isPlannedLessonFinished(row, clock))
+    .filter((row) => isPlannedLessonFinished(row, clock, nowMs))
     .map((row) => row.id);
 
   if (overdueIds.length === 0) {
