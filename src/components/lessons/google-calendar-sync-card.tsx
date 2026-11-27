@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CalendarDays, ExternalLink, Link2Off } from "lucide-react";
@@ -148,10 +147,10 @@ export function GoogleCalendarSyncCard({
           connection ? (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" asChild>
-                <Link href={connectHref}>
+                <a href={connectHref}>
                   <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                   Reconnect
-                </Link>
+                </a>
               </Button>
               <Button
                 variant="outline"
@@ -165,10 +164,10 @@ export function GoogleCalendarSyncCard({
             </div>
           ) : (
             <Button size="sm" asChild className="shrink-0">
-              <Link href={connectHref}>
+              <a href={connectHref}>
                 <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                 Connect Google Calendar
-              </Link>
+              </a>
             </Button>
           )
         ) : null}
@@ -181,7 +180,7 @@ export function GoogleCalendarSyncCard({
             automatic Google Meet transcript sync.
           </span>
           <Button variant="outline" size="sm" asChild className="h-7 text-xs">
-            <Link href={connectHref}>Reconnect</Link>
+            <a href={connectHref}>Reconnect</a>
           </Button>
         </div>
       ) : null}

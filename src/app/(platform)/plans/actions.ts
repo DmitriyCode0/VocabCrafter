@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -46,6 +46,7 @@ function parseOptionalWholeNumber(value: number | null, label: string) {
 }
 
 function revalidatePlanPaths() {
+  revalidateTag("plans-catalog", "max");
   revalidatePath("/plans");
   revalidatePath("/billing");
   revalidatePath("/billing/plans");

@@ -124,20 +124,20 @@ export async function TutorDashboard({
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  await autoCompleteOverduePlannedLessons({
-    tutorId: userId,
-    supabaseAdmin,
-  }).catch((error) => {
-    console.error("Failed to auto-complete overdue planned lessons:", error);
-  });
-
   const [
+    ,
     { count: monthlyQuizCount },
     { data: connections },
     allBalanceSummaries,
     { data: upcomingLessonsData },
     { data: completedLessonsData },
   ] = await Promise.all([
+    autoCompleteOverduePlannedLessons({
+      tutorId: userId,
+      supabaseAdmin,
+    }).catch((error) => {
+      console.error("Failed to auto-complete overdue planned lessons:", error);
+    }),
     supabase
       .from("quizzes")
       .select("*", { count: "exact", head: true })

@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildGrammarPromptDetails,
@@ -205,50 +206,51 @@ export function applyGrammarTopicPromptOverride(
   };
 }
 
+const getCachedGrammarTopicPromptOverrideRows = unstable_cache(
+  async (): Promise<GrammarTopicPromptOverrideRow[]> => {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("grammar_topic_prompt_overrides")
+      .select(EXTENDED_SELECT_COLUMNS)
+      .order("topic_key", { ascending: true });
+
+    if (!error) {
+      return data ?? [];
+    }
+
+    if (!isMissingGrammarTopicColumnsError(error)) {
+      throw error;
+    }
+
+    const { data: legacyData, error: legacyError } = await admin
+      .from("grammar_topic_prompt_overrides")
+      .select(LEGACY_SELECT_COLUMNS)
+      .order("topic_key", { ascending: true });
+
+    if (legacyError) {
+      throw legacyError;
+    }
+
+    return (legacyData ?? []).map((item) => normalizeLegacyOverrideRow(item));
+  },
+  ["grammar-topic-prompt-overrides"],
+  { revalidate: 300, tags: ["grammar-topic-prompt-overrides"] },
+);
+
 export async function fetchGrammarTopicPromptOverrides(
   topicKeys?: string[],
 ): Promise<Map<string, GrammarTopicPromptOverrideRow>> {
-  const admin = createAdminClient();
-  let query = admin
-    .from("grammar_topic_prompt_overrides")
-    .select(EXTENDED_SELECT_COLUMNS);
+  const rows = await getCachedGrammarTopicPromptOverrideRows();
 
-  if (topicKeys && topicKeys.length > 0) {
-    query = query.in("topic_key", Array.from(new Set(topicKeys)));
+  if (!topicKeys || topicKeys.length === 0) {
+    return new Map(rows.map((item) => [item.topic_key, item]));
   }
 
-  const { data, error } = await query.order("topic_key", { ascending: true });
-
-  if (!error) {
-    return new Map((data ?? []).map((item) => [item.topic_key, item]));
-  }
-
-  if (!isMissingGrammarTopicColumnsError(error)) {
-    throw error;
-  }
-
-  let legacyQuery = admin
-    .from("grammar_topic_prompt_overrides")
-    .select(LEGACY_SELECT_COLUMNS);
-
-  if (topicKeys && topicKeys.length > 0) {
-    legacyQuery = legacyQuery.in("topic_key", Array.from(new Set(topicKeys)));
-  }
-
-  const { data: legacyData, error: legacyError } = await legacyQuery.order(
-    "topic_key",
-    { ascending: true },
-  );
-
-  if (legacyError) {
-    throw legacyError;
-  }
-
+  const keySet = new Set(topicKeys);
   return new Map(
-    (legacyData ?? []).map((item) => {
-      const normalizedItem = normalizeLegacyOverrideRow(item);
-      return [normalizedItem.topic_key, normalizedItem];
-    }),
+    rows
+      .filter((item) => keySet.has(item.topic_key))
+      .map((item) => [item.topic_key, item]),
   );
 }
 

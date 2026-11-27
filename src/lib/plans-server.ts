@@ -85,7 +85,7 @@ export const getPlansCatalog = unstable_cache(async (): Promise<
     },
     {} as Record<PlanKey, PlanDefinition>,
   );
-}, ["plans-catalog"], { revalidate: 3600 });
+}, ["plans-catalog"], { revalidate: 3600, tags: ["plans-catalog"] });
 
 export async function listPlans(): Promise<PlanDefinition[]> {
   const catalog = await getPlansCatalog();

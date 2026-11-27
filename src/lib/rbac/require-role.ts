@@ -11,22 +11,25 @@ export const getAuthenticatedUser = cache(async (): Promise<{
 } | null> => {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId =
+    typeof claimsData?.claims?.sub === "string" ? claimsData.claims.sub : null;
 
-  if (!user) return null;
+  if (!userId) return null;
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("*")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   if (!profile) return null;
 
+  const claimEmail =
+    typeof claimsData?.claims?.email === "string" ? claimsData.claims.email : "";
+
   return {
-    user: { id: user.id, email: user.email ?? "" },
+    user: { id: userId, email: profile.email || claimEmail },
     profile,
   };
 });

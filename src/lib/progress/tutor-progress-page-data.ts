@@ -7,6 +7,7 @@ import {
   normalizeAppLanguage,
   type AppLanguage,
 } from "@/lib/i18n/app-language";
+import { getAuthenticatedUser } from "@/lib/rbac/require-role";
 import { createClient } from "@/lib/supabase/server";
 import type { Role } from "@/types/roles";
 
@@ -22,26 +23,13 @@ export interface TutorProgressPageData {
 export async function getTutorProgressPageData(
   requestedStudentId?: string | null,
 ): Promise<TutorProgressPageData> {
-  const supabase = await createClient();
+  const authenticatedUser = await getAuthenticatedUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!authenticatedUser) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, app_language")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) {
-    redirect("/login");
-  }
-
+  const { user, profile } = authenticatedUser;
   const role = profile.role as Role;
 
   if (role !== "tutor" && role !== "superadmin") {
@@ -61,6 +49,7 @@ export async function getTutorProgressPageData(
       activeStudentId = matchedActive.id;
       studentProfile = matchedActive;
     } else if (requestedStudentId) {
+      const supabase = await createClient();
       const { data: ownStudent } = await supabase
         .from("tutor_students")
         .select(
@@ -90,16 +79,19 @@ export async function getTutorProgressPageData(
     }
   } else {
     activeStudentId = requestedStudentId ?? null;
-    studentProfile = activeStudentId
-      ? await supabase
-          .from("profiles")
-          .select("id, full_name, email, avatar_url, cefr_level")
-          .eq("id", activeStudentId)
-          .single()
-          .then((result) =>
-            result.error ? null : (result.data as HistoryStudent),
-          )
-      : null;
+    if (activeStudentId) {
+      const supabase = await createClient();
+      studentProfile = await supabase
+        .from("profiles")
+        .select("id, full_name, email, avatar_url, cefr_level")
+        .eq("id", activeStudentId)
+        .single()
+        .then((result) =>
+          result.error ? null : (result.data as HistoryStudent),
+        );
+    } else {
+      studentProfile = null;
+    }
   }
 
   return {

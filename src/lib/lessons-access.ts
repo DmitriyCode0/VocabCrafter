@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
+import { getAuthenticatedUser } from "@/lib/rbac/require-role";
 import type { Role } from "@/types/roles";
 
 interface LessonsViewerAccessOptions {
@@ -9,30 +9,16 @@ interface LessonsViewerAccessOptions {
 }
 
 const getCachedLessonsViewer = cache(async () => {
-  const supabase = await createClient();
+  const authenticatedUser = await getAuthenticatedUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!authenticatedUser) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, app_language")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) {
-    redirect("/dashboard");
-  }
-
   return {
-    userId: user.id,
-    role: profile.role as Role,
-    appLanguage: normalizeAppLanguage(profile.app_language),
+    userId: authenticatedUser.user.id,
+    role: authenticatedUser.profile.role as Role,
+    appLanguage: normalizeAppLanguage(authenticatedUser.profile.app_language),
   };
 });
 

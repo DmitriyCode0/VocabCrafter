@@ -30,9 +30,9 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId =
+    typeof claimsData?.claims?.sub === "string" ? claimsData.claims.sub : null;
 
   const pathname = request.nextUrl.pathname;
   const isApiRoute = pathname.startsWith("/api/");
@@ -51,18 +51,18 @@ export async function updateSession(request: NextRequest) {
   );
 
   // If not authenticated and trying to access protected route
-  if (!user && !isPublicRoute && pathname !== "/") {
+  if (!userId && !isPublicRoute && pathname !== "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
   // Block unapproved authenticated users from protected API routes
-  if (user && isApiRoute) {
+  if (userId && isApiRoute) {
     const { data: apiProfile, error: apiProfileError } = await supabase
       .from("profiles")
       .select("role, approval_status")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (
@@ -83,11 +83,11 @@ export async function updateSession(request: NextRequest) {
   }
 
   // If authenticated user visits /onboarding after completing it, redirect to dashboard
-  if (user && pathname === "/onboarding") {
+  if (userId && pathname === "/onboarding") {
     const { data: onboardingProfile } = await supabase
       .from("profiles")
       .select("onboarding_completed")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (onboardingProfile?.onboarding_completed) {
@@ -97,105 +97,8 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // If authenticated, check onboarding and manual approval status
-  if (user && !isPublicRoute && pathname !== "/onboarding" && !isApiRoute) {
-    let profile: {
-      onboarding_completed: boolean;
-      role: string;
-      approval_status?: string | null;
-    } | null = null;
-
-    const { data: primaryProfile, error: profileError } = await supabase
-      .from("profiles")
-      .select("onboarding_completed, role, approval_status")
-      .eq("id", user.id)
-      .single();
-
-    if (
-      profileError &&
-      profileError.message.toLowerCase().includes("approval_status")
-    ) {
-      const { data: fallbackProfile } = await supabase
-        .from("profiles")
-        .select("onboarding_completed, role")
-        .eq("id", user.id)
-        .single();
-      profile = fallbackProfile;
-    } else if (!profileError) {
-      profile = primaryProfile;
-    }
-
-    // If profile doesn't exist yet (e.g., trigger hasn't fired), redirect to onboarding
-    if (!profile) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
-      return NextResponse.redirect(url);
-    }
-
-    // Redirect to onboarding if not completed
-    if (!profile.onboarding_completed) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
-      return NextResponse.redirect(url);
-    }
-
-    // Restrict unapproved accounts solely to /dashboard
-    if (
-      profile.role !== "superadmin" &&
-      profile.approval_status &&
-      profile.approval_status !== "approved" &&
-      pathname !== "/dashboard"
-    ) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
-    }
-
-    // Role-based route protection
-    if (profile) {
-      const adminRoutes = ["/analytics", "/users", "/grammar-rules"];
-      const tutorRoutes = ["/review", "/assignments/review"];
-      const libraryRoutes = ["/library"];
-      const isAdminRoute = adminRoutes.some((route) =>
-        pathname.startsWith(route),
-      );
-      const isTutorRoute = tutorRoutes.some((route) =>
-        pathname.startsWith(route),
-      );
-      const isLibraryRoute = libraryRoutes.some((route) =>
-        pathname.startsWith(route),
-      );
-
-      if (isAdminRoute && profile.role !== "superadmin") {
-        const url = request.nextUrl.clone();
-        url.pathname = "/dashboard";
-        return NextResponse.redirect(url);
-      }
-
-      if (
-        isTutorRoute &&
-        profile.role !== "tutor" &&
-        profile.role !== "superadmin"
-      ) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/dashboard";
-        return NextResponse.redirect(url);
-      }
-
-      if (
-        isLibraryRoute &&
-        profile.role !== "tutor" &&
-        profile.role !== "superadmin"
-      ) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/dashboard";
-        return NextResponse.redirect(url);
-      }
-    }
-  }
-
   // If authenticated and on login/register, redirect to dashboard
-  if (user && (pathname === "/login" || pathname === "/register")) {
+  if (userId && (pathname === "/login" || pathname === "/register")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

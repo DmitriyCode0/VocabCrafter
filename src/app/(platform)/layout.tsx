@@ -5,6 +5,7 @@ import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAuthenticatedUser, isProfileApproved } from "@/lib/rbac/require-role";
 import { AppLanguageProvider } from "@/components/providers/app-language-provider";
 import { TtsPreferenceProvider } from "@/components/providers/tts-preference-provider";
+import { PendingApprovalCard } from "@/components/dashboard/pending-approval-card";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
@@ -44,7 +45,14 @@ export default async function PlatformLayout({
                   : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]"
               }`}
             >
-              {children}
+              {isApproved ? (
+                children
+              ) : (
+                <PendingApprovalCard
+                  profile={profile as Profile}
+                  appLanguage={appLanguage}
+                />
+              )}
             </main>
           </div>
         </div>

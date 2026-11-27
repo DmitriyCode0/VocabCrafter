@@ -85,6 +85,7 @@ export function MobileBottomNav({ role }: MobileBottomNavProps) {
             <Link
               key={tab.href}
               href={tab.href}
+              prefetch={false}
               onClick={handleClick}
               className={cn(
                 "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[9px] font-medium transition-colors",

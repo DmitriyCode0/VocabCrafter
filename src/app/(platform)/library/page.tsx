@@ -4,31 +4,23 @@ import {
   type LibraryGrammarBrowserSection,
 } from "@/components/library/library-grammar-browser";
 import { LibraryPageHeader } from "@/components/library/library-page-header";
-import { createClient } from "@/lib/supabase/server";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAppMessages } from "@/lib/i18n/messages";
 import { getGrammarTopicPromptCatalog } from "@/lib/grammar/prompt-overrides";
+import { getAuthenticatedUser } from "@/lib/rbac/require-role";
 
 export const dynamic = "force-dynamic";
 
 export default async function LibraryPage() {
-  const supabase = await createClient();
+  const authenticatedUser = await getAuthenticatedUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!authenticatedUser) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, app_language")
-    .eq("id", user.id)
-    .single();
+  const { profile } = authenticatedUser;
 
-  if (profile?.role !== "tutor" && profile?.role !== "superadmin") {
+  if (profile.role !== "tutor" && profile.role !== "superadmin") {
     redirect("/dashboard");
   }
 
