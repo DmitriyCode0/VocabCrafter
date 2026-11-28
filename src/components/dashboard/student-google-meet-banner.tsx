@@ -1,6 +1,7 @@
 "use client";
 
-import { Video, CalendarClock } from "lucide-react";
+import Link from "next/link";
+import { Video, CalendarClock, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 
 export interface StudentNextLesson {
   id: string;
+  tutorId?: string | null;
   title: string | null;
   lessonDate: string;
   startTime: string | null;
@@ -32,10 +34,19 @@ export interface StudentNextLesson {
   tutorName: string;
 }
 
+export interface StudentLessonBalanceItem {
+  tutorId: string;
+  tutorName: string;
+  lessonsLeft: number | null;
+  balanceCents: number;
+  lessonPriceCents: number;
+}
+
 interface StudentGoogleMeetBannerProps {
   nextLesson: StudentNextLesson | null;
   upcomingLessons?: StudentNextLesson[];
   todayIso: string;
+  lessonBalances?: StudentLessonBalanceItem[];
   className?: string;
 }
 
@@ -47,10 +58,78 @@ function formatDayMonthLabel(isoDate: string) {
   }).format(parsed);
 }
 
+function resolveLessonBalanceBadge(
+  lessonBalances: StudentLessonBalanceItem[] | undefined,
+  activeLesson: StudentNextLesson | null,
+) {
+  const configuredBalances = (lessonBalances ?? []).filter(
+    (entry): entry is StudentLessonBalanceItem & { lessonsLeft: number } =>
+      entry.lessonsLeft !== null,
+  );
+
+  if (configuredBalances.length === 0) {
+    return null;
+  }
+
+  const matched = activeLesson?.tutorId
+    ? configuredBalances.find((entry) => entry.tutorId === activeLesson.tutorId)
+    : undefined;
+
+  if (matched) {
+    return {
+      lessonsLeft: matched.lessonsLeft,
+      tooltip: `${matched.tutorName}: ${formatLessonsLeftText(matched.lessonsLeft)}`,
+    };
+  }
+
+  if (configuredBalances.length === 1) {
+    const only = configuredBalances[0];
+    return {
+      lessonsLeft: only.lessonsLeft,
+      tooltip: `${only.tutorName}: ${formatLessonsLeftText(only.lessonsLeft)}`,
+    };
+  }
+
+  const totalLessonsLeft = configuredBalances.reduce(
+    (sum, entry) => sum + entry.lessonsLeft,
+    0,
+  );
+  const tooltip = configuredBalances
+    .map((entry) => `${entry.tutorName}: ${formatLessonsLeftText(entry.lessonsLeft)}`)
+    .join(" · ");
+
+  return {
+    lessonsLeft: totalLessonsLeft,
+    tooltip,
+  };
+}
+
+function formatLessonsLeftText(lessonsLeft: number) {
+  if (lessonsLeft < 0) {
+    const overdue = Math.abs(lessonsLeft);
+    return `${overdue} ${overdue === 1 ? "lesson" : "lessons"} overdue`;
+  }
+
+  return `${lessonsLeft} ${lessonsLeft === 1 ? "lesson" : "lessons"} left`;
+}
+
+function getLessonsLeftBadgeClassName(lessonsLeft: number) {
+  if (lessonsLeft <= 0) {
+    return "border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/15 dark:text-rose-300";
+  }
+
+  if (lessonsLeft === 1) {
+    return "border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 dark:text-amber-300";
+  }
+
+  return "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300";
+}
+
 export function StudentGoogleMeetBanner({
   nextLesson,
   upcomingLessons,
   todayIso: fallbackTodayIso,
+  lessonBalances,
   className,
 }: StudentGoogleMeetBannerProps) {
   const clientNow = useClientNow();
@@ -138,6 +217,8 @@ export function StudentGoogleMeetBanner({
     ? formatLessonTimeRange(displayStartTime, displayEndTime)
     : "";
 
+  const balanceBadge = resolveLessonBalanceBadge(lessonBalances, activeLesson);
+
   return (
     <Card
       className={cn(
@@ -197,7 +278,22 @@ export function StudentGoogleMeetBanner({
           </div>
         </div>
 
-        <div>
+        <div className="flex flex-wrap items-center gap-2.5 sm:shrink-0">
+          {balanceBadge ? (
+            <Link
+              href="/lessons"
+              prefetch={false}
+              title={balanceBadge.tooltip}
+              className={cn(
+                "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                getLessonsLeftBadgeClassName(balanceBadge.lessonsLeft),
+              )}
+            >
+              <Ticket className="h-3.5 w-3.5 shrink-0" />
+              <span>{formatLessonsLeftText(balanceBadge.lessonsLeft)}</span>
+            </Link>
+          ) : null}
+
           {isButtonActive && activeLesson?.meetUrl ? (
             <Button
               asChild
@@ -215,15 +311,15 @@ export function StudentGoogleMeetBanner({
             </Button>
           ) : (
             <Button
-              disabled
-              size="lg"
+              asChild
+              size="sm"
               variant="outline"
-              className="h-11 w-full text-muted-foreground sm:w-auto opacity-70"
+              className="h-9 flex-1 sm:flex-initial"
             >
-              <CalendarClock className="mr-2 h-4 w-4" />
-              {activeLesson
-                ? `Next lesson on ${formatDayMonthLabel(displayDate)}`
-                : "No lesson today"}
+              <Link href="/lessons" prefetch={false}>
+                <CalendarClock className="mr-1.5 h-4 w-4" />
+                View schedule
+              </Link>
             </Button>
           )}
         </div>

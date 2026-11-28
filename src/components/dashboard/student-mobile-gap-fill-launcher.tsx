@@ -41,6 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   StudentGoogleMeetBanner,
+  type StudentLessonBalanceItem,
   type StudentNextLesson,
 } from "@/components/dashboard/student-google-meet-banner";
 import { GrammarTopicSelector } from "@/components/quiz/grammar-topic-selector";
@@ -115,6 +116,7 @@ interface StudentMobileGapFillLauncherProps {
   nextLesson?: StudentNextLesson | null;
   upcomingLessons?: StudentNextLesson[];
   todayIso?: string;
+  lessonBalances?: StudentLessonBalanceItem[];
   grammarTopicCatalog?: {
     english: GrammarTopicLevelGroup[];
   };
@@ -131,6 +133,7 @@ export function StudentMobileGapFillLauncher({
   nextLesson = null,
   upcomingLessons,
   todayIso = "",
+  lessonBalances,
   grammarTopicCatalog,
   planGrammarTopicKeys,
   masteredGrammarTopicKeys,
@@ -466,6 +469,7 @@ export function StudentMobileGapFillLauncher({
             nextLesson={nextLesson}
             upcomingLessons={upcomingLessons}
             todayIso={todayIso}
+            lessonBalances={lessonBalances}
           />
 
           <Card className="border-primary/25 shadow-md">

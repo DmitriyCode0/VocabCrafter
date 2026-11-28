@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarDays, Crown, PlusCircle } from "lucide-react";
+import { BookOpen, CalendarDays, Crown, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,6 +8,7 @@ import {
   getPlanDisplayName,
   normalizePlanKey,
 } from "@/lib/plans";
+import { getLessonsLeft } from "@/lib/lessons";
 import { normalizeAppLanguage } from "@/lib/i18n/app-language";
 import { getAppMessages } from "@/lib/i18n/messages";
 import type { Role } from "@/types/roles";
@@ -15,7 +16,9 @@ import { Suspense, type ReactNode } from "react";
 import {
   DashboardSkeleton,
   AdminDashboardSkeleton,
+  StudentDashboardSkeleton,
 } from "@/components/dashboard/skeletons";
+import type { StudentLessonBalanceItem } from "@/components/dashboard/student-google-meet-banner";
 import { StudentMobileGapFillLauncher } from "@/components/dashboard/student-mobile-gap-fill-launcher";
 import { getGrammarTopicPromptCatalog } from "@/lib/grammar/prompt-overrides";
 import {
@@ -62,6 +65,9 @@ export default async function DashboardPage() {
 
     const [
       { data: upcomingLessonRows },
+      { data: tutorConnectionRows },
+      { data: balanceTransactionRows },
+      { data: completedLessonRows },
       englishCatalog,
       studentPlans,
       grammarMasteryData,
@@ -69,7 +75,7 @@ export default async function DashboardPage() {
       supabaseAdmin
         .from("tutor_student_lessons")
         .select(
-          "id, title, lesson_date, start_time, end_time, time_zone, start_at, end_at, status, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
+          "id, tutor_id, title, lesson_date, start_time, end_time, time_zone, start_at, end_at, status, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
         )
         .eq("student_id", user.id)
         .eq("status", "planned")
@@ -77,6 +83,22 @@ export default async function DashboardPage() {
         .order("lesson_date", { ascending: true })
         .order("start_time", { ascending: true })
         .limit(8),
+      supabaseAdmin
+        .from("tutor_students")
+        .select(
+          "tutor_id, lesson_price_cents, tutor_profile:profiles!tutor_students_tutor_id_fkey(full_name, email)",
+        )
+        .eq("student_id", user.id)
+        .eq("status", "active"),
+      supabaseAdmin
+        .from("tutor_student_balance_transactions")
+        .select("tutor_id, amount_cents")
+        .eq("student_id", user.id),
+      supabaseAdmin
+        .from("tutor_student_lessons")
+        .select("tutor_id, price_cents")
+        .eq("student_id", user.id)
+        .eq("status", "completed"),
       getGrammarTopicPromptCatalog("english"),
       listStudentTutorPlans(user.id).catch((): StudentTutorPlanCard[] => []),
       supabaseAdmin
@@ -84,6 +106,57 @@ export default async function DashboardPage() {
         .select("topic_key")
         .eq("student_id", user.id),
     ]);
+
+    const paidByTutor = new Map<string, number>();
+    for (const tx of (balanceTransactionRows ?? []) as Array<{
+      tutor_id: string;
+      amount_cents: number;
+    }>) {
+      paidByTutor.set(
+        tx.tutor_id,
+        (paidByTutor.get(tx.tutor_id) ?? 0) + tx.amount_cents,
+      );
+    }
+
+    const spentByTutor = new Map<string, number>();
+    for (const completed of (completedLessonRows ?? []) as Array<{
+      tutor_id: string;
+      price_cents: number;
+    }>) {
+      spentByTutor.set(
+        completed.tutor_id,
+        (spentByTutor.get(completed.tutor_id) ?? 0) + completed.price_cents,
+      );
+    }
+
+    const lessonBalances: StudentLessonBalanceItem[] = (
+      (tutorConnectionRows ?? []) as Array<{
+        tutor_id: string;
+        lesson_price_cents: number;
+        tutor_profile: { full_name: string | null; email: string } | null;
+      }>
+    )
+      .map((connection) => {
+        const paidCents = paidByTutor.get(connection.tutor_id) ?? 0;
+        const spentCents = spentByTutor.get(connection.tutor_id) ?? 0;
+        const balanceCents = paidCents - spentCents;
+
+        return {
+          tutorId: connection.tutor_id,
+          tutorName:
+            connection.tutor_profile?.full_name ||
+            connection.tutor_profile?.email ||
+            "Tutor",
+          balanceCents,
+          lessonPriceCents: connection.lesson_price_cents,
+          lessonsLeft: getLessonsLeft(balanceCents, connection.lesson_price_cents),
+        };
+      })
+      .sort((left, right) =>
+        left.tutorName.localeCompare(right.tutorName, undefined, {
+          sensitivity: "base",
+        }),
+      );
 
     const planGrammarTopicKeys = Array.from(
       new Set(
@@ -113,6 +186,7 @@ export default async function DashboardPage() {
 
     const upcomingLessons = ((upcomingLessonRows ?? []) as Array<{
       id: string;
+      tutor_id?: string | null;
       title: string | null;
       lesson_date: string;
       start_time: string | null;
@@ -125,6 +199,7 @@ export default async function DashboardPage() {
       tutor_profile: { full_name: string | null; email: string } | null;
     }>).map((row) => ({
       id: row.id,
+      tutorId: row.tutor_id ?? null,
       title: row.title,
       lessonDate: row.lesson_date,
       startTime: row.start_time,
@@ -152,40 +227,63 @@ export default async function DashboardPage() {
           nextLesson={nextLesson}
           upcomingLessons={upcomingLessons}
           todayIso={todayIso}
+          lessonBalances={lessonBalances}
           grammarTopicCatalog={grammarTopicCatalog}
           planGrammarTopicKeys={planGrammarTopicKeys}
           masteredGrammarTopicKeys={masteredGrammarTopicKeys}
         />
 
-        {/* Desktop / PC Student View: Full Dashboard */}
+        {/* Desktop / PC Student View: Calm 3-Row Dashboard */}
         <div className="hidden space-y-6 md:block">
-          <div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-2xl font-bold tracking-tight">
-                {messages.dashboard.welcomeBack(displayName)}
-              </h1>
-              <Link href="/billing" prefetch={false}>
-                <Badge
-                  variant="outline"
-                  className={`gap-1 text-xs font-semibold ${getPlanBadgeClassName(profile.plan)}`}
-                >
-                  {normalizePlanKey(profile.plan) === "premium" ? (
-                    <Crown className="h-3 w-3 shrink-0" />
-                  ) : null}
-                  {getPlanDisplayName(profile.plan)}
-                </Badge>
-              </Link>
+          <div className="flex flex-col gap-4 border-b border-border/50 pb-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="text-2xl font-bold tracking-tight">
+                  {messages.dashboard.welcomeBack(displayName)}
+                </h1>
+                <Link href="/billing" prefetch={false}>
+                  <Badge
+                    variant="outline"
+                    className={`gap-1 text-xs font-semibold ${getPlanBadgeClassName(profile.plan)}`}
+                  >
+                    {normalizePlanKey(profile.plan) === "premium" ? (
+                      <Crown className="h-3 w-3 shrink-0" />
+                    ) : null}
+                    {getPlanDisplayName(profile.plan)}
+                  </Badge>
+                </Link>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {messages.dashboard.roleDescriptions.student}
+              </p>
             </div>
-            <p className="text-muted-foreground">
-              {messages.dashboard.roleDescriptions.student}
-            </p>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/lessons" prefetch={false}>
+                  <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+                  {messages.nav.lessons}
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/vocabulary" prefetch={false}>
+                  <BookOpen className="mr-1.5 h-3.5 w-3.5" />
+                  {messages.nav.passiveVocabulary}
+                </Link>
+              </Button>
+            </div>
           </div>
 
-          <Suspense fallback={<DashboardSkeleton />}>
+          <Suspense fallback={<StudentDashboardSkeleton />}>
             <StudentDashboard
               userId={user.id}
               planKey={profile.plan}
+              cefrLevel={profile.cefr_level}
               messages={messages}
+              nextLesson={nextLesson}
+              upcomingLessons={upcomingLessons}
+              todayIso={todayIso}
+              lessonBalances={lessonBalances}
             />
           </Suspense>
         </div>

@@ -8,50 +8,108 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  CustomizableDashboard,
-  DashboardCustomizableItem,
-} from "@/components/dashboard/customizable-dashboard";
-import { StudentOverallPerformanceCard } from "@/components/progress/student-overall-performance-card";
+import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 import {
+  ArrowRight,
   BookOpen,
-  BookMarked,
+  ClipboardList,
   Flame,
   PlusCircle,
+  Sparkles,
   Target,
+  Trophy,
 } from "lucide-react";
-import { fmtLimit } from "@/lib/plans";
 import { getPlan } from "@/lib/plans-server";
-import {
-  AnimatedCard,
-} from "@/components/ui/animated-dashboard";
 import { calculateDayStreak } from "@/lib/history/calculate-day-streak";
 import {
   applyTutorTimeAdjustmentToSnapshot,
   getStudentProgressSnapshot,
+  type StudentProgressSnapshot,
 } from "@/lib/progress/profile-metrics";
 import { getPublishedTutorTimeAdjustment } from "@/lib/progress/published-tutor-time-adjustment";
 import {
   StudentGoogleMeetBanner,
+  type StudentLessonBalanceItem,
   type StudentNextLesson,
 } from "@/components/dashboard/student-google-meet-banner";
 import type { AppMessages } from "@/lib/i18n/messages";
+import { cn } from "@/lib/utils";
 
 function pct(used: number, total: number) {
   if (!isFinite(total) || total === 0) return 0;
   return Math.min(100, Math.round((used / total) * 100));
 }
 
+const PERFORMANCE_BAND_STYLES: Record<
+  StudentProgressSnapshot["overallPerformance"]["band"],
+  { label: string; badgeClassName: string } | null
+> = {
+  strong: {
+    label: "Strong",
+    badgeClassName:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  },
+  on_track: {
+    label: "On Track",
+    badgeClassName:
+      "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  },
+  building: {
+    label: "Building",
+    badgeClassName:
+      "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  },
+  needs_focus: null,
+};
+
+interface StudentWordMasterySummaryRow {
+  id: string;
+  term: string;
+  mastery_level: number | null;
+  next_review: string;
+  source_lesson_id: string | null;
+  created_at: string;
+}
+
+interface StudentPendingAssignmentRow {
+  id: string;
+  quiz_id: string;
+  due_date: string | null;
+  classes: { name: string } | null;
+  quizzes: { id: string; title: string; type: string } | null;
+}
+
+function formatDueDateShort(isoDate: string | null) {
+  if (!isoDate) return null;
+  const parsed = new Date(isoDate);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+  }).format(parsed);
+}
+
 export async function StudentDashboard({
   userId,
   planKey,
+  cefrLevel,
   messages,
+  nextLesson,
+  upcomingLessons,
+  todayIso,
+  lessonBalances,
 }: {
   userId: string;
   planKey?: string | null;
+  cefrLevel?: string | null;
   messages: AppMessages;
+  nextLesson: StudentNextLesson | null;
+  upcomingLessons: StudentNextLesson[];
+  todayIso: string;
+  lessonBalances: StudentLessonBalanceItem[];
 }) {
   const supabase = await createClient();
   const supabaseAdmin = createAdminClient();
@@ -60,26 +118,15 @@ export async function StudentDashboard({
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
-
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const todayIso = `${year}-${month}-${day}`;
-  const yesterday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() - 1,
-  );
-  const yesterdayIso = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+  const nowIso = new Date().toISOString();
 
   const [
     { count: monthlyQuizCount },
     { data: attemptRows },
-    { count: totalWordsTracked },
+    { data: wordMasteryRowsData, count: wordMasteryCount },
+    { data: membershipRows },
     progressSnapshot,
     publishedTutorTimeAdjustment,
-    { data: upcomingLessonRows },
   ] = await Promise.all([
     supabase
       .from("quizzes")
@@ -89,265 +136,408 @@ export async function StudentDashboard({
       .gte("created_at", monthStart.toISOString()),
     supabase
       .from("quiz_attempts")
-      .select("completed_at")
+      .select("quiz_id, completed_at")
       .eq("student_id", userId)
       .order("completed_at", { ascending: false }),
     supabaseAdmin
       .from("word_mastery")
-      .select("id", { count: "exact", head: true })
+      .select("id, term, mastery_level, next_review, source_lesson_id, created_at", {
+        count: "exact",
+      })
+      .eq("student_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(2000),
+    supabaseAdmin
+      .from("class_members")
+      .select("class_id")
       .eq("student_id", userId),
     getStudentProgressSnapshot(userId),
     getPublishedTutorTimeAdjustment(userId),
-    supabaseAdmin
-      .from("tutor_student_lessons")
-      .select(
-        "id, title, lesson_date, start_time, end_time, time_zone, start_at, end_at, status, meet_url, tutor_profile:profiles!tutor_student_lessons_tutor_id_fkey(full_name, email)",
-      )
-      .eq("student_id", userId)
-      .eq("status", "planned")
-      .gte("lesson_date", yesterdayIso)
-      .order("lesson_date", { ascending: true })
-      .order("start_time", { ascending: true })
-      .limit(8),
   ]);
 
-  const upcomingLessons: StudentNextLesson[] = (
-    (upcomingLessonRows ?? []) as Array<{
-      id: string;
-      title: string | null;
-      lesson_date: string;
-      start_time: string | null;
-      end_time: string | null;
-      time_zone?: string | null;
-      start_at?: string | null;
-      end_at?: string | null;
-      status: "planned" | "completed" | "cancelled";
-      meet_url: string | null;
-      tutor_profile: { full_name: string | null; email: string } | null;
-    }>
-  ).map((row) => ({
-    id: row.id,
-    title: row.title,
-    lessonDate: row.lesson_date,
-    startTime: row.start_time,
-    endTime: row.end_time,
-    timeZone: row.time_zone ?? null,
-    startAt: row.start_at ?? null,
-    endAt: row.end_at ?? null,
-    status: row.status,
-    meetUrl: row.meet_url,
-    tutorName: row.tutor_profile?.full_name || row.tutor_profile?.email || "Tutor",
-  }));
+  const completedQuizIds = new Set(
+    ((attemptRows ?? []) as Array<{ quiz_id: string; completed_at: string }>)
+      .map((row) => row.quiz_id)
+      .filter(Boolean),
+  );
 
-  const nextLesson: StudentNextLesson | null = upcomingLessons[0] ?? null;
+  const classIds = (
+    (membershipRows ?? []) as Array<{ class_id: string }>
+  ).map((row) => row.class_id);
 
-  const effectiveProgressSnapshot = publishedTutorTimeAdjustment != null
-    ? applyTutorTimeAdjustmentToSnapshot(
-        progressSnapshot,
-        publishedTutorTimeAdjustment,
-      )
-    : progressSnapshot;
+  let pendingAssignments: StudentPendingAssignmentRow[] = [];
+  if (classIds.length > 0) {
+    const { data: assignmentRows } = await supabaseAdmin
+      .from("assignments")
+      .select("id, quiz_id, due_date, classes(name), quizzes(id, title, type)")
+      .in("class_id", classIds)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    pendingAssignments = (
+      (assignmentRows ?? []) as StudentPendingAssignmentRow[]
+    ).filter(
+      (assignment) =>
+        assignment.quizzes?.id && !completedQuizIds.has(assignment.quiz_id),
+    );
+  }
+
+  const wordMasteryRows = (wordMasteryRowsData ??
+    []) as StudentWordMasterySummaryRow[];
+  const totalWordsTracked = wordMasteryCount ?? wordMasteryRows.length;
+
+  let dueWordsCount = 0;
+  let masteredWordsCount = 0;
+  for (const row of wordMasteryRows) {
+    if (row.next_review && row.next_review <= nowIso) {
+      dueWordsCount += 1;
+    }
+    if ((row.mastery_level ?? 0) >= 5) {
+      masteredWordsCount += 1;
+    }
+  }
+
+  const latestLessonRow = wordMasteryRows.find((row) =>
+    Boolean(row.source_lesson_id),
+  );
+  const latestLessonId = latestLessonRow?.source_lesson_id ?? null;
+  const latestLessonWordsAll = latestLessonId
+    ? wordMasteryRows.filter((row) => row.source_lesson_id === latestLessonId)
+    : [];
+  const latestLessonPreviewTerms = Array.from(
+    new Set(latestLessonWordsAll.map((row) => row.term.trim()).filter(Boolean)),
+  ).slice(0, 4);
+
+  const effectiveProgressSnapshot =
+    publishedTutorTimeAdjustment != null
+      ? applyTutorTimeAdjustmentToSnapshot(
+          progressSnapshot,
+          publishedTutorTimeAdjustment,
+        )
+      : progressSnapshot;
 
   const quizLimit = plan.quizzesPerMonth;
-  const quizPercentage = pct(monthlyQuizCount ?? 0, quizLimit);
-  const isQuizWarning = quizPercentage >= 80;
-  const isQuizOver = quizPercentage >= 100;
+  const usedQuizzes = monthlyQuizCount ?? 0;
+  const quizPercentage = pct(usedQuizzes, quizLimit);
+  const showQuotaWarning = isFinite(quizLimit) && quizPercentage >= 85;
+  const remainingQuizzes = Math.max(0, quizLimit - usedQuizzes);
+
   const dayStreak = calculateDayStreak(
     (attemptRows ?? []).map((attempt) => attempt.completed_at),
   );
 
+  const overallScore = effectiveProgressSnapshot.overallPerformance.score;
+  const performanceBand =
+    PERFORMANCE_BAND_STYLES[effectiveProgressSnapshot.overallPerformance.band];
+
   return (
     <div className="space-y-6">
+      {/* Row 1: Hero Next Lesson & Remaining Balance */}
       <StudentGoogleMeetBanner
         nextLesson={nextLesson}
         upcomingLessons={upcomingLessons}
         todayIso={todayIso}
+        lessonBalances={lessonBalances}
       />
 
-      <CustomizableDashboard
-        storageKey={`vocab-crafter.dashboard-layout:student:${userId}`}
-        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-      >
-        <DashboardCustomizableItem
-          id="new-quiz"
-          title={messages.dashboard.student.newQuizTitle}
-        >
-          <AnimatedCard>
-            <Card data-tour-id="student-new-quiz">
-              <CardHeader className="flex flex-row items-center gap-2">
-                <PlusCircle className="h-5 w-5 text-primary" />
-                <div>
-                  <CardTitle className="text-base">
-                    {messages.dashboard.student.newQuizTitle}
-                  </CardTitle>
-                  <CardDescription>
-                    {messages.dashboard.student.newQuizDescription}
-                  </CardDescription>
+      {/* Conditional Strip: Tutor-Assigned Homework (only when pending) */}
+      {pendingAssignments.length > 0 ? (
+        <Card className="border-primary/25 bg-primary/5">
+          <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                <ClipboardList className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold">
+                    Assigned by Tutor
+                  </span>
+                  <Badge
+                    variant="secondary"
+                    className="h-5 px-2 text-[11px] font-semibold tabular-nums"
+                  >
+                    {pendingAssignments.length} pending
+                  </Badge>
                 </div>
-              </CardHeader>
-              <CardFooter className="mt-auto justify-center">
-                <Button asChild className="w-full">
-                  <Link href="/quizzes/new" prefetch={false}>
-                    {messages.dashboard.student.createQuizButton}
+                <p className="text-xs text-muted-foreground">
+                  {pendingAssignments
+                    .slice(0, 2)
+                    .map((a) => {
+                      const due = formatDueDateShort(a.due_date);
+                      return `${a.quizzes?.title ?? "Quiz"}${due ? ` (due ${due})` : ""}`;
+                    })
+                    .join(" · ")}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {pendingAssignments.slice(0, 2).map((assignment) => (
+                <Button
+                  key={assignment.id}
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="h-8 bg-background/80 text-xs"
+                >
+                  <Link href={`/quizzes/${assignment.quiz_id}`} prefetch={false}>
+                    Start: {assignment.quizzes?.title ?? "Quiz"}
                   </Link>
                 </Button>
-              </CardFooter>
-            </Card>
-          </AnimatedCard>
-        </DashboardCustomizableItem>
-
-        <DashboardCustomizableItem
-          id="review-activity"
-          title={messages.dashboard.student.reviewTitle}
-        >
-          <AnimatedCard>
-            <Card data-tour-id="student-review-activity">
-              <CardHeader className="flex flex-row items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
-                <div>
-                  <CardTitle className="text-base">
-                    {messages.dashboard.student.reviewTitle}
-                  </CardTitle>
-                  <CardDescription>
-                    {messages.dashboard.student.reviewDescription}
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardFooter className="mt-auto justify-center">
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/quizzes/review" prefetch={false}>
-                    {messages.dashboard.student.startReviewButton}
+              ))}
+              {pendingAssignments.length > 2 ? (
+                <Button asChild size="sm" variant="ghost" className="h-8 text-xs">
+                  <Link href="/assignments" prefetch={false}>
+                    View all
+                    <ArrowRight className="ml-1 h-3.5 w-3.5" />
                   </Link>
                 </Button>
-              </CardFooter>
-            </Card>
-          </AnimatedCard>
-        </DashboardCustomizableItem>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
-        <DashboardCustomizableItem
-          id="passive-recognition"
-          title={messages.dashboard.student.passiveTitle}
+      {/* Row 2: Two Clear Study Actions */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Card A: Primary CTA — Daily Practice / Review */}
+        <Card
+          data-tour-id="student-review-activity"
+          className="flex flex-col border-primary/30 bg-card shadow-xs"
         >
-          <AnimatedCard>
-            <Card data-tour-id="student-passive-recognition">
-              <CardHeader className="flex flex-row items-center gap-2">
-                <BookMarked className="h-5 w-5 text-primary" />
-                <div>
-                  <CardTitle className="text-base">
-                    {messages.dashboard.student.passiveTitle}
-                  </CardTitle>
-                  <CardDescription>
-                    {messages.dashboard.student.passiveDescription}
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardFooter className="mt-auto justify-center">
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/vocabulary" prefetch={false}>
-                    {messages.dashboard.student.passiveButton}
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          </AnimatedCard>
-        </DashboardCustomizableItem>
-
-        <DashboardCustomizableItem
-          id="quizzes-created"
-          title={messages.dashboard.student.quizzesCreatedTitle}
-        >
-          <AnimatedCard>
-            <Card data-tour-id="student-quizzes-created">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {messages.dashboard.student.quizzesCreatedTitle}
+          <CardHeader className="flex flex-row items-start gap-3 pb-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Target className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-base">
+                  {messages.dashboard.student.reviewTitle}
                 </CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="text-2xl font-bold">
-                  {(monthlyQuizCount ?? 0).toLocaleString()}{" "}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    / {fmtLimit(quizLimit)}
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "tabular-nums text-[11px] font-semibold",
+                    dueWordsCount > 0
+                      ? "border-primary/30 bg-primary/10 text-primary"
+                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                  )}
+                >
+                  {dueWordsCount > 0
+                    ? `${dueWordsCount} ${dueWordsCount === 1 ? "word" : "words"} due`
+                    : totalWordsTracked > 0
+                      ? "All caught up"
+                      : "Ready to start"}
+                </Badge>
+              </div>
+              <CardDescription>
+                {messages.dashboard.student.reviewDescription}
+              </CardDescription>
+            </div>
+          </CardHeader>
+
+          <CardContent className="flex-1 pb-4">
+            {latestLessonPreviewTerms.length > 0 ? (
+              <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+                <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  <span>
+                    From your last lesson ({latestLessonWordsAll.length})
                   </span>
                 </div>
-                <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={`h-full rounded-full transition-all ${isQuizOver ? "bg-red-500" : isQuizWarning ? "bg-amber-500" : "bg-blue-500"}`}
-                    style={{ width: `${Math.min(quizPercentage, 100)}%` }}
-                  />
+                <div className="flex flex-wrap gap-1.5">
+                  {latestLessonPreviewTerms.map((term) => (
+                    <span
+                      key={term}
+                      className="rounded-md bg-background/80 px-2 py-0.5 text-xs font-medium text-foreground ring-1 ring-border/60"
+                    >
+                      {term}
+                    </span>
+                  ))}
+                  {latestLessonWordsAll.length > latestLessonPreviewTerms.length ? (
+                    <span className="px-1 py-0.5 text-xs text-muted-foreground">
+                      +{latestLessonWordsAll.length - latestLessonPreviewTerms.length} more
+                    </span>
+                  ) : null}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {isFinite(quizLimit)
-                    ? messages.dashboard.student.remainingThisMonth(
-                        Math.max(0, quizLimit - (monthlyQuizCount ?? 0)),
-                      )
-                    : messages.dashboard.student.unlimited}
-                </p>
-              </CardContent>
-            </Card>
-          </AnimatedCard>
-        </DashboardCustomizableItem>
+              </div>
+            ) : null}
+          </CardContent>
 
-        <DashboardCustomizableItem
-          id="day-streak"
-          title={messages.dashboard.student.dayStreakTitle}
-        >
-          <AnimatedCard>
-            <Card data-tour-id="student-day-streak">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {messages.dashboard.student.dayStreakTitle}
-                </CardTitle>
-                <Flame className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{dayStreak}</div>
-                <p className="text-xs text-muted-foreground">
-                  {messages.dashboard.student.consecutiveDays(dayStreak)}
-                </p>
-              </CardContent>
-            </Card>
-          </AnimatedCard>
-        </DashboardCustomizableItem>
+          <CardFooter className="mt-auto pt-0">
+            <Button asChild className="w-full">
+              <Link href="/quizzes/review" prefetch={false}>
+                {messages.dashboard.student.startReviewButton}
+              </Link>
+            </Button>
+          </CardFooter>
+        </Card>
 
-        <DashboardCustomizableItem
-          id="overall-progress"
-          title={messages.nav.progress}
+        {/* Card B: Secondary CTA — Create Custom Quiz */}
+        <Card
+          data-tour-id="student-new-quiz"
+          className="flex flex-col border-border/70 bg-card shadow-xs"
         >
-          <AnimatedCard>
-            <StudentOverallPerformanceCard
-              snapshot={effectiveProgressSnapshot}
-              href="/progress#overall-performance"
-              ctaLabel={messages.nav.progress}
-            />
-          </AnimatedCard>
-        </DashboardCustomizableItem>
+          <CardHeader className="flex flex-row items-start gap-3 pb-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
+              <PlusCircle className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-1">
+              <CardTitle className="text-base">
+                {messages.dashboard.student.newQuizTitle}
+              </CardTitle>
+              <CardDescription>
+                {messages.dashboard.student.newQuizDescription}
+              </CardDescription>
+            </div>
+          </CardHeader>
 
-        <DashboardCustomizableItem
-          id="total-words"
-          title={messages.dashboard.student.totalWordsTitle}
+          <CardContent className="flex-1 pb-4">
+            {showQuotaWarning ? (
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                <Link
+                  href="/billing"
+                  prefetch={false}
+                  className="font-medium underline-offset-2 hover:underline"
+                >
+                  {messages.dashboard.student.remainingThisMonth(remainingQuizzes)}
+                </Link>
+              </p>
+            ) : null}
+          </CardContent>
+
+          <CardFooter className="mt-auto pt-0">
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/quizzes/new" prefetch={false}>
+                {messages.dashboard.student.createQuizButton}
+              </Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+
+      {/* Row 3: Compact 3-Tile Progress Strip */}
+      <div className="grid gap-4 md:grid-cols-3">
+        {/* Tile 1: Day Streak */}
+        <Card
+          data-tour-id="student-day-streak"
+          className="border-border/70 bg-card/70 shadow-xs"
         >
-          <AnimatedCard>
-            <Card data-tour-id="student-total-words">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {messages.dashboard.student.totalWordsTitle}
-                </CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {totalWordsTracked ?? 0}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {messages.dashboard.student.totalWordsDescription}
-                </p>
-              </CardContent>
-            </Card>
-          </AnimatedCard>
-        </DashboardCustomizableItem>
-      </CustomizableDashboard>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {messages.dashboard.student.dayStreakTitle}
+            </CardTitle>
+            <div
+              className={cn(
+                "flex h-7 w-7 items-center justify-center rounded-md",
+                dayStreak > 0
+                  ? "bg-amber-500/15 text-amber-500"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
+              <Flame className="h-3.5 w-3.5" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold tabular-nums">{dayStreak}</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {dayStreak > 0
+                ? messages.dashboard.student.consecutiveDays(dayStreak)
+                : "Complete a quick practice to start"}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Tile 2: Vocabulary Deck */}
+        <Card
+          data-tour-id="student-total-words"
+          className="border-border/70 bg-card/70 shadow-xs"
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {messages.dashboard.student.totalWordsTitle}
+            </CardTitle>
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-sky-500/10 text-sky-500">
+              <BookOpen className="h-3.5 w-3.5" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-2xl font-bold tabular-nums">
+                {totalWordsTracked}
+              </div>
+              <Link
+                href="/mastery"
+                prefetch={false}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                View deck
+              </Link>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+              {masteredWordsCount} mastered · {dueWordsCount} due
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Tile 3: Level & Progress */}
+        <Card className="border-border/70 bg-card/70 shadow-xs">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {messages.nav.progress}
+            </CardTitle>
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-500">
+              <Trophy className="h-3.5 w-3.5" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {cefrLevel ? (
+                  <Badge variant="secondary" className="text-xs font-semibold">
+                    {cefrLevel}
+                  </Badge>
+                ) : null}
+                <span className="text-2xl font-bold tabular-nums">
+                  {overallScore}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    /100
+                  </span>
+                </span>
+              </div>
+              {performanceBand ? (
+                <Badge
+                  variant="outline"
+                  className={cn("text-[11px]", performanceBand.badgeClassName)}
+                >
+                  {performanceBand.label}
+                </Badge>
+              ) : (
+                <Link
+                  href="/progress#overall-performance"
+                  prefetch={false}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Details
+                </Link>
+              )}
+            </div>
+            <Progress value={overallScore} className="h-1.5" />
+            {performanceBand ? (
+              <div className="flex justify-end">
+                <Link
+                  href="/progress#overall-performance"
+                  prefetch={false}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  View progress
+                </Link>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

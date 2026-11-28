@@ -63,3 +63,63 @@ export function AdminDashboardSkeleton() {
     </div>
   );
 }
+
+export function StudentDashboardSkeleton() {
+  return (
+    <div className="space-y-6 animate-in fade-in-50 duration-500">
+      {/* Row 1: Hero lesson & balance banner */}
+      <Card className="border-border/60 bg-card/60">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-44" />
+              <Skeleton className="h-3 w-56" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="h-9 w-28 rounded-full" />
+            <Skeleton className="h-9 w-32 rounded-md" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Row 2: Two primary study action cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Card key={i} className="flex flex-col">
+            <CardHeader className="flex flex-row items-start gap-3 pb-3">
+              <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-5 w-36" />
+                <Skeleton className="h-3.5 w-3/4" />
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 space-y-2">
+              <Skeleton className="h-6 w-32 rounded-full" />
+            </CardContent>
+            <CardFooter className="mt-auto pt-2">
+              <Skeleton className="h-10 w-full" />
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+
+      {/* Row 3: Compact 3-tile progress strip */}
+      <div className="grid gap-4 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="h-4 w-4 rounded-full" />
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Skeleton className="h-7 w-20" />
+              <Skeleton className="h-3 w-36" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
